@@ -51,7 +51,7 @@ td { text-align: left; vertical-align: top;
 <h1>Adding Symmetry Between shared_ptr and weak_ptr</h1>
 
 <p>
-ISO/IEC JTC1 SC22 WG21 N???? - 2015-01-05
+ISO/IEC JTC1 SC22 WG21 N???? - 2015-01-19
 </p>
 
 <address>
@@ -64,9 +64,10 @@ Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 <a href="#Problem2">3. Problem: Generic programming and <code>weak_ptr</code></a><br>
 <a href="#Solutions">4. Solutions</a><br>
 <a href="#Objections">5. Possible objections</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Obj1">5a. Could <code>unlock</code> be confused with <code>reset</code>?</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Obj2">5b. Could <code>weak_ptr::unlock()</code> be a free function instead?</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Obj3">5c. Should <code>weak_ptr</code> also have certain move-constructors?</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Obj1">5a. Does <code>weak_ptr</code> deserve parity with <code>shared_ptr</code>?</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Obj2">5b. Could <code>unlock</code> be confused with <code>reset</code>?</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Obj3">5c. Could <code>weak_ptr::unlock()</code> be a free function instead?</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Obj4">5d. Should <code>weak_ptr</code> also have certain move-constructors?</a><br>
 <a href="#Wording">6. Proposed wording</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#util.smartptr.shared">20.8.2.2 Class template shared_ptr [util.smartptr.shared]</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#util.smartptr.shared.obs">20.8.2.2.5 shared_ptr observers [util.smartptr.shared.obs]</a><br>
@@ -217,7 +218,34 @@ no types explicitly) as:
 
 <h2><a name="Objections">5. Possible objections</a></h2>
 
-<h3><a name="Obj1">5a. Could <code>unlock</code> be confused with <code>reset</code>?</a></h3>
+<h3><a name="Obj1">5a. Does <code>weak_ptr</code> deserve parity with <code>shared_ptr</code>?</a></h3>
+
+<p>
+It has been suggested that the appropriate intuition for <code>weak_ptr</code> is not to think of it
+as a "pointer" type, but as a contract, promise, or "IOU" that may be redeemed (via <code>lock</code>)
+to produce a pointer when needed <a href="#Rodriguez">[Rodriguez]</a>. There is merit in this idea.
+<code>weak_ptr</code> is certainly not a normal "pointer" type: it has no unary <code>operator*</code>
+or <code>operator-&gt;</code>. Therefore, is there any logic to creating symmetry
+between <code>shared_ptr</code> (a "pointer" type) and <code>weak_ptr</code> (a "non-pointer" type)?
+</p>
+
+<p>
+We believe that viewing <code>weak_ptr</code> as an "IOU" type (rather than a "pointer" type)
+doesn't affect any of the problems or solutions presented in this proposal. For example, if we
+describe the purpose of <code>lock</code> as "redeem an IOU to obtain a <code>shared_ptr</code>,"
+it seems reasonable to provide a (symmetric) member function <code>unlock()</code> that, given
+a real <code>shared_ptr</code>, can turn it into an IOU to be redeemed later.
+</p>
+
+<p>
+The arguments from efficiency (number of reference-count bumps) and "generic programmability"
+(ability to express a conversion to <code>weak_ptr</code> without explicit types) seem no less
+applicable, whether one sees <code>shared_ptr</code> and <code>weak_ptr</code> on equal
+footing or whether one sees <code>weak_ptr</code> as an IOU to produce a
+<code>shared_ptr</code>.
+</p>
+
+<h3><a name="Obj2">5b. Could <code>unlock</code> be confused with <code>reset</code>?</a></h3>
 
 <p>
 The following code has no bugs:
@@ -264,7 +292,7 @@ It might be wise of implementors to annotate both <code>lock()</code> and <code>
 <code>[[warn_unused_result]]</code>.
 </p>
 
-<h3><a name="Obj2">5b. Could <code>weak_ptr::unlock()</code> be a free function instead?</a></h3>
+<h3><a name="Obj3">5c. Could <code>weak_ptr::unlock()</code> be a free function instead?</a></h3>
 
 <p>
 Other commentators (before this proposal),
@@ -292,7 +320,7 @@ the few exceptions will stand out! Unfortunately, the asymmetry of <code>lock</c
 to the library.
 </p>
 
-<h3><a name="Obj3">5c. Should <code>weak_ptr</code> also have certain move-constructors?</a></h3>
+<h3><a name="Obj4">5d. Should <code>weak_ptr</code> also have certain move-constructors?</a></h3>
 
 <p>Between working drafts N3797 and N4296, <code>weak_ptr</code> gained a move constructor
 and move assignment operator, as part of the resolution of LWG issue #2315
@@ -431,7 +459,7 @@ https://groups.google.com/a/isocpp.org/forum/#!msg/std-proposals/fBe0AySrnKY/a3W
 <dt><a name="Bug25509">[Bug25509]</a></dt>
 <dd>
 Paul Pluzhnikov. GCC bug report 25509, comment #28 (August 2014):<br>
-"I have just found ~30 bugs in our code, where someone wrote ... <code>v.empty(); // v.clear() was intended!</code>"
+"I have just found ~30 bugs in our code, where someone wrote ... <code>v.empty(); // v.clear() was intended!</code>"<br>
 <a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=25509#c28">https://gcc.gnu.org/bugzilla/show_bug.cgi?id=25509#c28</a>
 </dd>
 
@@ -462,6 +490,14 @@ http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2351.htm#aliasing</a>.
 http://isocpp.org/files/papers/n4296.pdf</a>.
 </dd>
 
+<dt><a name="Rodriguez">[Rodriguez]</a></dt>
+<dd>
+David Rodríguez Ibeas, in response to "add operator-> to std::weak_ptr" (January 2015):<br>
+"Today, even if the name is misleading, at least it is easy to teach that <code>weak_ptr</code>
+is not a pointer but a mechanism to (possibly) obtain one. ... I don't believe there is value
+of symmetry between a pointer and a non-pointer type."<br>
+<a href="https://groups.google.com/a/isocpp.org/d/msg/std-proposals/frsyAl9Pci4/m_lHTN2Dz9AJ">https://groups.google.com/a/isocpp.org/d/msg/std-proposals/frsyAl9Pci4/m_lHTN2Dz9AJ</a>
+</dd>
 </dl>
 
 </body>
