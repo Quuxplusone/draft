@@ -1694,8 +1694,23 @@ f(2, 1.0);          // OK: \tcode{args} contains two arguments: \tcode{int} and 
 \exitexample
 
 \pnum
+A \term{value pack} is the result of applying the
+postfix \tcode{\~{}} operator to a \grammarterm{postfix-expression}.
+The number of arguments contained by a value pack~\tcode{expr\~{}} is
+defined as \tcode{std::tuple_size_v<decltype(expr)>}. \enterexample
+
+\begin{codeblock}
+void f(int, double);
+std::tuple<int, double> t { 1, 2.0 };
+
+f(t~ ...);          // OK: \tcode{t\~{}} contains two arguments: \tcode{1} and \tcode{2.0}
+\end{codeblock}
+
+\exitexample
+
+\pnum
 A \term{parameter pack} is either a template parameter
-pack or a function parameter pack.
+pack, a function parameter pack, or a value pack.
 
 \pnum
 A \term{pack expansion}
@@ -1833,7 +1848,13 @@ argument; otherwise,
 if the pack is a function parameter pack, the element is an
 \grammarterm{id-expression}
 designating the function parameter that resulted from
-the instantiation of the pattern where the pack is declared.
+the instantiation of the pattern where the pack is declared; otherwise,
+
+\item
+if the pack is a value pack, the element is the \grammarterm{postfix-expression}
+\tcode{std::get<i>(p)}, where \tcode{p} is the
+\grammarterm{postfix-expression} obtained by removing the
+unpacking operator~\tcode{\~{}} from the value pack.
 \end{itemize}
 
 All of the $\mathtt{E}_i$ become elements in the enclosing list.
