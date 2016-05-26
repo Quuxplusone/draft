@@ -1117,11 +1117,35 @@ void f3() {
 \exitexample
 
 \pnum
-The closure type associated with a \grammarterm{lambda-expression} has no
+The closure type for a \grammarterm{lambda-expression} with no
+\grammarterm{lambda-capture} has a defaulted default constructor.
+\enternote Its copy constructor, move constructor, copy assignment operator,
+and move assignment operator are implicitly defined as usual.
+Since the closure type has no non-static data members, all of its
+special member functions are trivial. \exitnote
+
+\pnum
+The closure type for a \grammarterm{lambda-expression} with a
+\grammarterm{lambda-capture} has no
 default constructor and a deleted copy assignment operator. It has a
 defaulted copy constructor and a defaulted move constructor~(\ref{class.copy}).
 \enternote These special member functions are implicitly defined as
 usual, and might therefore be defined as deleted. \exitnote
+\enterexample
+
+\begin{codeblock}
+template<class T>
+void f(T) {
+  T x;
+  x();
+}
+int i = 0;
+void g() {
+  auto x = [](){ ++i; });
+  f(x);  // OK: increments i
+}
+\end{codeblock}
+\exitexample
 
 \pnum
 The closure type associated with a \grammarterm{lambda-expression} has an
