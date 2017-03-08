@@ -1,0 +1,367 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+
+<style type="text/css">
+
+body { color: #000000; background-color: #FFFFFF; }
+del { text-decoration: line-through; color: #8B0040; }
+ins { text-decoration: underline; color: #005100; }
+
+p.example { margin-left: 2em; }
+pre.example { margin-left: 2em; }
+div.example { margin-left: 2em; }
+
+code.extract { background-color: #F5F6A2; }
+pre.extract { margin-left: 2em; background-color: #F5F6A2;
+  border: 1px solid #E1E28E; }
+
+p.function { }
+.attribute { margin-left: 2em; }
+.attribute dt { float: left; font-style: italic;
+  padding-right: 1ex; }
+.attribute dd { margin-left: 0em; }
+
+blockquote.std { color: #000000; background-color: #F1F1F1;
+  border: 1px solid #D1D1D1;
+  padding-left: 0.5em; padding-right: 0.5em; }
+blockquote.stddel { text-decoration: line-through;
+  color: #000000; background-color: #FFEBFF;
+  border: 1px solid #ECD7EC;
+  padding-left: 0.5empadding-right: 0.5em; ; }
+
+blockquote.stdins { text-decoration: underline;
+  color: #000000; background-color: #C8FFC8;
+  border: 1px solid #B3EBB3; padding: 0.5em; }
+
+table { border: 1px solid black; border-spacing: 0px;
+  margin-left: auto; margin-right: auto; }
+th { text-align: left; vertical-align: top;
+  padding-left: 0.8em; border: none; }
+td { text-align: left; vertical-align: top;
+  padding-left: 0.8em; border: none; }
+
+</style>
+
+<title>Captureless lambdas should be default-constructible</title>
+</head>
+<body>
+
+<b>Document number:</b> PxxxxR0 <br>
+<b>Date:</b> 2017-03-07 <br>
+<b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
+<b>Audience:</b> Evolution Working Group <br>
+<b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
+
+<h1>Captureless lambdas should be default-constructible</h1>
+
+<p>
+<a href="#Introduction">1. Introduction</a><br>
+<a href="#Motivations">2. Motivations</a><br>
+<a href="#Triviality">3. Triviality of special member functions</a><br>
+<a href="#Proposed_wording">4. Proposed wording</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#expr.prim.lambda">5.1.5 Lambda expressions [expr.prim.lambda]</a><br>
+<a href="#References">5. References</a><br>
+</p>
+
+
+<h2><a name="Introduction">1. Introduction</a></h2>
+
+<p>
+This paper proposes one more small step in the long walk to make lambdas a full-fledged
+replacement for "functor objects" (class types with overloaded <code>operator()</code>).
+Namely, it proposes that the <i>type</i> of a captureless closure should suffice to
+reconstruct that closure's <i>behavior</i> — i.e., that, given a captureless closure type,
+we should be able to default-construct a closure of that type.
+</p>
+
+<p>
+Default-constructing a closure <i>with</i> captures remains nonsensical as far as I can
+tell, so I don't propose any change in the semantics of "captureful" closure types.
+</p>
+
+<p>
+Although I foresee this default-construction feature being most useful when combined
+with the ability to use lambda-expressions in unevaluated contexts (such as template
+arguments), this paper does <i>not</i> propose anything new along those lines.
+</p>
+
+<h2><a name="Motivations">2. Motivations</a></h2>
+
+<p>
+Ideally, any time a C++03 programmer would be tempted to write a one-off helper
+class with an overloaded <code>operator()</code>, a C++17 programmer should be
+tempted to use a lambda. Lambdas are nicer than named classes for cases where
+the <i>only</i> relevant thing about a value is the behavior of its
+<code>operator()</code>; for example, the "deleter" objects used in the descriptions
+of <code>unique_ptr</code> and <code>shared_ptr</code> (and perhaps soon in
+the descriptions of the classes concerned with RCU and hazard-pointer memory
+management). Consider this old-style code:
+</p>
+
+<pre>
+    struct Freer {
+        template&lt;class T>
+        void operator()(T *p) const { free(p); }
+    };
+    template&lt;class T>
+    using unique_c_ptr = std::unique_ptr&lt;T, Freer>;
+
+    int main()
+    {
+        unique_c_ptr&lt;int> p((int *)malloc(sizeof(int)));
+    }
+</pre>
+
+<p>
+Anecdotally, programmers are often surprised to find that there is no way to rewrite
+the above code to use a lambda. Sometimes this slowly dawning realization leads to
+awkward or buggy code such as
+</p>
+
+<pre>
+    template&lt;class T>
+    using unique_c_ptr = std::unique_ptr&lt;T, decltype(&free)>;
+
+    int main()
+    {
+        unique_c_ptr&lt;int> p((int *)malloc(sizeof(int)), free);
+    }
+</pre>
+
+<p>
+A subtlety of the above code is that if you accidentally omit the tokens "<code>, free</code>"
+from the final line, you'll get a program that compiles and runs... but dereferences a
+null function pointer the first time a <code>unique_c_ptr</code> is destructed! This is
+needlessly unfriendly to the programmer.
+</p>
+
+<p>
+Skipping to the end for just a minute: Here's the code I'm aiming to legalize with this
+proposal.
+</p>
+
+<pre>
+    auto freer = [](auto *p){ free(p); };
+
+    template&lt;class T>
+    using unique_c_ptr = std::unique_ptr&lt;T, decltype(freer)>;
+
+    int main()
+    {
+        unique_c_ptr&lt;int> p((int *)malloc(sizeof(int)));
+    }
+</pre>
+
+<p>
+The above doesn't compile today because the closure type produced by a lambda
+(captureless <i>or</i> captureful) is never default-constructible.
+</p>
+
+<p>
+Okay, returning to motivation. —
+In September 2016, Yakk posted a workaround for the current state of affairs on StackOverflow. <a href="#Yakk">[Yakk]</a>
+His code for <code>stateless_lambda_t&lt;F&gt;</code>, here renamed <code>stateless1</code>
+for clarity, actually created a singleton object of closure type <code>F</code> so that
+there would be a legitimate object on which to call <code>operator()</code>:
+</p>
+
+<pre>
+    template&lt;class F>
+    struct stateless1 {
+      static void *data() {
+        static std::aligned_storage_t< sizeof(F), alignof(F) > instance;
+        return static_cast&lt;void*>(&amp;instance);
+      };
+
+      template&lt;class Fin, std::enable_if_t<!std::is_same_v&lt;std::decay_t&lt;Fin>, stateless1>, int> = 0>
+      stateless1(Fin&& f) {
+        new (data()) F( std::forward&lt;Fin>(f) );
+      }
+
+      template&lt;class... Args>
+      decltype(auto) operator()(Args&&...args) const {
+        return (*static_cast&lt;F*>(data()))(std::forward&lt;Args>(args)...);
+      }
+
+      stateless1() = default;
+    };
+
+    template&lt;class F>
+    stateless1&lt;std::decay_t&lt;F>> make_stateless1(F&& f) {
+      return {std::forward&lt;F>(f)};
+    }
+
+    auto freer = [](auto *p) { free(p); };
+    int i = 42;
+    auto g = make_stateless1(freer);  // create the required singleton
+    template&lt;class T>
+    using unique_c_ptr = std::unique_ptr&lt;T, stateless2&lt;decltype(g)>>;
+
+    int main()
+    {
+        unique_c_ptr&lt;int> p((int *)malloc(sizeof(int)));
+    }
+</pre>
+
+<p>
+If you're willing to risk some undefined behavior, you can accomplish the same goal
+with much less code:
+</p>
+
+<pre>
+    template&lt;class F>
+    struct stateless2 {
+        template&lt;class... Args>
+        decltype(auto) operator()(Args&&... args) const {
+            return (*reinterpret_cast&lt;const F*>(this))(std::forward&lt;Args>(args)...);
+        }
+    };
+
+    auto freer = [](auto *p) { free(p); };
+    template&lt;class T>
+    using unique_c_ptr = std::unique_ptr&lt;T, stateless2&lt;decltype(freer)>>;
+
+    int main()
+    {
+        unique_c_ptr&lt;int> p((int *)malloc(sizeof(int)));
+    }
+</pre>
+
+<p>
+This paper proposes that we cut out all these arcane hacks (especially the seductively
+convenient one above, with the undefined behavior!) and allow programmers to write
+what they mean directly. Namely:
+</p>
+
+<pre>
+    auto freer = [](auto *p){ free(p); };
+
+    template&lt;class T>
+    using unique_c_ptr = std::unique_ptr&lt;T, decltype(freer)>;
+
+    int main()
+    {
+        unique_c_ptr&lt;int> p((int *)malloc(sizeof(int)));
+    }
+</pre>
+
+<p>
+This paper does <i>not</i> propose anything new as far as the
+"unevaluated context-ability" of closure types, not even captureless ones. Therefore,
+the following code (while desirable, in my opinion) will continue to be ill-formed:
+</p>
+
+<pre>
+    using ptr = std::unique_ptr&lt;int, decltype([](auto *p) { free(p); })>;
+    int main()
+    {
+        ptr p((int *)malloc(sizeof(int)));
+    }
+</pre>
+
+For additional StackOverflow discussion on this topic, see:
+
+<ul>
+    <li><a href="http://stackoverflow.com/questions/33310694">Is there a reason lambdas with an empty capture-list can't be default constructed?</a></li>
+    <li><a href="http://stackoverflow.com/questions/13419819">Why can non-capturing lambdas not be default-constructed, and is it possible to work around this?</a></li>
+    <li><a href="http://stackoverflow.com/questions/38722631">Why is a lambda in C++ never DefaultConstructible</a></li>
+</ul>
+
+<h2><a name="">3. Triviality of special member functions</a></h2>
+
+<p>The first draft of the proposed new paragraph below contained a longer
+non-normative note: "[The captureless closure type's] copy constructor,
+move constructor, copy assignment operator, and move assignment operator
+are implicitly defined as usual. Since the closure type has no non-static
+data members, all of its special member functions are trivial."
+</p>
+
+<p>
+However, this turns out not to be guaranteed by the normative wording in
+the current Standard. Closure types' special member functions are <i>not
+currently</i>
+guaranteed to be trivial, even when there are no captures, or even when the
+only thing captured is <code>this</code>. Implementations are explicitly
+permitted to provide non-trivially-copyable closure types via 5.1.5 (4.2):
+
+<blockquote class="std">
+<p>
+An implementation may define the closure type differently from what is
+described below provided this does not alter the observable behavior of
+the program other than by changing:
+<ul>
+<li>the size and/or alignment of the closure type,</li>
+<li>whether the closure type is trivially copyable (Clause 9),</li>
+<li>whether the closure type is a standard-layout class (Clause 9), or</li>
+<li>whether the closure type is a POD class (Clause 9).</li>
+</ul>
+</p>
+</blockquote>
+
+</p>
+
+<p>
+I argue that there is no useful purpose in permitting implementations to provide
+closure types with unexpectedly non-trivial special member functions.
+A separate paper might reasonably propose that the wording be tightened
+up to require triviality of most closure types' special member functions.
+However, the only thing in scope for <i>this</i> paper is to propose that
+the brand-new "defaulted default constructor for captureless closure types"
+should be trivial.
+</p>
+
+<h2><a name="Proposed_wording">4. Proposed wording for C++20</a></h2>
+
+<p>
+The wording in this section is relative to WG21 draft N4618 <a href="#N4618">[N4618]</a>,
+that is, the current draft of the C++17 standard.
+</p>
+
+<h3><a name="expr.prim.lambda">5.1.5 Lambda expressions [expr.prim.lambda]</a></h3>
+
+<p>
+Add a new paragraph between paragraphs 20 and 21, and edit paragraph 21 as follows.
+</p>
+
+<blockquote class="std">
+<p>
+    <ins>The closure type associated with a <i>lambda-expression</i>
+    with no <i>lambda-capture</i> has a defaulted, trivial default constructor.
+    [<i>Note:</i> Its copy constructor, move constructor, copy assignment operator,
+    and move assignment operator are implicitly defined as usual. — <i>end note</i>]</ins>
+</p>
+<p>
+    The closure type associated with a <i>lambda-expression</i>
+    <ins>with a <i>lambda-capture</i></ins>
+    has no default constructor and a deleted copy assignment operator.
+    It has a defaulted copy constructor and a defaulted move constructor (12.8).
+    [<i>Note:</i> These special member functions are implicitly defined as usual,
+    and might therefore be defined as deleted. — <i>end note</i>]
+</p>
+</blockquote>
+
+<h2><a name="References">5. References</a></h2>
+
+<dl>
+
+<dt><a name="N4618">[N4618]</a></dt>
+<dd>
+"Working Draft, Standard for Programming Language C++" (Nov 2016).<br>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4618.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4618.pdf</a>.
+</dd>
+
+<dt><a name="Yakk">[Yakk]</a></dt>
+<dd>
+Yakk on StackOverflow. "Instantiating C++ lambda by its type" (September 2016).<br>
+<a href="http://stackoverflow.com/a/39771222/1424877">
+http://stackoverflow.com/a/39771222/1424877</a>.
+</dd>
+
+</dl>
+
+</body>
+</html>
