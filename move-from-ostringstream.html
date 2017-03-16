@@ -1,0 +1,572 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+
+<style type="text/css">
+
+body { color: #000000; background-color: #FFFFFF; }
+del { text-decoration: line-through; color: #8B0040; }
+ins { text-decoration: underline; color: #005100; }
+
+p.example { margin-left: 2em; }
+pre.example { margin-left: 2em; }
+div.example { margin-left: 2em; }
+
+code.extract { background-color: #F5F6A2; }
+pre.extract { margin-left: 2em; background-color: #F5F6A2;
+  border: 1px solid #E1E28E; }
+
+p.function { }
+.attribute { margin-left: 2em; }
+.attribute dt { float: left; font-style: italic;
+  padding-right: 1ex; }
+.attribute dd { margin-left: 0em; }
+
+blockquote.std { color: #000000; background-color: #F1F1F1;
+  border: 1px solid #D1D1D1;
+  padding-left: 0.5em; padding-right: 0.5em; }
+blockquote.stddel { text-decoration: line-through;
+  color: #000000; background-color: #FFEBFF;
+  border: 1px solid #ECD7EC;
+  padding-left: 0.5empadding-right: 0.5em; ; }
+
+blockquote.stdins { text-decoration: underline;
+  color: #000000; background-color: #C8FFC8;
+  border: 1px solid #B3EBB3; padding: 0.5em; }
+
+table { border: 1px solid black; border-spacing: 0px;
+  margin-left: auto; margin-right: auto; }
+th { text-align: left; vertical-align: top;
+  padding-left: 0.8em; border: none; }
+td { text-align: left; vertical-align: top;
+  padding-left: 0.8em; border: none; }
+
+</style>
+
+<title>Moving out of ostringstream</title>
+</head>
+<body>
+
+<b>Document number:</b> PxxxxR0 <br>
+<b>Date:</b> 2017-03-07 <br>
+<b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
+<b>Audience:</b> Evolution Working Group <br>
+<b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
+
+<h1>Moving out of ostringstream</h1>
+
+<p>
+<a href="#Introduction">1. Introduction</a><br>
+<a href="#Motivations">2. Motivations</a><br>
+<a href="#Implementation_experience">3. Implementation experience</a><br>
+<a href="#Implementation_experience">4. Performance</a><br>
+<a href="#Proposed_wording">5. Proposed wording</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#stringbuf">27.8.2 Class template basic_stringbuf [stringbuf]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#stringbuf.members">27.8.2.3 Member functions [stringbuf.members]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#ostringstream">27.8.4 Class template basic_ostringstream [ostringstream]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#ostringstream.members">27.8.4.3 Member functions [ostringstream.members]</a><br>
+<a href="#References">6. References</a><br>
+</p>
+
+
+<h2><a name="Introduction">1. Introduction</a></h2>
+
+<p>
+"Iostreams" are often (rightly) maligned for being inefficient, for
+dragging in locales, for taking up a lot of heap allocations, and so on.
+This is too bad, as otherwise they're still very useful for simple
+string formatting.
+</p>
+
+<p>
+This paper proposes to eliminate just the most minor of the issues
+with ostringstream, namely, that <code>.str()</code> always makes an
+extra copy of the contained data.
+</p>
+
+<p>
+Benchmarks indicate that this optimization doesn't matter in practice,
+and so this proposal probably ought <b><i>not</i></b> to be adopted,
+unless some other motivation for it can be found.
+</p>
+
+<h2><a name="Motivations">2. Motivations</a></h2>
+
+<p>
+Here are a few examples of ostringstream usage from a production codebase
+(slightly anonymized):
+</p>
+
+<pre>
+    std::string get_parameters(boost::property_tree::ptree params)
+    {
+        std::ostringstream oss;
+        oss &lt;&lt; '[';
+        boost::property_tree::json_parser::write_json(oss, params, false);
+        oss &lt;&lt; ']';
+        return oss.str();
+    }
+
+    std::string get_path(const std::string&amp; prefix)
+    {
+        std::ostringstream path;
+        path &lt;&lt; get_cache_dir() &lt;&lt; '/' &lt;&lt; prefix &lt;&lt; '-'
+             &lt;&lt; std::any_cast&lt;int>(params.at("project_id")) &lt;&lt; '-'
+             &lt;&lt; std::any_cast&lt;const std::string&amp;>(params.at("session_id")) &lt;&lt; '-'
+             &lt;&lt; compute_cache_key(params);
+        return path.str();
+    }
+
+    void validate_id(size_t server_id)
+    {
+        // ...
+        if (server_id < 0 || server_id >= servers.size()) {
+            std::ostringstream oss;
+            oss &lt;&lt; "invalid server_id: " &lt;&lt; server_id;
+            throw std::runtime_error(oss.str());
+        }
+        // ...
+    }
+</pre>
+
+<p>
+In the first case, we're using <code>boost::property_tree::json_parser::write_json</code>,
+which has "write to file by name" and "write to <code>ostream</code>" overloads but
+no other alternative (in particular, no "write to <code>std::string</code>" overload).
+This code <i>cannot</i> reasonably be rewritten to avoid the use of iostreams.
+</p>
+
+<p>
+In the latter two cases, the use of iostreams pessimizes the code, but in exchange
+the programmer gets a bit of convenience. Consider the non-iostreams
+versions of the latter code:
+</p>
+
+<pre>
+    std::string get_path(const std::string&amp; prefix)
+    {
+        std::string path;
+        path = get_cache_dir() + "/" + prefix + '-'
+             + std::to_string(std::any_cast&lt;int>(params.at("project_id"))) + '-'
+             + std::any_cast&lt;const std::string&amp;>(params.at("session_id")) + '-'
+             + compute_cache_key(params);
+        return path;
+    }
+
+    void validate_id(size_t server_id)
+    {
+        // ...
+        if (server_id < 0 || server_id >= servers.size()) {
+            throw std::runtime_error("invalid server_id: "s + std::to_string(server_id));
+        }
+        // ...
+    }
+</pre>
+
+<p>
+Notice the careful usage of suffix <code>s</code> and <code>std::to_string</code>
+in the latter example. We have observed naive or careless programmers in the wild
+writing the equivalent of
+
+<pre>
+        if (server_id < 0 || server_id >= servers.size()) {
+            throw std::runtime_error("invalid server_id: " + server_id);
+        }
+</pre>
+
+(which is likely to segfault if <code>server_id > strlen("invalid server_id: ")</code>).
+Anything we can do to keep programmers away from the manual labor of string conversions
+is a good thing.
+</p>
+
+<p>
+As this third example illustrates, programmers <i>will</i> use ostringstream for
+string formatting even in cases where avoiding its use would be "easy" — because
+once you learn how simple it is to use ostringstream, why <i>not</i> be consistent
+and use it everywhere? This is how we ended up with the above code's three-line
+<code>throw</code> where one slightly-more-complex line would have sufficed.
+Simplicity and consistency win every time.
+</p>
+
+<p>
+The inefficiency of ostringstream for these use-cases comes from three orthogonal
+issues:
+<ul>
+    <li>Virtual method dispatch on <code>operator&lt;&lt;</code></li>
+    <li>Many levels of abstraction involved in <code>operator&lt;&lt;</code></li>
+    <li>Unnecessary copying of strings</li>
+</ul>
+This paper deals only with the last issue.
+</p>
+
+<p>
+In short, I propose to alter the meaning of the following well-formed code so that
+the implementation is no longer required to return a <i>copy</i> of the
+underlying string buffer, but rather may choose to return the <i>move</i>
+of the underlying buffer.
+</p>
+
+<pre>
+    std::string get_parameters(boost::property_tree::ptree params)
+    {
+        std::ostringstream oss;
+        oss &lt;&lt; '[';
+        boost::property_tree::json_parser::write_json(oss, params, false);
+        oss &lt;&lt; ']';
+        return std::move(oss).str();
+    }
+
+    std::string get_path(const std::string&amp; prefix)
+    {
+        std::ostringstream path;
+        path &lt;&lt; get_cache_dir() &lt;&lt; '/' &lt;&lt; prefix &lt;&lt; '-'
+             &lt;&lt; std::any_cast&lt;int>(params.at("project_id")) &lt;&lt; '-'
+             &lt;&lt; std::any_cast&lt;const std::string&amp;>(params.at("session_id")) &lt;&lt; '-'
+             &lt;&lt; compute_cache_key(params);
+        return std::move(path).str();
+    }
+
+    void validate_id(size_t server_id)
+    {
+        // ...
+        if (server_id < 0 || server_id >= servers.size()) {
+            std::ostringstream oss;
+            oss &lt;&lt; "invalid server_id: " &lt;&lt; server_id;
+            throw std::runtime_error(std::move(oss).str());
+        }
+        // ...
+    }
+</pre>
+
+<p>
+Looking forward to C++20+, we might predict that the move-semantics
+of <code>return</code> statements will continue evolving to the point where
+we won't even need to specify <code>std::move(oss)</code> anymore,
+because the compiler will be able to see that <code>oss</code>'s lifetime
+is ending and accordingly perform the overload resolution of <code>oss.str()</code>
+as if <code>oss</code> were already an rvalue. However, that's a
+subject for another, much more ambitious paper.
+</p>
+
+<h2><a name="Implementation_experience">3. Implementation experience</a></h2>
+
+<p>
+I've looked at what it would take to provide the above semantics in libc++.
+Fundamentally, we need to add an overload <code>basic_ostringstream::str()&amp;&amp;</code>.
+libc++ implements <code>basic_ostringstream::str()</code> entirely in terms
+of <code>basic_stringbuf::str()</code>, so we'll need an overload of
+<code>basic_stringbuf::str()&amp;&amp;</code> as well.
+</p>
+
+<p>
+Since <code>str()</code> is not a virtual function, there's no specific need to
+provide the new overloads for <code>basic_istringstream</code> and
+<code>basic_stringstream</code> as well; but it seems like a good idea to
+provide them, for consistency.
+</p>
+
+<p>
+So I propose the following additional member function overloads:
+<ul>
+    <li><code>basic_stringbuf::str() &amp;&amp;</code></li>
+    <li><code>basic_ostringstream::str() &amp;&amp;</code></li>
+    <li><code>basic_istringstream::str() &amp;&amp;</code> (?)</li>
+    <li><code>basic_stringstream::str() &amp;&amp;</code> (?)</li>
+</ul>
+</p>
+
+<p>
+The libc++ implementation of <code>basic_stringbuf::str()&amp;&amp;</code> looks like this:
+<pre>
+    template &lt;class _CharT, class _Traits, class _Allocator>
+    basic_string&lt;_CharT, _Traits, _Allocator>
+    basic_stringbuf&lt;_CharT, _Traits, _Allocator>::str() const <ins>&amp;</ins>
+    {
+        if (__mode_ &amp; ios_base::out)
+        {
+            if (__hm_ < this->pptr())
+                __hm_ = this->pptr();
+            return string_type(this->pbase(), __hm_, __str_.get_allocator());
+        }
+        else if (__mode_ &amp; ios_base::in)
+            return string_type(this->eback(), this->egptr(), __str_.get_allocator());
+        return string_type(__str_.get_allocator());
+    }
+
+    <ins>template &lt;class _CharT, class _Traits, class _Allocator></ins>
+    <ins>basic_string&lt;_CharT, _Traits, _Allocator></ins>
+    <ins>basic_stringbuf&lt;_CharT, _Traits, _Allocator>::str() &amp;&amp;</ins>
+    <ins>{</ins>
+        <ins>if (__mode_ &amp; ios_base::out)</ins>
+        <ins>{</ins>
+            <ins>if (__hm_ < this->pptr())</ins>
+                <ins>__hm_ = this->pptr();</ins>
+            <ins>ptrdiff_t __hm = __hm_ - this->pbase();</ins>
+            <ins>string_type s = _VSTD::move(__str_);</ins>
+            <ins>s.resize(__hm);</ins>
+            <ins>return s;</ins>
+        <ins>}</ins>
+        <ins>else if (__mode_ &amp; ios_base::in)</ins>
+            <ins>return string_type(this->eback(), this->egptr(), __str_.get_allocator());</ins>
+        <ins>return string_type(__str_.get_allocator());</ins>
+    <ins>}</ins>
+</pre>
+</p>
+
+<p>
+There is also an overload <code>basic_ostringstream::str(const string&amp;)</code>
+that <i>sets</i> the contents of the underlying string buffer. It would make
+sense to provide move-enabled versions of this member function for all the
+above classes as well; but this could be done either by adding an overload
+(taking <code>string&amp;&amp;</code>) or by rewriting the signature of the
+existing function (to take a <code>string</code> by value and move-out-of it
+into the underlying buffer). Since this is potentially controversial and not
+in the "critical path" of this optimization, I'm not proposing it.
+</p>
+
+<h2><a name="Performance">4. Performance benchmarks</a></h2>
+
+<p>
+As it turns out, any performance improvement from the above patch is completely
+lost in the noise of <code>operator&lt;&lt;</code>. Here are my test cases:
+</p>
+
+<pre>
+std::string trivial(int n)
+{
+    std::ostringstream oss;
+    oss << "abcdefghijklmnopqrstuvwxyz";
+    return std::move(oss).str();
+}
+
+std::string char_conversion(int n)
+{
+    std::ostringstream oss;
+    for (int i=0; i < 1000; ++i) {
+        oss << "[" << char('A' + i%32) << "], ";
+    }
+    return std::move(oss).str();
+}
+
+std::string int_conversion(int n)
+{
+    std::ostringstream oss;
+    for (int i=0; i < 1000; ++i) {
+        oss << "[" << (i%32) << "], ";
+    }
+    return std::move(oss).str();
+}
+</pre>
+
+<p>
+And here are some outputs of <code>sudo perf top</code> while those functions were
+running in tight loops, using the existing ("old") C++11 library and using the proposed
+("new") move-enabled library. It appears that there is no difference between the profiles,
+because the lion's share of time is spent in low-level formatting functions such as
+<code>xsputn</code>.
+</p>
+
+<p>
+This benchmark result strongly suggests that "performance" is <b><i>not</i></b> an
+appropriate reason to adopt this proposal.
+</p>
+
+<pre>
+(trivial, old library)
+ 15.82%  libstdc++.so.6.0.19  [.] __dynamic_cast
+  6.18%  libstdc++.so.6.0.19  [.] __cxxabiv1::__si_class_type_info::__do_dyncast(long, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_type_inf
+  5.71%  libc-2.19.so         [.] _int_free
+  5.15%  libstdc++.so.6.0.19  [.] __cxxabiv1::__vmi_class_type_info::__do_dyncast(long, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_type_in
+  4.98%  libc-2.19.so         [.] __GI___strcmp_ssse3
+  4.72%  new                  [.] trivial(int)
+  3.46%  libc-2.19.so         [.] _int_malloc
+  2.66%  libstdc++.so.6.0.19  [.] std::locale::locale()
+  2.62%  libc-2.19.so         [.] malloc
+  2.46%  libstdc++.so.6.0.19  [.] std::basic_ostream&lt;char, std::char_traits&lt;char> >&amp; std::__ostream_insert&lt;char, std::char_traits&lt;char> >(std::basic_ostream&lt;c
+  2.13%  libstdc++.so.6.0.19  [.] std::basic_stringbuf&lt;char, std::char_traits&lt;char>, std::allocator&lt;char> >::overflow(int)
+  2.12%  libstdc++.so.6.0.19  [.] std::locale::operator=(std::locale const&)
+  1.94%  libstdc++.so.6.0.19  [.] std::ios_base::ios_base()
+  1.81%  libstdc++.so.6.0.19  [.] std::locale::~locale()
+  1.73%  libstdc++.so.6.0.19  [.] std::locale::id::_M_id() const
+  1.48%  libstdc++.so.6.0.19  [.] bool std::has_facet&lt;std::ctype&lt;char> >(std::locale const&)
+  1.43%  libstdc++.so.6.0.19  [.] std::basic_streambuf&lt;char, std::char_traits&lt;char> >::xsputn(char const*, long)
+  1.23%  libc-2.19.so         [.] __memcpy_sse2_unaligned
+
+(trivial, new library)
+ 16.53%  libstdc++.so.6.0.19       [.] __dynamic_cast
+  6.28%  libstdc++.so.6.0.19       [.] __cxxabiv1::__si_class_type_info::__do_dyncast(long, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_typ
+  6.12%  libc-2.19.so              [.] _int_free
+  5.40%  libstdc++.so.6.0.19       [.] __cxxabiv1::__vmi_class_type_info::__do_dyncast(long, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_ty
+  5.05%  libc-2.19.so              [.] __GI___strcmp_ssse3
+  4.82%  old                       [.] trivial(int)
+  3.60%  libc-2.19.so              [.] _int_malloc
+  2.80%  libstdc++.so.6.0.19       [.] std::locale::locale()
+  2.75%  libc-2.19.so              [.] malloc
+  2.43%  libstdc++.so.6.0.19       [.] std::basic_ostream&lt;char, std::char_traits&lt;char> >&amp; std::__ostream_insert&lt;char, std::char_traits&lt;char> >(std::basic_ostr
+  2.30%  libstdc++.so.6.0.19       [.] std::basic_stringbuf&lt;char, std::char_traits&lt;char>, std::allocator&lt;char> >::overflow(int)
+  2.25%  libstdc++.so.6.0.19       [.] std::locale::operator=(std::locale const&)
+  1.88%  libstdc++.so.6.0.19       [.] std::locale::id::_M_id() const
+  1.87%  libstdc++.so.6.0.19       [.] std::ios_base::ios_base()
+  1.85%  libstdc++.so.6.0.19       [.] std::locale::~locale()
+  1.53%  libstdc++.so.6.0.19       [.] bool std::has_facet&lt;std::ctype&lt;char> >(std::locale const&)
+  1.49%  libstdc++.so.6.0.19       [.] std::basic_streambuf&lt;char, std::char_traits&lt;char> >::xsputn(char const*, long)
+  1.23%  libc-2.19.so              [.] __memcpy_sse2_unaligned
+
+(char_conversion, old library)
+ 42.08%  libstdc++.so.6.0.19       [.] std::basic_ostream&lt;char, std::char_traits&lt;char> >&amp; std::__ostream_insert&lt;char, std::char_traits&lt;char> >(std::basic_ostr
+ 23.83%  libstdc++.so.6.0.19       [.] std::basic_streambuf&lt;char, std::char_traits&lt;char> >::xsputn(char const*, long)
+ 10.72%  libstdc++.so.6.0.19       [.] std::ostream::sentry::sentry(std::ostream&)
+  8.36%  libc-2.19.so              [.] __memcpy_sse2_unaligned
+  2.45%  old                       [.] char_conversion(int)
+  1.83%  libstdc++.so.6.0.19       [.] _ZNSo6sentryC1ERSo@plt
+  1.74%  libstdc++.so.6.0.19       [.] memcpy@plt
+  1.17%  old                       [.] _ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l@plt
+
+(char_conversion, new library)
+ 41.94%  libstdc++.so.6.0.19  [.] std::basic_ostream&lt;char, std::char_traits&lt;char> >&amp; std::__ostream_insert&lt;char, std::char_traits&lt;char> >(std::basic_ostream<c
+ 23.98%  libstdc++.so.6.0.19  [.] std::basic_streambuf&lt;char, std::char_traits&lt;char> >::xsputn(char const*, long)
+ 10.75%  libstdc++.so.6.0.19  [.] std::ostream::sentry::sentry(std::ostream&)
+  8.30%  libc-2.19.so         [.] __memcpy_sse2_unaligned
+  2.50%  new                  [.] char_conversion(int)
+  1.82%  libstdc++.so.6.0.19  [.] memcpy@plt
+  1.81%  libstdc++.so.6.0.19  [.] _ZNSo6sentryC1ERSo@plt
+  1.18%  new                  [.] _ZSt16__ostream_insertIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_PKS3_l@plt
+
+(int_conversion, old library)
+ 19.36%  libstdc++.so.6.0.19    [.] std::basic_ostream&lt;char, std::char_traits<char> >&amp; std::__ostream_insert&lt;char, std::char_traits&lt;char> >(std::basic_ostream
+ 16.26%  libstdc++.so.6.0.19    [.] std::basic_streambuf&lt;char, std::char_traits<char> >::xsputn(char const*, long)
+ 15.06%  libstdc++.so.6.0.19    [.] std::ostream&amp; std::ostream::_M_insert<long>(long)
+ 11.24%  libstdc++.so.6.0.19    [.] std::ostreambuf_iterator&lt;char, std::char_traits<char> > std::num_put&lt;char, std::ostreambuf_iterator&lt;char, std::char_traits
+ 10.33%  libstdc++.so.6.0.19    [.] std::ostream::sentry::sentry(std::ostream&)
+  6.49%  libc-2.19.so           [.] __memcpy_sse2_unaligned
+  4.54%  libstdc++.so.6.0.19    [.] 0x0000000000088bc9
+  2.30%  libstdc++.so.6.0.19    [.] std::num_put&lt;char, std::ostreambuf_iterator&lt;char, std::char_traits&lt;char> > >::do_put(std::ostreambuf_iterator&lt;char, std::c
+  1.69%  old                    [.] int_conversion(int)
+  1.25%  libstdc++.so.6.0.19    [.] std::ostream::operator&lt;&lt;(int)
+  1.14%  libstdc++.so.6.0.19    [.] memcpy@plt
+
+(int_conversion, new library)
+ 19.79%  libstdc++.so.6.0.19           [.] std::basic_ostream&lt;char, std::char_traits&lt;char> >&amp; std::__ostream_insert&lt;char, std::char_traits&lt;char> >(std::basic_
+ 16.14%  libstdc++.so.6.0.19           [.] std::basic_streambuf&lt;char, std::char_traits&lt;char> >::xsputn(char const*, long)
+ 15.04%  libstdc++.so.6.0.19           [.] std::ostream&amp; std::ostream::_M_insert&lt;long>(long)
+ 11.71%  libstdc++.so.6.0.19           [.] std::ostreambuf_iterator&lt;char, std::char_traits&lt;char> > std::num_put&lt;char, std::ostreambuf_iterator&lt;char, std::char
+ 10.55%  libstdc++.so.6.0.19           [.] std::ostream::sentry::sentry(std::ostream&)
+  6.23%  libc-2.19.so                  [.] __memcpy_sse2_unaligned
+  4.68%  libstdc++.so.6.0.19           [.] 0x0000000000088b9b
+  2.30%  libstdc++.so.6.0.19           [.] std::num_put&lt;char, std::ostreambuf_iterator&lt;char, std::char_traits&lt;char> > >::do_put(std::ostreambuf_iterator&lt;char,
+  1.74%  new                           [.] int_conversion(int)
+  1.42%  libstdc++.so.6.0.19           [.] std::ostream::operator&lt;&lt;(int)
+  1.07%  libstdc++.so.6.0.19           [.] memcpy@plt
+</pre>
+
+<h2><a name="Proposed_wording">5. Proposed wording for C++20</a></h2>
+
+<p>
+The wording in this section is relative to WG21 draft N4618 <a href="#N4618">[N4618]</a>,
+that is, the current draft of the C++17 standard.
+</p>
+
+<h3><a name="stringbuf">27.8.2 Class template basic_stringbuf [stringbuf]</a></h3>
+
+<p>Edit paragraph 1 as follows.</p>
+
+<blockquote class="std">
+<p>
+<code>
+    // 27.8.2.3, get and set<br>
+    basic_string&lt;charT, traits, Allocator> str() const <ins>&amp;</ins>;<br>
+    <ins>basic_string&lt;charT, traits, Allocator> str() &amp;&amp;;</ins><br>
+    void str(const basic_string&lt;charT, traits, Allocator>& s);
+</code>
+</p>
+</blockquote>
+
+<h3><a name="stringbuf.members">27.8.2.3 Member functions [stringbuf.members]</a></h3>
+
+<p>Edit paragraph 1 as follows.</p>
+
+<blockquote class="std">
+<p>
+    <code>
+    basic_string&lt;charT, traits, Allocator> str() const <ins>&amp;</ins>;<br>
+    <ins>basic_string&lt;charT, traits, Allocator> str() &amp;&amp;</ins>;
+    </code>
+</p>
+<p>
+<i>Returns:</i>
+A <code>basic_string</code> object whose content is equal to the <code>basic_stringbuf</code>
+underlying character sequence. If the <code>basic_stringbuf</code> was created only in input mode,
+the resultant <code>basic_string</code> contains the character sequence in the range
+<code>[eback(), egptr())</code>. If the <code>basic_stringbuf</code> was created with
+<code>which &amp; ios_base::out</code> being nonzero then the resultant <code>basic_string</code>
+contains the character sequence in the range <code>[pbase(), high_mark)</code>, where
+<code>high_mark</code> represents the position one past the highest initialized character
+in the buffer. Characters can be initialized by writing to the stream, by constructing
+the <code>basic_stringbuf</code> with a <code>basic_string</code>, or by calling the
+<code>str(basic_string)</code> member function. In the case of calling the
+<code>str(basic_string)</code> member function, all characters initialized prior to the
+call are now considered uninitialized (except for those characters re-initialized by
+the new <code>basic_string</code>). Otherwise the <code>basic_stringbuf</code> has been
+created in neither input nor output mode and a zero length <code>basic_string</code>
+is returned.
+</p>
+
+<p>
+After calling the rvalue-reference-qualified <code>str()</code> member function, the
+contents of the <code>basic_stringbuf</code> underlying character sequence are unspecified.
+</p>
+</blockquote>
+
+<h3><a name="ostringstream">27.8.4 Class template basic_ostringstream [ostringstream]</a></h3>
+
+<p>Edit paragraph 1 as follows.</p>
+
+<blockquote class="std">
+<p>
+<code>
+    // 27.8.4.3, members<br>
+    basic_stringbuf&lt;charT, traits, Allocator>* rdbuf() const;<br>
+    <br>
+    basic_string&lt;charT, traits, Allocator> str() const <ins>&amp;</ins>;<br>
+    <ins>basic_string&lt;charT, traits, Allocator> str() &amp;&amp;;</ins><br>
+    void str(const basic_string&lt;charT, traits, Allocator>&amp; s);
+</code>
+</p>
+</blockquote>
+
+<h3><a name="ostringstream.members">27.8.4.3 Member functions [ostringstream.members]</a></h3>
+
+<p>Edit paragraph 2, and add a paragraph between paragraphs 2 and 3, as follows.</p>
+
+<blockquote class="std">
+<p>
+    <code>
+    basic_string&lt;charT, traits, Allocator> str() const <ins>&amp;</ins>;<br>
+    </code>
+</p>
+<p><i>Returns:</i> <code>rdbuf()->str()</code>.</p>
+<p>
+    <code>
+    <ins>basic_string&lt;charT, traits, Allocator> str() &amp;&amp;;</ins><br>
+    </code>
+</p>
+<p><i>Returns:</i> <code>std::move(rdbuf())->str()</code>.</p>
+</blockquote>
+
+<h2><a name="References">6. References</a></h2>
+
+<dl>
+
+<dt><a name="N4618">[N4618]</a></dt>
+<dd>
+"Working Draft, Standard for Programming Language C++" (Nov 2016).<br>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4618.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4618.pdf</a>.
+</dd>
+
+</dl>
+
+</body>
+</html>
