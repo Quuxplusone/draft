@@ -49,8 +49,8 @@ td { text-align: left; vertical-align: top;
 </head>
 <body>
 
-<b>Document number:</b> PxxxxR0 <br>
-<b>Date:</b> 2017-03-07 <br>
+<b>Document number:</b> P0756R0 <br>
+<b>Date:</b> 2017-07-17 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
@@ -61,7 +61,7 @@ td { text-align: left; vertical-align: top;
 <a href="#Introduction">1. Introduction</a><br>
 <a href="#Motivations">2. Motivations</a><br>
 <a href="#Proposed_wording">3. Proposed wording</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#expr.prim.lambda">5.1.5 Lambda expressions [expr.prim.lambda]</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#expr.prim.lambda">8.1.5.2 Captures [expr.prim.lambda.capture]</a><br>
 <a href="#References">4. References</a><br>
 </p>
 
@@ -74,6 +74,13 @@ of lambda syntax &mdash; stumbling blocks of which many programmers may not even
 The first is that <code>[&x, =](){ return x; }</code> is ill-formed.<br>
 The second is that <code>[=, y](){ return x; }</code> is ill-formed.<br>
 I propose to make both of these lambdas well-formed, with the obvious meanings.
+</p>
+
+<p>
+This proposal is effectively a superset of Thomas Köppe's recent proposal
+"Allow lambda capture <code>[=, this]</code>" <a href="#P0409R2">[P0409R2]</a>;
+the difference is that P0409 proposes to add a single word to [expr.prim.lambda.capture]
+whereas this paper proposes to strike the entire offending <i>sentence</i> from that clause.
 </p>
 
 <h2><a name="Motivations">2. Motivations</a></h2>
@@ -172,11 +179,11 @@ would both be supported for the above example's capture-list.
 <h2><a name="Proposed_wording">3. Proposed wording for C++20</a></h2>
 
 <p>
-The wording in this section is relative to WG21 draft N4618 <a href="#N4618">[N4618]</a>,
+The wording in this section is relative to WG21 draft N4659 <a href="#N4659">[N4659]</a>,
 that is, the current draft of the C++17 standard.
 </p>
 
-<h3><a name="expr.prim.lambda">5.1.5 Lambda expressions [expr.prim.lambda]</a></h3>
+<h3><a name="expr.prim.lambda">8.1.5.2 Captures [expr.prim.lambda.capture]</a></h3>
 
 <p>
 Edit the grammar in paragraph 1 as follows.
@@ -184,10 +191,6 @@ Edit the grammar in paragraph 1 as follows.
 
 <blockquote class="std">
 <p>
-<i>lambda-expression:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;lambda-introducer lambda-declarator<sub>opt</sub> compound-statement<br>
-lambda-introducer:</i><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<code>[</code> <i>lambda-capture<sub>opt</sub></i> <code>]</code><br>
 <i>lambda-capture:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<del>capture-default</del><br>
 &nbsp;&nbsp;&nbsp;&nbsp;capture-list</i><br>
@@ -211,14 +214,11 @@ simple-capture:<br>
 <i>init-capture:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;identifier initializer</i><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<code>&amp;</code> <i>identifier initializer<br>
-lambda-declarator:</i><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<code>(</code> <i>parameter-declaration-clause</i> <code>)</code> <i>decl-specifier-seq<sub>opt</sub>
-noexcept-specifier<sub>opt</sub> attribute-specifier-seq<sub>opt</sub> trailing-return-type<sub>opt</sub></i>
 </p>
 </blockquote>
 
 <p>
-Edit paragraph 9 as follows.
+Edit paragraph 2 as follows.
 </p>
 
 <blockquote class="std">
@@ -256,11 +256,18 @@ Edit paragraph 9 as follows.
 
 <dl>
 
-<dt><a name="N4618">[N4618]</a></dt>
+<dt><a name="N4659">[N4659]</a></dt>
 <dd>
-"Working Draft, Standard for Programming Language C++" (Nov 2016).<br>
-<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4618.pdf">
-http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/n4618.pdf</a>.
+"Working Draft, Standard for Programming Language C++" (March 2017).<br>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4659.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4659.pdf</a>.
+</dd>
+
+<dt><a name="P0409R2">[P0409R2]</a></dt>
+<dd>
+Thomas Köppe. "Allow lambda capture <code>[=, this]</code>" (March 2017).<br>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0409r2.html">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0409r2.html</a>.
 </dd>
 
 </dl>
