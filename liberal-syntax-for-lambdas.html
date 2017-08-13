@@ -50,7 +50,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> D0756R0 <br>
-<b>Date:</b> 2017-07-17 <br>
+<b>Date:</b> 2017-08-12 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
@@ -60,9 +60,10 @@ td { text-align: left; vertical-align: top;
 <p>
 <a href="#Introduction">1. Introduction</a><br>
 <a href="#Motivations">2. Motivations</a><br>
-<a href="#Proposed_wording">3. Proposed wording</a><br>
+<a href="#Simple">3. "Simple. The default goes first."</a><br>
+<a href="#Proposed_wording">4. Proposed wording</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#expr.prim.lambda">8.1.5.2 Captures [expr.prim.lambda.capture]</a><br>
-<a href="#References">4. References</a><br>
+<a href="#References">5. References</a><br>
 </p>
 
 
@@ -176,11 +177,88 @@ Under this proposal, the syntaxes <code>[=, token]</code> and <code>[token, =]</
 would both be supported for the above example's capture-list.
 </p>
 
-<h2><a name="Proposed_wording">3. Proposed wording for C++20</a></h2>
+<h2><a name="Simple">3. "Simple. The default goes first."</a></h2>
+
+<p>
+In discussion on the std-proposals mailing list <a href="#Bolas">[Bolas]</a>, the following objection was raised:
+<blockquote>
+    Seeing `=` first makes it clear to the reader that this is a value default-capturing lambda.
+    Seeing `&` first makes it clear that it's a reference default-capturing lambda.
+    Seeing neither makes it clear that it captures only what is listed.
+    It's a simple rule to remember: <i><b>put the default first</b></i>. I don't think that rule affects teachability.
+    [...]
+    Unless you think that "default initialization" is somehow related to and should be
+    syntactically consistent with "default parameters" or "default capture".
+</blockquote>
+</p>
+
+<p>My rebuttal is that currently C++ supports "defaults" or "default behavior" in the following
+places associated with the <i>trailing end</i>:
+<ul>
+<li>Default values for function arguments (such arguments can appear only at the <i>end</i>)</li>
+<li>C-style variadic "..." soaks up unmatched arguments (only at the <i>end</i>)</li>
+<li>Variadic template parameter packs soak up unmatched arguments (technically anywhere but
+typically you find them at the <i>end</i>)</li>
+<li>Aggregate initializer "set the rest of my fields to zero" (only for <i>trailing</i> fields)</li>
+</ul>
+And in the following places, "default behaviors" can appear in any order, intermixed with non-defaults:
+<ul>
+<li>Default values for template parameters</li>
+<li>Default values for non-static data members</li>
+</ul>
+In only this one place does the "default behavior" for a C++ construct appear at the <i>beginning</i>
+of a construct:
+<ul>
+<li>Default capturing behavior for lambda expressions (only at the <i>beginning</i>)</li>
+</ul>
+The simple rule <i>put the default first</i> is not a rule that appears anywhere else in C++; while many
+places in C++ encourage the student to learn the competing rule, <i><b>put the default last</b></i>.
+</p>
+
+<p>
+Normal English usage is also on the side of "default last": it feels natural to say
+<blockquote>
+    <i>Put the apple in the basket, the banana in the bowl, and everything else in the cupboard.</i>
+</blockquote>
+It feels <i>un</i>natural to say
+<blockquote>
+    <i>Put everything else in the cupboard, the apple in the basket, and the banana in the bowl.</i>
+</blockquote>
+Yet the latter is what C++11 lambda syntax requires from the student!
+</p>
+
+<p>
+This is not intended to convince you that the "right" place for the capture-default is in the trailing
+position. This is merely intended to convince you that many students naturally <i>try</i> (and even
+<i>want</i>) to put the default in the trailing position, and get frustrating compiler errors as a result.
+Here are the compiler error messages from GCC, Clang, and Visual C++ as of this writing:
+<pre>
+    (GCC 8.0.0)
+    prog.cc: In function 'int main()':
+    prog.cc:9:9: error: expected identifier before '=' token
+         [x, =]() { };
+             ^
+
+    (Clang 6.0.0)
+    prog.cc:9:9: error: expected variable name or 'this' in lambda capture list
+        [x, =]() { };
+            ^
+
+    (Visual C++ 19.00.23506)
+    source_file.cpp(9): error C2337: 'x': attribute not found
+    source_file.cpp(9): error C2059: syntax error: '='
+    source_file.cpp(9): error C2143: syntax error: missing ';' before '{'
+</pre>
+Just changing all the major compilers to produce better error messages would be an improvement
+on the status quo. But even better would be to make the code compile on the first shot!
+</p>
+
+
+<h2><a name="Proposed_wording">4. Proposed wording for C++20</a></h2>
 
 <p>
 The wording in this section is relative to WG21 draft N4659 <a href="#N4659">[N4659]</a>,
-that is, the current draft of the C++17 standard.
+that is, the current draft of the C++17 standard as of July 2017.
 </p>
 
 <h3><a name="expr.prim.lambda">8.1.5.2 Captures [expr.prim.lambda.capture]</a></h3>
@@ -213,7 +291,7 @@ simple-capture:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<code>* this</code><br>
 <i>init-capture:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;identifier initializer</i><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<code>&amp;</code> <i>identifier initializer<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<code>&amp;</code> <i>identifier initializer</i><br>
 </p>
 </blockquote>
 
@@ -252,9 +330,16 @@ Edit paragraph 2 as follows.
 </p>
 </blockquote>
 
-<h2><a name="References">4. References</a></h2>
+<h2><a name="References">5. References</a></h2>
 
 <dl>
+
+<dt><a name="Bolas">[Bolas]</a></dt>
+<dd>
+std-proposals forum thread "P0756R0: Lambda syntax should be more liberal in what it accepts" (July–August 2017).<br>
+<a href="https://groups.google.com/a/isocpp.org/forum/#!msg/std-proposals/gQnC5Bkd224/FX7D7OkrBgAJ">
+https://groups.google.com/a/isocpp.org/forum/#!msg/std-proposals/gQnC5Bkd224/FX7D7OkrBgAJ</a>.
+</dd>
 
 <dt><a name="N4659">[N4659]</a></dt>
 <dd>
