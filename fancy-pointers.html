@@ -1,0 +1,1161 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+
+<style type="text/css">
+
+body { color: #000000; background-color: #FFFFFF; }
+del { text-decoration: line-through; color: #8B0040; }
+ins { text-decoration: underline; color: #005100; }
+dfn { font-style: italic; font-weight: bold; color: #004020; }
+li { margin: 0 0 1ex 0; }
+
+p.example { margin-left: 2em; }
+pre.example { margin-left: 2em; }
+div.example { margin-left: 2em; }
+
+code.extract { background-color: #F5F6A2; }
+pre.extract { margin-left: 2em; background-color: #F5F6A2;
+  border: 1px solid #E1E28E; }
+
+.clarification { margin-left: 2em; margin-right: 2em; color: #000040; background-color: #F8F8F8; }
+span.clarification { margin-left: 0; margin-right: 0; color: #000040; background-color: #F8F8F8; }
+
+p.function { }
+.attribute { margin-left: 2em; }
+.attribute dt { float: left; font-style: italic;
+  padding-right: 1ex; }
+.attribute dd { margin-left: 0em; }
+
+blockquote.std { color: #000000; background-color: #F1F1F1;
+  border: 1px solid #D1D1D1;
+  padding-left: 0.5em; padding-right: 0.5em; }
+blockquote.stddel { text-decoration: line-through;
+  color: #000000; background-color: #FFEBFF;
+  border: 1px solid #ECD7EC;
+  padding-left: 0.5empadding-right: 0.5em; ; }
+
+blockquote.stdins { text-decoration: underline;
+  color: #000000; background-color: #C8FFC8;
+  border: 1px solid #B3EBB3; padding: 0.5em; }
+
+table { border: 1px solid black; border-spacing: 0px;
+  margin-left: auto; margin-right: auto; }
+th { text-align: left; vertical-align: top;
+  padding-left: 0.8em; border: none; }
+td { text-align: left; vertical-align: top;
+  padding-left: 0.8em; border: none; }
+
+</style>
+
+<title>Towards meaningful fancy pointers</title>
+</head>
+<body>
+
+<b>Document number:</b> DxxxxR0 <br>
+<b>Date:</b> 2017-08-15 <br>
+<b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
+<b>Audience:</b> Library Evolution Working Group <br>
+<b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
+
+<h1>Towards meaningful fancy pointers</h1>
+
+<p>
+<a href="#Summary">Summary. Proposed direction for fancy pointers.</a><br>
+<a href="#Objects">Objects and values. A handle is a value that points to an object. Casting.</a><br>
+<a href="#Allocator">An allocator is a handle to a memory resource.</a><br>
+<a href="#Pointer">Pointer values may be dereferenceable and/or deallocatable.</a><br>
+<a href="#Purposes">Purposes of fancy pointer types.</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#A">Scenario A. High-memory-area "far" pointers.</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#B">Scenario B. Small-data-area "near" pointers.</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#C">Scenario C. Pointers indistinguishable from native pointers.</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#D">Scenario D. "Fat" pointers carrying metadata for dereference-time.</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#E">Scenario E. "Segmented" pointers carrying metadata for deallocate-time.</a><br>
+<a href="#Any">Is any kind of fancy pointer compatible with C++?</a><br>
+<a href="#Requirements">Requirements on fancy pointer types if <i>fancy-pointer-support</i> were adopted.</a><br>
+<a href="#basic_string"><code>basic_string</code> requires trivial default constructibility.</a><br>
+</p>
+
+
+<h2><a name="Summary">Summary. Proposed direction for fancy pointers.</a></h2>
+
+<p>
+This is a position paper explaining my take on fancy pointers in C++.
+Indented, grayed paragraphs represent "clarifications" that can probably be skipped on first reading.
+</p>
+
+<p class="clarification">
+What do we want fancy pointers to represent?
+</p>
+<ul class="clarification">
+    <li>
+        (A) Un-augmented fancy pointers addressing a greater range of memory: far pointers.
+        This is impossible in C++ because every object must have a (native) address.
+    </li>
+    <li>
+(B) Un-augmented fancy pointers addressing a lesser range of memory: small data area.
+This is plausible. Some containers (std::vector) work already; some (std::list) work only in
+certain runtime situations.
+    </li>
+    <li>
+(C) Un-augmented fancy pointers addressing exactly the same range of memory: then we should just
+give up on fancy pointers and use raw pointers all the time. Deprecate fancy pointers in C++2a.
+    </li>
+    <li>
+(D) Augmented fancy pointers whose metadata affects arithmetic: fat pointers.
+This is plausible but expensive, and not worth the implementation effort for vendors.
+    </li>
+    <li>
+(E) Augmented fancy pointers whose metadata affects deallocation: segmented pointers.
+This is plausible. Some containers (std::vector) work already; some (std::list) require only
+trivial modifications; some (std::shared_ptr) require large fixes.
+    </li>
+</ul>
+<p class="clarification">
+I propose two self-consistent future directions for fancy pointers. In one direction,
+we keep the status quo that no scenarios except (C) are supported, and move toward
+deprecation of the fancy-pointer mechanism. In my preferred direction, we require that
+vendors support the scenarios (B) and (E).
+</p>
+
+<p class="clarification">
+In my preferred solution, every STL container needs to follow these rules:
+</p>
+<ol class="clarification">
+    <li>
+        Whenever you get a pointer from allocate(), hang onto it. You will never be able to
+        reconstruct its metadata if you lose it.
+    </li>
+    <li>
+        Assume that metadata is preserved via the fancy pointer type's special member functions,
+        and via casting from one fancy pointer type to a rebound version of that type
+        (e.g. <code>static_cast&lt;FancyPtrT>(fancyPtrU)</code>). Do not assume that metadata
+        is preserved via any other operations.
+    </li>
+    <li>
+        Assume that <code>static_cast&lt;T*>(fancyPtrT)</code> is a correct slicing expression.
+        Prefer to avoid <code>std::addressof(*fancyPtrT)</code>, which isn't going to work if
+        <code>fancyPtrT</code> is not dereferenceable.
+    </li>
+    <li>
+        Assume that <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(t)</code> returns a
+        <i>dereferenceable</i> pointer, but not a <i>deallocatable</i> one. Do not assume that
+        <code>static_cast&lt;FancyPtrT&gt;(std::addressof(t))</code> compiles.
+        (<code>FancyPtrT</code> might not have a one-argument constructor.)
+    </li>
+    <li>
+        <code>basic_string</code> may assume that its fancy pointer type is trivially default
+        constructible. No other type may assume this.
+    </li>
+    <li>
+        Assume that the fancy pointer type models <code>NullablePointer</code>. (Construction
+        from and comparison to <code>nullptr</code> ought to be supported.)
+    </li>
+    <li>
+        Do not assume that the fancy pointer type models <code>RandomAccessIterator</code>.
+        (For example, do not rely on <code>operator++</code>, <code>operator[]</code>, or
+        <code>operator&lt;</code>. Slice to <code>T*</code> before attempting these operations.)
+    </li>
+</ol>
+<p class="clarification">
+In the sections that follow, I will lay out the case for these recommendations.
+</p>
+
+
+<h2><a name="Objects">Objects and values. A handle is a value that points to an object. Casting.</a></h2>
+
+<p>
+By <dfn>object</dfn> I mean something like we see in object-oriented programming: an <i>object</i> has
+a unique identity, and this identity is preserved even as the internal state of the object is mutated.
+Objects with different identities are never interchangeable.
+In C++, an object is often represented in code by a C++ variable or piece of memory, in which case the
+object's identity is tantamount to that variable's memory address. However, there also exist objects
+that are not variables. For example, "the program call stack" could be considered an object; it is
+mutated whenever a function is called or returns. "The heap" is another object; it is mutated by
+<code>operator new</code> and <code>operator delete</code>.
+</p>
+
+<p>
+By <dfn>value</dfn> I mean something like we see in "value semantics": a <i>value</i> is an almost
+Platonic ideal, such as <code>5</code> or <code>"hello"</code>. Values can exist independently of any
+particular storage. Identical values are interchangeable; saying that value <code>a</code> is equal to
+value <code>b</code> is tantamount to saying that value <code>a</code> <i>is</i> value <code>b</code>.
+</p>
+
+<p class="clarification">
+Sometimes we say that an object "has a value," or refer to an object's state as "its value." I will
+try not to do either of those things in this paper.
+</p>
+
+<p>
+A <dfn>handle</dfn> is a particularly important kind of value. A handle is the Platonic ideal
+representing the identity of an <i>object</i>. In C++, a handle is often represented in code by
+(the value of) a C++ native pointer. You cannot have two different objects with the
+same identity, but you can have two copies of a handle — two handles — that refer to the same
+object. Handles that refer to the same object are "equal," and thus (philosophically speaking)
+interchangeable.
+</p>
+
+<p>
+A <dfn>type</dfn> is essentially a set of values. In C++ we usually say that a value "has a type,"
+but in this case I'm being more Platonic. Suppose I make a type <code>digit</code> which is
+the set of values 0 through 9; and I make another type <code>evendigit</code> which is
+the set of values 0,2,4,6,8. The value 4 belongs to both types; the value 4 is representable
+in both types.
+</p>
+
+<p class="clarification">
+This definition of <i>type</i> is problematic in C++ because we are used to strong static typing,
+where a value really <i>does</i> "have a type." We want to say that the value 4 is representable
+in both <code>digit</code> and <code>evendigit</code> — that <code>digit(4)</code> and
+<code>evendigit(4)</code> represent "the same value," even though they have different C++ types
+and may not even be comparable via <code>operator==</code>. Therefore, C++ introduces the idea
+of <i>casting</i>.
+</p>
+
+<p>
+A value of type A may be <dfn>cast to</dfn> type B. The result is a value
+of type B which nevertheless is in some abstract sense <i>the same</i> as the value of type A.
+Value-sameness is preserved through casting operations, when possible. If the source value
+is not representable in the destination type, then value-sameness cannot be preserved; such
+a cast might be prohibited by the language, or it might just throw away some parts of the value.
+</p>
+
+<p class="clarification">
+For example, casting the value <code>3.00</code> from <code>double</code> to <code>int</code>
+and back will preserve its value, because the value "3" is representable in both types.
+Casting the value <code>3.14</code> from <code>double</code> to <code>int</code> and back
+will preserve part of its value but throw away some of it. In C++, "casting" of the kind
+we're talking about is usually represented via <code>static_cast</code>.
+</p>
+
+<p>
+If a type T is the Cartesian product of types U and V, <i>and</i> there is a natural mapping
+from T to U, we say that T is an <dfn>augmented type</dfn> with respect to U.
+<i>Casting</i> an augmented type T to its corresponding non-augmented type U throws away the
+"V part" of the T value but preserves the "U part." Casting from U to T may be possible,
+but will fail to correctly reconstitute the "V part" of the data. I will use the term
+<dfn>metadata</dfn> to refer to the "V part" of the data, the part that is thrown away
+when casting to the non-augmented type.
+</p>
+
+<p class="clarification">
+For example, <code>double</code> is more or less an augmented type with respect to <code>int</code>.
+Casting the value <code>3.14</code> from <code>double</code> to <code>int</code>
+will preserve the <code>int</code> part of its value but throw away the fractional part.
+(When considering <code>double</code> as an augmented <code>int</code>, the fractional part
+is the <i>metadata</i>.)
+Casting from <code>int</code> back to the augmented type <code>double</code> is possible,
+but will reconstitute the metadata as ".00" instead of the correct ".14".
+</p>
+
+<p class="clarification">
+Most well-known product types, such as <code>std::tuple&lt;U,V&gt;</code>, are not really
+augmented types because there is no "natural" mapping from <code>std::tuple&lt;U,V&gt;</code>
+to <code>U</code>. In C++ terms, <code>static_cast</code>'ing from <code>std::tuple&lt;U,V&gt;</code>
+to <code>U</code> will not compile. But the following <code>Augmented&lt;U, Meta&gt;</code> is
+definitely an <i>augmented type</i> with respect to <code>U</code>:
+</p>
+<pre class="clarification">
+    template&lt;class U, class Meta&gt;
+    struct Augmented {
+        U u_;
+        Meta meta_;
+        Augmented(U u, Meta m) : u_(u), meta_(m) {}
+        operator U() const { return u_; }
+    };
+</pre>
+
+<p class="clarification">
+In C++, a derived type is often an augmented type with respect to its public base type(s).
+Casting from derived to base results in <i>slicing</i> away of the "non-base parts" of the instance,
+but preserves the "base parts." If casting from derived to base is forbidden (for example by
+deleting the base type's copy constructor), then the derived type is <i>not</i> an augmented type
+with respect to the base type.
+</p>
+
+
+<h2><a name="Allocator">An allocator is a handle to a memory resource.</a></h2>
+
+<p>
+A <dfn>memory resource</dfn> is an object that affords two functions: <i>allocation</i> and <i>deallocation</i>
+of memory chunks. How it does that is irrelevant for our purposes. Some memory resources are
+nice well-behaved C++ variables of types derived from <code>std::pmr::memory_resource</code> with
+overridden <code>allocate</code> and <code>deallocate</code> virtual member functions. But another
+well-known memory resource is just "the heap." "The heap" doesn't exist as a concrete C++ object,
+but it still affords <i>allocation</i> via <code>operator new</code> and <i>deallocation</i>
+via <code>operator delete</code>. Therefore I say that "the heap" is a <i>memory resource</i> as well.
+</p>
+
+<p>
+An <dfn>allocator</dfn> is a handle to a memory resource. By this definition, an instance of
+<code>std::allocator&lt;T&gt;</code> is an allocator, because it is a handle to "the heap."
+An instance of <code>std::pmr::memory_resource*</code> also is an allocator, because it is a handle
+to a <code>std::pmr::memory_resource</code>. (Recall that a <i>handle</i> is a value that
+uniquely identifies an object.)
+</p>
+
+<p>
+In order to enable generic programming with allocators, the STL introduced the <code>Allocator</code>
+concept. This is a standardized interface that must be provided by any type that is going to be
+used as the allocator of an STL container. A type that models <code>Allocator</code> must provide
+actual <i>member functions</i> named <code>allocate</code> and <code>deallocate</code>. For example,
+the type <code>std::pmr::memory_resource*</code> does not model <code>Allocator</code>, but
+the type <code>std::pmr::polymorphic_allocator&lt;T&gt;</code> does model <code>Allocator</code>.
+</p>
+
+<p class="clarification">
+In C++ there is actually a whole family of concepts <code>Allocator&lt;T&gt;</code> each associated
+with allocating and deallocating C++ objects of type <code>T</code>. However, it is implicitly
+required that I can <i>cast</i> an object of type <code>some_allocator&lt;T&gt;</code> to type
+<code>some_allocator&lt;U&gt;</code>. Casting alters type without altering value; that is,
+casting a handle in this way produces a new handle which uniquely identifies the same
+memory resource.
+</p>
+
+<p>
+Determining the appropriate destination type for a cast is called <dfn>rebinding</dfn>.
+C++ implicitly requires that if <code>x</code> (of type <code>X</code>
+modeling <code>Allocator&lt;T&gt;</code>) is a handle to some memory resource <i>m</i>,
+then after the variable definition <code>auto y = static_cast&lt;std::allocator_traits&lt;X&gt;::rebind_alloc&lt;U&gt;&gt;(x)</code>,
+<code>y</code> (of type <code>Y</code> modeling <code>Allocator&lt;U&gt;</code>)
+is a handle to that same memory resource <i>m</i>.
+</p>
+
+<p class="clarification">
+This definition of rebinding is compatible with "slab allocator"-style memory resources, where
+<code>SlabAllocator&lt;int32_t&gt;::allocate</code> and <code>SlabAllocator&lt;int64_t&gt;::allocate</code>
+allocate chunks out of different, non-overlapping slabs of memory. A single <i>memory resource</i>
+then consists of a single <i>complete set</i> of slabs. The important thing is that we must
+be able to take a handle to this <i>memory resource</i> and cast it around without affecting its
+<i>value</i> (that is, the identity of the memory resource to which it refers).
+<pre class="clarification">
+    SlabResource mr1;
+    auto a32 = SlabAllocator&lt;int32_t&gt;(&mr1);  // get a handle to the memory resource
+    auto b64 = SlabAllocator&lt;int64_t&gt;(a32);  // cast that handle to a new C++ type
+    auto c32 = SlabAllocator&lt;int32_t&gt;(b64);  // cast the handle back to the original type
+    // At this point, a32 and c32 must both identify memory resource "mr1".
+    // c32 is NOT ALLOWED to identify a different memory resource "mr2".
+    // c32 is NOT ALLOWED to identify no memory resource (e.g. to have become "null" or otherwise unusable).
+    // a32 and c32, being the same value in the same C++ type, must be truly interchangeable.
+</pre>
+</p>
+
+<p>
+The foregoing definitions imply that allocators are cheap to copy. Making a copy of an allocator does
+not make a copy of the underlying memory resource. Allocators are rebindable and castable: you can
+change the C++ type of an allocator instance without changing its fundamental value. These rules should
+be familiar because this is also how C++ treats <i>iterators</i> and <i>pointers</i>: handles,
+cheap to copy, castable.
+</p>
+
+<p class="clarification">
+We can create an allocator <i>type</i> which has many possible <i>values</i>: for example,
+<code>std::pmr::polymorphic_allocator</code>. We can also create an allocator type whose set of
+possible values has only one member: for example, <code>std::allocator</code> is an allocator
+type whose only possible value is "the identity of 'the heap'." Since the set of possible values
+has size 1, an instance of the type contains log(1) = 0 bits of information and thus
+<code>std::is_empty_v&lt;std::allocator&lt;T&gt;&gt;</code>.
+Casting an <code>std::allocator&lt;T&gt;</code>
+to <code>std::allocator&lt;U&gt;</code> preserves its value, in that the value resulting from the
+cast continues to identify "the heap."
+</p>
+
+
+<h2><a name="Pointer">Pointer values may be dereferenceable and/or deallocatable.</a></h2>
+
+<p>
+A <dfn>native pointer</dfn> is a value of a native pointer type.
+A <dfn>native pointer type</dfn> is a C++ type of the form <code>T*</code> where <code>T</code>
+is an object type. For the purposes of this paper, we don't care about function pointers or
+member pointers, because those aren't suitable subjects for allocation and deallocation.
+</p>
+
+<p>
+A <dfn>pointer</dfn> is a handle that satisfies specific syntactic constraints; it must afford
+(many of) the same operations as a C++ native pointer. Specifically, the following operations
+must be supported:
+<pre>
+    decltype(p){}                 (value-initialization must create a null value)
+    p == nullptr, if (p), !p      (comparison against null)
+    p == p, p != p                (comparison against another pointer value of the same type)
+    *p                            (dereference)
+</pre>
+Native pointers also support the <dfn>pointer arithmetic</dfn> operations, which is to say,
+native pointers model the <code>RandomAccessIterator</code> concept:
+<pre>
+    ++p, p++, --p, p--            (bidirectional mutation)
+    p += i, p -= i                (random-access mutation)
+    p + i, i + p, p - i           (random-access construction)
+    p - p                         (random-access difference)
+    p < p, p <= p, p > p, p >= p  (random-access inequality comparison)
+    p[i]                          (random-access dereference)
+</pre>
+</p>
+
+<p>
+A <dfn>fancy pointer</dfn> is a pointer that is not a native pointer.
+A <dfn>fancy pointer type</dfn> is a C++ type all of whose values are fancy pointers.
+When I need to refer to an example C++ fancy pointer type, I will use names such as
+<code>FancyPtrInt</code> (for a pointer whose values identify objects of type <code>int</code>)
+or <code>FancyPtrT</code> (for a pointer whose values identify objects of type <code>T</code>).
+</p>
+
+<p class="clarification">
+Fancy pointer types are described in [allocator.requirements]/5 as types modeling both
+<code>NullablePointer</code> and <code>RandomAccessIterator</code>; that is, in today's C++, a
+fancy pointer type must provide pointer arithmetic.
+I will argue that fancy pointer types have no philosophical need to provide pointer arithmetic.
+</p>
+
+<p>
+Some pointer values are <dfn>dereferenceable</dfn> and some are not.
+</p>
+
+<p>
+<dfn>Null</dfn> is a specific pointer value. Every pointer type contains the value <i>null</i>.
+Casting the null value preserves its value. The null value is never dereferenceable.
+</p>
+
+<p class="clarification">
+In the native pointer type <code>int*</code>, we can construct non-dereferenceable values in at least
+the following ways:
+</p>
+<pre class="clarification">
+    int arr[10];
+    int *p1 = nullptr;   // the null pointer is never dereferenceable
+    int *p2 = arr + 10;  // a "one-past-the-end" pointer is not dereferenceable
+</pre>
+<p class="clarification">
+There are also ways to have an object <code>p</code> of type <code>int*</code> where the behavior
+of <code>*p</code> is undefined, such as
+</p>
+<pre class="clarification">
+    int *p3 = new int; delete p3;  // a deallocated pointer is not dereferenceable
+    int *p4;                       // an uninitialized pointer is not dereferenceable
+</pre>
+<p class="clarification">
+but these examples are not interesting in the context of this paper. Philosophically it is arguable
+that these examples treat <code>p3</code> and <code>p4</code> as <i>stateful objects</i>, and that
+the names <code>p3</code> and <code>p4</code> do not identify pointer <i>values</i> at all.
+In this paper I am concerned with pointer values like <code>p1</code> and <code>p2</code>; I do not
+consider <code>p3</code> and <code>p4</code> to be relevant.
+</p>
+
+<p>
+Some pointer values are <dfn>deallocatable</dfn> (with respect to a given memory resource) and some
+are not. Any pointer value successfully returned from the <i>allocation</i> mechanism of a
+memory resource <code>mr</code> is deallocatable with respect to <code>mr</code>.
+</p>
+
+<p class="clarification">
+Many <i>dereferenceable</i> pointers will not be <i>deallocatable</i>. (For example, any pointer
+identifying a non-allocated object will not be deallocatable by any allocator. Also, a pointer
+allocated by memory resource A is unlikely to be deallocatable by memory resource B.)
+Some <i>deallocatable</i> pointers will not be <i>dereferenceable</i>. (For example, the native pointer
+returned from <code>malloc(0)</code> on some implementations is deallocatable with respect to
+<code>malloc()/free()</code> but not dereferenceable.)
+</p>
+
+
+<h2><a name="Purposes">Purposes of fancy pointer types.</a></h2>
+
+<p>
+What are the possible motivations for fancy pointer types?
+Why might a programmer desire a pointer type that is different from any native pointer type?
+Here are five scenarios I consider plausible.
+</p>
+
+
+<h3><a name="A">Scenario A. High-memory-area "far" pointers.</a></h3>
+
+<p>
+Let <dfn>main memory</dfn> be defined as the set of all object addresses addressable by
+C++ native pointer types. Some programmers deal in objects that are not located in main memory.
+</p>
+
+<p class="clarification">
+A historical example is the 80286, where 16-bit native pointers could identify only the
+memory addresses between 0x0000 and 0xFFFF, but the computer itself had additional memory
+ranging from address 0x1'0000 to address 0xF'FFFF, and some models had a "high memory area"
+between 0x10'0000 and 0x10'FFEF. These additional addresses were not addressable with native
+pointers such as <code>int*</code>. Compilers of the day provided additional built-in types
+such as <code>far int*</code>, where <code>sizeof(far int*) &gt; sizeof(int*)</code>.
+</p>
+
+<p class="clarification">
+A possible future example is objects residing in some location which
+<i>is not memory-mapped into the current process's virtual address space</i>.
+Today this is unlikely to be a real problem for 64-bit address spaces — we just take
+anything we care about (including the OS kernel, and also GPU memory if I understand correctly)
+and map it into the current process's address space. It might be a problem looking forward
+into the future of enormous (>18 exabytes?) non-volatile storage, or more likely looking
+downward into the domain of 32-bit and 16-bit microcontrollers with smaller main memories.
+</p>
+
+<p>
+Can we use fancy pointer types to address objects that are not located in main memory?
+</p>
+
+<p>
+<b>No, we cannot use fancy pointer types to address objects that aren't located in main memory.</b>
+</p>
+
+<p class="clarification">
+Every fancy pointer type must provide an <code>operator*</code> that returns a reference to
+an object. That is, we must have a function definition along these lines:
+</p>
+<pre class="clarification">
+    struct FancyPtrInt {
+        int& FancyPtrInt::operator*() const {
+            // some magic goes here
+        }
+        // ...
+    };
+</pre>
+<p class="clarification">
+The expression <code>*fancyp</code> returns a reference to its identified object as type <code>int&</code>.
+So its identified object must be addressable by a native pointer value — namely,
+<code>std::addressof(*fancyp)</code>. Therefore, this attempt to use fancy pointers to address objects
+outside main memory has failed.
+</p>
+
+
+<h3><a name="B">Scenario B. Small-data-area "near" pointers.</a></h3>
+
+<p>
+Some programmers deal in memory "arenas" that are much smaller than the entire range of main memory.
+The programmer may wish to use a C++ pointer type that reflects that smaller range of possible
+pointer values. Since this pointer type contains fewer than (address-space) values, its representation
+in memory requires fewer than log(address-space) bits. For example, a pointer type that can hold
+one of only 32,767 distinct addresses (or <i>null</i>) philosophically ought to require only
+log(32768) = 15 bits of storage per pointer. A C++ fancy pointer type with fewer value bits than a
+native pointer is called a <dfn>near fancy pointer</dfn>.
+</p>
+
+<p class="clarification">
+On a 32-bit microcontroller, the programmer might define a frequently used list container like this:
+</p>
+<pre class="clarification">
+    #include &lt;list&gt;
+    #include &lt;memory_resource&gt;
+
+    // Reserve representation 0x0000 for "null".
+    std::pmr::monotonic_buffer_resource g_smallData((void*)0x0001, 32767, std::pmr::null_memory_resource());
+
+    int main() {
+        std::pmr::list&lt;int32_t&gt; widgets(&g_smallData);
+
+        widgets.push_back(1);
+    }
+</pre>
+<p class="clarification">
+Any allocations made by <code>widgets</code> always reside within the "small data area,"
+addresses 0x00000001 through 0x00007FFF. This means that in principle, each pointer should
+consume only 16 bits of memory footprint. Since each list node contains two
+pointers, this would be a savings of 4 bytes per node, allowing us to fit twice as many
+list elements into the small data area as we could naively fit.
+</p>
+
+<p class="clarification">
+The Standard Library doesn't provide a fancy-pointer version of <code>memory_resource</code>, but
+we can easily roll our own. We'd create a near fancy pointer type like this:
+</p>
+<pre class="clarification">
+    template&lt;class T&gt;
+    class NearPtr {
+        int16_t ptr_ = 0;
+    public:
+        NearPtr() = default;
+        NearPtr(std::nullptr_t) {}
+        explicit NearPtr(T *p) : ptr_((int16_t)(intptr_t)p) {}
+        T& operator*() const {
+            return *(T*)(intptr_t)ptr_;
+        }
+
+        template&lt;class U&gt;
+        explicit NearPtr(const NearPtr&lt;U&gt;&amp; rhs) : ptr_(rhs.ptr_) {}
+    };
+
+    // Reserve representation 0x0000 for "null".
+    std::pmr::monotonic_buffer_resource g_smallData((void*)0x0001, 32767, std::pmr::null_memory_resource());
+
+    template&lt;class T&gt;
+    struct NearAllocator {
+        using value_type = T;
+        using pointer = NearPtr&lt;T&gt;;
+        using void_pointer = NearPtr&lt;void&gt;;
+
+        pointer allocate(size_t n) {
+            void *vp = g_smallData.allocate(n * sizeof(T), alignof(T));
+            return static_cast&lt;pointer&gt;(static_cast&lt;void_pointer&gt;(vp));
+        }
+        void deallocate(pointer p, size_t n) {
+            g_smallData.deallocate(static_cast&lt;void*&gt;(static_cast&lt;T*&gt;(p)), n * sizeof(T), alignof(T));
+        }
+    };
+
+    int main() {
+        std::list&lt;int32_t, NearAllocator&lt;int32_t&gt;&gt; widgets;
+
+        widgets.push_back(1);
+    }
+</pre>
+
+<p>
+Can we use <i>near fancy pointer</i> types to address objects that are located in a "small" fixed subset of main memory?
+</p>
+
+<p>
+<b>Yes; but there are practical limitations.</b>
+</p>
+
+<p>
+<i>Near fancy pointer</i> types (such as the <code>NearPtr</code> above) are no problem for
+these standard containers: <code>deque</code>, <code>forward_list</code>, <code>vector</code>.
+But these other standard containers <i>will</i> have technical difficulties with near fancy pointers:
+<code>list</code>, <code>map</code>, <code>set</code>, <code>unordered_set</code>, <code>unordered_map</code>.
+These containers have trouble because their natural implementation requires a linked list
+where some nodes in the linked list are allocated (i.e. fancy pointers identifying objects in
+the "small data area") and some nodes are not (i.e. these nodes are not in the "small data area"
+and thus are not addressable by the near fancy pointer type).
+</p>
+
+<p>
+Containers with this difficulty shall be called <dfn>list-like containers</dfn>.
+</p>
+
+<div display="block" align="center">
+<img src="fancy-pointers.fwdlist.png" width="40%" display="inline"></img>
+<img src="fancy-pointers.list.png" width="40%" display="inline"></img>
+</div>
+
+<p>
+We have the following possible solutions to this problem:
+<ol>
+    <li>
+        Near fancy pointer types are just not allowed.
+        <span class="clarification">(This is the reference solution.
+        Any solution less appealing than this one can be summarily dismissed.)</span>
+    </li>
+    <li>
+        Near fancy pointer types are not allowed for <i>list-like containers</i>, but
+        are allowed for other containers. The Standard would have to specify for each
+        container whether it was list-like or not.
+    </li>
+    <li>
+        List-like containers use only native pointers for addressing.
+        These native pointers are cast back to fancy pointers at deallocation time.
+        This solution loses the memory-footprint benefit we were hoping to get
+        from using fancy pointers, such that we might as well use native pointers
+        in this case. (Therefore this solution is summarily dismissed.)
+    </li>
+    <li>
+        Each node of a list-like container holds an extra bit indicating whether the node
+        is allocated (in which case it is identified by a fancy pointer) or non-allocated
+        (in which case it is identified by a native pointer).
+        <span class="clarification">This solution requires at least 1 extra bit of memory
+        footprint per node.
+        The extra bit would be redundant for "non-near" pointer types. The Standard
+        might specify a trait (e.g. <code>constexpr bool std::pointer_traits&lt;FancyPtrT&gt;::is_near</code>)
+        so that standard list-like containers would not need to pay for the extra bit,
+        or break ABI compatibility, in non-near cases. This solution requires vendors
+        to do a lot of new work.</span>
+    </li>
+    <li>
+        Near fancy pointer types are allowed for list-like containers, but if the container
+        itself, or any subobject thereof, cannot be addressed with (a rebinding of) its own
+        <code>pointer</code> type, then the behavior is undefined.
+        <span class="clarification">This solution does not require any new work from vendors,
+        but it does introduce a new source of undefined behavior.</span>
+        <pre class="clarification">
+    int main() {
+        using L = std::list&lt;int32_t, NearAllocator&lt;int32_t&gt;&gt;;
+
+        L alpha = std::make_shared&lt;L&gt;();  // undefined behavior
+        auto beta = std::make_shared&lt;L&gt;();  // undefined behavior
+        auto gamma = std::allocate_shared&lt;L&gt;(NearAllocator&lt;L&gt;());  // OK!
+    }
+        </pre>
+    </li>
+</ol>
+</p>
+
+<p>
+In my opinion, solutions (1), (2), and (5) are all workable. Solution (1) is the de-facto
+solution today: <b>Near fancy pointer types are just not allowed.</b>
+</p>
+
+
+<h3><a name="C">Scenario C. Pointers indistinguishable from native pointers.</a></h3>
+
+<p class="clarification">
+In Scenario A we saw that "far" fancy pointers are not allowed: no fancy pointer type can ever
+address <i>more</i> than main memory. In Scenario B we saw that "near" fancy pointers are
+de-facto not allowed: any fancy pointer addressing <i>less</i> than all of main memory causes
+problems for list-like containers. Assuming solution (1) to Scenario B, we seem to have proven
+that every fancy pointer type must be able to address <i>no less and no more</i> than all of main memory;
+that is, the set of fancy pointer values must exactly equal the set of native pointer values.
+</p>
+
+<p>
+Can we use fancy pointer types that are exactly equivalent to native pointers?
+</p>
+
+<p>
+<b>Yes, but we should use native pointers instead.</b> Fancy pointers equivalent to native pointers
+are not useful. If this were <i>all</i> that fancy pointers were good for, the Committee would be
+justified in deprecating the entire fancy-pointer mechanism.
+</p>
+
+
+<h3><a name="D">Scenario D. "Fat" pointers carrying metadata for dereference-time.</a></h3>
+
+<p>
+Some programming systems use "fat pointers" which are <i>augmented</i> versions of native pointers.
+The <i>metadata</i> part of a fat pointer communicates the size of the original allocation so that
+dereferences can be bounds-checked, and/or the type of the original allocation so that dereferences
+can be type-checked.
+</p>
+
+<p class="clarification">
+For example, here is one possible "fat" fancy pointer type.
+</p>
+<pre class="clarification">
+    template&lt;class T&gt;
+    class FatPtr {
+        char *base_ = nullptr;
+        int cur_ = 0;
+        int max_ = 1;
+    public:
+        FatPtr() = default;
+        FatPtr(std::nullptr_t) {}
+        explicit FatPtr(T *p, int n) : base_((char*)p), max_(n * sizeof (T)) {}
+
+        template&lt;class U&gt;
+        explicit FatPtr(const FatPtr&lt;U&gt;&amp; rhs) :
+            base_(rhs.base_), cur_(rhs.cur_), max_(rhs.max_) {
+            if (cur_ % sizeof(T) != 0) throw "misaligned";
+        }
+
+        T& operator*() const {
+            if (base_ == nullptr) {
+                throw "null";
+            } else if (cur_ &lt; 0 || max_ &lt;= cur_) {
+                throw "out of bounds";
+            } else if (cur_ % sizeof(T) != 0) {
+                throw "misaligned";
+            } else {
+                return *(T*)(base_ + cur_);
+            }
+        }
+
+        auto& operator++() {
+            if (base_ == nullptr) throw "null";
+            if (max_ &lt;= cur_ + sizeof(T)) throw "out of bounds";
+            cur_ += sizeof(T);
+            return *this;
+        }
+
+        // ...
+    };
+
+    template&lt;class T&gt;
+    struct FatAllocator {
+        using value_type = T;
+        using pointer = FatPtr&lt;T&gt;;
+        using void_pointer = FatPtr&lt;void&gt;;
+
+        pointer allocate(size_t n) {
+            T *p = std::allocator&lt;T&gt;().allocate(n);
+            return pointer(p, n);
+        }
+        void deallocate(pointer p, size_t n) {
+            if (p.cur_ != 0) throw "deallocating non-allocated pointer";
+            std::allocator&lt;T&gt;().deallocate(p, n);
+        }
+    };
+</pre>
+<p class="clarification">
+This fat-pointer type plays well with list-like containers because its range of values includes all
+of main memory.
+</p>
+
+<p>
+In order to get the benefit of bounds-checking, the container must do pointer arithmetic only on
+<code>FatPtr</code>s losslessly derived from the originally allocated <code>FatPtr</code>.
+In order to get the benefit of type-checking, the container must dereference only
+<code>FatPtr</code>s losslessly derived from the originally allocated <code>FatPtr</code>, which
+effectively implies doing pointer arithmetic only on <code>FatPtr</code>s.
+This will generally have a performance cost, especially in debug mode.
+Worse, if we use fat pointers <i>only</i> for safety-checking, there will be no benefit to counter
+the performance cost, unless the standard container itself has bugs.
+</p>
+
+<p>
+The fat-pointer scenario is the only scenario in this paper where it makes sense to do pointer arithmetic
+on fancy pointers. In every other case, it is equivalent — and generally more efficient, especially
+in debug mode — to do pointer arithmetic only on native pointers.
+</p>
+
+<p>
+Can we use <i>fat fancy pointer</i> types to bounds-check each access to an allocation?
+</p>
+
+<p>
+<b>Yes; but I think it is not worth the performance cost.</b>
+</p>
+
+<p>
+We have the following possible solutions to this problem:
+<ol>
+    <li>
+        Fat fancy pointer types are technically permitted, but may be sliced to native pointers
+        at any time. Every fancy pointer type is required to model <code>RandomAccessIterator</code>;
+        containers may use either fancy pointers or native pointers for pointer arithmetic.
+        This is the de-facto and most conservative solution.
+    </li>
+    <li>
+        Fat fancy pointer types are fully supported. Every fancy pointer type is required to model
+        <code>RandomAccessIterator</code>; containers must use fancy pointers derived from the
+        original allocation for all pointer arithmetic.
+        This solution has a performance cost in debug mode. This solution also has the cost that
+        it transforms the <i>de-jure</i> requirement (that fancy pointer types model
+        <code>RandomAccessIterator</code>) into a <i>de-facto</i> requirement. User-defined
+        fancy pointer types that do not model all of <code>RandomAccessIterator</code> may stop working
+        if this solution is implemented. This solution requires vendors to do a lot of new work.
+    </li>
+    <li>
+        Fat fancy pointer types are supported; but containers are required to use them for pointer-arithmetic
+        only in the implementations of functions which might have undesirable behavior if done with
+        native pointers. For example, the bounds-checked <code>vector::at</code> could use either native
+        or fancy pointer arithmetic, but the unchecked <code>vector::operator[]</code> would be required
+        by the Standard to return the dereference of a fancy pointer losslessly derived from the original
+        allocation. The Standard would have to specify "fancy" or "native" arithmetic for each container
+        member function. This solution requires vendors to do some new work.
+    </li>
+    <li>
+        Fat fancy pointers are explicitly unsupported. Fancy pointers are no longer required to
+        model <code>RandomAccessIterator</code> at all. Containers must slice fancy pointers
+        to native pointers before performing any operation other than comparison, dereference,
+        or deallocation. This solution requires vendors to do some new work.
+    </li>
+</ol>
+</p>
+
+<p>
+In my opinion, solutions (1), (3), and (4) are workable. Solution (2) has too many practical disadvantages:
+breaks working code, hurts performance, requires work from vendors. I claim that solution (4) is the best:
+<b>Fat fancy pointers should be effectively ignored. Fancy pointer types should no longer be
+required to model <code>RandomAccessIterator</code>.</b>
+</p>
+
+
+<h3><a name="E">Scenario E. "Segmented" pointers carrying metadata for deallocate-time.</a></h3>
+
+<p>
+Some programming systems use <i>augmented</i> pointers similar to Scenario D, but whose
+<i>metadata</i> is used only by the deallocation mechanism. For example, a memory resource
+managing several memory "segments" might store the identity of the current segment in the
+allocated pointer, so that the pointer can be returned to the correct segment at deallocation
+time. Because of this example, I call such fancy pointers <dfn>segmented pointers</dfn>.
+</p>
+
+<p class="clarification">
+For example, here is one possible "segmented" fancy pointer type.
+<a href="https://github.com/Quuxplusone/from-scratch/blob/master/include/scratch/bits/containers/segmented-allocator.h"
+>A full implementation is available on my GitHub under the name
+<code>scratch::pmr::segmented_resource</code>.</a>
+</p>
+<pre class="clarification">
+    class Segment;
+
+    template&lt;class T&gt;
+    class SegmentedPtr {
+        T *ptr_ = nullptr;
+        Segment *seg_ = nullptr;
+    public:
+        SegmentedPtr() = default;
+        SegmentedPtr(std::nullptr_t) {}
+        explicit SegmentedPtr(T *p, Segment *seg) : ptr_(p), seg_(seg) {}
+
+        template&lt;class U&gt;
+        explicit SegmentedPtr(const SegmentedPtr&lt;U&gt;&amp; rhs) :
+            ptr_(rhs.ptr_), seg_(rhs.seg_) {}
+
+        auto segment() const { return seg_; }
+        T& operator*() const { return *ptr_; }
+        auto& operator++() { ++ptr_; return *this; }
+
+        // ...
+
+        static auto pointer_to(T& r) { return SegmentedPtr(&r, nullptr); }
+    };
+
+    class Segment {
+        char buffer[10000];
+        int index = 0;
+        int freed = 0;
+    public:
+        bool can_allocate(size_t bytes) {
+            return (sizeof buffer - index) >= bytes;
+        }
+        auto allocate(size_t bytes) {
+            index += bytes;
+            void *p = &buffer[index - bytes];
+            return SegmentedPtr&lt;void&gt;(p, this);
+        }
+        void deallocate(void *, size_t bytes) {
+            freed += bytes;
+            if (freed == index) {
+                index = freed = 0;
+            }
+        }
+    };
+
+    class SegmentedResource {
+        std::list&lt;Segment&gt; m_segments;
+    public:
+        SegmentedPtr&lt;void&gt; allocate(size_t bytes, size_t align) {
+            assert(align <= alignof(std::max_align_t));
+            bytes += -bytes % alignof(std::max_align_t);
+            assert(bytes <= 10000);
+
+            for (auto&& seg : m_segments) {
+                if (seg.can_allocate(bytes)) {
+                    return seg.allocate(bytes);
+                }
+            }
+            return m_segments.emplace_back().allocate(bytes);
+        }
+        void deallocate(SegmentedPtr&lt;void&gt; p, size_t bytes, size_t) {
+            bytes += -bytes % alignof(std::max_align_t);
+            p.segment()->deallocate(static_cast&lt;void*&gt;(p), bytes);
+        }
+    };
+
+    template&lt;class T&gt;
+    class SegmentedAllocator {
+        SegmentedResource *mr_;
+    public:
+        using value_type = T;
+        using pointer = SegmentedPtr&lt;T&gt;;
+
+        SegmentedAllocator(SegmentedResource *mr): mr_(mr) {}
+
+        pointer allocate(size_t n) {
+            return pointer(mr_->allocate(n * sizeof(T), alignof(T)));
+        }
+        void deallocate(pointer p, size_t n) {
+            return mr_->deallocate(p, n * sizeof(T), alignof(T));
+        }
+    };
+
+    int main() {
+        SegmentedResource mr;
+        std::list&lt;int, SegmentedAllocator&lt;int&gt;&gt; widgets(&mr);
+
+        widgets.push_back(1);
+    }
+</pre>
+<p class="clarification">
+The important line is this one, in <code>SegmentedResource::deallocate</code>:
+</p>
+<pre class="clarification">
+            p.segment()->deallocate(static_cast&lt;void*&gt;(p), bytes);
+</pre>
+<p class="clarification">
+This line returns <code>p</code>'s memory to the segment from which it was originally allocated.
+If the identity of that segment were not part of <code>p</code>'s metadata, this code would
+not work. If <code>p</code>'s metadata had been sliced away prior to deallocation (that is,
+if the pointer passed to the deallocation mechanism were not losslessly derived from the original
+allocation), this code would not work.
+</p>
+
+<p class="clarification">
+If the programmer cannot rely on the container to deallocate a pointer losslessly derived from the
+original allocation, then the programmer cannot use this kind of segmented memory resource.
+</p>
+
+<p>
+Can we use <i>segmented pointer</i> types to hold metadata used at deallocation time?
+</p>
+
+<p>
+<b>Yes, we can; it has practical difficulties, but I believe it is worth implementing.</b>
+</p>
+
+<p>
+The problems in this case are not with the containers. No vendor's containers actually
+support segmented pointers today, due to needless overuse of slicing expressions such as
+<code>std::pointer_traits&lt;P&gt;::pointer_to(std::addressof(*q))</code>; but adjusting those
+expressions to non-slicing expressions such as <code>static_cast&lt;P&gt;(q)</code> can be done
+mechanically. Every vendor's containers (as far as I know) reserve enough internal storage
+to allow keeping a copy of each allocated fancy pointer until deallocation time.
+</p>
+
+<p>
+The problems I have found in practice are with the allocator-aware non-containers:
+<code>promise</code>, <code>shared_ptr</code>, and <code>packaged_task</code>. These
+types have shared states that may be allocated with an allocator, and their current
+implementations generally do not preserve a copy of the allocated pointer — only
+a copy of the allocator handle.
+</p>
+
+<p class="clarification">
+For example, libc++'s <code>promise(allocator_arg, _Alloc)</code> looks effectively like this:
+</p>
+<pre class="clarification">
+    template&lt;class _Rp, class _Alloc&gt;
+    class __assoc_state_alloc : public __assoc_state&lt;_Rp&gt;
+    {
+        _Alloc __alloc_;
+        void __on_zero_shared() noexcept override {
+            using _Al = typename __allocator_traits_rebind&lt;_Alloc, __assoc_state_alloc>::type;
+            using _ATraits = allocator_traits&lt;_Al>;
+            using _PTraits = pointer_traits&lt;typename _ATraits::pointer>;
+            _Al __a(__alloc_);
+            this->~__assoc_state_alloc();
+            __a.deallocate(std::pointer_traits&lt;_P&gt;::pointer_to(*this), 1);
+        }
+ public:
+        explicit __assoc_state_alloc(const _Alloc& __a)
+            : __alloc_(__a) {}
+    };
+
+    template&lt;class _Rp>
+    template&lt;class _Alloc>
+    promise&lt;_Rp>::promise(allocator_arg_t, const _Alloc& __a0)
+    {
+        using _State = __assoc_state_alloc&lt;_Rp, _Alloc>;
+        using _A2 = typename __allocator_traits_rebind&lt;_Alloc, _State>::type;
+        using _D2 = __allocator_destructor&lt;_A2>;
+        _A2 __a(__a0);
+        unique_ptr&lt;_State, _D2> __hold(__a.allocate(1), _D2(__a, 1));
+        ::new(static_cast&lt;void*>(std::addressof(*__hold.get()))) _State(__a0);
+        __state_ = std::addressof(*__hold.release());
+    }
+</pre>
+<p class="clarification">
+The argument to <code>__a.deallocate</code> is the direct result of <code>pointer_to</code>;
+that is, it will fail to correctly reconstitute the metadata that was lost in the conversion
+from fancy pointer <code>__hold.get()</code> to native pointer <code>this</code>.
+To make this code work with segmented pointers, the <code>__assoc_state_alloc</code> struct
+must store a copy of the originally allocated pointer.
+</p>
+
+<p>
+We have the following possible solutions to this problem:
+<ol>
+    <li>
+        Segmented pointer types are not allowed. Fancy pointers may be sliced to native pointers
+        at any time, which means their metadata cannot be used for deallocation. This is the de-facto
+        solution.
+    </li>
+    <li>
+        Segmented pointer types are fully supported. Every allocator-aware type
+        is required to use for deallocation a fancy pointer derived from the
+        corresponding original allocation. This solution requires vendors to do a lot of new work.
+    </li>
+    <li>
+        Segmented pointer types are supported by some allocator-aware types, and not
+        supported by others. The Standard dictates which allocator-aware types are
+        <dfn>segmented-allocator-aware</dfn>. This solution requires specification work
+        from the Committee, plus some work from vendors, and leaves the situation confusing
+        for users. (Therefore this solution is summarily dismissed.)
+    </li>
+</ol>
+</p>
+
+<p>
+In my opinion, solutions (1) and (2) are workable.
+</p>
+
+
+<h2><a name="Any">Is any kind of fancy pointer compatible with C++?</a></h2>
+
+<p>
+We have seen that there are five plausible scenarios for fancy-pointer usage in C++.<br/>
+Scenario (A), far pointers, was proven impossible to support.<br/>
+Scenario (B), near pointers, has three possible resolutions of which the de-facto one is "do not support."<br/>
+Scenario (C), pointers indistinguishable from native pointers, is a special case.<br/>
+Scenario (D), fat pointers, has three possible solutions of which the de-facto one is "do not support."<br/>
+Scenario (E), segmented pointers, has two possible solutions of which the de-facto one
+is "do not support."
+</p>
+
+<p>
+If we adopt the de-facto solution in all scenarios, our conclusion is that only Scenario (C)
+is workable, and therefore the only valid pointer types in C++ are those indistinguishable
+from native pointer types. I will refer to this set of solutions as
+<dfn>fancy-pointer-deprecation</dfn>.
+</p>
+
+<p>
+If we are willing to force some work on vendors, my preferred solutions would be
+B-5 (support near pointers, with undefined behavior for certain uses of list-like containers);
+D-1 (do not support fat pointers), E-2 (support segmented pointers). I will refer to this
+set of solutions as <dfn>fancy-pointer-support</dfn>.
+</p>
+
+
+<h2><a name="Requirements">Requirements on fancy pointer types if <i>fancy-pointer-support</i> were adopted.</a></h2>
+
+<p>
+Solution B-5 requires only that it be possible to cast a native pointer-to-<code>Base</code>
+(to a subobject of a list-like container; therefore, non-null) into a <i>dereferenceable</i>
+fancy pointer-to-<code>Base</code>. This requirement is translated into C++ terms via the
+standard trait <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(T& r)</code>.
+</p>
+
+<p>
+Solution E-2 requires that it be possible to losslessly cast a fancy
+pointer-to-<code>Derived</code> into a fancy-pointer-to-<code>Base</code>, and also vice versa.
+(Here <code>Base</code> represents a possibly-terminal node of a list-like container, and
+<code>Derived</code> represents a non-terminal node.) This requirement might be translated into
+C++ terms in many possible ways. The most natural way to express casting in C++ is via
+<code>static_cast</code>.
+</p>
+
+<p>
+As long as fancy pointer types are permitted by the Standard, container implementations
+will also require that it be possible to cast a fancy pointer-to-<code>T</code> into
+a native pointer-to-<code>T</code>. The most natural way to express casting in C++ is via
+<code>static_cast</code>. Therefore we should require that every fancy pointer type
+support casting to its corresponding native pointer type.
+</p>
+
+<p class="clarification">
+Today, container implementations say <code>std::addressof(*fancyPtrT)</code> instead of
+<code>static_cast&lt;T*&gt;(fancyPtrT)</code>. The latter is more philosophically appropriate.
+The former also has the potential problem that it can be used only for <i>dereferenceable</i>
+pointer values. For example, <code>std::addressof(*fancyPtrT)</code> cannot safely be used
+when <code>fancyPtrT == nullptr</code>. This does not seem to be a problem for containers
+in practice.
+</p>
+
+<p class="clarification">
+<code>std::addressof(*fancyPtrT)</code> also cannot safely be used when <code>fancyPtrT</code>
+represents a "one-past-the-end" pointer value. Such values arise only via fancy pointer
+arithmetic.
+</p>
+
+<p>
+If we forbid <i>fat pointers</i>, then no container implementation will ever require fancy
+pointer arithmetic. Therefore we should drop the requirement that fancy pointer types
+model <code>RandomAccessIterator</code>. This may require some work from vendors, to replace
+expressions such as <code>fancyPtrT[k]</code> with <code>static_cast&lt;T*&gt;(fancyPtrT)[k]</code>.
+</p>
+
+<h2><a name="basic_string"><code>basic_string</code> requires trivial default constructibility.</a></h2>
+
+<p>
+<code>basic_string</code>'s implementation generally requires that its <code>pointer</code>
+type be trivially default constructible. The Standard should explicitly specify this requirement
+in [string.require].
+</p>
+
+</body>
+</html>
