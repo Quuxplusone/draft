@@ -55,7 +55,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> DxxxxR0 <br>
-<b>Date:</b> 2017-08-15 <br>
+<b>Date:</b> 2017-08-17 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
@@ -68,18 +68,19 @@ td { text-align: left; vertical-align: top;
 <a href="#Allocator">An allocator is a handle to a memory resource.</a><br>
 <a href="#Pointer">Pointer values may be dereferenceable and/or deallocatable.</a><br>
 <a href="#Purposes">Purposes of fancy pointer types.</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#A">Scenario A. High-memory-area "far" pointers.</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#A">Scenario A. "Offset" pointers with a modified bit-level representation.</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#B">Scenario B. Small-data-area "near" pointers.</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#C">Scenario C. Pointers indistinguishable from native pointers.</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#C">Scenario C. High-memory-area "far" pointers.</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#D">Scenario D. "Fat" pointers carrying metadata for dereference-time.</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#E">Scenario E. "Segmented" pointers carrying metadata for deallocate-time.</a><br>
 <a href="#Any">Is any kind of fancy pointer compatible with C++?</a><br>
 <a href="#Requirements">Requirements on fancy pointer types if <i>fancy-pointer-support</i> were adopted.</a><br>
 <a href="#basic_string"><code>basic_string</code> requires trivial default constructibility.</a><br>
+<a href="#References">References and further reading.</a><br>
 </p>
 
 
-<h2><a name="Summary">Summary. Proposed direction for fancy pointers.</a></h2>
+<h2><a name="Summary">Summary. Proposed directions for fancy pointers.</a></h2>
 
 <p>
 This is a position paper explaining my take on fancy pointers in C++.
@@ -91,17 +92,18 @@ What do we want fancy pointers to represent?
 </p>
 <ul class="clarification">
     <li>
-        (A) Un-augmented fancy pointers addressing a greater range of memory: far pointers.
-        This is impossible in C++ because every object must have a (native) address.
+(A) Un-augmented fancy pointers with a different bit-level representation than native pointers: offset pointers.
+This is explicitly supported today. Many types (std::vector) work already; some non-container types
+(std::shared_ptr) do not work.
     </li>
     <li>
 (B) Un-augmented fancy pointers addressing a lesser range of memory: small data area.
-This is plausible. Some containers (std::vector) work already; some (std::list) work only in
+This is plausible. Some containers (std::vector) implicitly work already; some (std::list) work only in
 certain runtime situations.
     </li>
     <li>
-(C) Un-augmented fancy pointers addressing exactly the same range of memory: then we should just
-give up on fancy pointers and use raw pointers all the time. Deprecate fancy pointers in C++2a.
+(C) Un-augmented fancy pointers addressing a greater range of memory: far pointers.
+This turns out to be impossible in C++ because every object must have a native address.
     </li>
     <li>
 (D) Augmented fancy pointers whose metadata affects arithmetic: fat pointers.
@@ -110,14 +112,15 @@ This is plausible but expensive, and not worth the implementation effort for ven
     <li>
 (E) Augmented fancy pointers whose metadata affects deallocation: segmented pointers.
 This is plausible. Some containers (std::vector) work already; some (std::list) require only
-trivial modifications; some (std::shared_ptr) require large fixes.
+trivial modifications; some (std::shared_ptr) require major fixes.
     </li>
 </ul>
 <p class="clarification">
 I propose two self-consistent future directions for fancy pointers. In one direction,
-we keep the status quo that no scenarios except (C) are supported, and move toward
-deprecation of the fancy-pointer mechanism. In my preferred direction, we require that
-vendors support the scenarios (B) and (E).
+we keep the status quo that no scenario except (A) is supported, and perhaps move toward
+separation of the <i>pointer storage type</i> from the <i>allocation mechanism</i>.
+In my preferred direction, we require that vendors support scenarios (B) and (E) as well
+as (A).
 </p>
 
 <p class="clarification">
@@ -125,25 +128,33 @@ In my preferred solution, every STL container needs to follow these rules:
 </p>
 <ol class="clarification">
     <li>
+        Any dereferenceable pointer stored "within" the container must be stored as a
+        fancy pointer. (Required by A; wanted by B.)
+    </li>
+    <li>
+        A dereferenceable pointer stored "outside" the container, such as in an iterator,
+        may be stored as a fancy pointer or as a native pointer. (Relevant to A.)
+    </li>
+    <li>
         Whenever you get a pointer from allocate(), hang onto it. You will never be able to
-        reconstruct its metadata if you lose it.
+        reconstruct its metadata if you lose it. (Required by E.)
     </li>
     <li>
         Assume that metadata is preserved via the fancy pointer type's special member functions,
         and via casting from one fancy pointer type to a rebound version of that type
         (e.g. <code>static_cast&lt;FancyPtrT>(fancyPtrU)</code>). Do not assume that metadata
-        is preserved via any other operations.
+        is preserved via any other operations. (Required by E.)
     </li>
     <li>
         Assume that <code>static_cast&lt;T*>(fancyPtrT)</code> is a correct slicing expression.
         Prefer to avoid <code>std::addressof(*fancyPtrT)</code>, which isn't going to work if
-        <code>fancyPtrT</code> is not dereferenceable.
+        <code>fancyPtrT</code> is not dereferenceable. (Required by A, B, and E.)
     </li>
     <li>
         Assume that <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(t)</code> returns a
         <i>dereferenceable</i> pointer, but not a <i>deallocatable</i> one. Do not assume that
-        <code>static_cast&lt;FancyPtrT&gt;(std::addressof(t))</code> compiles.
-        (<code>FancyPtrT</code> might not have a one-argument constructor.)
+        <code>static_cast&lt;FancyPtrT&gt;(std::addressof(t))</code> compiles;
+        <code>FancyPtrT</code> might not have a one-argument constructor. (Required by E.)
     </li>
     <li>
         <code>basic_string</code> may assume that its fancy pointer type is trivially default
@@ -155,8 +166,9 @@ In my preferred solution, every STL container needs to follow these rules:
     </li>
     <li>
         Do not assume that the fancy pointer type models <code>RandomAccessIterator</code>.
-        (For example, do not rely on <code>operator++</code>, <code>operator[]</code>, or
-        <code>operator&lt;</code>. Slice to <code>T*</code> before attempting these operations.)
+        For example, do not rely on <code>operator++</code>, <code>operator[]</code>, or
+        <code>operator&lt;</code>. Slice to <code>T*</code> before attempting these operations.
+        (Improves the performance and usability of A, B, and E. Precludes D.)
     </li>
 </ol>
 <p class="clarification">
@@ -281,10 +293,15 @@ with respect to the base type.
 
 <p>
 A <dfn>memory resource</dfn> is an object that affords two functions: <i>allocation</i> and <i>deallocation</i>
-of memory chunks. How it does that is irrelevant for our purposes. Some memory resources are
-nice well-behaved C++ variables of types derived from <code>std::pmr::memory_resource</code> with
-overridden <code>allocate</code> and <code>deallocate</code> virtual member functions. But another
-well-known memory resource is just "the heap." "The heap" doesn't exist as a concrete C++ object,
+of memory chunks. How it does that is irrelevant for our purposes. An allocation mechanism must somehow
+yield a <i>handle</i> that uniquely identifies the allocated memory chunk; the corresponding
+deallocation mechanism must accept that same <i>handle</i> as input.
+</p>
+
+<p class="clarification">
+Instances of types derived from <code>std::pmr::memory_resource</code> are memory resources.
+Instances of <code>boost::interprocess::segment_manager_base</code> are also memory resources.
+But another well-known memory resource is just "the heap." "The heap" doesn't exist as a concrete C++ object,
 but it still affords <i>allocation</i> via <code>operator new</code> and <i>deallocation</i>
 via <code>operator delete</code>. Therefore I say that "the heap" is a <i>memory resource</i> as well.
 </p>
@@ -469,57 +486,152 @@ Here are five scenarios I consider plausible.
 </p>
 
 
-<h3><a name="A">Scenario A. High-memory-area "far" pointers.</a></h3>
+<h3><a name="A">Scenario A. "Offset" pointers with a modified bit-level representation.</a></h3>
 
 <p>
-Let <dfn>main memory</dfn> be defined as the set of all object addresses addressable by
-C++ native pointer types. Some programmers deal in objects that are not located in main memory.
+Some programming systems use <dfn>offset pointers</dfn>, which are equivalent
+to native pointers but whose bit-level representation is different. For example, the bit-level
+representation of a <code>boost::interprocess::offset_ptr</code> identifying an object <code>x</code>
+is the memory address of <code>x</code> minus the address of the <code>offset_ptr</code> itself.
 </p>
 
 <p class="clarification">
-A historical example is the 80286, where 16-bit native pointers could identify only the
-memory addresses between 0x0000 and 0xFFFF, but the computer itself had additional memory
-ranging from address 0x1'0000 to address 0xF'FFFF, and some models had a "high memory area"
-between 0x10'0000 and 0x10'FFEF. These additional addresses were not addressable with native
-pointers such as <code>int*</code>. Compilers of the day provided additional built-in types
-such as <code>far int*</code>, where <code>sizeof(far int*) &gt; sizeof(int*)</code>.
+This means that the representation of a <code>boost::interprocess::offset_ptr</code> object depends
+on its memory address. <code>offset_ptr</code> objects are not trivially copyable. Yet, at the
+Platonic level, <code>offset_ptr</code> can be said to have the same set of possible <i>values</i>
+as a native pointer type.
 </p>
 
 <p class="clarification">
-A possible future example is objects residing in some location which
-<i>is not memory-mapped into the current process's virtual address space</i>.
-Today this is unlikely to be a real problem for 64-bit address spaces — we just take
-anything we care about (including the OS kernel, and also GPU memory if I understand correctly)
-and map it into the current process's address space. It might be a problem looking forward
-into the future of enormous (>18 exabytes?) non-volatile storage, or more likely looking
-downward into the domain of 32-bit and 16-bit microcontrollers with smaller main memories.
+The benefit of <code>boost::interprocess::offset_ptr</code> is that if a memory region is mapped
+into the address space of two different processes, then every <code>offset_ptr</code> residing in the
+mapped region will identify the same object no matter which process is asking — as long as the
+identified object <i>also</i> resides in the mapped region.
 </p>
 
 <p>
-Can we use fancy pointer types to address objects that are not located in main memory?
+Can we use <i>offset fancy pointer types</i> to enable safe sharing of memory regions?
 </p>
 
 <p>
-<b>No, we cannot use fancy pointer types to address objects that aren't located in main memory.</b>
+<b>Yes; but the requirements on vendors are unclear, and there are pitfalls for the programmer.</b>
+</p>
+
+<p>
+A C++ object type is <dfn>representation-aware</dfn> if its object representation stores handles
+to allocated memory only in objects of the appropriate fancy pointer type. Instances of
+<i>representation-aware</i> types instantiated with <code>boost::interprocess::offset_ptr</code>
+can safely be stored in shared memory segments; instances of <i>non-representation-aware</i>
+types cannot safely be stored in shared memory segments.
+</p>
+
+<p>
+The following standard types are required or expected to be <i>representation-aware</i>:
+</p>
+<ul>
+    <li>Allocator-aware container types.</li>
+    <li>Container "node handle" types.</li>
+    <li><code>basic_string</code>. <span class="clarification">
+The usual "small string optimization" does not affect <i>representation-awareness</i>.
+In both libc++ and libstdc++, the relevant type-pun involves the representation of the <code>size_t capacity</code>
+member, not the representation of the allocated <code>data</code> pointer.
+</span></li>
+    <li><code>unique_ptr</code>.</li>
+</ul>
+
+
+<p>
+The following standard types are, in practice, <i>not</i> representation-aware:
+</p>
+<ul>
+    <li>Container "iterator" types.</li>
+    <li><code>shared_ptr</code>. <span class="clarification">
+But <code>boost::interprocess::shared_ptr</code> is. An instance of <code>boost::interprocess::shared_ptr&lt;T,A,D&gt;</code>
+holds fancy pointers (of type rebound from <code>allocator_traits&lt;A&gt;::pointer</code>) to the controlled object
+and to the control block.
+</span></li>
+    <li><code>packaged_task</code>, <code>promise</code> and <code>future</code>.</li>
+    <li><code>function</code> and <code>any</code>.</li>
+    <li><code>lock_guard</code>, <code>unique_lock</code>, <code>string_view</code>, etc.</li>
+    <li><code>pmr::polymorphic_allocator</code>. <span class="clarification">
+But <code>boost::interprocess::allocator</code> is. An instance of <code>boost::interprocess::allocator&lt;T,MR&gt;</code>
+holds a fancy pointer (of type rebound from <code>MR::void_pointer</code>) to the underlying memory resource of
+type <code>MR</code>(typically <code>boost::interprocess::segment_manager</code>).
+</span></li>
+    <li>Any polymorphic class type — for example <code>pmr::memory_resource</code>, <code>ostream</code>, etc. —
+    because of the vptr.</li>
+</ul>
+
+<p>
+The <i>representation-awareness</i> of a C++ class type is orthogonal to its memory allocation strategy.
 </p>
 
 <p class="clarification">
-Every fancy pointer type must provide an <code>operator*</code> that returns a reference to
-an object. That is, we must have a function definition along these lines:
+For example, <code>shared_ptr</code> requires allocation (and supports allocation with an allocator via
+<code>allocate_shared</code>) but <code>shared_ptr</code> is not representation-aware.
+Vice versa, <code>boost::interprocess::allocator</code> is representation-aware (it contains a non-static
+data member of fancy pointer type) but not allocator-aware (the fancy pointer is not obtained via
+<code>allocator_traits&lt;A&gt;::pointer</code> for any type <code>A</code>, and does not point to an
+allocation).
 </p>
-<pre class="clarification">
-    struct FancyPtrInt {
-        int& FancyPtrInt::operator*() const {
-            // some magic goes here
-        }
-        // ...
-    };
-</pre>
+
 <p class="clarification">
-The expression <code>*fancyp</code> returns a reference to its identified object as type <code>int&</code>.
-So its identified object must be addressable by a native pointer value — namely,
-<code>std::addressof(*fancyp)</code>. Therefore, this attempt to use fancy pointers to address objects
-outside main memory has failed.
+It is a shame that the standard <i>representation-aware</i> types inherit their storage type from
+<code>allocator_traits&lt;A&gt;::pointer</code> instead of from a separate template parameter <code>P</code>.
+I don't see how to fix this without breaking ABI and requiring a lot of work from vendors.
+A small step in this direction would be to add an allocator adaptor <code>std::storage_allocator_adaptor&lt;P,A&gt;</code>
+identical to <code>A</code> except that its <code>pointer</code> typedef is
+<code>pointer_traits&lt;P&gt;::rebind&lt;A::value_type&gt;</code>. This would ease using
+<code>offset_ptr</code> with representation-aware containers; but not help with types that were
+not already representation-aware, such as <code>shared_ptr</code>.
+</p>
+
+<p>
+The programmer is responsible for discovering whether any given C++ type is <i>representation-aware</i>. There is
+no programmatic way to determine the <i>representation-awareness</i> of a given type. The consequence of
+wrongly guessing that a type is <i>representation-aware</i> is typically a segfault.
+</p>
+
+<p>
+There are three alternatives applicable to the current situation:
+</p>
+<ol>
+    <li>
+        Offset fancy pointer types are allowed, but difficult to use safely.
+        (The current solution.)
+    </li>
+    <li>
+        Offset fancy pointer types are not allowed. The Standard removes support
+        for <code>boost::interprocess::offset_ptr</code>. This solution breaks
+        existing code.
+    </li>
+    <li>
+        Offset fancy pointer types become more fully supported.
+        Many additional standard types gain <i>representation-awareness</i>; for example,
+        <code>std::shared_ptr</code> gains a template parameter controlling the
+        type of its internal pointers. This solution requires vendors to do a
+        lot of new work, and breaks ABI compatibility. This solution does not address
+        the fundamental problem that there is no programmatic way to determine or
+        ensure the <i>representation-awareness</i> of a given type.
+    </li>
+    <li>
+        The pointer type associated with the <i>object representation</i> of a class
+        is somehow divorced from the pointer type associated with the allocation mechanism.
+        Each allocator-aware type gains a template parameter <code>P</code> controlling
+        the type of its internal pointers, in addition to the old template parameter
+        <code>A</code> controlling its allocation mechanism. This solution requires
+        vendors to do a lot of new work, and breaks ABI compatibility. This solution
+        again does not address the fundamental problem that there is no programmatic way
+        to determine or ensure the <i>representation-awareness</i> of a given type.
+    </li>
+</ol>
+</p>
+
+<p>
+In my opinion, solution (1), the de-facto solution today, is the only workable solution.
+Solution (4) is philosophically attractive but does not make any headway on the fundamental
+problem and therefore offers no benefit at present.
+We are left with solution (1): <b>Offset fancy pointer types are allowed, but difficult to use safely.</b>
 </p>
 
 
@@ -689,25 +801,57 @@ solution today: <b>Near fancy pointer types are just not allowed.</b>
 </p>
 
 
-<h3><a name="C">Scenario C. Pointers indistinguishable from native pointers.</a></h3>
+<h3><a name="C">Scenario C. High-memory-area "far" pointers.</a></h3>
+
+<p>
+Let <dfn>main memory</dfn> be defined as the set of all object addresses addressable by
+C++ native pointer types. Some programmers deal in objects that are not located in main memory.
+</p>
 
 <p class="clarification">
-In Scenario A we saw that "far" fancy pointers are not allowed: no fancy pointer type can ever
-address <i>more</i> than main memory. In Scenario B we saw that "near" fancy pointers are
-de-facto not allowed: any fancy pointer addressing <i>less</i> than all of main memory causes
-problems for list-like containers. Assuming solution (1) to Scenario B, we seem to have proven
-that every fancy pointer type must be able to address <i>no less and no more</i> than all of main memory;
-that is, the set of fancy pointer values must exactly equal the set of native pointer values.
+A historical example is the 80286, where 16-bit native pointers could identify only the
+memory addresses between 0x0000 and 0xFFFF, but the computer itself had additional memory
+ranging from address 0x1'0000 to address 0xF'FFFF, and some models had a "high memory area"
+between 0x10'0000 and 0x10'FFEF. These additional addresses were not addressable with native
+pointers such as <code>int*</code>. Compilers of the day provided additional built-in types
+such as <code>far int*</code>, where <code>sizeof(far int*) &gt; sizeof(int*)</code>.
+</p>
+
+<p class="clarification">
+A possible future example is objects residing in some location which
+<i>is not memory-mapped into the current process's virtual address space</i>.
+Today this is unlikely to be a real problem for 64-bit address spaces — we just take
+anything we care about (including the OS kernel, and also GPU memory if I understand correctly)
+and map it into the current process's address space. It might be a problem looking forward
+into the future of enormous (>18 exabytes?) non-volatile storage, or more likely looking
+downward into the domain of 32-bit and 16-bit microcontrollers with smaller main memories.
 </p>
 
 <p>
-Can we use fancy pointer types that are exactly equivalent to native pointers?
+Can we use fancy pointer types to address objects that are not located in main memory?
 </p>
 
 <p>
-<b>Yes, but we should use native pointers instead.</b> Fancy pointers equivalent to native pointers
-are not useful. If this were <i>all</i> that fancy pointers were good for, the Committee would be
-justified in deprecating the entire fancy-pointer mechanism.
+<b>No, we cannot use fancy pointer types to address objects that aren't located in main memory.</b>
+</p>
+
+<p class="clarification">
+Every fancy pointer type must provide an <code>operator*</code> that returns a reference to
+an object. That is, we must have a function definition along these lines:
+</p>
+<pre class="clarification">
+    struct FancyPtrInt {
+        int& FancyPtrInt::operator*() const {
+            // some magic goes here
+        }
+        // ...
+    };
+</pre>
+<p class="clarification">
+The expression <code>*fancyp</code> returns a reference to its identified object as type <code>int&</code>.
+So its identified object must be addressable by a native pointer value — namely,
+<code>std::addressof(*fancyp)</code>. Therefore, this attempt to use fancy pointers to address objects
+outside main memory has failed.
 </p>
 
 
@@ -785,16 +929,19 @@ of main memory.
 
 <p>
 In order to get the benefit of bounds-checking, the container must do pointer arithmetic only on
-<code>FatPtr</code>s losslessly derived from the originally allocated <code>FatPtr</code>.
-In order to get the benefit of type-checking, the container must dereference only
-<code>FatPtr</code>s losslessly derived from the originally allocated <code>FatPtr</code>, which
-effectively implies doing pointer arithmetic only on <code>FatPtr</code>s.
+<code>FatPtr</code> values losslessly derived from the originally allocated <code>FatPtr</code>.
+</p>
+
+<p class="clarification">
+In order to get the benefit of <i>type</i>-checking, the container must dereference only
+<code>FatPtr</code> values losslessly derived from the originally allocated <code>FatPtr</code>, which
+again implies doing pointer arithmetic only on <code>FatPtr</code>.
 This will generally have a performance cost, especially in debug mode.
 Worse, if we use fat pointers <i>only</i> for safety-checking, there will be no benefit to counter
 the performance cost, unless the standard container itself has bugs.
 </p>
 
-<p>
+<p class="clarification">
 The fat-pointer scenario is the only scenario in this paper where it makes sense to do pointer arithmetic
 on fancy pointers. In every other case, it is equivalent — and generally more efficient, especially
 in debug mode — to do pointer arithmetic only on native pointers.
@@ -815,32 +962,33 @@ We have the following possible solutions to this problem:
         Fat fancy pointer types are technically permitted, but may be sliced to native pointers
         at any time. Every fancy pointer type is required to model <code>RandomAccessIterator</code>;
         containers may use either fancy pointers or native pointers for pointer arithmetic.
-        This is the de-facto and most conservative solution.
+        <span class="clarification">This is the de-facto and most conservative solution.</span>
     </li>
     <li>
         Fat fancy pointer types are fully supported. Every fancy pointer type is required to model
-        <code>RandomAccessIterator</code>; containers must use fancy pointers derived from the
-        original allocation for all pointer arithmetic.
-        This solution has a performance cost in debug mode. This solution also has the cost that
+        <code>RandomAccessIterator</code>. Containers must do pointer arithmetic only on fancy pointers
+        derived from the original allocation.
+        <span class="clarification">This solution has a performance cost in debug mode.
+        This solution also has the cost that
         it transforms the <i>de-jure</i> requirement (that fancy pointer types model
         <code>RandomAccessIterator</code>) into a <i>de-facto</i> requirement. User-defined
         fancy pointer types that do not model all of <code>RandomAccessIterator</code> may stop working
-        if this solution is implemented. This solution requires vendors to do a lot of new work.
+        if this solution is implemented. This solution requires vendors to do a lot of new work.</span>
     </li>
     <li>
         Fat fancy pointer types are supported; but containers are required to use them for pointer-arithmetic
         only in the implementations of functions which might have undesirable behavior if done with
-        native pointers. For example, the bounds-checked <code>vector::at</code> could use either native
-        or fancy pointer arithmetic, but the unchecked <code>vector::operator[]</code> would be required
-        by the Standard to return the dereference of a fancy pointer losslessly derived from the original
-        allocation. The Standard would have to specify "fancy" or "native" arithmetic for each container
-        member function. This solution requires vendors to do some new work.
+        native pointers. <span class="clarification">For example, the bounds-checked <code>vector::at</code>
+        could use either native or fancy pointer arithmetic, but the unchecked <code>vector::operator[]</code>
+        must dereference a fancy pointer losslessly derived from the original allocation.
+        The Standard would have to specify "fancy" or "native" arithmetic for each container
+        member function. This solution requires vendors to do some new work.</span>
     </li>
     <li>
         Fat fancy pointers are explicitly unsupported. Fancy pointers are no longer required to
         model <code>RandomAccessIterator</code> at all. Containers must slice fancy pointers
         to native pointers before performing any operation other than comparison, dereference,
-        or deallocation. This solution requires vendors to do some new work.
+        or deallocation. <span class="clarification">This solution requires vendors to do some new work.</a>
     </li>
 </ol>
 </p>
@@ -848,7 +996,7 @@ We have the following possible solutions to this problem:
 <p>
 In my opinion, solutions (1), (3), and (4) are workable. Solution (2) has too many practical disadvantages:
 breaks working code, hurts performance, requires work from vendors. I claim that solution (4) is the best:
-<b>Fat fancy pointers should be effectively ignored. Fancy pointer types should no longer be
+<b>Fat pointers should remain unsupported. Fancy pointer types should no longer be
 required to model <code>RandomAccessIterator</code>.</b>
 </p>
 
@@ -856,7 +1004,7 @@ required to model <code>RandomAccessIterator</code>.</b>
 <h3><a name="E">Scenario E. "Segmented" pointers carrying metadata for deallocate-time.</a></h3>
 
 <p>
-Some programming systems use <i>augmented</i> pointers similar to Scenario D, but whose
+Some programming systems use <i>augmented</i> pointers similar to Scenario E, but whose
 <i>metadata</i> is used only by the deallocation mechanism. For example, a memory resource
 managing several memory "segments" might store the identity of the current segment in the
 allocated pointer, so that the pointer can be returned to the correct segment at deallocation
@@ -1077,27 +1225,28 @@ In my opinion, solutions (1) and (2) are workable.
 <h2><a name="Any">Is any kind of fancy pointer compatible with C++?</a></h2>
 
 <p>
-We have seen that there are five plausible scenarios for fancy-pointer usage in C++.<br/>
-Scenario (A), far pointers, was proven impossible to support.<br/>
-Scenario (B), near pointers, has three possible resolutions of which the de-facto one is "do not support."<br/>
-Scenario (C), pointers indistinguishable from native pointers, is a special case.<br/>
-Scenario (D), fat pointers, has three possible solutions of which the de-facto one is "do not support."<br/>
+We have seen that there are five plausible scenarios for fancy-pointer usage in C++.<br>
+Scenario (A), offset pointers, has only one workable solution, "continue to partly support."<br>
+Scenario (B), near pointers, has three possible solutions of which the de-facto one is "do not support."<br>
+Scenario (C), far pointers, was proven impossible to support.<br>
+Scenario (D), fat pointers, has three possible solutions of which the de-facto one is "do not support."<br>
 Scenario (E), segmented pointers, has two possible solutions of which the de-facto one
 is "do not support."
 </p>
 
 <p>
-If we adopt the de-facto solution in all scenarios, our conclusion is that only Scenario (C)
-is workable, and therefore the only valid pointer types in C++ are those indistinguishable
-from native pointer types. I will refer to this set of solutions as
-<dfn>fancy-pointer-deprecation</dfn>.
+If we adopt the de-facto solution in all scenarios, our conclusion is that only Scenario (A)
+is workable, and therefore we may want to explore ways to separate <i>storage type</i> from
+<i>allocation mechanism</i>; we also may want to explore ways to determine the <i>representation-awareness</i>
+of a type at compile time.
 </p>
 
 <p>
 If we are willing to force some work on vendors, my preferred solutions would be
-B-5 (support near pointers, with undefined behavior for certain uses of list-like containers);
-D-1 (do not support fat pointers), E-2 (support segmented pointers). I will refer to this
-set of solutions as <dfn>fancy-pointer-support</dfn>.
+A-1 (continue the status quo on offset pointers), B-5 (support near pointers, with undefined behavior
+for certain uses of list-like containers); D-1 (do not support fat pointers),
+E-2 (fully support segmented pointers). I will refer to this set of solutions as
+<dfn>fancy-pointer-support</dfn>.
 </p>
 
 
@@ -1110,13 +1259,38 @@ fancy pointer-to-<code>Base</code>. This requirement is translated into C++ term
 standard trait <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(T& r)</code>.
 </p>
 
+<p class="clarification">
+The reason we must use <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(T& r)</code>
+rather than the simpler <code>static_cast&lt;FancyPtrT&gt;(T*)</code> is that there may not
+be any natural mapping from <code>T*</code> values onto <code>FancyPtrT</code> values.
+In scenario (B), some values of <code>T*</code> do not have an image in <code>FancyPtrT</code>.
+In scenario (E), the operation requires us to invent the metadata part of a <code>FancyPtrT</code> value.
+In both cases a mapping is possible, but it is not a <i>natural</i> mapping, and thus must
+not be represented in C++ by <code>static_cast</code>.
+</p>
+
+<p class="clarification">
+It is a shame that the signature of <code>pointer_to</code> takes <code>T&</code>, thus
+requiring that the input native pointer be <i>dereferenceable</i>. This means there is
+no generic way to get the fancy-pointer value corresponding to a one-past-the-end pointer;
+and the generic way to get a fancy null pointer is <code>FancyPtrT{}</code> rather than
+<code>pointer_to(nullptr)</code>. This does not seem to be a problem for containers in
+practice.
+</p>
+
+<p class="clarification">
+If scenario (A), offset pointers, is the only scenario in play, then
+<code>static_cast&lt;FancyPtrT&gt;(T*)</code> is perhaps an appropriate way to get the
+storage representation of a native pointer. Scenario (B), near pointers, is also relevant
+to storage representation.
+</p>
+
 <p>
 Solution E-2 requires that it be possible to losslessly cast a fancy
 pointer-to-<code>Derived</code> into a fancy-pointer-to-<code>Base</code>, and also vice versa.
 (Here <code>Base</code> represents a possibly-terminal node of a list-like container, and
-<code>Derived</code> represents a non-terminal node.) This requirement might be translated into
-C++ terms in many possible ways. The most natural way to express casting in C++ is via
-<code>static_cast</code>.
+<code>Derived</code> represents a non-terminal node.) The most natural way to express casting
+in C++ is via <code>static_cast</code>.
 </p>
 
 <p>
@@ -1131,14 +1305,14 @@ support casting to its corresponding native pointer type.
 Today, container implementations say <code>std::addressof(*fancyPtrT)</code> instead of
 <code>static_cast&lt;T*&gt;(fancyPtrT)</code>. The latter is more philosophically appropriate.
 The former also has the potential problem that it can be used only for <i>dereferenceable</i>
-pointer values. For example, <code>std::addressof(*fancyPtrT)</code> cannot safely be used
+pointer values. <code>std::addressof(*fancyPtrT)</code> cannot safely be used
 when <code>fancyPtrT == nullptr</code>. This does not seem to be a problem for containers
 in practice.
 </p>
 
 <p class="clarification">
-<code>std::addressof(*fancyPtrT)</code> also cannot safely be used when <code>fancyPtrT</code>
-represents a "one-past-the-end" pointer value. Such values arise only via fancy pointer
+Also, <code>std::addressof(*fancyPtrT)</code> cannot safely be used when <code>fancyPtrT</code>
+represents a "one-past-the-end" fancy pointer value; but such values arise only via fancy pointer
 arithmetic.
 </p>
 
@@ -1152,10 +1326,35 @@ expressions such as <code>fancyPtrT[k]</code> with <code>static_cast&lt;T*&gt;(f
 <h2><a name="basic_string"><code>basic_string</code> requires trivial default constructibility.</a></h2>
 
 <p>
-<code>basic_string</code>'s implementation generally requires that its <code>pointer</code>
+<code>basic_string</code>'s implementation typically requires that its <code>pointer</code>
 type be trivially default constructible. The Standard should explicitly specify this requirement
 in [string.require].
 </p>
+
+
+<h2><a name="References">References and further reading.</a></h2>
+
+<dl>
+
+<dd>
+Lance Diduck. N2486 "Alternative Allocators and Standard Containers." December 2007.
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2486.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2486.pdf</a>.
+</dd>
+
+<dd>
+Boost.Interprocess <code>offset_ptr</code> documentation.
+<a href="http://www.boost.org/doc/libs/1_64_0/doc/html/interprocess/offset_ptr.html">
+http://www.boost.org/doc/libs/1_64_0/doc/html/interprocess/offset_ptr.html</a>.
+</dd>
+
+<dd>
+Doug Judd. "Why <code>pointer_traits</code> was introduced in C++11." September 2015.
+<a href="http://blog.nuggetwheat.org/index.php/2015/09/01/why-pointer_traits-was-introduced-in-c11/">
+http://blog.nuggetwheat.org/index.php/2015/09/01/why-pointer_traits-was-introduced-in-c11/</a>.
+</dd>
+
+</dl>
 
 </body>
 </html>
