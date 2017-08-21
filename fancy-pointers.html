@@ -76,7 +76,8 @@ td { text-align: left; vertical-align: top;
 <a href="#Any">Is any kind of fancy pointer compatible with C++?</a><br>
 <a href="#Requirements">Requirements on fancy pointer types if <i>fancy-pointer-support</i> were adopted.</a><br>
 <a href="#basic_string"><code>basic_string</code> requires trivial default constructibility.</a><br>
-<a href="#References">References and further reading.</a><br>
+<a href="#Iterators">Appendix. Storage-awareness of iterators.</a><br>
+<a href="#References">Appendix. References and further reading.</a><br>
 </p>
 
 
@@ -544,7 +545,7 @@ member, not the representation of the allocated <code>data</code> pointer.
 The following standard types are, in practice, <i>not</i> representation-aware:
 </p>
 <ul>
-    <li>Container "iterator" types.</li>
+    <li>Container "iterator" types. (See <a href="#Iterators">Storage-awareness of iterators</a>.)</li>
     <li><code>shared_ptr</code>. <span class="clarification">
 But <code>boost::interprocess::shared_ptr</code> is. An instance of <code>boost::interprocess::shared_ptr&lt;T,A,D&gt;</code>
 holds fancy pointers (of type rebound from <code>allocator_traits&lt;A&gt;::pointer</code>) to the controlled object
@@ -1332,26 +1333,51 @@ in [string.require].
 </p>
 
 
-<h2><a name="References">References and further reading.</a></h2>
+<h2><a name="Iterators">Appendix. Storage-awareness of iterators.</a></h2>
+
+<table>
+<tr><th></th>                 <th>libc++</th><th>GNU</th><th>MSVC</th><th>Boost.Container</th></tr>
+<tr><th>deque</th>               <td>Yes</td><td>Yes</td><td>No </td><td>Yes</td></tr>
+<tr><th>forward_list (slist)</th><td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>list</th>                <td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>map (etc.)</th>          <td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>unordered_map (etc.)</th><td>Yes</td><td>No </td><td>Yes</td><td>   </td></tr>
+<tr><th>flat_map (etc.)</th>     <td>   </td><td>   </td><td>   </td><td>Yes</td></tr>
+<tr><th>vector</th>              <td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+</table>
+
+<p class="clarification">
+GNU <code>forward_list</code>, <code>list</code>, <code>map</code>, and <code>unordered_map</code> iterators
+each hold a raw pointer to an allocated list node.
+MSVC <code>deque</code>'s iterator holds a raw pointer to the deque itself, and an integer offset.
+</p>
+
+<h2><a name="References">Appendix. References and further reading.</a></h2>
 
 <dl>
 
 <dd>
-Lance Diduck. N2486 "Alternative Allocators and Standard Containers." December 2007.
-<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2486.pdf">
-http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2486.pdf</a>.
+Boost.Interprocess <code>offset_ptr</code> documentation.
+<a href="http://www.boost.org/doc/libs/1_64_0/doc/html/interprocess/offset_ptr.html">
+http://www.boost.org/doc/libs/1_64_0/doc/html/interprocess/offset_ptr.html</a>
 </dd>
 
 <dd>
-Boost.Interprocess <code>offset_ptr</code> documentation.
-<a href="http://www.boost.org/doc/libs/1_64_0/doc/html/interprocess/offset_ptr.html">
-http://www.boost.org/doc/libs/1_64_0/doc/html/interprocess/offset_ptr.html</a>.
+Lance Diduck. N2486 "Alternative Allocators and Standard Containers." December 2007.
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2486.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2486.pdf</a>
+</dd>
+
+<dd>
+Nevin Liber. N3884 "Contiguous Iterators: A Refinement of Random-Access Iterators." January 2014.
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n3884.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n3884.pdf</a>
 </dd>
 
 <dd>
 Doug Judd. "Why <code>pointer_traits</code> was introduced in C++11." September 2015.
 <a href="http://blog.nuggetwheat.org/index.php/2015/09/01/why-pointer_traits-was-introduced-in-c11/">
-http://blog.nuggetwheat.org/index.php/2015/09/01/why-pointer_traits-was-introduced-in-c11/</a>.
+http://blog.nuggetwheat.org/index.php/2015/09/01/why-pointer_traits-was-introduced-in-c11/</a>
 </dd>
 
 </dl>
