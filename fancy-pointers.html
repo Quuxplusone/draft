@@ -55,7 +55,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> DxxxxR0 <br>
-<b>Date:</b> 2017-08-17 <br>
+<b>Date:</b> 2017-08-29 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
@@ -76,8 +76,9 @@ td { text-align: left; vertical-align: top;
 <a href="#Any">Is any kind of fancy pointer compatible with C++?</a><br>
 <a href="#Requirements">Requirements on fancy pointer types if <i>fancy-pointer-support</i> were adopted.</a><br>
 <a href="#basic_string"><code>basic_string</code> requires trivial default constructibility.</a><br>
-<a href="#Iterators">Appendix. Storage-awareness of iterators.</a><br>
+<a href="#Iterators">Appendix. Representation-awareness of iterator types, in some present-day library implementations.</a><br>
 <a href="#References">Appendix. References and further reading.</a><br>
+<a href="#Acknowledgments">Acknowledgments.</a><br>
 </p>
 
 
@@ -85,7 +86,11 @@ td { text-align: left; vertical-align: top;
 
 <p>
 This is a position paper explaining my take on fancy pointers in C++.
-Indented, grayed paragraphs represent "clarifications" that can probably be skipped on first reading.
+Indented, grayed paragraphs represent "clarifications" that should be skipped on your first reading.
+</p>
+
+<p class="clarification">
+For example, this grayed paragraph should be skipped on your first reading.
 </p>
 
 <p class="clarification">
@@ -125,54 +130,6 @@ as (A).
 </p>
 
 <p class="clarification">
-In my preferred solution, every STL container needs to follow these rules:
-</p>
-<ol class="clarification">
-    <li>
-        Any dereferenceable pointer stored "within" the container must be stored as a
-        fancy pointer. (Required by A; wanted by B.)
-    </li>
-    <li>
-        A dereferenceable pointer stored "outside" the container, such as in an iterator,
-        may be stored as a fancy pointer or as a native pointer. (Relevant to A.)
-    </li>
-    <li>
-        Whenever you get a pointer from allocate(), hang onto it. You will never be able to
-        reconstruct its metadata if you lose it. (Required by E.)
-    </li>
-    <li>
-        Assume that metadata is preserved via the fancy pointer type's special member functions,
-        and via casting from one fancy pointer type to a rebound version of that type
-        (e.g. <code>static_cast&lt;FancyPtrT>(fancyPtrU)</code>). Do not assume that metadata
-        is preserved via any other operations. (Required by E.)
-    </li>
-    <li>
-        Assume that <code>static_cast&lt;T*>(fancyPtrT)</code> is a correct slicing expression.
-        Prefer to avoid <code>std::addressof(*fancyPtrT)</code>, which isn't going to work if
-        <code>fancyPtrT</code> is not dereferenceable. (Required by A, B, and E.)
-    </li>
-    <li>
-        Assume that <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(t)</code> returns a
-        <i>dereferenceable</i> pointer, but not a <i>deallocatable</i> one. Do not assume that
-        <code>static_cast&lt;FancyPtrT&gt;(std::addressof(t))</code> compiles;
-        <code>FancyPtrT</code> might not have a one-argument constructor. (Required by E.)
-    </li>
-    <li>
-        <code>basic_string</code> may assume that its fancy pointer type is trivially default
-        constructible. No other type may assume this.
-    </li>
-    <li>
-        Assume that the fancy pointer type models <code>NullablePointer</code>. (Construction
-        from and comparison to <code>nullptr</code> ought to be supported.)
-    </li>
-    <li>
-        Do not assume that the fancy pointer type models <code>RandomAccessIterator</code>.
-        For example, do not rely on <code>operator++</code>, <code>operator[]</code>, or
-        <code>operator&lt;</code>. Slice to <code>T*</code> before attempting these operations.
-        (Improves the performance and usability of A, B, and E. Precludes D.)
-    </li>
-</ol>
-<p class="clarification">
 In the sections that follow, I will lay out the case for these recommendations.
 </p>
 
@@ -203,12 +160,16 @@ try not to do either of those things in this paper.
 </p>
 
 <p>
-A <dfn>handle</dfn> is a particularly important kind of value. A handle is the Platonic ideal
-representing the identity of an <i>object</i>. In C++, a handle is often represented in code by
-(the value of) a C++ native pointer. You cannot have two different objects with the
-same identity, but you can have two copies of a handle — two handles — that refer to the same
-object. Handles that refer to the same object are "equal," and thus (philosophically speaking)
-interchangeable.
+By <dfn>handle</dfn> I mean a value representing the identity of an <i>object</i>.
+You cannot have two different objects with the same identity, but you can have two copies of a handle
+— two handles — that refer to the same object. Handles that refer to the same object are "equal,"
+and thus (philosophically speaking) interchangeable.
+</p>
+
+<p class="clarification">
+In C++, a handle is often represented in code by (the value of) a C++ native pointer.
+A handle does nothing but identify an object; therefore a handle can be copied; therefore a handle
+does not "own" its referent.
 </p>
 
 <p>
@@ -545,7 +506,7 @@ member, not the representation of the allocated <code>data</code> pointer.
 The following standard types are, in practice, <i>not</i> representation-aware:
 </p>
 <ul>
-    <li>Container "iterator" types. (See <a href="#Iterators">Storage-awareness of iterators</a>.)</li>
+    <li>Container "iterator" types. (See <a href="#Iterators">Representation-awareness of iterators</a>.)</li>
     <li><code>shared_ptr</code>. <span class="clarification">
 But <code>boost::interprocess::shared_ptr</code> is. An instance of <code>boost::interprocess::shared_ptr&lt;T,A,D&gt;</code>
 holds fancy pointers (of type rebound from <code>allocator_traits&lt;A&gt;::pointer</code>) to the controlled object
@@ -629,7 +590,7 @@ There are three alternatives applicable to the current situation:
 </p>
 
 <p>
-In my opinion, solution (1), the de-facto solution today, is the only workable solution.
+In my opinion, solution (1), the de-facto solution today, is the only tenable solution.
 Solution (4) is philosophically attractive but does not make any headway on the fundamental
 problem and therefore offers no benefit at present.
 We are left with solution (1): <b>Offset fancy pointer types are allowed, but difficult to use safely.</b>
@@ -762,20 +723,16 @@ We have the following possible solutions to this problem:
         List-like containers use only native pointers for addressing.
         These native pointers are cast back to fancy pointers at deallocation time.
         This solution loses the memory-footprint benefit we were hoping to get
-        from using fancy pointers, such that we might as well use native pointers
-        in this case. (Therefore this solution is summarily dismissed.)
+        from using fancy pointers. This solution is incompatible with Scenarios A and E.
+        (Therefore this solution is summarily dismissed.)
     </li>
     <li>
         Each node of a list-like container holds an extra bit indicating whether the node
         is allocated (in which case it is identified by a fancy pointer) or non-allocated
         (in which case it is identified by a native pointer).
-        <span class="clarification">This solution requires at least 1 extra bit of memory
-        footprint per node.
-        The extra bit would be redundant for "non-near" pointer types. The Standard
-        might specify a trait (e.g. <code>constexpr bool std::pointer_traits&lt;FancyPtrT&gt;::is_near</code>)
-        so that standard list-like containers would not need to pay for the extra bit,
-        or break ABI compatibility, in non-near cases. This solution requires vendors
-        to do a lot of new work.</span>
+        This solution loses the memory-footprint benefit we were hoping to get
+        from using fancy pointers. This solution is incompatible with Scenario A.
+        (Therefore this solution is summarily dismissed.)
     </li>
     <li>
         Near fancy pointer types are allowed for list-like containers, but if the container
@@ -797,7 +754,7 @@ We have the following possible solutions to this problem:
 </p>
 
 <p>
-In my opinion, solutions (1), (2), and (5) are all workable. Solution (1) is the de-facto
+In my opinion, solutions (1), (2), and (5) are all tenable. Solution (1) is the de-facto
 solution today: <b>Near fancy pointer types are just not allowed.</b>
 </p>
 
@@ -995,7 +952,7 @@ We have the following possible solutions to this problem:
 </p>
 
 <p>
-In my opinion, solutions (1), (3), and (4) are workable. Solution (2) has too many practical disadvantages:
+In my opinion, solutions (1), (3), and (4) are tenable. Solution (2) has too many practical disadvantages:
 breaks working code, hurts performance, requires work from vendors. I claim that solution (4) is the best:
 <b>Fat pointers should remain unsupported. Fancy pointer types should no longer be
 required to model <code>RandomAccessIterator</code>.</b>
@@ -1005,7 +962,7 @@ required to model <code>RandomAccessIterator</code>.</b>
 <h3><a name="E">Scenario E. "Segmented" pointers carrying metadata for deallocate-time.</a></h3>
 
 <p>
-Some programming systems use <i>augmented</i> pointers similar to Scenario E, but whose
+Some programming systems use <i>augmented</i> pointers similar to Scenario D, but whose
 <i>metadata</i> is used only by the deallocation mechanism. For example, a memory resource
 managing several memory "segments" might store the identity of the current segment in the
 allocated pointer, so that the pointer can be returned to the correct segment at deallocation
@@ -1141,12 +1098,14 @@ The problems in this case are not with the containers. No vendor's containers ac
 support segmented pointers today, due to needless overuse of slicing expressions such as
 <code>std::pointer_traits&lt;P&gt;::pointer_to(std::addressof(*q))</code>; but adjusting those
 expressions to non-slicing expressions such as <code>static_cast&lt;P&gt;(q)</code> can be done
-mechanically. Every vendor's containers (as far as I know) reserve enough internal storage
-to allow keeping a copy of each allocated fancy pointer until deallocation time.
+mechanically. As far as I know, every vendor's containers already use fancy pointer types internally
+(in order to support Scenario A), and so they have the capability to hold a copy of each allocated
+fancy pointer until deallocation time; no ABI-breaking changes to class layouts would be required
+in order to support segmented pointers.
 </p>
 
 <p>
-The problems I have found in practice are with the allocator-aware non-containers:
+The ABI problems I have found in practice are with the allocator-aware non-containers:
 <code>promise</code>, <code>shared_ptr</code>, and <code>packaged_task</code>. These
 types have shared states that may be allocated with an allocator, and their current
 implementations generally do not preserve a copy of the allocated pointer — only
@@ -1219,7 +1178,7 @@ We have the following possible solutions to this problem:
 </p>
 
 <p>
-In my opinion, solutions (1) and (2) are workable.
+In my opinion, solutions (1) and (2) are tenable.
 </p>
 
 
@@ -1227,7 +1186,7 @@ In my opinion, solutions (1) and (2) are workable.
 
 <p>
 We have seen that there are five plausible scenarios for fancy-pointer usage in C++.<br>
-Scenario (A), offset pointers, has only one workable solution, "continue to partly support."<br>
+Scenario (A), offset pointers, has only one tenable solution, "continue to partly support."<br>
 Scenario (B), near pointers, has three possible solutions of which the de-facto one is "do not support."<br>
 Scenario (C), far pointers, was proven impossible to support.<br>
 Scenario (D), fat pointers, has three possible solutions of which the de-facto one is "do not support."<br>
@@ -1237,7 +1196,7 @@ is "do not support."
 
 <p>
 If we adopt the de-facto solution in all scenarios, our conclusion is that only Scenario (A)
-is workable, and therefore we may want to explore ways to separate <i>storage type</i> from
+is tenable, and therefore we may want to explore ways to separate <i>storage type</i> from
 <i>allocation mechanism</i>; we also may want to explore ways to determine the <i>representation-awareness</i>
 of a type at compile time.
 </p>
@@ -1324,6 +1283,57 @@ model <code>RandomAccessIterator</code>. This may require some work from vendors
 expressions such as <code>fancyPtrT[k]</code> with <code>static_cast&lt;T*&gt;(fancyPtrT)[k]</code>.
 </p>
 
+<p class="clarification">
+In my preferred solution (support A, B, and E but not D), every STL container needs
+to follow these rules:
+</p>
+<ol class="clarification">
+    <li>
+        Any dereferenceable pointer stored "within" the container must be stored as a
+        fancy pointer. (Required by A; wanted by B.)
+    </li>
+    <li>
+        A dereferenceable pointer stored "outside" the container, such as in an iterator,
+        may be stored as a fancy pointer or as a native pointer. (Relevant to A.)
+    </li>
+    <li>
+        Whenever you get a pointer from allocate(), hang onto it. You will never be able to
+        reconstruct its metadata if you lose it. (Required by E.)
+    </li>
+    <li>
+        Assume that metadata is preserved via the fancy pointer type's special member functions,
+        and via casting from one fancy pointer type to a rebound version of that type
+        (e.g. <code>static_cast&lt;FancyPtrT>(fancyPtrU)</code>). Do not assume that metadata
+        is preserved via any other operations. (Required by E.)
+    </li>
+    <li>
+        Assume that <code>static_cast&lt;T*>(fancyPtrT)</code> is a correct slicing expression.
+        Prefer to avoid <code>std::addressof(*fancyPtrT)</code>, which isn't going to work if
+        <code>fancyPtrT</code> is not dereferenceable. (Required by A, B, and E.)
+    </li>
+    <li>
+        Assume that <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(t)</code> returns a
+        <i>dereferenceable</i> pointer, but not a <i>deallocatable</i> one. Do not assume that
+        <code>static_cast&lt;FancyPtrT&gt;(std::addressof(t))</code> compiles;
+        <code>FancyPtrT</code> might not have a one-argument constructor. (Required by E.)
+    </li>
+    <li>
+        <code>basic_string</code> may assume that its fancy pointer type is trivially default
+        constructible. No other type may assume this.
+    </li>
+    <li>
+        Assume that the fancy pointer type models <code>NullablePointer</code>. (Construction
+        from and comparison to <code>nullptr</code> ought to be supported.)
+    </li>
+    <li>
+        Do not assume that the fancy pointer type models <code>RandomAccessIterator</code>.
+        For example, do not rely on <code>operator++</code>, <code>operator[]</code>, or
+        <code>operator&lt;</code>. Slice to <code>T*</code> before attempting these operations.
+        (Improves the performance and usability of A, B, and E. Precludes D.)
+    </li>
+</ol>
+
+
 <h2><a name="basic_string"><code>basic_string</code> requires trivial default constructibility.</a></h2>
 
 <p>
@@ -1333,9 +1343,15 @@ in [string.require].
 </p>
 
 
-<h2><a name="Iterators">Appendix. Storage-awareness of iterators.</a></h2>
+<h2><a name="Iterators">Appendix. Representation-awareness of iterator types, in some present-day library implementations.</a></h2>
 
-<table>
+<p class="clarification">
+The following table shows, for various container classes <code>C</code> across various common library
+implementations, the compatibility of <code>C::iterator</code> with <code>boost::interprocess::offset_ptr</code>.
+This demonstrates the current state of my Scenario A (<i>offset pointers</i>) across these implementations.
+</p>
+
+<table class="clarification">
 <tr><th></th>                 <th>libc++</th><th>GNU</th><th>MSVC</th><th>Boost.Container</th></tr>
 <tr><th>deque</th>               <td>Yes</td><td>Yes</td><td>No </td><td>Yes</td></tr>
 <tr><th>forward_list (slist)</th><td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
@@ -1352,14 +1368,15 @@ each hold a raw pointer to an allocated list node.
 MSVC <code>deque</code>'s iterator holds a raw pointer to the deque itself, and an integer offset.
 </p>
 
+
 <h2><a name="References">Appendix. References and further reading.</a></h2>
 
 <dl>
 
 <dd>
 Boost.Interprocess <code>offset_ptr</code> documentation.
-<a href="http://www.boost.org/doc/libs/1_64_0/doc/html/interprocess/offset_ptr.html">
-http://www.boost.org/doc/libs/1_64_0/doc/html/interprocess/offset_ptr.html</a>
+<a href="https://www.boost.org/doc/libs/1_65_0/doc/html/interprocess/offset_ptr.html">
+https://www.boost.org/doc/libs/1_65_0/doc/html/interprocess/offset_ptr.html</a>
 </dd>
 
 <dd>
@@ -1381,6 +1398,12 @@ http://blog.nuggetwheat.org/index.php/2015/09/01/why-pointer_traits-was-introduc
 </dd>
 
 </dl>
+
+<h2><a name="Acknowledgments">Acknowledgments.</a></h2>
+
+<p class="clarification">
+Thanks to Alfredo Correa for identifying many confusing passages in drafts of this paper.
+</p>
 
 </body>
 </html>
