@@ -17,11 +17,23 @@ pre.example { margin-left: 2em; }
 div.example { margin-left: 2em; }
 
 code.extract { background-color: #F5F6A2; }
-pre.extract { margin-left: 2em; background-color: #F5F6A2;
-  border: 1px solid #E1E28E; }
+pre.extract {
+    margin-left: 2em; background-color: #F5F6A2;
+    border: 1px solid #E1E28E;
+}
 
-.clarification { margin-left: 2em; margin-right: 2em; color: #000040; background-color: #F8F8F8; }
+div.clarification {
+    margin-left: 1em; margin-right: 2em; color: #000040; background-color: #F8F8F8;
+    border-left: 5px solid #FA8258; padding-left: 1.5em;
+    padding-top: 1px; padding-bottom: 1px;
+    margin-top: 1px; margin-bottom: 1px;
+}
 span.clarification { margin-left: 0; margin-right: 0; color: #000040; background-color: #F8F8F8; }
+
+p.toc {
+    margin-left: 2em;
+    line-height: 1.2;
+}
 
 p.function { }
 .attribute { margin-left: 2em; }
@@ -62,8 +74,8 @@ td { text-align: left; vertical-align: top;
 
 <h1>Towards meaningful fancy pointers</h1>
 
-<p>
-<a href="#Summary">Summary. Proposed direction for fancy pointers.</a><br>
+<p class="toc">
+<a href="#Summary">Summary. Intended reading order.</a><br>
 <a href="#Objects">Objects and values. A handle is a value that points to an object. Casting.</a><br>
 <a href="#Allocator">An allocator is a handle to a memory resource.</a><br>
 <a href="#Pointer">Pointer values may be dereferenceable and/or deallocatable.</a><br>
@@ -82,21 +94,22 @@ td { text-align: left; vertical-align: top;
 </p>
 
 
-<h2><a name="Summary">Summary. Proposed directions for fancy pointers.</a></h2>
+<h2><a name="Summary">Summary. Intended reading order.</a></h2>
 
 <p>
 This is a position paper explaining my take on fancy pointers in C++.
 Indented, grayed paragraphs represent "clarifications" that should be skipped on your first reading.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 For example, this grayed paragraph should be skipped on your first reading.
-</p>
-
-<p class="clarification">
+</p></div>
+<div>&nbsp;</div>
+<div class="clarification">
+<p>
 What do we want fancy pointers to represent?
 </p>
-<ul class="clarification">
+<ul>
     <li>
 (A) Un-augmented fancy pointers with a different bit-level representation than native pointers: offset pointers.
 This is explicitly supported today. Many types (std::vector) work already; some non-container types
@@ -121,7 +134,7 @@ This is plausible. Some containers (std::vector) work already; some (std::list) 
 trivial modifications; some (std::shared_ptr) require major fixes.
     </li>
 </ul>
-<p class="clarification">
+<p>
 I propose two self-consistent future directions for fancy pointers. In one direction,
 we keep the status quo that no scenario except (A) is supported, and perhaps move toward
 separation of the <i>pointer storage type</i> from the <i>allocation mechanism</i>.
@@ -129,9 +142,10 @@ In my preferred direction, we require that vendors support scenarios (B) and (E)
 as (A).
 </p>
 
-<p class="clarification">
+<p>
 In the sections that follow, I will lay out the case for these recommendations.
 </p>
+</div>
 
 
 <h2><a name="Objects">Objects and values. A handle is a value that points to an object. Casting.</a></h2>
@@ -154,10 +168,10 @@ particular storage. Identical values are interchangeable; saying that value <cod
 value <code>b</code> is tantamount to saying that value <code>a</code> <i>is</i> value <code>b</code>.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 Sometimes we say that an object "has a value," or refer to an object's state as "its value." I will
 try not to do either of those things in this paper.
-</p>
+</p></div>
 
 <p>
 By <dfn>handle</dfn> I mean a value representing the identity of an <i>object</i>.
@@ -166,11 +180,11 @@ You cannot have two different objects with the same identity, but you can have t
 and thus (philosophically speaking) interchangeable.
 </p>
 
-<p class="clarification">
-In C++, a handle is often represented in code by (the value of) a C++ native pointer.
+<div class="clarification"><p>
+In C++, a <i>handle</i> is often represented in code by (the value of) a C++ native pointer.
 A handle does nothing but identify an object; therefore a handle can be copied; therefore a handle
 does not "own" its referent.
-</p>
+</p></div>
 
 <p>
 A <dfn>type</dfn> is essentially a set of values. In C++ we usually say that a value "has a type,"
@@ -180,14 +194,14 @@ the set of values 0,2,4,6,8. The value 4 belongs to both types; the value 4 is r
 in both types.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 This definition of <i>type</i> is problematic in C++ because we are used to strong static typing,
 where a value really <i>does</i> "have a type." We want to say that the value 4 is representable
 in both <code>digit</code> and <code>evendigit</code> — that <code>digit(4)</code> and
 <code>evendigit(4)</code> represent "the same value," even though they have different C++ types
 and may not even be comparable via <code>operator==</code>. Therefore, C++ introduces the idea
 of <i>casting</i>.
-</p>
+</p></div>
 
 <p>
 A value of type A may be <dfn>cast to</dfn> type B. The result is a value
@@ -197,13 +211,13 @@ is not representable in the destination type, then value-sameness cannot be pres
 a cast might be prohibited by the language, or it might just throw away some parts of the value.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 For example, casting the value <code>3.00</code> from <code>double</code> to <code>int</code>
 and back will preserve its value, because the value "3" is representable in both types.
 Casting the value <code>3.14</code> from <code>double</code> to <code>int</code> and back
 will preserve part of its value but throw away some of it. In C++, "casting" of the kind
 we're talking about is usually represented via <code>static_cast</code>.
-</p>
+</p></div>
 
 <p>
 If a type T is the Cartesian product of types U and V, <i>and</i> there is a natural mapping
@@ -215,7 +229,7 @@ but will fail to correctly reconstitute the "V part" of the data. I will use the
 when casting to the non-augmented type.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 For example, <code>double</code> is more or less an augmented type with respect to <code>int</code>.
 Casting the value <code>3.14</code> from <code>double</code> to <code>int</code>
 will preserve the <code>int</code> part of its value but throw away the fractional part.
@@ -225,14 +239,14 @@ Casting from <code>int</code> back to the augmented type <code>double</code> is 
 but will reconstitute the metadata as ".00" instead of the correct ".14".
 </p>
 
-<p class="clarification">
+<p>
 Most well-known product types, such as <code>std::tuple&lt;U,V&gt;</code>, are not really
 augmented types because there is no "natural" mapping from <code>std::tuple&lt;U,V&gt;</code>
 to <code>U</code>. In C++ terms, <code>static_cast</code>'ing from <code>std::tuple&lt;U,V&gt;</code>
 to <code>U</code> will not compile. But the following <code>Augmented&lt;U, Meta&gt;</code> is
 definitely an <i>augmented type</i> with respect to <code>U</code>:
 </p>
-<pre class="clarification">
+<pre>
     template&lt;class U, class Meta&gt;
     struct Augmented {
         U u_;
@@ -242,13 +256,14 @@ definitely an <i>augmented type</i> with respect to <code>U</code>:
     };
 </pre>
 
-<p class="clarification">
+<p>
 In C++, a derived type is often an augmented type with respect to its public base type(s).
 Casting from derived to base results in <i>slicing</i> away of the "non-base parts" of the instance,
 but preserves the "base parts." If casting from derived to base is forbidden (for example by
 deleting the base type's copy constructor), then the derived type is <i>not</i> an augmented type
 with respect to the base type.
 </p>
+</div>
 
 
 <h2><a name="Allocator">An allocator is a handle to a memory resource.</a></h2>
@@ -260,13 +275,13 @@ yield a <i>handle</i> that uniquely identifies the allocated memory chunk; the c
 deallocation mechanism must accept that same <i>handle</i> as input.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 Instances of types derived from <code>std::pmr::memory_resource</code> are memory resources.
 Instances of <code>boost::interprocess::segment_manager_base</code> are also memory resources.
 But another well-known memory resource is just "the heap." "The heap" doesn't exist as a concrete C++ object,
 but it still affords <i>allocation</i> via <code>operator new</code> and <i>deallocation</i>
 via <code>operator delete</code>. Therefore I say that "the heap" is a <i>memory resource</i> as well.
-</p>
+</p></div>
 
 <p>
 An <dfn>allocator</dfn> is a handle to a memory resource. By this definition, an instance of
@@ -285,14 +300,14 @@ the type <code>std::pmr::memory_resource*</code> does not model <code>Allocator<
 the type <code>std::pmr::polymorphic_allocator&lt;T&gt;</code> does model <code>Allocator</code>.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 In C++ there is actually a whole family of concepts <code>Allocator&lt;T&gt;</code> each associated
 with allocating and deallocating C++ objects of type <code>T</code>. However, it is implicitly
 required that I can <i>cast</i> an object of type <code>some_allocator&lt;T&gt;</code> to type
 <code>some_allocator&lt;U&gt;</code>. Casting alters type without altering value; that is,
 casting a handle in this way produces a new handle which uniquely identifies the same
 memory resource.
-</p>
+</p></div>
 
 <p>
 Determining the appropriate destination type for a cast is called <dfn>rebinding</dfn>.
@@ -303,14 +318,15 @@ then after the variable definition <code>auto y = static_cast&lt;std::allocator_
 is a handle to that same memory resource <i>m</i>.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 This definition of rebinding is compatible with "slab allocator"-style memory resources, where
 <code>SlabAllocator&lt;int32_t&gt;::allocate</code> and <code>SlabAllocator&lt;int64_t&gt;::allocate</code>
 allocate chunks out of different, non-overlapping slabs of memory. A single <i>memory resource</i>
 then consists of a single <i>complete set</i> of slabs. The important thing is that we must
 be able to take a handle to this <i>memory resource</i> and cast it around without affecting its
 <i>value</i> (that is, the identity of the memory resource to which it refers).
-<pre class="clarification">
+</p>
+<pre>
     SlabResource mr1;
     auto a32 = SlabAllocator&lt;int32_t&gt;(&mr1);  // get a handle to the memory resource
     auto b64 = SlabAllocator&lt;int64_t&gt;(a32);  // cast that handle to a new C++ type
@@ -320,7 +336,7 @@ be able to take a handle to this <i>memory resource</i> and cast it around witho
     // c32 is NOT ALLOWED to identify no memory resource (e.g. to have become "null" or otherwise unusable).
     // a32 and c32, being the same value in the same C++ type, must be truly interchangeable.
 </pre>
-</p>
+</div>
 
 <p>
 The foregoing definitions imply that allocators are cheap to copy. Making a copy of an allocator does
@@ -330,7 +346,7 @@ be familiar because this is also how C++ treats <i>iterators</i> and <i>pointers
 cheap to copy, castable.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 We can create an allocator <i>type</i> which has many possible <i>values</i>: for example,
 <code>std::pmr::polymorphic_allocator</code>. We can also create an allocator type whose set of
 possible values has only one member: for example, <code>std::allocator</code> is an allocator
@@ -340,7 +356,7 @@ has size 1, an instance of the type contains log(1) = 0 bits of information and 
 Casting an <code>std::allocator&lt;T&gt;</code>
 to <code>std::allocator&lt;U&gt;</code> preserves its value, in that the value resulting from the
 cast continues to identify "the heap."
-</p>
+</p></div>
 
 
 <h2><a name="Pointer">Pointer values may be dereferenceable and/or deallocatable.</a></h2>
@@ -382,12 +398,12 @@ When I need to refer to an example C++ fancy pointer type, I will use names such
 or <code>FancyPtrT</code> (for a pointer whose values identify objects of type <code>T</code>).
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 Fancy pointer types are described in [allocator.requirements]/5 as types modeling both
 <code>NullablePointer</code> and <code>RandomAccessIterator</code>; that is, in today's C++, a
 fancy pointer type must provide pointer arithmetic.
 I will argue that fancy pointer types have no philosophical need to provide pointer arithmetic.
-</p>
+</p></div>
 
 <p>
 Some pointer values are <dfn>dereferenceable</dfn> and some are not.
@@ -398,30 +414,30 @@ Some pointer values are <dfn>dereferenceable</dfn> and some are not.
 Casting the null value preserves its value. The null value is never dereferenceable.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 In the native pointer type <code>int*</code>, we can construct non-dereferenceable values in at least
 the following ways:
 </p>
-<pre class="clarification">
+<pre>
     int arr[10];
     int *p1 = nullptr;   // the null pointer is never dereferenceable
     int *p2 = arr + 10;  // a "one-past-the-end" pointer is not dereferenceable
 </pre>
-<p class="clarification">
+<p>
 There are also ways to have an object <code>p</code> of type <code>int*</code> where the behavior
 of <code>*p</code> is undefined, such as
 </p>
-<pre class="clarification">
+<pre>
     int *p3 = new int; delete p3;  // a deallocated pointer is not dereferenceable
     int *p4;                       // an uninitialized pointer is not dereferenceable
 </pre>
-<p class="clarification">
+<p>
 but these examples are not interesting in the context of this paper. Philosophically it is arguable
 that these examples treat <code>p3</code> and <code>p4</code> as <i>stateful objects</i>, and that
 the names <code>p3</code> and <code>p4</code> do not identify pointer <i>values</i> at all.
 In this paper I am concerned with pointer values like <code>p1</code> and <code>p2</code>; I do not
 consider <code>p3</code> and <code>p4</code> to be relevant.
-</p>
+</p></div>
 
 <p>
 Some pointer values are <dfn>deallocatable</dfn> (with respect to a given memory resource) and some
@@ -429,14 +445,14 @@ are not. Any pointer value successfully returned from the <i>allocation</i> mech
 memory resource <code>mr</code> is deallocatable with respect to <code>mr</code>.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 Many <i>dereferenceable</i> pointers will not be <i>deallocatable</i>. (For example, any pointer
 identifying a non-allocated object will not be deallocatable by any allocator. Also, a pointer
 allocated by memory resource A is unlikely to be deallocatable by memory resource B.)
 Some <i>deallocatable</i> pointers will not be <i>dereferenceable</i>. (For example, the native pointer
 returned from <code>malloc(0)</code> on some implementations is deallocatable with respect to
 <code>malloc()/free()</code> but not dereferenceable.)
-</p>
+</p></div>
 
 
 <h2><a name="Purposes">Purposes of fancy pointer types.</a></h2>
@@ -457,19 +473,19 @@ representation of a <code>boost::interprocess::offset_ptr</code> identifying an 
 is the memory address of <code>x</code> minus the address of the <code>offset_ptr</code> itself.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 This means that the representation of a <code>boost::interprocess::offset_ptr</code> object depends
 on its memory address. <code>offset_ptr</code> objects are not trivially copyable. Yet, at the
 Platonic level, <code>offset_ptr</code> can be said to have the same set of possible <i>values</i>
 as a native pointer type.
 </p>
 
-<p class="clarification">
+<p>
 The benefit of <code>boost::interprocess::offset_ptr</code> is that if a memory region is mapped
 into the address space of two different processes, then every <code>offset_ptr</code> residing in the
 mapped region will identify the same object no matter which process is asking — as long as the
 identified object <i>also</i> resides in the mapped region.
-</p>
+</p></div>
 
 <p>
 Can we use <i>offset fancy pointer types</i> to enable safe sharing of memory regions?
@@ -528,7 +544,7 @@ type <code>MR</code>(typically <code>boost::interprocess::segment_manager</code>
 The <i>representation-awareness</i> of a C++ class type is orthogonal to its memory allocation strategy.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 For example, <code>shared_ptr</code> requires allocation (and supports allocation with an allocator via
 <code>allocate_shared</code>) but <code>shared_ptr</code> is not representation-aware.
 Vice versa, <code>boost::interprocess::allocator</code> is representation-aware (it contains a non-static
@@ -537,7 +553,7 @@ data member of fancy pointer type) but not allocator-aware (the fancy pointer is
 allocation).
 </p>
 
-<p class="clarification">
+<p>
 It is a shame that the standard <i>representation-aware</i> types inherit their storage type from
 <code>allocator_traits&lt;A&gt;::pointer</code> instead of from a separate template parameter <code>P</code>.
 I don't see how to fix this without breaking ABI and requiring a lot of work from vendors.
@@ -546,7 +562,7 @@ identical to <code>A</code> except that its <code>pointer</code> typedef is
 <code>pointer_traits&lt;P&gt;::rebind&lt;A::value_type&gt;</code>. This would ease using
 <code>offset_ptr</code> with representation-aware containers; but not help with types that were
 not already representation-aware, such as <code>shared_ptr</code>.
-</p>
+</p></div>
 
 <p>
 The programmer is responsible for discovering whether any given C++ type is <i>representation-aware</i>. There is
@@ -609,10 +625,10 @@ log(32768) = 15 bits of storage per pointer. A C++ fancy pointer type with fewer
 native pointer is called a <dfn>near fancy pointer</dfn>.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 On a 32-bit microcontroller, the programmer might define a frequently used list container like this:
 </p>
-<pre class="clarification">
+<pre>
     #include &lt;list&gt;
     #include &lt;memory_resource&gt;
 
@@ -625,7 +641,7 @@ On a 32-bit microcontroller, the programmer might define a frequently used list 
         widgets.push_back(1);
     }
 </pre>
-<p class="clarification">
+<p>
 Any allocations made by <code>widgets</code> always reside within the "small data area,"
 addresses 0x00000001 through 0x00007FFF. This means that in principle, each pointer should
 consume only 16 bits of memory footprint. Since each list node contains two
@@ -633,11 +649,11 @@ pointers, this would be a savings of 4 bytes per node, allowing us to fit twice 
 list elements into the small data area as we could naively fit.
 </p>
 
-<p class="clarification">
+<p>
 The Standard Library doesn't provide a fancy-pointer version of <code>memory_resource</code>, but
 we can easily roll our own. We'd create a near fancy pointer type like this:
 </p>
-<pre class="clarification">
+<pre>
     template&lt;class T&gt;
     class NearPtr {
         int16_t ptr_ = 0;
@@ -677,6 +693,7 @@ we can easily roll our own. We'd create a near fancy pointer type like this:
         widgets.push_back(1);
     }
 </pre>
+</div>
 
 <p>
 Can we use <i>near fancy pointer</i> types to address objects that are located in a "small" fixed subset of main memory?
@@ -740,15 +757,15 @@ We have the following possible solutions to this problem:
         <code>pointer</code> type, then the behavior is undefined.
         <span class="clarification">This solution does not require any new work from vendors,
         but it does introduce a new source of undefined behavior.</span>
-        <pre class="clarification">
-    int main() {
-        using L = std::list&lt;int32_t, NearAllocator&lt;int32_t&gt;&gt;;
+        <div class="clarification"><pre>
+int main() {
+    using L = std::list&lt;int32_t, NearAllocator&lt;int32_t&gt;&gt;;
 
-        L alpha = std::make_shared&lt;L&gt;();  // undefined behavior
-        auto beta = std::make_shared&lt;L&gt;();  // undefined behavior
-        auto gamma = std::allocate_shared&lt;L&gt;(NearAllocator&lt;L&gt;());  // OK!
-    }
-        </pre>
+    L alpha = std::make_shared&lt;L&gt;();  // undefined behavior
+    auto beta = std::make_shared&lt;L&gt;();  // undefined behavior
+    auto gamma = std::allocate_shared&lt;L&gt;(NearAllocator&lt;L&gt;());  // OK!
+}
+        </pre></div>
     </li>
 </ol>
 </p>
@@ -766,7 +783,7 @@ Let <dfn>main memory</dfn> be defined as the set of all object addresses address
 C++ native pointer types. Some programmers deal in objects that are not located in main memory.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 A historical example is the 80286, where 16-bit native pointers could identify only the
 memory addresses between 0x0000 and 0xFFFF, but the computer itself had additional memory
 ranging from address 0x1'0000 to address 0xF'FFFF, and some models had a "high memory area"
@@ -775,7 +792,7 @@ pointers such as <code>int*</code>. Compilers of the day provided additional bui
 such as <code>far int*</code>, where <code>sizeof(far int*) &gt; sizeof(int*)</code>.
 </p>
 
-<p class="clarification">
+<p>
 A possible future example is objects residing in some location which
 <i>is not memory-mapped into the current process's virtual address space</i>.
 Today this is unlikely to be a real problem for 64-bit address spaces — we just take
@@ -783,7 +800,7 @@ anything we care about (including the OS kernel, and also GPU memory if I unders
 and map it into the current process's address space. It might be a problem looking forward
 into the future of enormous (>18 exabytes?) non-volatile storage, or more likely looking
 downward into the domain of 32-bit and 16-bit microcontrollers with smaller main memories.
-</p>
+</p></div>
 
 <p>
 Can we use fancy pointer types to address objects that are not located in main memory?
@@ -793,11 +810,11 @@ Can we use fancy pointer types to address objects that are not located in main m
 <b>No, we cannot use fancy pointer types to address objects that aren't located in main memory.</b>
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 Every fancy pointer type must provide an <code>operator*</code> that returns a reference to
 an object. That is, we must have a function definition along these lines:
 </p>
-<pre class="clarification">
+<pre>
     struct FancyPtrInt {
         int& FancyPtrInt::operator*() const {
             // some magic goes here
@@ -805,12 +822,12 @@ an object. That is, we must have a function definition along these lines:
         // ...
     };
 </pre>
-<p class="clarification">
+<p>
 The expression <code>*fancyp</code> returns a reference to its identified object as type <code>int&</code>.
 So its identified object must be addressable by a native pointer value — namely,
 <code>std::addressof(*fancyp)</code>. Therefore, this attempt to use fancy pointers to address objects
 outside main memory has failed.
-</p>
+</p></div>
 
 
 <h3><a name="D">Scenario D. "Fat" pointers carrying metadata for dereference-time.</a></h3>
@@ -822,10 +839,10 @@ dereferences can be bounds-checked, and/or the type of the original allocation s
 can be type-checked.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 For example, here is one possible "fat" fancy pointer type.
 </p>
-<pre class="clarification">
+<pre>
     template&lt;class T&gt;
     class FatPtr {
         char *base_ = nullptr;
@@ -880,17 +897,18 @@ For example, here is one possible "fat" fancy pointer type.
         }
     };
 </pre>
-<p class="clarification">
+<p>
 This fat-pointer type plays well with list-like containers because its range of values includes all
 of main memory.
-</p>
+</p></div>
 
 <p>
 In order to get the benefit of bounds-checking, the container must do pointer arithmetic only on
 <code>FatPtr</code> values losslessly derived from the originally allocated <code>FatPtr</code>.
 </p>
 
-<p class="clarification">
+<div class="clarification">
+<p>
 In order to get the benefit of <i>type</i>-checking, the container must dereference only
 <code>FatPtr</code> values losslessly derived from the originally allocated <code>FatPtr</code>, which
 again implies doing pointer arithmetic only on <code>FatPtr</code>.
@@ -899,11 +917,12 @@ Worse, if we use fat pointers <i>only</i> for safety-checking, there will be no 
 the performance cost, unless the standard container itself has bugs.
 </p>
 
-<p class="clarification">
+<p>
 The fat-pointer scenario is the only scenario in this paper where it makes sense to do pointer arithmetic
 on fancy pointers. In every other case, it is equivalent — and generally more efficient, especially
 in debug mode — to do pointer arithmetic only on native pointers.
 </p>
+</div>
 
 <p>
 Can we use <i>fat fancy pointer</i> types to bounds-check each access to an allocation?
@@ -969,13 +988,13 @@ allocated pointer, so that the pointer can be returned to the correct segment at
 time. Because of this example, I call such fancy pointers <dfn>segmented pointers</dfn>.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 For example, here is one possible "segmented" fancy pointer type.
 <a href="https://github.com/Quuxplusone/from-scratch/blob/master/include/scratch/bits/containers/segmented-allocator.h"
 >A full implementation is available on my GitHub under the name
 <code>scratch::pmr::segmented_resource</code>.</a>
 </p>
-<pre class="clarification">
+<pre>
     class Segment;
 
     template&lt;class T&gt;
@@ -1066,13 +1085,13 @@ For example, here is one possible "segmented" fancy pointer type.
         widgets.push_back(1);
     }
 </pre>
-<p class="clarification">
+<p>
 The important line is this one, in <code>SegmentedResource::deallocate</code>:
 </p>
-<pre class="clarification">
+<pre>
             p.segment()->deallocate(static_cast&lt;void*&gt;(p), bytes);
 </pre>
-<p class="clarification">
+<p>
 This line returns <code>p</code>'s memory to the segment from which it was originally allocated.
 If the identity of that segment were not part of <code>p</code>'s metadata, this code would
 not work. If <code>p</code>'s metadata had been sliced away prior to deallocation (that is,
@@ -1080,10 +1099,11 @@ if the pointer passed to the deallocation mechanism were not losslessly derived 
 allocation), this code would not work.
 </p>
 
-<p class="clarification">
+<p>
 If the programmer cannot rely on the container to deallocate a pointer losslessly derived from the
 original allocation, then the programmer cannot use this kind of segmented memory resource.
 </p>
+</div>
 
 <p>
 Can we use <i>segmented pointer</i> types to hold metadata used at deallocation time?
@@ -1112,10 +1132,10 @@ implementations generally do not preserve a copy of the allocated pointer — on
 a copy of the allocator handle.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 For example, libc++'s <code>promise(allocator_arg, _Alloc)</code> looks effectively like this:
 </p>
-<pre class="clarification">
+<pre>
     template&lt;class _Rp, class _Alloc&gt;
     class __assoc_state_alloc : public __assoc_state&lt;_Rp&gt;
     {
@@ -1146,13 +1166,13 @@ For example, libc++'s <code>promise(allocator_arg, _Alloc)</code> looks effectiv
         __state_ = std::addressof(*__hold.release());
     }
 </pre>
-<p class="clarification">
+<p>
 The argument to <code>__a.deallocate</code> is the direct result of <code>pointer_to</code>;
 that is, it will fail to correctly reconstitute the metadata that was lost in the conversion
 from fancy pointer <code>__hold.get()</code> to native pointer <code>this</code>.
 To make this code work with segmented pointers, the <code>__assoc_state_alloc</code> struct
 must store a copy of the originally allocated pointer.
-</p>
+</p></div>
 
 <p>
 We have the following possible solutions to this problem:
@@ -1219,7 +1239,7 @@ fancy pointer-to-<code>Base</code>. This requirement is translated into C++ term
 standard trait <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(T& r)</code>.
 </p>
 
-<p class="clarification">
+<div class="clarification"><p>
 The reason we must use <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(T& r)</code>
 rather than the simpler <code>static_cast&lt;FancyPtrT&gt;(T*)</code> is that there may not
 be any natural mapping from <code>T*</code> values onto <code>FancyPtrT</code> values.
@@ -1229,7 +1249,7 @@ In both cases a mapping is possible, but it is not a <i>natural</i> mapping, and
 not be represented in C++ by <code>static_cast</code>.
 </p>
 
-<p class="clarification">
+<p>
 It is a shame that the signature of <code>pointer_to</code> takes <code>T&</code>, thus
 requiring that the input native pointer be <i>dereferenceable</i>. This means there is
 no generic way to get the fancy-pointer value corresponding to a one-past-the-end pointer;
@@ -1238,12 +1258,12 @@ and the generic way to get a fancy null pointer is <code>FancyPtrT{}</code> rath
 practice.
 </p>
 
-<p class="clarification">
+<p>
 If scenario (A), offset pointers, is the only scenario in play, then
 <code>static_cast&lt;FancyPtrT&gt;(T*)</code> is perhaps an appropriate way to get the
 storage representation of a native pointer. Scenario (B), near pointers, is also relevant
 to storage representation.
-</p>
+</p></div>
 
 <p>
 Solution E-2 requires that it be possible to losslessly cast a fancy
@@ -1261,7 +1281,8 @@ a native pointer-to-<code>T</code>. The most natural way to express casting in C
 support casting to its corresponding native pointer type.
 </p>
 
-<p class="clarification">
+<div class="clarification">
+<p>
 Today, container implementations say <code>std::addressof(*fancyPtrT)</code> instead of
 <code>static_cast&lt;T*&gt;(fancyPtrT)</code>. The latter is more philosophically appropriate.
 The former also has the potential problem that it can be used only for <i>dereferenceable</i>
@@ -1269,12 +1290,12 @@ pointer values. <code>std::addressof(*fancyPtrT)</code> cannot safely be used
 when <code>fancyPtrT == nullptr</code>. This does not seem to be a problem for containers
 in practice.
 </p>
-
-<p class="clarification">
+<p>
 Also, <code>std::addressof(*fancyPtrT)</code> cannot safely be used when <code>fancyPtrT</code>
 represents a "one-past-the-end" fancy pointer value; but such values arise only via fancy pointer
 arithmetic.
 </p>
+</div>
 
 <p>
 If we forbid <i>fat pointers</i>, then no container implementation will ever require fancy
@@ -1283,11 +1304,12 @@ model <code>RandomAccessIterator</code>. This may require some work from vendors
 expressions such as <code>fancyPtrT[k]</code> with <code>static_cast&lt;T*&gt;(fancyPtrT)[k]</code>.
 </p>
 
-<p class="clarification">
+<div class="clarification">
+<p>
 In my preferred solution (support A, B, and E but not D), every STL container needs
 to follow these rules:
 </p>
-<ol class="clarification">
+<ol>
     <li>
         Any dereferenceable pointer stored "within" the container must be stored as a
         fancy pointer. (Required by A; wanted by B.)
@@ -1309,7 +1331,7 @@ to follow these rules:
     <li>
         Assume that <code>static_cast&lt;T*>(fancyPtrT)</code> is a correct slicing expression.
         Prefer to avoid <code>std::addressof(*fancyPtrT)</code>, which isn't going to work if
-        <code>fancyPtrT</code> is not dereferenceable. (Required by A, B, and E.)
+        <code>fancyPtrT</code> is not a <i>dereferenceable</i> value. (Required by A, B, and E.)
     </li>
     <li>
         Assume that <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(t)</code> returns a
@@ -1332,7 +1354,7 @@ to follow these rules:
         (Improves the performance and usability of A, B, and E. Precludes D.)
     </li>
 </ol>
-
+</div>
 
 <h2><a name="basic_string"><code>basic_string</code> requires trivial default constructibility.</a></h2>
 
@@ -1343,15 +1365,16 @@ in [string.require].
 </p>
 
 
+<div class="clarification">
 <h2><a name="Iterators">Appendix. Representation-awareness of iterator types, in some present-day library implementations.</a></h2>
 
-<p class="clarification">
+<p>
 The following table shows, for various container classes <code>C</code> across various common library
 implementations, the compatibility of <code>C::iterator</code> with <code>boost::interprocess::offset_ptr</code>.
 This demonstrates the current state of my Scenario A (<i>offset pointers</i>) across these implementations.
 </p>
 
-<table class="clarification">
+<table>
 <tr><th></th>                 <th>libc++</th><th>GNU</th><th>MSVC</th><th>Boost.Container</th></tr>
 <tr><th>deque</th>               <td>Yes</td><td>Yes</td><td>No </td><td>Yes</td></tr>
 <tr><th>forward_list (slist)</th><td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
@@ -1362,13 +1385,16 @@ This demonstrates the current state of my Scenario A (<i>offset pointers</i>) ac
 <tr><th>vector</th>              <td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
 </table>
 
-<p class="clarification">
+<p>
 GNU <code>forward_list</code>, <code>list</code>, <code>map</code>, and <code>unordered_map</code> iterators
 each hold a raw pointer to an allocated list node.
 MSVC <code>deque</code>'s iterator holds a raw pointer to the deque itself, and an integer offset.
 </p>
+</div>
 
 
+<div>&nbsp;</div>
+<div class="clarification">
 <h2><a name="References">Appendix. References and further reading.</a></h2>
 
 <dl>
@@ -1398,12 +1424,16 @@ http://blog.nuggetwheat.org/index.php/2015/09/01/why-pointer_traits-was-introduc
 </dd>
 
 </dl>
+</div>
 
+<div>&nbsp;</div>
+<div class="clarification">
 <h2><a name="Acknowledgments">Acknowledgments.</a></h2>
 
-<p class="clarification">
+<p>
 Thanks to Alfredo Correa for identifying many confusing passages in drafts of this paper.
 </p>
+</div>
 
 </body>
 </html>
