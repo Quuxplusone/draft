@@ -1,0 +1,207 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+   "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+
+<style type="text/css">
+
+body { color: #000000; background-color: #FFFFFF; }
+del { text-decoration: line-through; color: #8B0040; }
+ins { text-decoration: underline; color: #005100; }
+
+p.example { margin-left: 2em; }
+pre.example { margin-left: 2em; }
+div.example { margin-left: 2em; }
+
+code.extract { background-color: #F5F6A2; }
+pre.extract { margin-left: 2em; background-color: #F5F6A2;
+  border: 1px solid #E1E28E; }
+
+p.function { }
+.attribute { margin-left: 2em; }
+.attribute dt { float: left; font-style: italic;
+  padding-right: 1ex; }
+.attribute dd { margin-left: 0em; }
+
+blockquote.std { color: #000000; background-color: #F1F1F1;
+  border: 1px solid #D1D1D1;
+  padding-left: 0.5em; padding-right: 0.5em; }
+blockquote.stddel { text-decoration: line-through;
+  color: #000000; background-color: #FFEBFF;
+  border: 1px solid #ECD7EC;
+  padding-left: 0.5em; padding-right: 0.5em; }
+
+blockquote.stdins { text-decoration: underline;
+  color: #000000; background-color: #C8FFC8;
+  border: 1px solid #B3EBB3; padding: 0.5em; }
+
+table { border: 1px solid black; border-spacing: 0px;
+  margin-left: auto; margin-right: auto; }
+th { text-align: left; vertical-align: top;
+  padding-left: 0.8em; border: none; }
+td { text-align: left; vertical-align: top;
+  padding-left: 0.8em; border: none; }
+
+</style>
+
+<title>random_device, no strings attached</title>
+</head>
+<body>
+
+<b>Document number:</b> DxxxxR0 <br>
+<b>Date:</b> 2017-08-31 <br>
+<b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
+<b>Audience:</b> Library Evolution Working Group <br>
+<b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
+
+<h1><code>random_device</code>, no <code>string</code>s attached</h1>
+
+<p>
+<a href="#Introduction">1. Introduction and motivation</a><br>
+<a href="#Proposed_wording">2. Proposed wording for C++20</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#rand.device">29.6.6 Class random_device [rand.device]</a><br>
+<a href="#References">3. References</a><br>
+</p>
+
+
+<h2><a name="Introduction">1. Introduction and motivation</a></h2>
+
+<p>
+[rand.device] /3 defines the constructor of <code>std::random_device</code> as follows <a href="#N4659">[N4659]</a>.
+This wording apparently has not been touched since the original proposal in 2002 <a href="#N1398">[N1398]</a>.
+</p>
+<blockquote class="std">
+<p>
+    <code>
+    explicit random_device(const string&amp; token = <i>implementation-defined</i>);<br>
+    </code>
+</p>
+<p>
+<i>Effects:</i>
+Constructs a <code>random_device</code> nondeterministic uniform random bit generator object.
+The semantics and default value of the <code>token</code> parameter are implementation-defined.
+</p>
+<p>(Footnote: The parameter is intended to allow an implementation to differentiate between
+different sources of randomness.)</p>
+</blockquote>
+
+<p>
+On libc++, the default and only supported value of this parameter is the 12-character string
+<code>"/dev/urandom"</code>.
+</p>
+
+<p>
+On libstdc++, the supported values include <code>"/dev/urandom"</code>, <code>"/dev/random"</code>,
+<code>"default"</code>, <code>"mt19937"</code>, and anything that looks like an input to <code>strtoul</code>;
+the default value changes depending on user-controllable preprocessor macros.
+</p>
+
+<p>
+Notice that there is no way to construct an object of type <code>std::random_device</code>
+without first constructing an object of type <code>std::string</code>. This may be problematic
+for codebases where using the heap is forbidden.
+</p>
+
+<p>
+Furthermore, <code>std::random_device</code>'s constructor is not <i>allocator-aware</i>;
+it requires that the input string be constructed using <code>std::allocator</code>.
+This requires linking in (and template-instantiating) all of the machinery of
+<code>std::allocator</code>, including <code>operator new</code>, even in programs that
+just want the default behavior of <code>std::random_device</code>. This machinery will be
+instantiated, compiled, and linked in, <i>even if the implementation-defined default value
+is subject to Small String Optimization!</i>
+</p>
+
+<p>
+There are many possible overload sets which would adequately address my concern here:
+<ol>
+    <li><code>()</code> and <code>(const string&)</code> — my proposed solution</li>
+    <li><code>()</code> and <code>(string_view)</code></li>
+    <li><code>(string_view = <i>default</i>)</code></li>
+    <li><code>(const string&)</code> and <code>(string_view = <i>default</i>)</code></li>
+    <li><code>()</code> and <code>(const string&)</code> and <code>(string_view)</code></li>
+</ol>
+The simplest solution, which therefore I propose, is to add a default (zero-argument) constructor
+and <i>not</i> to add a new dependency on <code>string_view</code>. Solutions 4 and 5 introduce
+the possibility of overload resolution ambiguity in the case of <code>random_device(X())</code>
+where <code>X()</code> is implicitly convertible to either <code>string</code> or <code>string_view</code>.
+</p>
+
+
+<h2><a name="Proposed_wording">2. Proposed wording for C++20</a></h2>
+
+<p>
+The wording in this section is relative to WG21 draft N4659 <a href="#N4659">[N4659]</a>,
+that is, the current draft of the C++17 standard.
+</p>
+
+<h3><a name="rand.device">29.6.6 Class random_device [rand.device]</a></h3>
+
+<p>
+Edit paragraphs 2 and 3 as follows.
+</p>
+
+<blockquote class="std">
+<code>
+class random_device {<br>
+public:<br>
+&nbsp; <i>// types</i><br>
+&nbsp; using result_type = unsigned int;<br>
+<br>
+&nbsp; <i>// generator characteristics</i><br>
+&nbsp; static constexpr result_type min() { return numeric_limits&lt;result_type>::min(); }<br>
+&nbsp; static constexpr result_type max() { return numeric_limits&lt;result_type>::max(); }<br>
+<br>
+&nbsp; <i>// constructors</i><br>
+&nbsp; <ins>random_device();</ins><br>
+&nbsp; explicit random_device(const string&amp; token<del> = <i>implementation-defined</i></del>);<br>
+<br>
+&nbsp; <i>// generating functions</i><br>
+&nbsp; result_type operator()();<br>
+<br>
+&nbsp; <i>// property functions</i><br>
+&nbsp; double entropy() const noexcept;<br>
+<br>
+&nbsp; <i>// no copy functions</i><br>
+&nbsp; random_device(const random_device&amp;<del>&nbsp;</del>) = delete;<br>
+&nbsp; void operator=(const random_device&amp;<del>&nbsp;</del>) = delete;<br>
+};
+</code>
+<p>
+    <code>
+    <ins>random_device();</ins><br>
+    explicit random_device(const string&amp; token<del> = <i>implementation-defined</i></del>);<br>
+    </code>
+</p>
+<p>
+<i>Effects:</i>
+Constructs a <code>random_device</code> nondeterministic uniform random bit generator object.
+The semantics <del>and default value</del> of the <code>token</code> parameter are implementation-defined.
+</p>
+<p>(Footnote: The parameter is intended to allow an implementation to differentiate between
+different sources of randomness.)</p>
+</blockquote>
+
+<h2><a name="References">3. References</a></h2>
+
+<dl>
+
+<dt><a name="N1398">[N1398]</a></dt>
+<dd>
+Jens Maurer. "A Proposal to Add an Extensible Random Number Facility to the Standard Library" (November 2002).<br>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1398.html">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1398.html</a>
+</dd>
+
+<dt><a name="N4659">[N4659]</a></dt>
+<dd>
+"Working Draft, Standard for Programming Language C++" (March 2017).<br>
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4659.pdf">
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4659.pdf</a>.
+</dd>
+
+</dl>
+
+</body>
+</html>
