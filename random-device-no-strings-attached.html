@@ -50,7 +50,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> DxxxxR0 <br>
-<b>Date:</b> 2017-08-31 <br>
+<b>Date:</b> 2017-09-01 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
@@ -126,6 +126,14 @@ The simplest solution, which therefore I propose, is to add a default (zero-argu
 and <i>not</i> to add a new dependency on <code>string_view</code>. Solutions 4 and 5 introduce
 the possibility of overload resolution ambiguity in the case of <code>random_device(X())</code>
 where <code>X()</code> is implicitly convertible to either <code>string</code> or <code>string_view</code>.
+</p>
+
+<p>
+Any solution involving <code>string_view</code> has the pitfall that a user-provided
+<code>string_view</code> is not necessarily null-terminated; so if the constructor wants to
+pass it to <code>fopen</code> (for example), it will have to copy the user-provided bytes into
+a null-terminated array (perhaps allocated, perhaps of size <code>PATH_MAX</code>/<code>MAX_PATH</code>
+on the stack). It is better to use the user-provided buffer directly.
 </p>
 
 
