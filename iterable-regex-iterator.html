@@ -50,7 +50,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> D0757R0 <br>
-<b>Date:</b> 2017-08-22 <br>
+<b>Date:</b> 2017-09-10 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
@@ -187,12 +187,9 @@ these iterators would have benefited from a different structure; that is, rather
 I would have preferred a syntax that split up the "iterable range" object from the
 "iterator" object, like this:
 <pre>
-    for (auto& p : fs::list_directory("sandbox")) { ... }
+    for (auto& p : fs::walk_directory("sandbox")) { ... }
     for (auto& m : regex_iterate(s, r)) { ... }
 </pre>
-(Notice that each <code>m</code> is itself iterable: it has been true since C++11 that
-a single <code>smatch</code> object can be iterated as if it were its list of capturing
-groups.)
 </p>
 
 <h2><a name="Alternatives">3. Alternative syntax ideas</a></h2>
@@ -286,8 +283,10 @@ using sregex_iterator  = regex_iterator&lt;string::const_iterator>;<br>
 using wsregex_iterator = regex_iterator&lt;wstring::const_iterator>;<br>
 <br>
 <ins><i>// 28.12.2, range access for regex_iterator</i></ins><br>
-<ins>regex_iterator begin(regex_iterator iter) noexcept;</ins><br>
-<ins>regex_iterator end(const regex_iterator&) noexcept;</ins><br>
+<ins>template&lt;class B, class C, class T&gt;</ins></br>
+<ins>regex_iterator&lt;B, C, T&gt; begin(regex_iterator&lt;B, C, T&gt;) noexcept;</ins><br>
+<ins>template&lt;class B, class C, class T&gt;</ins></br>
+<ins>regex_iterator&lt;B, C, T&gt; end(const regex_iterator&lt;B, C, T&gt;&amp;) noexcept;</ins><br>
 <br>
 <i>// <del>28.12.2</del> <ins>28.12.3</ins>, class template regex_token_iterator</i><br>
 template &lt;class BidirectionalIterator,<br>
@@ -302,8 +301,10 @@ using sregex_token_iterator  = regex_token_iterator&lt;string::const_iterator>;<
 using wsregex_token_iterator = regex_token_iterator&lt;wstring::const_iterator>;<br>
 <br>
 <ins><i>// 28.12.4, range access for regex_token_iterator</i></ins><br>
-<ins>regex_token_iterator begin(regex_token_iterator iter) noexcept;</ins><br>
-<ins>regex_token_iterator end(const regex_token_iterator&) noexcept;</ins><br>
+<ins>template&lt;class B, class C, class T&gt;</ins></br>
+<ins>regex_token_iterator&lt;B, C, T&gt; begin(regex_token_iterator&lt;B, C, T&gt;) noexcept;</ins><br>
+<ins>template&lt;class B, class C, class T&gt;</ins></br>
+<ins>regex_token_iterator&lt;B, C, T&gt; end(const regex_token_iterator&lt;B, C, T&gt;&amp;) noexcept;</ins><br>
 </code>
 </blockquote>
 
@@ -320,13 +321,15 @@ Insert a new section following section 28.12.1 as follows.
 <p>1. These functions enable range access for <code>regex_iterator</code>.</p>
 </ins>
 <pre>
-    <ins>regex_iterator begin(regex_iterator iter) noexcept;</ins>
+    <ins>template&lt;class B, class C, class T&gt;</ins>
+    <ins>regex_iterator&lt;B, C, T&gt; begin(regex_iterator&lt;B, C, T&gt; iter) noexcept;</ins>
 </pre>
 <p><ins>Returns: <code>iter</code>.</ins></p>
 <pre>
-    <ins>regex_iterator end(const regex_iterator&) noexcept;</ins>
+    <ins>template&lt;class B, class C, class T&gt;</ins>
+    <ins>regex_iterator&lt;B, C, T&gt; end(const regex_iterator&lt;B, C, T&gt;&amp;) noexcept;</ins>
 </pre>
-<p><ins>Returns: <code>regex_iterator()</code>.</ins></p>
+<p><ins>Returns: <code>regex_iterator&lt;B, C, T&gt;()</code>.</ins></p>
 </blockquote>
 
 <p>
@@ -335,17 +338,19 @@ Insert a new section after the renumbered section 28.12.3 [re.tokiter] as follow
 
 <blockquote class="std">
 <ins>
-<h3>28.12.2 <code>regex_token_iterator</code> non-member functions [re.tokiter.nonmember]</h3>
+<h3>28.12.4 <code>regex_token_iterator</code> non-member functions [re.tokiter.nonmember]</h3>
 <p>1. These functions enable range access for <code>regex_token_iterator</code>.</p>
 </ins>
 <pre>
-    <ins>regex_token_iterator begin(regex_token_iterator iter) noexcept;</ins>
+    <ins>template&lt;class B, class C, class T&gt;</ins>
+    <ins>regex_token_iterator&lt;B, C, T&gt; begin(regex_token_iterator&lt;B, C, T&gt; iter) noexcept;</ins>
 </pre>
 <p><ins>Returns: <code>iter</code>.</ins></p>
 <pre>
-    <ins>regex_token_iterator end(const regex_token_iterator&) noexcept;</ins>
+    <ins>template&lt;class B, class C, class T&gt;</ins>
+    <ins>regex_token_iterator&lt;B, C, T&gt; end(const regex_token_iterator&lt;B, C, T&gt;&amp;) noexcept;</ins>
 </pre>
-<p><ins>Returns: <code>regex_token_iterator()</code>.</ins></p>
+<p><ins>Returns: <code>regex_token_iterator&lt;B, C, T&gt;()</code>.</ins></p>
 </blockquote>
 
 <h2><a name="References">5. References</a></h2>
