@@ -67,7 +67,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> D0773R0 <br>
-<b>Date:</b> 2017-08-29 <br>
+<b>Date:</b> 2017-10-05 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
@@ -77,6 +77,7 @@ td { text-align: left; vertical-align: top;
 <p class="toc">
 <a href="#Summary">Summary. Intended reading order.</a><br>
 <a href="#Objects">Objects and values. A handle is a value that points to an object. Casting.</a><br>
+<a href="#Storage">Storage representation.</a><br>
 <a href="#Allocator">An allocator is a handle to a memory resource.</a><br>
 <a href="#Pointer">Pointer values may be dereferenceable and/or deallocatable.</a><br>
 <a href="#Purposes">Purposes of fancy pointer types.</a><br>
@@ -88,7 +89,7 @@ td { text-align: left; vertical-align: top;
 <a href="#Any">Is any kind of fancy pointer compatible with C++?</a><br>
 <a href="#Requirements">Requirements on fancy pointer types if <i>fancy-pointer-support</i> were adopted.</a><br>
 <a href="#basic_string"><code>basic_string</code> requires trivial default constructibility.</a><br>
-<a href="#Iterators">Appendix. Representation-awareness of iterator types, in some present-day library implementations.</a><br>
+<a href="#Iterators">Appendix. Representation-awareness of container and iterator types, in some present-day library implementations.</a><br>
 <a href="#References">Appendix. References and further reading.</a><br>
 <a href="#Acknowledgments">Acknowledgments.</a><br>
 </p>
@@ -116,7 +117,7 @@ This is explicitly supported today. Many types (std::vector) work already; some 
 (std::shared_ptr) do not work.
     </li>
     <li>
-(B) Un-augmented fancy pointers addressing a lesser range of memory: small data area.
+(B) Un-augmented fancy pointers addressing a lesser range of memory such as the Small Data Area: near pointers.
 This is plausible. Some containers (std::vector) implicitly work already; some (std::list) work only in
 certain runtime situations.
     </li>
@@ -129,7 +130,7 @@ This turns out to be impossible in C++ because every object must have a native a
 This is plausible but expensive, and not worth the implementation effort for vendors.
     </li>
     <li>
-(E) Augmented fancy pointers whose metadata affects deallocation: segmented pointers.
+(E) Augmented fancy pointers whose metadata affects only deallocation: segmented pointers.
 This is plausible. Some containers (std::vector) work already; some (std::list) require only
 trivial modifications; some (std::shared_ptr) require major fixes.
     </li>
@@ -264,6 +265,31 @@ deleting the base type's copy constructor), then the derived type is <i>not</i> 
 with respect to the base type.
 </p>
 </div>
+
+
+<h2><a name="Storage">Storage representation.</a></h2>
+
+<p>
+In C++, a type defines not only a set of <i>values</i> but also a mapping from values to
+bit-level <dfn>storage representations</dfn>. (For example, while I consider <code>(double)3</code> and
+<code>(int)3</code> to be the same <i>value</i>, they have different bit-level <i>storage representations</i>
+when they are stored into memory as part of a C++ object.)
+</p>
+
+<p>
+In some programming systems the most important thing about a C++ type is not its range of possible values
+but its mapping from values to <i>storage representations</i>.
+</p>
+
+<div class="clarification"><p>
+An example of significant <i>storage representation</i> is <code>boost::interprocess::offset_ptr&lt;T&gt;</code>,
+which has the same range of values as the native pointer type <code>T*</code> but a different bit-level storage
+representation. Since <code>(T*)(&x)</code> and <code>offset_ptr&lt;T&gt;(&x)</code> are the same <i>value</i>,
+we should expect that they can be interconverted using <code>static_cast</code>.
+In fact, under Boost 1.64, <code>static_cast&lt;offset_ptr&lt;T&gt;&gt;((T*){})</code> is accepted but
+<code>static_cast&lt;int*&gt;(offset_ptr&lt;T&gt;{})</code> is ill-formed. I believe this is a defect in the
+current implementation of <code>boost::interprocess::offset_ptr</code>.
+</p></div>
 
 
 <h2><a name="Allocator">An allocator is a handle to a memory resource.</a></h2>
@@ -468,14 +494,14 @@ Here are five scenarios I consider plausible.
 
 <p>
 Some programming systems use <dfn>offset pointers</dfn>, which are equivalent
-to native pointers but whose bit-level representation is different. For example, the bit-level
+to native pointers but whose bit-level storage representation is different. For example, the storage
 representation of a <code>boost::interprocess::offset_ptr</code> identifying an object <code>x</code>
 is the memory address of <code>x</code> minus the address of the <code>offset_ptr</code> itself.
 </p>
 
 <div class="clarification"><p>
-This means that the representation of a <code>boost::interprocess::offset_ptr</code> object depends
-on its memory address. <code>offset_ptr</code> objects are not trivially copyable. Yet, at the
+This means that the storage representation of a <code>boost::interprocess::offset_ptr</code> object depends
+on the object's own memory address. <code>offset_ptr</code> objects are not trivially copyable. Yet, at the
 Platonic level, <code>offset_ptr</code> can be said to have the same set of possible <i>values</i>
 as a native pointer type.
 </p>
@@ -507,7 +533,7 @@ types cannot safely be stored in shared memory segments.
 The following standard types are required or expected to be <i>representation-aware</i>:
 </p>
 <ul>
-    <li>Allocator-aware container types.</li>
+    <li>Allocator-aware container types. (But libstdc++'s containers break this rule.)</li>
     <li>Container "node handle" types.</li>
     <li><code>basic_string</code>. <span class="clarification">
 The usual "small string optimization" does not affect <i>representation-awareness</i>.
@@ -1118,18 +1144,18 @@ The problems in this case are not with the containers. No vendor's containers ac
 support segmented pointers today, due to needless overuse of slicing expressions such as
 <code>std::pointer_traits&lt;P&gt;::pointer_to(std::addressof(*q))</code>; but adjusting those
 expressions to non-slicing expressions such as <code>static_cast&lt;P&gt;(q)</code> can be done
-mechanically. As far as I know, every vendor's containers already use fancy pointer types internally
-(in order to support Scenario A), and so they have the capability to hold a copy of each allocated
-fancy pointer until deallocation time; no ABI-breaking changes to class layouts would be required
-in order to support segmented pointers.
+mechanically. Some vendors' containers (e.g. libc++) already use fancy pointer types internally
+(in order to support Scenario A), so no ABI-breaking changes to class layouts would be required
+in order to support segmented pointers. Other vendors (e.g. libstdc++) use native pointer types
+internally, and thus even to support Scenario A would involve ABI-breaking changes for them.
 </p>
 
 <p>
-The ABI problems I have found in practice are with the allocator-aware non-containers:
+Even libc++ has ABI problems with the allocator-aware non-containers:
 <code>promise</code>, <code>shared_ptr</code>, and <code>packaged_task</code>. These
-types have shared states that may be allocated with an allocator, and their current
-implementations generally do not preserve a copy of the allocated pointer — only
-a copy of the allocator handle.
+types have shared states that may be allocated with an allocator. Their current
+implementations generally do not preserve a copy of the allocated <i>pointer</i> — only
+a copy of the allocator itself.
 </p>
 
 <div class="clarification"><p>
@@ -1325,8 +1351,9 @@ to follow these rules:
     <li>
         Assume that metadata is preserved via the fancy pointer type's special member functions,
         and via casting from one fancy pointer type to a rebound version of that type
-        (e.g. <code>static_cast&lt;FancyPtrT>(fancyPtrU)</code>). Do not assume that metadata
-        is preserved via any other operations. (Required by E.)
+        (e.g. <code>static_cast&lt;FancyPtrT>(fancyPtrU)</code>).
+        (This proposes a resolution to LWG 2260.)
+        Do not assume that metadata is preserved via any other operations. (Required by E.)
     </li>
     <li>
         Assume that <code>static_cast&lt;T*>(fancyPtrT)</code> is a correct slicing expression.
@@ -1338,10 +1365,6 @@ to follow these rules:
         <i>dereferenceable</i> pointer, but not a <i>deallocatable</i> one. Do not assume that
         <code>static_cast&lt;FancyPtrT&gt;(std::addressof(t))</code> compiles;
         <code>FancyPtrT</code> might not have a one-argument constructor. (Required by E.)
-    </li>
-    <li>
-        <code>basic_string</code> may assume that its fancy pointer type is trivially default
-        constructible. No other type may assume this.
     </li>
     <li>
         Assume that the fancy pointer type models <code>NullablePointer</code>. (Construction
@@ -1359,14 +1382,41 @@ to follow these rules:
 <h2><a name="basic_string"><code>basic_string</code> requires trivial default constructibility.</a></h2>
 
 <p>
-<code>basic_string</code>'s implementation typically requires that its <code>pointer</code>
-type be trivially default constructible. The Standard should explicitly specify this requirement
-in [string.require].
+The <code>basic_string</code> implementations of libc++ and MSVC implicitly require that their
+allocator's <code>pointer</code> type be trivially default constructible and trivially destructible <a
+href="https://bugs.llvm.org/show_bug.cgi?id=20508">(libc++ bug 20508)</a>.
+The Standard should either explicitly specify these requirements in [string.require], or else
+the implementations of <code>basic_string</code> should be fixed to avoid implicitly depending
+on trivial constructibility and destructibility of the <code>pointer</code> type.
 </p>
 
 
 <div class="clarification">
-<h2><a name="Iterators">Appendix. Representation-awareness of iterator types, in some present-day library implementations.</a></h2>
+<h2><a name="Iterators">Appendix. Representation-awareness of container and iterator types, in some present-day library implementations.</a></h2>
+
+<p>
+The following table shows, for various container classes <code>C</code> across various common library
+implementations, the compatibility of <code>C</code> with <code>boost::interprocess::offset_ptr</code>.
+This demonstrates the current state of my Scenario A (<i>offset pointers</i>) across these implementations.
+</p>
+
+<table>
+<tr><th></th>                 <th>libc++</th><th>GNU</th><th>MSVC</th><th>Boost.Container</th></tr>
+<tr><th>deque</th>               <td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><th>forward_list (slist)</th><td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>list</th>                <td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>map (etc.)</th>          <td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>unordered_map (etc.)</th><td>Yes</td><td>No </td><td>Yes</td><td>   </td></tr>
+<tr><th>flat_map (etc.)</th>     <td>   </td><td>   </td><td>   </td><td>Yes</td></tr>
+<tr><th>vector</th>              <td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><th>basic_string</th>        <td>X  </td><td>Yes</td><td>X  </td><td>Yes</td></tr>
+</table>
+
+<p>
+The "X" entries for <code>basic_string</code> indicate that the libraries require trivial constructibility,
+which <code>offset_ptr</code> does not have; but if this were fixed then the libraries would be able to
+support <code>offset_ptr</code> with no further patches (as far as I know).
+</p>
 
 <p>
 The following table shows, for various container classes <code>C</code> across various common library
@@ -1375,14 +1425,15 @@ This demonstrates the current state of my Scenario A (<i>offset pointers</i>) ac
 </p>
 
 <table>
-<tr><th></th>                 <th>libc++</th><th>GNU</th><th>MSVC</th><th>Boost.Container</th></tr>
-<tr><th>deque</th>               <td>Yes</td><td>Yes</td><td>No </td><td>Yes</td></tr>
-<tr><th>forward_list (slist)</th><td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
-<tr><th>list</th>                <td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
-<tr><th>map (etc.)</th>          <td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
-<tr><th>unordered_map (etc.)</th><td>Yes</td><td>No </td><td>Yes</td><td>   </td></tr>
-<tr><th>flat_map (etc.)</th>     <td>   </td><td>   </td><td>   </td><td>Yes</td></tr>
-<tr><th>vector</th>              <td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><th></th>                          <th>libc++</th><th>GNU</th><th>MSVC</th><th>Boost.Container</th></tr>
+<tr><th>deque iterator</th>               <td>Yes</td><td>Yes</td><td>No </td><td>Yes</td></tr>
+<tr><th>forward_list (slist) iterator</th><td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>list iterator</th>                <td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>map (etc.) iterator</th>          <td>Yes</td><td>No </td><td>Yes</td><td>Yes</td></tr>
+<tr><th>unordered_map (etc.) iterator</th><td>Yes</td><td>No </td><td>Yes</td><td>   </td></tr>
+<tr><th>flat_map (etc.) iterator</th>     <td>   </td><td>   </td><td>   </td><td>Yes</td></tr>
+<tr><th>vector iterator</th>              <td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><th>basic_string iterator</th>        <td>Yes</td><td>Yes</td><td>?</td><td>?</td></tr>
 </table>
 
 <p>
@@ -1427,6 +1478,12 @@ http://blog.nuggetwheat.org/index.php/2015/09/01/why-pointer_traits-was-introduc
 Arthur O'Dwyer. "pointer-traits.md." August 2017.
 <a href="https://github.com/Quuxplusone/from-scratch/blob/master/include/scratch/bits/traits-classes/pointer-traits.md">
 https://github.com/Quuxplusone/from-scratch/blob/master/include/scratch/bits/traits-classes/pointer-traits.md</a>
+</dd>
+
+<dd>
+Jonathan Wakely. LWG 2260 "Missing requirement for Allocator::pointer." Opened 2013-05-14, last modified 2017-07-30.
+<a href="https://timsong-cpp.github.io/lwg-issues/2260">
+https://timsong-cpp.github.io/lwg-issues/2260</a>
 </dd>
 
 </dl>
