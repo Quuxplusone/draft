@@ -47,7 +47,7 @@ blockquote.std { color: #000000; background-color: #F1F1F1;
 blockquote.stddel { text-decoration: line-through;
   color: #000000; background-color: #FFEBFF;
   border: 1px solid #ECD7EC;
-  padding-left: 0.5empadding-right: 0.5em; ; }
+  padding-left: 0.5em; padding-right: 0.5em; }
 
 blockquote.stdins { text-decoration: underline;
   color: #000000; background-color: #C8FFC8;
@@ -755,19 +755,24 @@ these standard containers: <code>deque</code>, <code>forward_list</code>, <code>
 But these other standard containers <i>will</i> have technical difficulties with near fancy pointers:
 <code>list</code>, <code>map</code>, <code>set</code>, <code>unordered_set</code>, <code>unordered_map</code>.
 These containers have trouble because their natural implementation requires a linked list
-where some nodes in the linked list are allocated (i.e. fancy pointers identifying objects in
-the "small data area") and some nodes are not (i.e. these nodes are not in the "small data area"
-and thus are not addressable by the near fancy pointer type).
+where most nodes in the linked list are allocated (i.e. fancy pointers identifying objects in
+the "small data area") and some "sentinel node" is not (i.e. the sentinel node is not located
+in the "small data area" and thus is not addressable by the near fancy pointer type).
 </p>
 
 <p>
-Containers with this difficulty shall be called <dfn>list-like containers</dfn>.
+Containers with this difficulty shall be called <dfn>sentinel-node containers</dfn>.
 </p>
 
 <div display="block" align="center">
-<img src="fancy-pointers.fwdlist.png" width="40%" display="inline"></img>
 <img src="fancy-pointers.list.png" width="40%" display="inline"></img>
+<img src="fancy-pointers.fwdlist.png" width="40%" display="inline"></img>
 </div>
+
+<p>
+An implementation of <code>std::list</code> where the sentinel node is allocated (rather than being part of
+the container instance's member data) is not a <i>sentinel-node container</i>.
+</p>
 
 <p>
 We have the following possible solutions to this problem:
@@ -778,19 +783,19 @@ We have the following possible solutions to this problem:
         Any solution less appealing than this one can be summarily dismissed.)</span>
     </li>
     <li>
-        Near fancy pointer types are not allowed for <i>list-like containers</i>, but
+        Near fancy pointer types are not allowed for <i>sentinel-node containers</i>, but
         are allowed for other containers. The Standard would have to specify for each
         container whether it was list-like or not.
     </li>
     <li>
-        List-like containers use only native pointers for addressing.
+        Sentinel-node containers use only native pointers for addressing.
         These native pointers are cast back to fancy pointers at deallocation time.
         This solution loses the memory-footprint benefit we were hoping to get
         from using fancy pointers. This solution is incompatible with Scenarios A and E.
         (Therefore this solution is summarily dismissed.)
     </li>
     <li>
-        Each node of a list-like container holds an extra bit indicating whether the node
+        Each node of a sentinel-node container holds an extra bit indicating whether the node
         is allocated (in which case it is identified by a fancy pointer) or non-allocated
         (in which case it is identified by a native pointer).
         This solution loses the memory-footprint benefit we were hoping to get
@@ -798,7 +803,16 @@ We have the following possible solutions to this problem:
         (Therefore this solution is summarily dismissed.)
     </li>
     <li>
-        Near fancy pointer types are allowed for list-like containers, but if the container
+        Near fancy pointer types are allowed for sentinel-node containers, but if the container
+        cannot statically detect that its <code>pointer</code> type is wide enough to access
+        all of main memory, then the container will switch to an implementation where the
+        sentinel node is allocated using the same mechanism as other nodes.
+        <span>This solution essentially requires that vendors provide two implementations
+        of each sentinel-node container: one for efficiency and one for use with near fancy
+        pointers.</span>
+    </li>
+    <li>
+        Near fancy pointer types are allowed for sentinel-node containers, but if the container
         itself, or any subobject thereof, cannot be addressed with (a rebinding of) its own
         <code>pointer</code> type, then the behavior is undefined.
         <span class="clarification">This solution does not require any new work from vendors,
@@ -817,7 +831,7 @@ int main() {
 </p>
 
 <p>
-In my opinion, solutions (1), (2), and (5) are all tenable. Solution (1) is the de-facto
+In my opinion, solutions (1), (2), and (6) are all tenable. Solution (1) is the de-facto
 solution today: <b>Near fancy pointer types are just not allowed.</b>
 </p>
 
@@ -1269,7 +1283,7 @@ of a type at compile time.
 
 <p>
 If we are willing to force some work on vendors, my preferred solutions would be
-A-1 (continue the status quo on offset pointers), B-5 (support near pointers, with undefined behavior
+A-1 (continue the status quo on offset pointers), B-6 (support near pointers, with undefined behavior
 for certain uses of list-like containers); D-1 (do not support fat pointers),
 E-2 (fully support segmented pointers). I will refer to this set of solutions as
 <dfn>fancy-pointer-support</dfn>.
@@ -1279,7 +1293,7 @@ E-2 (fully support segmented pointers). I will refer to this set of solutions as
 <h2><a name="Requirements">Requirements on fancy pointer types if <i>fancy-pointer-support</i> were adopted.</a></h2>
 
 <p>
-Solution B-5 requires only that it be possible to cast a native pointer-to-<code>Base</code>
+Solution B-6 requires only that it be possible to cast a native pointer-to-<code>Base</code>
 (to a subobject of a list-like container; therefore, non-null) into a <i>dereferenceable</i>
 fancy pointer-to-<code>Base</code>. This requirement is translated into C++ terms via the
 standard trait <code>std::pointer_traits&lt;FancyPtrT&gt;::pointer_to(T& r)</code>.
@@ -1453,7 +1467,7 @@ This demonstrates the current state of my Scenario A (<i>offset pointers</i>) ac
 <tr><th>unordered_map (etc.) iterator</th><td>Yes</td><td>No </td><td>Yes</td><td>   </td></tr>
 <tr><th>flat_map (etc.) iterator</th>     <td>   </td><td>   </td><td>   </td><td>Yes</td></tr>
 <tr><th>vector iterator</th>              <td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-<tr><th>basic_string iterator</th>        <td>Yes</td><td>Yes</td><td>?</td><td>?</td></tr>
+<tr><th>basic_string iterator</th>        <td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
 </table>
 
 <p>
