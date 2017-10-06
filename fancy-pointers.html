@@ -70,7 +70,7 @@ td { text-align: left; vertical-align: top;
 <b>Date:</b> 2017-10-05 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
-<b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt; <br>
+<b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt;, Bob Steagall &lt;bob.steagall.cpp@gmail.com&gt; <br>
 
 <h1>Towards meaningful fancy pointers</h1>
 
@@ -106,31 +106,51 @@ Indented, grayed paragraphs represent "clarifications" that should be skipped on
 For example, this grayed paragraph should be skipped on your first reading.
 </p></div>
 <div>&nbsp;</div>
+
+<p>
+I contend that the Standard's current wording related to fancy pointer types is so vague and unconstraining
+as to be effectively meaningless. For example, the table in [allocator.requirements] requires that the
+fancy pointer <code>p</code> passed to <code>deallocate</code> "shall be a value returned by an earlier call
+to <code>allocate</code>...", but the Standard lacks any formal notion of what it means to preserve the "value"
+of a fancy pointer. (In this paper's Scenarios C, D, and E, casting the allocated fancy pointer to
+<i>native pointer</i> type and then back to fancy pointer type is not a value-preserving operation.)
+Some operations on allocators seem to have implicit requirements; for example, <code>allocate_shared</code>
+implicitly requires that fancy pointers be convertible to native pointers. Some vendors' container
+implementations require things of fancy pointer types beyond the Standard; for example, <code>basic_string</code>
+usually requires that its pointer type be trivially constructible.
+</p>
+
+<p>
+This paper tries to start a discussion of formal semantics for "fancy pointer" types in C++, and
+what it means for a container or algorithm to be "allocator-aware."
+</p>
+
 <div class="clarification">
 <p>
-What do we want fancy pointers to represent?
+I propose a taxonomy of fancy pointer types into five not-mutually-exclusive categories, along the axes of
+<i>storage representation</i>, <i>addressable range</i>, and <i>carried metadata</i>.
 </p>
 <ul>
     <li>
-(A) Un-augmented fancy pointers with a different bit-level representation than native pointers: offset pointers.
+(A) Fancy pointers with a different bit-level representation than native pointers: <b>offset</b> pointers.
 This is explicitly supported today. Many types (std::vector) work already; some non-container types
 (std::shared_ptr) do not work.
     </li>
     <li>
-(B) Un-augmented fancy pointers addressing a lesser range of memory such as the Small Data Area: near pointers.
+(B) Fancy pointers addressing a narrower range of memory (a Small Data Area): <b>near</b> pointers.
 This is plausible. Some containers (std::vector) implicitly work already; some (std::list) work only in
 certain runtime situations.
     </li>
     <li>
-(C) Un-augmented fancy pointers addressing a greater range of memory: far pointers.
+(C) Fancy pointers addressing a wider range of memory: <b>far</b> pointers.
 This turns out to be impossible in C++ because every object must have a native address.
     </li>
     <li>
-(D) Augmented fancy pointers whose metadata affects arithmetic: fat pointers.
+(D) Augmented fancy pointers whose metadata affects arithmetic: <b>fat</b> pointers.
 This is plausible but expensive, and not worth the implementation effort for vendors.
     </li>
     <li>
-(E) Augmented fancy pointers whose metadata affects only deallocation: segmented pointers.
+(E) Augmented fancy pointers whose metadata affects only deallocation: <b>segmented</b> pointers.
 This is plausible. Some containers (std::vector) work already; some (std::list) require only
 trivial modifications; some (std::shared_ptr) require major fixes.
     </li>
@@ -1414,8 +1434,8 @@ This demonstrates the current state of my Scenario A (<i>offset pointers</i>) ac
 
 <p>
 The "X" entries for <code>basic_string</code> indicate that the libraries require trivial constructibility,
-which <code>offset_ptr</code> does not have; but if this were fixed then the libraries would be able to
-support <code>offset_ptr</code> with no further patches (as far as I know).
+which <code>offset_ptr</code> does not have; but if the library vendors patched this one bug, then the
+libraries would be able to support <code>offset_ptr</code> with no further patches (as far as I know).
 </p>
 
 <p>
