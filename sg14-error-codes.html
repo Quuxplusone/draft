@@ -63,12 +63,12 @@ td { text-align: left; vertical-align: top;
 <a href="#Description">2. Description of C++11's <code>&lt;system_error&gt;</code> facilities</a><br>
 <a href="#Best">3. Proposed best practices for using C++11's <code>&lt;system_error&gt;</code> facilities</a><br>
 <a href="#Issues">4. Issues with the <code>&lt;system_error&gt;</code> facilities</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-string">4.1 Use of std::string</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-outparams">4.2 Proliferation of "two-API" libraries</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-bool">4.3 No normative wording sets aside the <code>0</code> enumerator</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-singletons">4.4 Reliance on singletons</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-constexpr">4.5 No <code>error_category</code> subclass can be a literal type</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-metadata">4.6 No guidance on attaching extra information to <code>error_code</code></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-string">4.1. Use of <code>std::string</code></a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-outparams">4.2. Proliferation of "two-API" libraries</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-bool">4.3. No wording sets aside the <code>0</code> enumerator</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-singletons">4.4. Reliance on singletons</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-constexpr">4.5. No <code>error_category</code> subclass can be a literal type</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-metadata">4.6. No guidance on attaching extra information to <code>error_code</code></a><br>
 </p>
 
 
@@ -381,6 +381,218 @@ discussion.
 
 <h2><a name="Issues">4. Issues with the <code>&lt;system_error&gt;</code> facilities</a></h2>
 
+<p>
+    On the 2017-10-11 teleconference, the following issues were discussed.
+</p>
+
+
+<h3><a name="issue-string">4.1. Use of <code>std::string</code></a></h3>
+
+<p>
+    <code>std::error_category</code>'s method <code>virtual std::string message(int) const</code> converts an error-code-enumerator
+    into a human-readable message. This functionality is apparently useful only for presentation to humans; i.e., we do not expect
+    that anyone should be treating the result of <code>message()</code> as a unique key, nor scanning into its elements with
+    <code>strstr</code>. However, as a pure virtual method, this method <i>must</i> be implemented by each <code>error_category</code>
+    subclass.
+</p>
+<p>
+    Its return type is <code>std::string</code>, i.e., it introduces a hard-coded dependency on <code>std::allocator&lt;char&gt;</code>.
+    This seems to imply that if you are on a computer system without <code>new</code> and <code>delete</code>,
+    without <code>std::allocator</code>, without <code>std::string</code>, then you cannot implement your own <code>error_category</code>
+    subclasses, which effectively means that you cannot use <code>std::error_code</code> to deal with disappointment.
+    SG14 sees any hard-coded dependency on <code>std::allocator</code> as unfortunate.
+    For a supposedly "fundamental" library like <code>&lt;system_error&gt;</code> it is <i>extremely</i> unfortunate.
+</p>
+<p>
+    During the call, Charley Bay commented that returning ownership of a dynamically allocated string allows the
+    <code>error_category</code> subclass to return a message that differs based on <i>the current locale</i>.
+    However, nobody on the call claimed that this functionality was important to them. Furthermore, if locale-awareness
+    were desirable, then branching on the <i>current (global) locale</i> would be the wrong way to go about it, because
+    that mechanism would not be usable by multi-threaded programs. The right way to introduce locale-awareness into
+    <code>error_category</code> would be to provide a virtual method <code>std::string message(int, const std::locale&)</code>.
+</p>
+<p>
+    SG14 seems to agree that eliminating the dependency on <code>std::allocator</code> would be nice.
+</p>
+<p>
+    SG14 seems to agree that dynamically allocated message strings are not an important feature.
+</p>
+<p>
+    Two ways of removing <code>std::string</code> were proposed: return <code>const char*</code>, or return <code>std::string_view</code>.
+    Arthur O'Dwyer commented that he strongly prefers <code>const char*</code> for simplicity (no new library dependencies) and for consistency
+    with <code>std::error_category::name()</code> and <code>std::exception::what()</code>.
+    Niall Douglas commented that he prefers <code>std::string_view</code> over raw null-terminated <code>const char*</code> whenever possible.
+</p>
+<p>
+    Both ways of removing <code>std::string</code> alter the return type of a pure virtual method
+    and thus inevitably break every subclass of <code>std::error_category</code> ever. SG14 has no way out of this dilemma
+    other than to suggest "wait for <code>std2</code> and do it correctly there."
+</p>
+
+
+<h3><a name="issue-outparams">4.2. Proliferation of "two-API" libraries</a></h3>
+
+<p>
+    <code>&lt;filesystem&gt;</code> is the poster child for this issue. Every function and method in <code>&lt;filesystem&gt;</code>
+    comes in two flavors: throwing and non-throwing. The throwing version gets the "natural" signature (as is right and expected
+    in C++); and the non-throwing version gets a signature with an extra out-parameter of type <code>std::error_code&</code>.
+    The expectation is apparently that <code>&lt;system_error&gt;</code> users will be willing to write "C-style" code:
+    <pre>
+        namespace fs = std::filesystem;
+        void truncate_if_large(const fs::path& p) noexcept
+        {
+            std::error_code ec;  // declare an uninitialized variable
+            uintmax_t oldsize = fs::file_size(p, ec);
+            if (ec) { report_error(ec); return; }
+            if (oldsize > 1000) {
+                fs::resize_file(p, 1000, ec);
+                if (ec) { report_error(ec); return; }
+            }
+        }
+    </pre>
+</p>
+
+<p>
+    It would be nicer if the non-throwing API had exactly the same signatures as the throwing API, except that it should
+    return <code>expected&lt;T&gt;</code> or <code>result&lt;T&gt;</code> instead of <code>T</code>. On the telecon,
+    Arthur O'Dwyer commented that this can't easily be done because you cannot have two functions with the same name
+    and the same signature, differing only in return type.
+</p>
+<p>
+    It is possible to segregate the <i>free functions</i> into a separate namespace, say <code>namespace std::filesystem::nothrow</code>,
+    so that the above code could be written as
+    <pre>
+        namespace fs = std::filesystem::nothrow;  // hypothetical
+        void truncate_if_large(const fs::path& p) noexcept
+        {
+            auto oldsize = fs::file_size(p);
+            if (!oldsize.has_value()) { report_error(oldsize.error()); return; }
+            if (oldsize.value() > 1000) {
+                auto failure = fs::resize_file(p, 1000);
+                if (failure) { report_error(failure.error()); return; }
+            }
+        }
+    </pre>
+    However, this doesn't help with member functions, such as <code>directory_entry::is_symlink()</code>.
+</p>
+
+<p>
+    Having two APIs (throwing and non-throwing) side by side in the same namespace has another disadvantage.
+    There is a significant risk that the programmer might accidentally leave off the out-parameter that signifies
+    "non-throwing-ness", resulting in a call to the throwing version when a call to the non-throwing version was
+    intended.
+    <pre>
+        namespace fs = std::filesystem;
+        void truncate_if_large(const fs::path& p) noexcept
+        {
+            std::error_code ec;  // declare an uninitialized variable
+            uintmax_t oldsize = fs::file_size(p, ec);
+            if (ec) { report_error(ec); return; }
+            if (oldsize > 1000) {
+                fs::resize_file(p, 1000);  // Oops! Bug goes undetected by all major vendors.
+                if (ec) { report_error(ec); return; }
+            }
+        }
+    </pre>
+    Therefore, segregating throwing from non-throwing functions is desirable. But we don't know how to make
+    segregation work for member functions. Therefore perhaps the <i>best</i> outcome would be to stick with
+    a single (non-throwing) API for each library.
+</p>
+<p>
+    If we had a single (non-throwing) API that returned something like <code>Expected&lt;T&gt;</code>, and if
+    <code>Expected&lt;T&gt;</code> had a member function <code>T or_throw()</code> that returned the
+    <code>ex.value()</code> if possible or else threw a <code>system_error</code> initialized from <code>ex.error()</code>,
+    then we could write exception-throwing code fluently as follows:
+    <pre>
+        namespace fs = std::filesystem::nothrow;
+        void truncate_if_large(const fs::path& p) noexcept
+        {
+            uintmax_t oldsize = fs::file_size(p).or_throw();
+            if (oldsize > 1000) {
+                fs::resize_file(p, 1000).or_throw();
+            }
+        }
+    </pre>
+    Here we assume that the template class <code>Expected&lt;void&gt;</code> is marked with the standard
+    <code>[[nodiscard]]</code> attribute, so that if the programmer accidentally leaves off the final <code>or_throw()</code>
+    the compiler will emit a warning.
+</p>
+
+<p>
+    SG14 seems not to have a great answer for how to avoid "two-API" libraries such as <code>&lt;filesystem&gt;</code>
+    going forward; but we believe that "two-API" libraries should be avoided. The Networking TS seems to be shaping up
+    to be another "two-API" library. We believe this is unfortunate.
+</p>
+
+
+<h3><a name="issue-bool">4.3. No wording sets aside the <code>0</code> enumerator</a></h3>
+
+<p>
+    The current Standard strongly implies the best-practice mentioned above: that every error-code-enumerator and
+    every error-condition-enumerator should set aside <code>success = 0</code> as a special case.
+    <pre>
+        enum class TroublesomeCode { out_of_memory, out_of_files };
+        struct TroublesomeCategory : public std::error_category {
+            const char *name() const noexcept override { return ""; }
+            std::string message(int e) const override {
+                switch (e) {
+                    case TroublesomeCode::out_of_memory: return "out of memory";
+                    case TroublesomeCode::out_of_files: return "out of files";
+                    default: __builtin_unreachable();
+                }
+            }
+        };
+        const std::error_category& troublesome_category() {
+            static const TroublesomeCategory instance;
+            return instance;
+        }
+
+        template<> struct std::is_error_code_enum&lt;TroublesomeCode&gt; : std::true_type {};
+        std::error_code make_error_code(TroublesomeCode e) {
+            return std::error_code((int)e, troublesome_category());
+        }
+
+        int main() {
+            std::error_code ec = TroublesomeCode::out_of_memory;
+            if (ec) {
+                puts("This line will not be printed.");
+            }
+        }
+    </pre>
+    SG14 would like to see some explicit acknowledgment in the Standard that error-code enumerators with value <code>0</code>
+    are "special," i.e., they will not be treated as "errors" by any of the machinery in the Standard. Error codes with
+    value <code>0</code> are effectively reserved for the "success" case, and programmers should not attempt to use them
+    for any other purpose.
+</p>
+<p>
+    Vice versa, programmers should be aware that using a non-zero integer value to represent "success" will not work as expected.
+    Consider an HTTP library that naively attempts to use <code>ok = 200</code> as its "success" code, and then provides an
+    ADL <code>make_error_code</code> like this:
+    <pre>
+        enum class HTTPStatusCode { ok = 200, created = 201, /* ... */ };
+
+        template<> struct std::is_error_code_enum&lt;HTTPStatusCode&gt; : std::true_type {};
+        std::error_code make_error_code(HTTPStatusCode e) {
+            return std::error_code((e == ok) ? 0 : (int)e, http_status_category());
+        }
+
+        std::string HTTPStatusCategory::message(int e) const {
+            switch (e) {
+                case 0: return "200 OK";
+                case 201: return "201 Created";
+                // ...
+            }
+        }
+    </pre>
+    The programmer may head far down this "garden path" under the assumption that his goal of a non-zero "ok" code is attainable;
+    but we on the Committee know that it is <i>not</i> attainable. We should save the programmer some time and some headaches,
+    by explicitly reserving error-code <code>0</code> in the standard.
+</p>
+
+
+<h3><a name="issue-singletons">4.4 Reliance on singletons</a></h3>
+<h3><a name="issue-constexpr">4.5 No <code>error_category</code> subclass can be a literal type</a></h3>
+<h3><a name="issue-metadata">4.6 No guidance on attaching extra information to <code>error_code</code></a></h3>
 
 
 
