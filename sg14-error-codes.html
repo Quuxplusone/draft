@@ -134,10 +134,10 @@ discussion.
         std::error_category *cat_;
     public:
         error_code() noexcept : error_code(0, std::system_category()) {}
-        error_code(int e, const std::error_category& c) noexcept : value_(e), cat_(&c) {}
+        error_code(int e, const std::error_category&amp; c) noexcept : value_(e), cat_(&amp;c) {}
         template&lt;class E&gt; error_code(E e) noexcept requires(std::is_error_code_enum_v&lt;E&gt;) { *this = make_error_code(e); }  // intentional ADL
-        template&lt;class E&gt; error_code& operator=(E e) noexcept requires(std::is_error_code_enum_v&lt;E&gt;) { *this = make_error_code(e); }  // intentional ADL
-        void assign(int e, const std::error_category& c) noexcept { value_ = e; cat_ = &amp;c; }
+        template&lt;class E&gt; error_code&amp; operator=(E e) noexcept requires(std::is_error_code_enum_v&lt;E&gt;) { *this = make_error_code(e); }  // intentional ADL
+        void assign(int e, const std::error_category&amp; c) noexcept { value_ = e; cat_ = &amp;c; }
         void clear() noexcept { *this = std::error_code(); }
 
         explicit operator bool() const noexcept { return value_ != 0; }
@@ -255,7 +255,7 @@ discussion.
         system_error(std::error_code ec, const std::string&amp; w) : code_(ec), what_(ec.message() + ": " + w) {}
         system_error(std::error_code ec, const char *w) : system_error(ec, std::string(w)) {}
         system_error(int e, const std::error_category&amp; cat) : system_error(std::error_code(e, cat)) {}
-        system_error(int e, const std::error_category&amp; cat, const std::string& w) : system_error(std::error_code(e, cat), w) {}
+        system_error(int e, const std::error_category&amp; cat, const std::string&amp; w) : system_error(std::error_code(e, cat), w) {}
         system_error(int e, const std::error_category&amp; cat, const char *w) : system_error(std::error_code(e, cat), w) {}
         const std::error_code&amp; code() const noexcept { return code_; }
         const char *what() const noexcept override { return what_.c_str(); }
@@ -417,7 +417,7 @@ discussion.
     However, nobody on the call claimed that this functionality was important to them. Furthermore, if locale-awareness
     were desirable, then branching on the <i>current (global) locale</i> would be the wrong way to go about it, because
     that mechanism would not be usable by multi-threaded programs. The right way to introduce locale-awareness into
-    <code>error_category</code> would be to provide a virtual method <code>std::string message(int, const std::locale&)</code>.
+    <code>error_category</code> would be to provide a virtual method <code>std::string message(int, const std::locale&amp;)</code>.
 </p>
 <p>
     SG14 seems to agree that eliminating the dependency on <code>std::allocator</code> would be nice.
@@ -443,7 +443,7 @@ discussion.
 <p>
     <code>&lt;filesystem&gt;</code> is the poster child for this issue. Every function and method in <code>&lt;filesystem&gt;</code>
     comes in two flavors: throwing and non-throwing. The throwing version gets the "natural" signature (as is right and expected
-    in C++); and the non-throwing version gets a signature with an extra out-parameter of type <code>std::error_code&</code>.
+    in C++); and the non-throwing version gets a signature with an extra out-parameter of type <code>std::error_code&amp;</code>.
     The expectation is apparently that <code>&lt;system_error&gt;</code> users will be willing to write "C-style" code:
     <pre>
         namespace fs = std::filesystem;
@@ -491,7 +491,7 @@ discussion.
     intended.
     <pre>
         namespace fs = std::filesystem;
-        void truncate_if_large(const fs::path& p) noexcept
+        void truncate_if_large(const fs::path&amp; p) noexcept
         {
             std::error_code ec;  // declare an uninitialized variable
             uintmax_t oldsize = fs::file_size(p, ec);
@@ -513,7 +513,7 @@ discussion.
     then we could write exception-throwing code fluently as follows:
     <pre>
         namespace fs = std::filesystem::nothrow;
-        void truncate_if_large(const fs::path& p) noexcept
+        void truncate_if_large(const fs::path&amp; p) noexcept
         {
             uintmax_t oldsize = fs::file_size(p).or_throw();
             if (oldsize > 1000) {
@@ -609,7 +609,7 @@ discussion.
 <pre>
         error_code() noexcept : error_code(0, std::null_category()) {}
         error_condition() noexcept : error_code(0, std::null_category()) {}
-        explicit operator bool() const noexcept { return cat_ != &std::null_category(); }
+        explicit operator bool() const noexcept { return cat_ != &amp;std::null_category(); }
 </pre>
     This would eliminate the current requirement that error-code <code>0</code> always be reserved. Providing
     a default "null category" could also help to clarify the expected semantics of a default-constructed
@@ -658,10 +658,10 @@ discussion.
 <p>
     In practice, some platforms (notably MSVC, and libc++ if built with a compile-time flag) work around the above problems
     for <code>type_info</code> singletons by implementing <code>type_info::operator==</code> as a string-equality (i.e.
-    <code>!strcmp(this->name(), rhs.name())</code>) instead of an address-equality (i.e. <code>this == &rhs</code>).
+    <code>!strcmp(this->name(), rhs.name())</code>) instead of an address-equality (i.e. <code>this == &amp;rhs</code>).
     This workaround is blessed by the Standard; <code>type_info::operator==</code> is specified to return
     "true if the two values describe the same type" with no constraints on <i>how</i> this "sameness" is determined.
-    In contrast, <code>error_category::operator==</code> is specified to return exactly "<code>this == &rhs</code>"
+    In contrast, <code>error_category::operator==</code> is specified to return exactly "<code>this == &amp;rhs</code>"
     with no wiggle room at all.
 </p>
 <p>
@@ -677,12 +677,12 @@ discussion.
 
 <p>
     On the SG14 telecon, Odin Holmes and Charley Bay raised the issue that <code>std::error_code</code> is not usable in
-    constexpr contexts; for example, <code>bool operator==(const error_code& lhs, const error_code& rhs) noexcept</code>
+    constexpr contexts; for example, <code>bool operator==(const error_code&amp; lhs, const error_code&amp; rhs) noexcept</code>
     is not <code>constexpr</code>. Even constructing a <code>std::error_code</code> instance cannot be done constexprly,
-    because <code>error_code(int val, const error_category& cat) noexcept</code> is not <code>constexpr</code>.
+    because <code>error_code(int val, const error_category&amp; cat) noexcept</code> is not <code>constexpr</code>.
     Even if it <i>were</i> constexpr, we <i>still</i> wouldn't be able to construct an <code>error_code</code> constexprly,
-    because we couldn't get the appropriate <code>const error_category&</code>, because for example
-    <code>const error_category& generic_category() noexcept</code> is not constexpr!
+    because we couldn't get the appropriate <code>const error_category&amp;</code>, because for example
+    <code>const error_category&amp; generic_category() noexcept</code> is not constexpr!
 </p>
 <p>
     It is impossible to manipulate any <code>error_category</code> instance constexprly, because <code>error_category</code>
@@ -722,7 +722,7 @@ discussion.
     which is a conforming extension.)
 </p>
 <pre>
-    constexpr int constexpr_4throot(int i, std::error_code& ec) {
+    constexpr int constexpr_4throot(int i, std::error_code&amp; ec) {
         int j = constexpr_sqrt(i, ec);
         if (ec) return 0;
         return constexpr_sqrt(j, ec);
