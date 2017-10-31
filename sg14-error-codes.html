@@ -55,7 +55,7 @@ td { text-align: left; vertical-align: top;
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt;, Charley Bay &lt;charleyb123@gmail.com&gt;,
-Odin Holmes &lt;holmes@auto-intern.de&gt;, Michael Wong &lt;fraggamuffin@gmail.com&gt; <br>
+Odin Holmes &lt;holmes@auto-intern.de&gt;, Michael Wong &lt;fraggamuffin@gmail.com&gt;, Niall Douglas <s_sourceforge@nedprod.com><br>
 
 <h1>Summary of SG14 discussion on <code>&lt;system_error&gt;</code></h1>
 
@@ -91,14 +91,14 @@ in <code>status_value&lt;E,T&gt;</code>
 (<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0262r0.html">P0262R0</a>, Lawrence Crowl),
 in <code>expected&lt;T,E&gt;</code>
 (<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0323r2.pdf">P0323R2</a>, Vicente J. Botet Escribá),
-and in <code>result&lt;T,E&gt;</code> (Niall Douglas).
+  and in <code>result&lt;T,EC&gt;</code> (<a href="https://ned14.github.io/outcome/">Outcome</a>, Niall Douglas).
 </p>
 
 <p>
-In all of those future idioms involving <code>expected&lt;T,E&gt;</code>-style result types, SG14 expects that
-the <code>E</code> type parameter will default to <code>std::error_code</code> — which is right and good. This means
-that the coming years will see extremely heavy use of <code>std::error_code</code> at every level of the system.
-This means that SG14 is very interested in correcting deficiencies in <code>std::error_code</code> sooner, rather
+In all of those future idioms involving value-or-error types, SG14 expects that the choice of 
+the <code>E</code> type parameter to <code>std::error_code</code> or equivalent will be common. This means
+that the coming years will see much increased use of <code>std::error_code</code> in both new and existing code bases.
+This means that SG14 is very interested in correcting deficiencies in <code>&lt;system_error&gt;</code> sooner, rather
 than later.
 </p>
 
@@ -106,7 +106,7 @@ than later.
 On SG14's 2017-10-11 teleconference call, various people contributed to a miscellaneous "laundry list" of
 perceived deficiencies with <code>&lt;system_error&gt;</code>. Several "best practices" were also proposed for
 how we expect <code>&lt;system_error&gt;</code> facilities to be used in the best codebases. (Unfortunately,
-the Standard Library does not follow <i>anyone's</i> proposed "best practice"!) This paper is a summary of that
+the Standard Library does not follow <i>any</i> one proposed "best practice"!) This paper is a summary of that
 discussion.
 </p>
 
@@ -117,9 +117,9 @@ discussion.
 </p>
 
 <p>
-    A <code>std::error_code</code> object wraps an integer "error enumerator" and a pointer to an "error category"
-    (that is, a handle to the specific error domain associated with this integer enumerator). The addition of the
-    error domain handle is what allows us to distinguish, say, <code>error=5</code> "no leader for Kafka partition"
+    A <code>std::error_code</code> object wraps a signed integer "error enumerator" and a reference to an "error category" singleton
+    (that is, to the specific error domain associated with this integer enumerator). The addition of the
+    error domain reference is what allows us to distinguish, say, <code>error=5</code> "no leader for Kafka partition"
     (in the rdkafka domain) from <code>error=5</code> "I/O error" (in the POSIX domain). Two <code>error_code</code>
     instances compare equal if and only if they represent the same error enumerator <i>in the same domain</i>.
 </p>
@@ -127,37 +127,37 @@ discussion.
     Notice that <code>std::error_condition</code> is not the same type as <code>std::error_code</code>!
 </p>
 <pre>
-    namespace std {
+namespace std {
     class error_code {
         int value_;
-        std::error_category *cat_;
+        const std::error_category &cat_;
     public:
         error_code() noexcept : error_code(0, std::system_category()) {}
-        error_code(int e, const std::error_category& c) noexcept : value_(e), cat_(&c) {}
+        error_code(int e, const std::error_category& c) noexcept : value_(e), cat_(c) {}
         template&lt;class E&gt; error_code(E e) noexcept requires(std::is_error_code_enum_v&lt;E&gt;) { *this = make_error_code(e); }  // intentional ADL
         template&lt;class E&gt; error_code& operator=(E e) noexcept requires(std::is_error_code_enum_v&lt;E&gt;) { *this = make_error_code(e); }  // intentional ADL
-        void assign(int e, const std::error_category& c) noexcept { value_ = e; cat_ = &c; }
+        void assign(int e, const std::error_category& c) noexcept { *this = error_code(e, c); }
         void clear() noexcept { *this = std::error_code(); }
 
-        explicit operator bool() const noexcept { return !!value_; }
+        explicit operator bool() const noexcept { return value_ != 0; }  // note this rules out use of code zero for ANY domain
         int value() const noexcept { return value_; }
         const std::error_category& category() const noexcept { return cat_; }
 
         std::string message() const { return cat_->message(value_); }
         std::error_condition default_error_condition() const noexcept { return cat_->default_error_condition(value_); }
     };
-    bool operator==(const std::error_code& a, const std::error_code& b) noexcept { return a.value() == b.value() && &a.category() == &b.category(); }
-    } // namespace std
+    bool operator==(const std::error_code& a, const std::error_code& b) noexcept { return a.value() == b.value() && a.category() == b.category(); }
+} // namespace std
 </pre>
 
 <p>
-    Each "error domain" is represented in code by an object of type <code>std::error_category</code>. These are always
-    singletons, effectively, because <code>error_code</code> equality-comparison is implemented in terms of pointer comparison
+    Each "error domain" is represented in code by an object of type <code>std::error_category</code>. The standard effectively
+    implies that these must be singletons, because <code>error_code</code> equality-comparison is implemented in terms of pointer comparison
     (see above). So two <code>error_category</code> objects located at different memory addresses represent different
     error domains, <i>by definition</i>, as far as the currently standardized scheme is concerned.
 </p>
 <pre>
-    namespace std {
+namespace std {
     class error_category {
     public:
         constexpr error_category() noexcept = default;
@@ -173,7 +173,7 @@ discussion.
         virtual bool equivalent(const std::error_code& code, int e) const noexcept { return code == std::error_code(e, *this); }
     };
     bool operator==(const std::error_category& a, const std::error_category& b) noexcept { return &a == &b; }
-    } // namespace std
+} // namespace std
 </pre>
 
 <p>
@@ -189,29 +189,32 @@ discussion.
     to <code>std::error_code</code>.
 </p>
 <pre>
-    namespace std {
+namespace std {
     class error_condition {
         int value_;
-        std::error_category *cat_;
+        const std::error_category &cat_;
     public:
         error_condition() noexcept : error_code(0, std::generic_category()) {}
-        error_condition(int e, const std::error_category& c) noexcept : value_(e), cat_(&c) {}
+        error_condition(int e, const std::error_category& c) noexcept : value_(e), cat_(c) {}
         template&lt;class E&gt; error_condition(E e) noexcept requires(std::is_error_condition_enum_v&lt;E&gt;) { *this = make_error_condition(e); }  // intentional ADL
         template&lt;class E&gt; error_condition& operator=(E e) noexcept requires(std::is_error_condition_enum_v&lt;E&gt;) { *this = make_error_condition(e); }  // intentional ADL
-        void assign(int e, const std::error_category& c) noexcept { value_ = e; cat_ = &c; }
+        void assign(int e, const std::error_category& c) noexcept { *this = error_condition(e, c); }
         void clear() noexcept { *this = std::error_condition(); }
 
-        explicit operator bool() const noexcept { return !!value_; }
+        explicit operator bool() const noexcept { return value_ == 0; }
         int value() const noexcept { return value_; }
         const std::error_category& category() const noexcept { return cat_; }
 
         std::string message() const { return cat_->message(value_); }
     };
-    bool operator==(const std::error_condition& a, const std::error_condition& b) noexcept { return a.value() == b.value() && &a.category() == &b.category(); }
-    } // namespace std
+    bool operator==(const std::error_condition& a, const std::error_condition& b) noexcept { return a.value() == b.value() && a.category() == b.category(); }
+} // namespace std
 </pre>
 <p>
-    The best practice for using <code>std::error_condition</code> is the subject of some debate in SG14; see the rest of this paper.
+    As much as the implementation is almost identical, conditions have very different semantic meanings to codes.
+</p>
+<p>
+    The best practice for using <code>std::error_condition</code> is the subject of some debate to many, including SG14; see the rest of this paper.
     However, clearly the vague intent of <code>std::error_condition</code> is to represent in some way a high-level "condition" which
     a low-level "error code" (thrown up from the bowels of the system) might or might not "match" in some high-level semantic sense.
     Notice that the error domain of a default-constructed <code>error_code</code> is <code>system_category()</code>, whereas the
@@ -221,18 +224,18 @@ discussion.
 <p>
     The standard provides a highly customizable codepath for comparing an <code>error_code</code> against an <code>error_condition</code>
     with <code>operator==</code>.
-    (Both <code>error_code</code> and <code>error_condition</code> are value types &mdash; in fact they are POD types &mdash; which means
+    (Both <code>error_code</code> and <code>error_condition</code> are value types &mdash; in fact they are trivially copyable types &mdash; which means
     that their own <code>operator==(A,A)</code> are just bitwise comparisons. We are now speaking of <code>operator==(A,B)</code>.)
 </p>
 <pre>
-    namespace std {
+namespace std {
     bool operator==(const std::error_code& a, const std::error_condition& b) noexcept {
         return a.category().equivalent(a.value(), b) or b.category().equivalent(a, b.value());
     }
     bool operator==(const std::error_condition& a, const std::error_code& b) noexcept {
         return a.category().equivalent(a.value(), b) or b.category().equivalent(a, b.value());
     }
-    } // namespace std
+} // namespace std
 </pre>
 <p>
     Recall that the base-class implementation of <code>error_category::equivalent()</code> is just to compare for strict equality;
@@ -245,7 +248,7 @@ discussion.
     (but not an <code>error_condition</code>):
 </p>
 <pre>
-    namespace std {
+namespace std {
     class system_error : public std::runtime_error {
         std::error_code code_;
         std::string what_;
@@ -259,8 +262,12 @@ discussion.
         const std::error_code& code() const noexcept { return code_; }
         const char *what() const noexcept override { return what_.c_str(); }
     };
-    } // namespace std
+} // namespace std
 </pre>
+  
+<p>
+  Note that <code>filesystem_error</code> in the Filesystem TS inherits from <code>system_error</code>.
+</p>
 
 <h2><a name="Best">3. Proposed best practices for using C++11's <code>&lt;system_error&gt;</code> facilities</a></h2>
 
@@ -273,11 +280,25 @@ discussion.
     <ol>
         <li>No enumeration type <code>E</code> should ever satisfy <i>both</i> <code>is_error_code_enum_v&lt;E&gt;</code>
         and <code>is_error_condition_enum_v&lt;E&gt;</code> simultaneously. (To do so would be to represent a low-level error code value
-        and a high-level abstract condition simultaneously, which is impossible.)</li>
+        and a high-level abstract condition simultaneously, which is impossible.)
+      
+          <!-- ned: You're thinking of this wrong. An error code can legitimately also be a condition if it wishes to invoke the semantic
+          mapping when other codes are compared to it. You may not realise, but ec1 == ec2 is not transitive to ec2 == ec1 when
+          the code to condition mapping is invoked. Mapping has *direction*. That's why it's legal to be both a code and a condition.
+
+          Now, I personally think that the value add of directional semantic mapping is very low, and it needs to go away in any future
+          <system_error2>. But you need to explain this stuff specifically, otherwise you look ignorant of the existing design.
+          -->
+      
+      </li>
 
         <li>For any enumeration type <code>E</code>, the ADL function <code>make_error_code(E)</code> should exist if-and-only-if
         <code>is_error_code_enum_v&lt;E&gt;</code>; and the ADL function <code>make_error_condition(E)</code> should exist if-and-only-if
         <code>is_error_condition_enum_v&lt;E&gt;</code>.
+          
+          <!-- flip this around, so the is_error_code_enum trait should exist if and only if make_error_code exists. Which is, in fact,
+          already the standard. You can't have it your way round because it's perfectly legitimate to have a make_error_code function
+          which has nothing to do with std::error_code -->
 
         <li>In any enumeration type <code>E</code> satisfying either <code>is_error_code_enum_v&lt;E&gt;</code> or
         <code>is_error_condition_enum_v&lt;E&gt;</code>, the enumerator value <code>0</code> must be set aside as a "success"
@@ -290,8 +311,8 @@ discussion.
         No <code>error_category</code> subclass should be "shared" between two enumeration types; and no <code>error_category</code>
         subclass should exist that is not associated with a specific enumeration type.</li>
 
-        <li>Each <code>error_category</code> subclass should be a singleton; that is, it should have a single instance
-        across the entire program.</li>
+      <li>Each <code>error_category</code> subclass should be a singleton; that is, it <b>must</b> have a single instance
+        across the entire program. Otherwise error code equivalence testing will fail in hard to debug ways.</li>
 
         <li>When your library detects a failure, it should construct an <code>std::error_code</code> representing the failure. This can
         be done using ADL <code>make_error_code(LibD::ErrCode::failure_mode)</code> or simply using <code>LibD::ErrCode::failure_mode</code>
@@ -325,7 +346,13 @@ discussion.
         instead <code>libB</code> should expect its callers to write <code>if (LibB::is_oom_failure(code))</code>, where
         <code>bool LibB::is_oom_failure(std::error_code)</code> is a free function provided by <code>libB</code>. This successfully
         accomplishes semantic classification, and does it without any operator overloading, and therefore does it without the
-        need for the <code>std::error_condition</code> type.</li>
+        need for the <code>std::error_condition</code> type.
+      
+          <!-- You're forgetting one of the great strengths of the present error code design, it lets you tie together error codes from
+          multiple third party libraries without having to touch their source code. Via creating your own conditions, you can get the
+          "address not found" error code in third party library A, B and C to all interoperate. That was Beman's intent, and it works well -->
+      
+      </li>
     </ol>
 </p>
 
@@ -378,7 +405,6 @@ discussion.
         need for the <code>std::error_condition</code> type.</li>
     </ol>
 </p>
-
 
 <h2><a name="Issues">4. Issues with the <code>&lt;system_error&gt;</code> facilities</a></h2>
 
@@ -526,6 +552,8 @@ discussion.
     SG14 seems not to have a great answer for how to avoid "two-API" libraries such as <code>&lt;filesystem&gt;</code>
     going forward; but we believe that "two-API" libraries should be avoided. The Networking TS seems to be shaping up
     to be another "two-API" library. We believe this is unfortunate.
+  
+  <!-- ned: I've leave you to decide whether Outcome's approach is worth mentioning here or not -->
 </p>
 
 
@@ -567,6 +595,12 @@ discussion.
     are "special," i.e., they will not be treated as "errors" by any of the machinery in the Standard. Error codes with
     value <code>0</code> are effectively reserved for the "success" case, and programmers should not attempt to use them
     for any other purpose.
+    
+    <!-- ned: I object in the strongest terms to the standard doing any such thing. Code = 0 is a perfectly valid failure code.
+    system_error should NOT be forcing this onto people. What should be done instead is a new constexpr null_category
+    and the if(ec) boolean test should be implemented as return *this == std::error_code(); where a default constructed
+    error code has code zero with the null_category. These will be 100% trivial types, there is no cost to requiring comparison
+    to a constexpr constructed default instance -->
 </p>
 <p>
     Vice versa, programmers should be aware that using a non-zero integer value to represent "success" will not work as expected.
@@ -591,6 +625,11 @@ discussion.
     The programmer may head far down this "garden path" under the assumption that his goal of a non-zero "ok" code is attainable;
     but we on the Committee know that it is <i>not</i> attainable. We should save the programmer some time and some headaches,
     by explicitly reserving error-code <code>0</code> in the standard.
+    
+    <!-- I personally think that any system_error2 should copy the design of NT kernel error codes which have four subdomains,
+    success, success with information, failure with information, failure where the top bit is success/failure, so simply testing codes
+    for < 0 means "it failed". Obviously we don't encode that into the error code itself, but rather into the v2 design of categories,
+    especially if we can somehow get them to carry payload -->
 </p>
 
 
@@ -604,8 +643,7 @@ discussion.
     form of the <code>std::type_info</code> singletons which are used by <code>dynamic_cast</code> and also by <code>catch</code>.
 </p>
 <p>
-    Prior to the SG14 telecon, Niall Douglas raised the point that singletons do not play well with DLLs (a.k.a. shared objects,
-    a.k.a. dylibs). On some platforms, there are common programming idioms which can cause a C++ library's "singletons" to become
+    Prior to the SG14 telecon, Niall Douglas raised the point that singletons do not play well with header only libraries. On some platforms, there are common programming idioms which can cause a C++ library's "singletons" to become
     duplicated. These include at least:
     <ul>
         <li>
@@ -620,16 +658,26 @@ discussion.
         </li>
     </ul>
     Arthur O'Dwyer's (admittedly uninformed) opinion is that these sound like antipatterns that could reasonably be avoided.
-    Niall Douglas's opinion seems to be either that these are valid patterns, or else that they turn out to be impossible to
-    avoid in practice. Charley Bay has also seen these failure modes in practice.
+    Niall Douglas's opinion is that these are patterns in use in big consumers e.g. Python loads its C/C++ modules with
+    <code>RTLD_LOCAL</code>, and indeed has no choice but to do so. Charley Bay has also seen these failure modes in practice.
 </p>
 <p>
-    The practical difficulty of using singletons in DLLs seems to be a continuing pain point for certain programmers. The use
+    The practical difficulty of using singletons in header only libraries seems to be a continuing pain point for certain programmers. The use
     of singletons by RTTI seems to be a continuing reason that some programmers avoid <code>dynamic_cast</code> and
     exception handling. The use of singletons by <code>std::error_category</code> will cause the same kinds of problems in practice
     as the use of singletons by RTTI in exception-handling. If we cannot figure out how to eliminate these practical problems,
     then <code>std::error_code</code> cannot possibly be a suitable replacement for exception-handling because it will
     continue to have the same problems (namely, a reliance on singletons compared for address-equality).
+    
+    <!-- You are aware right that C++ exception throws have the exact same singleton problem too? The EH runtime uses
+    the vtable when catching exception throws, and it assumes that the vtable is unique per unique type thrown. Which
+    is not the case in a multiple -fvisibility=hidden use case on ELF. ELF is so profoundly broken for C++ it's unreal, at
+    least MachO and PE have viable workarounds for this crap. On ELF you are literally flying constantly on empty.
+    
+    What WG21 really needs to do is stop dicking around and just standardise full fat modules with a complete superset
+    of shared libraries, and a brand new universal ABI which is NOT the Itanium nor MSVC one. That lets the vendors
+    keep backwards compatibility, meanwhile we all stop living in the 1970s of linker technology -->
+
 </p>
 <p>
     In practice, some platforms (notably MSVC, and libc++ if built with a compile-time flag) work around the above problems
@@ -645,8 +693,10 @@ discussion.
     allow for string-equality comparison.
 </p>
 <p>
-    SG14 identifies "singletons in DLLs" as a problem area. It is currently unclear how to handle "singletons in DLLs" in C++.
+    SG14 identifies "singletons in header only libraries" as a problem area. It is currently unclear how to handle "singletons in header only libraries" in C++.
     Whoever knows the best practice in this area should speak up.
+    
+    <!-- Stephan Lawavej's Immortalizer! -->
 </p>
 
 <h3><a name="issue-constexpr">4.5 No <code>error_category</code> subclass can be a literal type</a></h3>
@@ -664,6 +714,10 @@ discussion.
     It is impossible to manipulate any <code>error_category</code> instance constexprly, because <code>error_category</code>
     is not a literal type: it has a virtual destructor, whereas literal types require trivial destructors. This is especially
     unfortunate because <code>error_category</code> does not need polymorphic destruction.
+    
+    <!-- The virtual destructor is to allow derived classes to free caches or tables of message lookups, indeed any Windows
+    implementation of system_category would need this as it queries the Windows kernel and stores retrieved strings into
+    a hash table -->
 </p>
 <p>
     On the telecon, Odin Holmes explained that in his programs he often uses <code>constexpr</code> on functions that he does
@@ -729,6 +783,17 @@ discussion.
     We have not investigated whether <code>std::error_code</code> itself can be made constexpr-friendly, but we would like to see
     some work in this area.
 </p>
+
+<!-- I'll be very blunt here, system_error is what it is, it can't be fixed now. The ship has sailed.
+
+Much more interesting is the development of a system_error2 living in the std2:: namespace
+
+If SG14 can champion a system_error2 fixing all the major problems with system_error, I think I would find this
+discussion much more productive. As it is, right now we are whinging about various problems in system_error
+which I am not sure are actually showstoppers per se, just rather unfortunate.
+
+A system_error2 proposal in the std2:: namespace I think would clarify the discussion enormously.
+It's easy to complain, must harder to come up with something truly better -->
 
 
 <h3><a name="issue-metadata">4.6 No guidance on attaching extra information to <code>error_code</code></a></h3>
