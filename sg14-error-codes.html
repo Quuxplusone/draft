@@ -55,7 +55,8 @@ td { text-align: left; vertical-align: top;
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt;, Charley Bay &lt;charleyb123@gmail.com&gt;,
-Odin Holmes &lt;holmes@auto-intern.de&gt;, Michael Wong &lt;fraggamuffin@gmail.com&gt; <br>
+Odin Holmes &lt;holmes@auto-intern.de&gt;, Michael Wong &lt;fraggamuffin@gmail.com&gt;,
+Niall Douglas &lt;s_sourceforge@nedprod.com&gt;<br>
 
 <h1>Summary of SG14 discussion on <code>&lt;system_error&gt;</code></h1>
 
@@ -91,13 +92,13 @@ in <code>status_value&lt;E,T&gt;</code>
 (<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0262r0.html">P0262R0</a>, Lawrence Crowl),
 in <code>expected&lt;T,E&gt;</code>
 (<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0323r2.pdf">P0323R2</a>, Vicente J. Botet Escribá),
-and in <code>result&lt;T,E&gt;</code> (Niall Douglas).
+and in <code>result&lt;T,EC&gt;</code> (<a href="https://ned14.github.io/outcome/">Outcome</a>, Niall Douglas).
 </p>
 
 <p>
 In all of those future idioms involving <code>expected&lt;T,E&gt;</code>-style result types, SG14 expects that
 the <code>E</code> type parameter will default to <code>std::error_code</code> — which is right and good. This means
-that the coming years will see extremely heavy use of <code>std::error_code</code> at every level of the system.
+that the coming years will see much increased use of <code>std::error_code</code> in both new and existing codebases.
 This means that SG14 is very interested in correcting deficiencies in <code>std::error_code</code> sooner, rather
 than later.
 </p>
@@ -136,23 +137,23 @@ discussion.
         error_code(int e, const std::error_category& c) noexcept : value_(e), cat_(&c) {}
         template&lt;class E&gt; error_code(E e) noexcept requires(std::is_error_code_enum_v&lt;E&gt;) { *this = make_error_code(e); }  // intentional ADL
         template&lt;class E&gt; error_code& operator=(E e) noexcept requires(std::is_error_code_enum_v&lt;E&gt;) { *this = make_error_code(e); }  // intentional ADL
-        void assign(int e, const std::error_category& c) noexcept { value_ = e; cat_ = &c; }
+        void assign(int e, const std::error_category& c) noexcept { value_ = e; cat_ = &amp;c; }
         void clear() noexcept { *this = std::error_code(); }
 
-        explicit operator bool() const noexcept { return !!value_; }
+        explicit operator bool() const noexcept { return value_ != 0; }
         int value() const noexcept { return value_; }
-        const std::error_category& category() const noexcept { return cat_; }
+        const std::error_category&amp; category() const noexcept { return cat_; }
 
         std::string message() const { return cat_->message(value_); }
         std::error_condition default_error_condition() const noexcept { return cat_->default_error_condition(value_); }
     };
-    bool operator==(const std::error_code& a, const std::error_code& b) noexcept { return a.value() == b.value() && &a.category() == &b.category(); }
+    bool operator==(const std::error_code&amp; a, const std::error_code&amp; b) noexcept { return a.value() == b.value() &amp;&amp; &amp;a.category() == &amp;b.category(); }
     } // namespace std
 </pre>
 
 <p>
-    Each "error domain" is represented in code by an object of type <code>std::error_category</code>. These are always
-    singletons, effectively, because <code>error_code</code> equality-comparison is implemented in terms of pointer comparison
+    Each "error domain" is represented in code by an object of type <code>std::error_category</code>. The standard effectively
+    implies that these must be singletons, because <code>error_code</code> equality-comparison is implemented in terms of pointer comparison
     (see above). So two <code>error_category</code> objects located at different memory addresses represent different
     error domains, <i>by definition</i>, as far as the currently standardized scheme is concerned.
 </p>
@@ -161,7 +162,7 @@ discussion.
     class error_category {
     public:
         constexpr error_category() noexcept = default;
-        error_category(const error_category&) = delete;
+        error_category(const error_category&amp;) = delete;
         virtual ~error_category() {}
 
         virtual const char *name() const noexcept = 0;
@@ -169,10 +170,10 @@ discussion.
         virtual std::error_condition default_error_condition(int e) const noexcept { return std::error_condition(e, *this); }
         virtual std::string message(int e) const = 0;
 
-        virtual bool equivalent(int e, const std::error_condition& condition) const noexcept { return this->default_error_condition(e) == condition; }
-        virtual bool equivalent(const std::error_code& code, int e) const noexcept { return code == std::error_code(e, *this); }
+        virtual bool equivalent(int e, const std::error_condition&amp; condition) const noexcept { return this->default_error_condition(e) == condition; }
+        virtual bool equivalent(const std::error_code&amp; code, int e) const noexcept { return code == std::error_code(e, *this); }
     };
-    bool operator==(const std::error_category& a, const std::error_category& b) noexcept { return &a == &b; }
+    bool operator==(const std::error_category&amp; a, const std::error_category&amp; b) noexcept { return &amp;a == &amp;b; }
     } // namespace std
 </pre>
 
@@ -195,19 +196,19 @@ discussion.
         std::error_category *cat_;
     public:
         error_condition() noexcept : error_code(0, std::generic_category()) {}
-        error_condition(int e, const std::error_category& c) noexcept : value_(e), cat_(&c) {}
+        error_condition(int e, const std::error_category&amp; c) noexcept : value_(e), cat_(&amp;c) {}
         template&lt;class E&gt; error_condition(E e) noexcept requires(std::is_error_condition_enum_v&lt;E&gt;) { *this = make_error_condition(e); }  // intentional ADL
-        template&lt;class E&gt; error_condition& operator=(E e) noexcept requires(std::is_error_condition_enum_v&lt;E&gt;) { *this = make_error_condition(e); }  // intentional ADL
-        void assign(int e, const std::error_category& c) noexcept { value_ = e; cat_ = &c; }
+        template&lt;class E&gt; error_condition&amp; operator=(E e) noexcept requires(std::is_error_condition_enum_v&lt;E&gt;) { *this = make_error_condition(e); }  // intentional ADL
+        void assign(int e, const std::error_category&amp; c) noexcept { value_ = e; cat_ = &amp;c; }
         void clear() noexcept { *this = std::error_condition(); }
 
-        explicit operator bool() const noexcept { return !!value_; }
+        explicit operator bool() const noexcept { return value_ != 0; }
         int value() const noexcept { return value_; }
-        const std::error_category& category() const noexcept { return cat_; }
+        const std::error_category&amp; category() const noexcept { return cat_; }
 
         std::string message() const { return cat_->message(value_); }
     };
-    bool operator==(const std::error_condition& a, const std::error_condition& b) noexcept { return a.value() == b.value() && &a.category() == &b.category(); }
+    bool operator==(const std::error_condition&amp; a, const std::error_condition&amp; b) noexcept { return a.value() == b.value() &amp;&amp; &amp;a.category() == &amp;b.category(); }
     } // namespace std
 </pre>
 <p>
@@ -221,16 +222,16 @@ discussion.
 <p>
     The standard provides a highly customizable codepath for comparing an <code>error_code</code> against an <code>error_condition</code>
     with <code>operator==</code>.
-    (Both <code>error_code</code> and <code>error_condition</code> are value types &mdash; in fact they are POD types &mdash; which means
+    (Both <code>error_code</code> and <code>error_condition</code> are value types &mdash; in fact they are trivial types &mdash; which means
     that their own <code>operator==(A,A)</code> are just bitwise comparisons. We are now speaking of <code>operator==(A,B)</code>.)
 </p>
 <pre>
     namespace std {
-    bool operator==(const std::error_code& a, const std::error_condition& b) noexcept {
-        return a.category().equivalent(a.value(), b) or b.category().equivalent(a, b.value());
+    bool operator==(const std::error_code&amp; a, const std::error_condition&amp; b) noexcept {
+        return a.category().equivalent(a.value(), b) || b.category().equivalent(a, b.value());
     }
-    bool operator==(const std::error_condition& a, const std::error_code& b) noexcept {
-        return a.category().equivalent(a.value(), b) or b.category().equivalent(a, b.value());
+    bool operator==(const std::error_condition&amp; a, const std::error_code&amp; b) noexcept {
+        return a.category().equivalent(a.value(), b) || b.category().equivalent(a, b.value());
     }
     } // namespace std
 </pre>
@@ -251,16 +252,19 @@ discussion.
         std::string what_;
     public:
         system_error(std::error_code ec) : code_(ec), what_(ec.message()) {}
-        system_error(std::error_code ec, const std::string& w) : code_(ec), what_(ec.message() + ": " + w) {}
+        system_error(std::error_code ec, const std::string&amp; w) : code_(ec), what_(ec.message() + ": " + w) {}
         system_error(std::error_code ec, const char *w) : system_error(ec, std::string(w)) {}
-        system_error(int e, const std::error_category& cat) : system_error(std::error_code(e, cat)) {}
-        system_error(int e, const std::error_category& cat, const std::string& w) : system_error(std::error_code(e, cat), w) {}
-        system_error(int e, const std::error_category& cat, const char *w) : system_error(std::error_code(e, cat), w) {}
-        const std::error_code& code() const noexcept { return code_; }
+        system_error(int e, const std::error_category&amp; cat) : system_error(std::error_code(e, cat)) {}
+        system_error(int e, const std::error_category&amp; cat, const std::string& w) : system_error(std::error_code(e, cat), w) {}
+        system_error(int e, const std::error_category&amp; cat, const char *w) : system_error(std::error_code(e, cat), w) {}
+        const std::error_code&amp; code() const noexcept { return code_; }
         const char *what() const noexcept override { return what_.c_str(); }
     };
     } // namespace std
 </pre>
+<p>
+    Note that <code>std::filesystem::filesystem_error</code> inherits from <code>std::system_error</code>.
+</p>
 
 <h2><a name="Best">3. Proposed best practices for using C++11's <code>&lt;system_error&gt;</code> facilities</a></h2>
 
@@ -443,7 +447,7 @@ discussion.
     The expectation is apparently that <code>&lt;system_error&gt;</code> users will be willing to write "C-style" code:
     <pre>
         namespace fs = std::filesystem;
-        void truncate_if_large(const fs::path& p) noexcept
+        void truncate_if_large(const fs::path&amp; p) noexcept
         {
             std::error_code ec;  // declare an uninitialized variable
             uintmax_t oldsize = fs::file_size(p, ec);
@@ -467,7 +471,7 @@ discussion.
     so that the above code could be written as
     <pre>
         namespace fs = std::filesystem::nothrow;  // hypothetical
-        void truncate_if_large(const fs::path& p) noexcept
+        void truncate_if_large(const fs::path&amp; p) noexcept
         {
             auto oldsize = fs::file_size(p);
             if (!oldsize.has_value()) { report_error(oldsize.error()); return; }
@@ -546,7 +550,7 @@ discussion.
                 }
             }
         };
-        const std::error_category& troublesome_category() {
+        const std::error_category&amp; troublesome_category() {
             static const TroublesomeCategory instance;
             return instance;
         }
@@ -563,7 +567,8 @@ discussion.
             }
         }
     </pre>
-    SG14 would like to see some explicit acknowledgment in the Standard that error-code enumerators with value <code>0</code>
+    If the current specification of <code>std::error_code</code> is to remain untouched, then SG14 would like to see some explicit
+    acknowledgment in the Standard that error-code enumerators with value <code>0</code>
     are "special," i.e., they will not be treated as "errors" by any of the machinery in the Standard. Error codes with
     value <code>0</code> are effectively reserved for the "success" case, and programmers should not attempt to use them
     for any other purpose.
@@ -591,6 +596,24 @@ discussion.
     The programmer may head far down this "garden path" under the assumption that his goal of a non-zero "ok" code is attainable;
     but we on the Committee know that it is <i>not</i> attainable. We should save the programmer some time and some headaches,
     by explicitly reserving error-code <code>0</code> in the standard.
+</p>
+<p>
+    However, there is an alternative and perhaps better solution, which is to replace certain constructors and member functions
+    of <code>std::error_code</code> and <code>std::error_condition</code> as follows: Rather than
+<pre>
+        error_code() noexcept : error_code(0, std::system_category()) {}
+        error_condition() noexcept : error_code(0, std::generic_category()) {}
+        explicit operator bool() const noexcept { return value_ != 0; }
+</pre>
+    we could propose
+<pre>
+        error_code() noexcept : error_code(0, std::null_category()) {}
+        error_condition() noexcept : error_code(0, std::null_category()) {}
+        explicit operator bool() const noexcept { return cat_ != &std::null_category(); }
+</pre>
+    This would eliminate the current requirement that error-code <code>0</code> always be reserved. Providing
+    a default "null category" could also help to clarify the expected semantics of a default-constructed
+    <code>error_condition</code>, which at present is implementation-defined and varies by vendor.
 </p>
 
 
@@ -620,8 +643,9 @@ discussion.
         </li>
     </ul>
     Arthur O'Dwyer's (admittedly uninformed) opinion is that these sound like antipatterns that could reasonably be avoided.
-    Niall Douglas's opinion seems to be either that these are valid patterns, or else that they turn out to be impossible to
-    avoid in practice. Charley Bay has also seen these failure modes in practice.
+    Niall Douglas's opinion is that these are patterns in use in big consumers, e.g. Python loads its C/C++ modules with
+    <code>RTLD_LOCAL</code>, and indeed has no choice but to do so.
+    Charley Bay has also seen these failure modes in practice.
 </p>
 <p>
     The practical difficulty of using singletons in DLLs seems to be a continuing pain point for certain programmers. The use
