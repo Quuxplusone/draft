@@ -51,7 +51,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> D0824R1 <br>
-<b>Date:</b> 2017-10-30 <br>
+<b>Date:</b> 2017-12-01 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt;, Charley Bay &lt;charleyb123@gmail.com&gt;,
@@ -74,6 +74,7 @@ Niall Douglas &lt;s_sourceforge@nedprod.com&gt;<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-operator">4.7. Reliance on a surprising overload of <code>operator==</code></a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-naming">4.8. <code>error_category</code> should properly be named <code>error_domain</code></a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-anyway">4.9. Standard <code>error_code</code>-yielding functions can throw exceptions anyway</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-idb">4.10. Underspecified <code>error_code</code> comparison semantics</a><br>
 </p>
 
 
@@ -789,9 +790,108 @@ TODO
 
 <h3><a name="issue-anyway">4.9. Standard <code>error_code</code>-yielding functions can throw exceptions anyway</a></h3>
 
-In LWG discussion of <a href="https://cplusplus.github.io/LWG/issue3014">LWG 3014</a>,
-it was pointed out that <a href="http://eel.is/c++draft/fs.err.report#2.2">[fs.err.report]</a>
-makes several guarantees about the error-reporting behavior of functions in the <code>std::filesystem</code> namespace.
+<p>
+    In LWG discussion of <a href="https://cplusplus.github.io/LWG/issue3014">LWG 3014</a>,
+    it was pointed out that <a href="http://eel.is/c++draft/fs.err.report#2.2">[fs.err.report]</a>
+    makes several guarantees about the error-reporting behavior of functions in the <code>std::filesystem</code> namespace.
+</p>
+<blockquote>
+    Functions <b>not</b> having an argument of type <code>error_code&amp;</code> handle errors as follows,
+    unless otherwise specified:
+    <ul>
+        <li>
+            (2.1) When a call by the implementation to an operating system or other underlying API results in an
+            error that prevents the function from meeting its specifications, an exception of type <code>filesystem_error</code>
+            shall be thrown. For functions with a single path argument, that argument shall be passed to the
+            <code>filesystem_error</code> constructor with a single path argument. For functions with two path arguments,
+            the first of these arguments shall be passed to the <code>filesystem_error</code> constructor as the
+            <code>path1</code> argument, and the second shall be passed as the <code>path2</code> argument.
+            The <code>filesystem_error</code> constructor's <code>error_code</code> argument is set as appropriate
+            for the specific operating system dependent error.
+        </li>
+        <li>
+            (2.2) <b>Failure to allocate storage is reported by throwing an exception</b> as described in [res.on.exception.handling].
+        </li>
+        <li>
+            (2.3) Destructors throw nothing.
+        </li>
+    </ul>
+    Functions <b>having</b> an argument of type <code>error_code&amp;</code> handle errors as follows, unless otherwise specified:
+    <ul>
+        <li>
+            (3.1) If a call by the implementation to an operating system or other underlying API results in an error that
+            prevents the function from meeting its specifications, the <code>error_code&amp;</code> argument is set as
+            appropriate for the specific operating system dependent error. Otherwise, <code>clear()</code> is called on
+            the <code>error_code&amp;</code> argument.
+        </li>
+    </ul>
+</blockquote>
+<p>
+    It is unclear whether functions using the "<code>error_code</code>" API (e.g. <code>std::filesystem::copy_file</code>)
+    are meant to report "out of memory" errors according to (3.1), or whether the lack of any explicit instruction for
+    "out of memory" errors means that vendors are free to report them by throwing an exception.
+    In practice, it appears that vendors <i>do</i> feel free to report "out of memory" conditions via exception-handling.
+</p>
+<p>
+    This arguably sets a precedent that makes the "two-API solution" even harder to teach and use. A programmer might
+    reasonably expect that if an API provides an <code>error_code&amp;</code> out-parameter, then <i>errors will be reported
+    via that out-parameter</i>. If, as in the case of <code>std::filesystem</code>, the presence of an out-parameter
+    cannot be used to detect the error-reporting mechanism — if standard APIs are free to mix several different
+    error-reporting mechanisms within the same function — writing reliable code becomes more challenging.
+</p>
 
+
+<h3><a name="issue-idb">4.10. Underspecified <code>error_code</code> comparison semantics</a></h3>
+
+<p>
+    Arthur observes that the following program's behavior differs between libc++ and libstdc++:
+</p>
+<pre>
+    #include &lt;system_error&gt;
+
+    int main() {
+        std::error_code ec;          // that is, {0, system_category}
+        std::error_condition econd;  // that is, {0, generic_category}
+        return ec == econd;          // libc++ true, libstdc++ false
+    }
+</pre>
+<p>
+    Since <code>error_condition</code> objects are meant only for "catching" (testing) <code>error_code</code> values,
+    perhaps it is incorrect for the programmer to even consider default-constructing an <code>error_condition</code>
+    variable. However, it might still be worthwhile for the Standard to provide guidance in this area.
+</p>
+<p>
+    <a href="https://accu.org/index.php/journals/2422"><i>Overload</i> journal 141</a> (October 2017) includes an
+    article by Ralph McArdell titled "C++11 (and beyond) Exception Handling," which presents a set of proposed
+    "best practices" for using <code>&lt;system_error&gt;</code>. These best practices basically align with Arthur
+    O'Dwyer's best practices in Section 3 above; one notable difference is that McArdell recommends constructing
+    the "no error" <code>error_code</code> value differently:
+</p>
+<pre>
+    class ErrCategory : std::error_category { ... };
+    enum ErrCode { success = 0, failure1 = 1, failure2 = 2 };
+    template<> struct std::is_error_code_enum<ErrCode> : std::true_type {};
+    inline std::error_code make_error_code(ErrCode e) {
+        static const ErrCategory c;
+        return std::error_code((int)e, c);
+    }
+
+    std::error_code McArdellNoError() {
+        return ErrCode{};  // that is, {0, ErrCategory}
+    }
+
+    std::error_code ODwyerNoError() {
+        return std::error_code{};  // that is, {0, system_category}
+    }
+</pre>
+<p>
+    A programmer working with one of these libraries, who merely wants to know whether
+    <code>std::error_code ec</code> represents an error or not, must have a deep knowledge
+    of all the libraries in his program in order to know whether <code>!ec</code> is
+    trustworthy (see point 4.3); and furthermore, he cannot necessarily trust
+    <code>ec == std::error_condition{}</code> either (point 4.10); and <i>furthermore</i>,
+    if one of his libraries might use McArdell's best practices, he cannot
+    necessarily trust <code>ec == std::error_code{}</code> either.
+</p>
 </body>
 </html>
