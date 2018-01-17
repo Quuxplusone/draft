@@ -51,7 +51,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> D0824R1 <br>
-<b>Date:</b> 2018-01-12 <br>
+<b>Date:</b> 2018-01-16 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt;, Charley Bay &lt;charleyb123@gmail.com&gt;,
@@ -683,7 +683,7 @@ discussion.
 <h3><a name="issue-constexpr">4.5. No <code>error_category</code> subclass can be a literal type</a></h3>
 
 <p>
-    On the SG14 telecon, Odin Holmes and Charley Bay raised the issue that <code>std::error_code</code> is not usable in
+    During the SG14 telecon, Odin Holmes and Charley Bay raised the issue that <code>std::error_code</code> is not usable in
     constexpr contexts; for example, <code>bool operator==(const error_code&amp; lhs, const error_code&amp; rhs) noexcept</code>
     is not <code>constexpr</code>. Even constructing a <code>std::error_code</code> instance cannot be done constexprly,
     because <code>error_code(int val, const error_category&amp; cat) noexcept</code> is not <code>constexpr</code>.
@@ -697,7 +697,7 @@ discussion.
     unfortunate because <code>error_category</code> does not need polymorphic destruction.
 </p>
 <p>
-    On the telecon, Odin Holmes explained that in his programs he often uses <code>constexpr</code> on functions that he does
+    During the SG14 telecon, Odin Holmes explained that in his programs he often uses <code>constexpr</code> on functions that he does
     <i>not</i> expect to be evaluated at compile-time. The reason he uses <code>constexpr</code> is to demonstrate and enforce
     that the functions are <i>pure</i>; and their compile-time-evaluability is just an occasional bonus. This usage of
     <code>constexpr</code> would have been infeasible in C++11, where constexpr functions were constrained to single statements;
@@ -785,11 +785,51 @@ discussion.
 
 <h3><a name="issue-operator">4.7. Reliance on a surprising overload of <code>operator==</code></a></h3>
 
-TODO
+<p>
+    The library design relies on the ability to perform a "semantic match" operation between a <code>std::error_code</code> (a low-level
+    error indicator) and a <code>std::error_condition</code> (a high-level condition). The "semantic match" operation is expressed
+    in C++ source code as <code>(ec == econd)</code>. During the SG14 telecon, Charley Bay remarked that this use of
+    <code>operator==</code> is surprising because it represents an operation that is fundamentally <i>unlike</i> equality.
+</p>
 
-<h3><a name="issue-naming">4.8. <code>error_category</code> should properly be named <code>error_domain</code></a></h3>
+<p>
+    For example, "equality" is transitive, but "semantic match" is not necessarily transitive, in that we can have
+    <code>ec1 == econd1 &amp;&amp; econd1 == ec2 &amp;&amp; ec1 != ec2</code> or
+    <code>econd1 == ec1 &amp;&amp; ec1 == econd2 &amp;&amp; econd1 != econd2</code>.
+</p>
 
-TODO
+<p>
+    Also, "semantic match" is not necessarily (notionally) symmetric or reflexive, in that we can construct examples where
+    <code>make_error_code(e1) == make_error_condition(e2) &amp;&amp; make_error_code(e2) != make_error_condition(e1)</code> or even
+    <code>make_error_code(e1) != make_error_condition(e1)</code>. However, these examples require that the enumeration type
+    of <code>e1</code> define both <code>make_error_code</code> and <code>make_error_condition</code>, which contradicts
+    Arthur's suggested best practices.
+</p>
+
+<p>
+    It might have been better for the library's API to use a meaningful identifier such as <code>ec.matches(econd)</code>,
+    rather than hijacking the <code>==</code> operator for this distinct semantic-match operation.
+</p>
+
+
+<h3><a name="issue-naming">4.8. <code>error_category</code> should properly have been named <code>error_domain</code></a></h3>
+
+<p>
+    SG14 generally concluded that the best way to explain the intention of <code>error_category</code> is to say that each
+    singleton derived from <code>error_category</code> represents a particular <i>domain</i> of errors. Each category object
+    understands and manages error codes in a particular <i>domain</i> — for example, "POSIX errors" or "filesystem errors"
+    or "rdkafka errors." It was generally concluded that the English word "domain" expresses this notion more clearly and
+    appropriately than the English word "category."
+</p>
+
+<p>
+    It is obviously too late to change the name of <code>std::error_category</code> to <code>std::error_domain</code>; that
+    ship has sailed. In the SG14 telecon it was remarked that maybe it's fortunate that the name <code>std::error_domain</code>
+    is still available. If someone designs a "better <code>error_category</code>" (one without singletons,
+    or without <code>std::string</code>, or with constexpr support), then the new thing can be called <code>std::error_domain</code>
+    and we can stop teaching the "awkwardly named" <code>std::error_category</code>.
+</p>
+
 
 <h3><a name="issue-anyway">4.9. Standard <code>error_code</code>-yielding functions can throw exceptions anyway</a></h3>
 
