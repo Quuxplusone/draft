@@ -51,7 +51,7 @@ td { text-align: left; vertical-align: top;
 <body>
 
 <b>Document number:</b> D0824R1 <br>
-<b>Date:</b> 2018-01-16 <br>
+<b>Date:</b> 2018-02-05 <br>
 <b>Project:</b> ISO JTC1/SC22/WG21, Programming Language C++ <br>
 <b>Audience:</b> Library Evolution Working Group <br>
 <b>Reply to:</b> Arthur O'Dwyer &lt;arthur.j.odwyer@gmail.com&gt;, Charley Bay &lt;charleyb123@gmail.com&gt;,
@@ -64,6 +64,8 @@ Niall Douglas &lt;s_sourceforge@nedprod.com&gt;<br>
 <a href="#Introduction">1. Introduction</a><br>
 <a href="#Description">2. Description of C++11's <code>&lt;system_error&gt;</code> facilities</a><br>
 <a href="#Best">3. Proposed best practices for using C++11's <code>&lt;system_error&gt;</code> facilities</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#best-arthur">3.1. Proposed by Arthur O'Dwyer</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#best-charley">3.2. Proposed by Charley Bay</a><br>
 <a href="#Issues">4. Issues with the <code>&lt;system_error&gt;</code> facilities</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-string">4.1. Use of <code>std::string</code></a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<a href="#issue-outparams">4.2. Proliferation of "two-API" libraries</a><br>
@@ -272,10 +274,13 @@ discussion.
 
 <h2><a name="Best">3. Proposed best practices for using C++11's <code>&lt;system_error&gt;</code> facilities</a></h2>
 
+<h3><a name="best-arthur">3.1. Proposed by Arthur O'Dwyer</a></h3>
+
 <p>
     In the example that follows, we have an application <code>appA</code>, which calls into library <code>libB</code>,
     which calls into library <code>libC</code>, which calls into library <code>libD</code>.
 </p>
+
 <p>
     Arthur O'Dwyer proposes the following general rules:
     <ol>
@@ -337,6 +342,14 @@ discussion.
     </ol>
 </p>
 
+
+<h3><a name="best-charley">3.2. Proposed by Charley Bay</a></h3>
+
+<p>
+    In the example that follows, we have an application <code>appA</code>, which calls into library <code>libB</code>,
+    which calls into library <code>libC</code>, which calls into library <code>libD</code>.
+</p>
+
 <p>
     Charley Bay proposes (something like) the following general rules (paraphrased here by Arthur O'Dwyer):
     <ol>
@@ -357,15 +370,12 @@ discussion.
         <li><code>error_category</code> subclasses are not necessarily singletons. It is conceivable that multiple instances
         of the same <code>error_category</code> subclass type could exist within the same program.</li>
 
-        <li>When your library detects a failure, it should construct an <code>std::error_code</code> representing the failure. This can
-        be done using ADL <code>make_error_code(LibD::ErrCode::failure_mode)</code> or simply using <code>LibD::ErrCode::failure_mode</code>
+        <li>When your library detects a failure, it should construct an <code>std::error_code</code> representing the failure.
+        This should be done using <code>LibD::ErrCode::failure_mode</code>
         (which works because of <code>std::error_code</code>'s implicit constructor from error-code-enum types).</li>
 
         <li>This <code>std::error_code</code> is passed up the stack using out-parameters (as <code>&lt;filesystem&gt;</code>) or
         using <code>Expected&lt;T, std::error_code&gt;</code>.</li>
-
-        <li>When <code>libB</code> receives a <code>std::error_code code</code> that must be checked for <i>failure versus success</i>,
-        it should use <code>if (code)</code> or <code>if (!code)</code>.</li>
 
         <li>When <code>libB</code> receives a <code>std::error_code code</code>, it must <i>never</i> be checked for
         <i>a particular source-specific error</i> (such as "rdkafka partition lacks a leader"). Every test should be done
@@ -375,11 +385,17 @@ discussion.
         <code>libC</code> API must be expressed in terms of the specific set of abstract failure modes exposed by that
         same <code>libC</code> API.</li>
 
+        <li>When <code>libB</code> receives a <code>std::error_code code</code>, it should <i>not</i> be checked for
+        <i>failure versus success</i>
+        via <code>if (code)</code> or <code>if (!code)</code>. Instead, "failure" should be a semantic classification
+        as described in the preceding point.</li>
+
         <li>As explained in the preceding point, exact-equality comparisons should never be used.
         But with the standard syntax, there is a significant risk that the programmer will accidentally write
         <code>if (code == LibB::ErrCode::oom_failure)</code> (exact-equality comparison) instead of the intended
         <code>if (code == make_error_condition(LibB::ErrCode::oom_failure))</code> (semantic classification).
-        Therefore <code>std::error_condition</code> and error-condition-enum types should <i>not be used</i>. <code>libB</code>
+        Therefore, under the current standard library design, <code>std::error_condition</code> and error-condition-enum types
+        should <i>not be used</i>. <code>libB</code>
         should expect its callers to write <code>if (LibB::is_oom_failure(code))</code>, where
         <code>bool LibB::is_oom_failure(std::error_code)</code> is a free function provided by <code>libB</code>. This successfully
         accomplishes semantic classification, and does it without any operator overloading, and therefore does it without the
@@ -411,7 +427,8 @@ discussion.
     subclasses, which effectively means that you cannot use <code>std::error_code</code> to deal with disappointment.
     SG14 sees any hard-coded dependency on <code>std::allocator</code> as unfortunate.
     For a supposedly "fundamental" library like <code>&lt;system_error&gt;</code> it is <i>extremely</i> unfortunate.
-    (LWG issue 2955 is related: <code>std::from_chars</code> used to depend on <code>std::error_code</code> and thence on
+    (<a href="https://cplusplus.github.io/LWG/issue2955">LWG issue 2955</a> is related: <code>std::from_chars</code>
+    used to depend on <code>std::error_code</code> and thence on
     <code>std::string</code>. It was resolved by the adoption of <a href="https://wg21.link/P0682R1">P0682R1</a>,
     i.e., <code>std::from_chars</code> simply stopped trying to use <code>std::error_code</code> at all.)
 </p>
@@ -765,7 +782,7 @@ discussion.
 <h3><a name="issue-metadata">4.6. No guidance on attaching extra information to <code>error_code</code></a></h3>
 
 <p>
-    Both Niall Douglas and Charley Bay have (independently) attempted to subclass <code>std::error_code</code> in order to create a
+    Niall Douglas has attempted to subclass <code>std::error_code</code> in order to create a
     kind of <code>extended_error_code</code> that contains not only a category pointer and an integer but also some kind of "payload",
     such as a string or variant holding the arguments of the operation that failed. This is very similar in intent to the C++17 standard
     library's <code>std::filesystem::filesystem_error</code>, which holds a <code>std::error_code</code> and two instances of
@@ -774,11 +791,21 @@ discussion.
     trying to make something non-polymorphic to be used in the absence of exception-handling.
 </p>
 <p>
-    The standard library does not currently provide an <code>extended_error_code</code> type (or class template). For people who need
+    Niall's further experiments with "<code>error_code</code> plus payload" have resulted in a design he calls "<code>status_code</code>",
+    described in <a href="https://groups.google.com/a/isocpp.org/d/msg/sg14/erKowFV9jWk/t7WPfvaWBAAJ">a thread on the SG14 reflector</a>.
+</p>
+<p>
+    Charley Bay has attempted a similar goal via different means. Charley created a subclass of <code>std::error_category</code>
+    which maintained a lookup table of the "payload" for each <code>error_code</code> currently in flight. (This lookup table needs
+    some mechanism for "garbage-collection," since <code>error_code</code> objects are trivially destructible and have no built-in
+    hook by which they could be reference-counted.)
+</p>
+<p>
+    The standard library does not currently provide an <code>extended_error_code</code> type. For people who need
     (or think they need) something along these lines, it's hard to tell whether they should be inheriting from <code>error_code</code>
     (will that lead to slicing pitfalls? overload resolution gaffes?), or aggregating á là <code>filesystem_error</code>, or simply
     passing the extra data around manually via a second out-parameter or something like <code>pair&lt;error_code, string&gt;</code>.
-    Either way, C++ does not provide a standard wheel, so different programmers may end up inventing slightly
+    Anyway, C++ does not provide a standard wheel, so different programmers may end up inventing slightly
     different wheels here.
 </p>
 
@@ -834,7 +861,7 @@ discussion.
 <h3><a name="issue-anyway">4.9. Standard <code>error_code</code>-yielding functions can throw exceptions anyway</a></h3>
 
 <p>
-    In LWG discussion of <a href="https://cplusplus.github.io/LWG/issue3014">LWG 3014</a>,
+    In LWG discussion of <a href="https://cplusplus.github.io/LWG/issue3014">LWG issue 3014</a>,
     it was pointed out that <a href="http://eel.is/c++draft/fs.err.report#2.2">[fs.err.report]</a>
     makes several guarantees about the error-reporting behavior of functions in the <code>std::filesystem</code> namespace.
 </p>
@@ -907,7 +934,7 @@ discussion.
     <a href="https://accu.org/index.php/journals/2422"><i>Overload</i> journal 141</a> (October 2017) includes an
     article by Ralph McArdell titled "C++11 (and beyond) Exception Handling," which presents a set of proposed
     "best practices" for using <code>&lt;system_error&gt;</code>. These best practices basically align with Arthur
-    O'Dwyer's best practices in Section 3 above; one notable difference is that McArdell recommends constructing
+    O'Dwyer's best practices in Section 3 above. A notable difference is that McArdell recommends constructing
     the "no error" <code>error_code</code> value differently:
 </p>
 <pre>
@@ -934,7 +961,7 @@ discussion.
     trustworthy (see point 4.3); and furthermore, he cannot necessarily trust
     <code>ec == std::error_condition{}</code> either (point 4.10); and <i>furthermore</i>,
     if one of his libraries might use McArdell's best practices, he cannot
-    necessarily trust <code>ec == std::error_code{}</code> either.
+    necessarily trust <code>ec == std::error_code{}</code> either!
 </p>
 </body>
 </html>
