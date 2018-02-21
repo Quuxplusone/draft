@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>p0907r0: Signed Integers are Two’s Complement</title>
+  <title>DxxxxR0: Signed Integers are Two’s Complement, Conservative Version</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1176,8 +1176,6 @@ Possible extra rowspan handling
 		}
 	}
 </style>
-  <meta content="Bikeshed version 39e591568007a470c8705dd14db3d9d86db98356" name="generator">
-  <link href="http://wg21.link/P0907r0" rel="canonical">
 <style>/* style-md-lists */
 
             /* This is a weird hack for me not yet following the commonmark spec
@@ -1393,15 +1391,18 @@ Possible extra rowspan handling
   <input id="hidedel" style="display:none" type="checkbox">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">p0907r0<br>Signed Integers are Two’s Complement</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Published Proposal, <time class="dt-updated" datetime="2018-02-09">9 February 2018</time></span></h2>
+   <h1 class="p-name no-ref" id="title">dxxxxr0<br>Signed Integers are Two’s Complement, Conservative Version</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Unpublished Proposal, <time class="dt-updated" datetime="2018-02-21">21 February 2018</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
+<!--
      <dt>This version:
      <dd><a class="u-url" href="http://wg21.link/P0907r0">http://wg21.link/P0907r0</a>
+-->
      <dt>Author:
      <dd>
-      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:jfbastien@apple.com">JF Bastien</a> (<span class="p-org org">Apple</span>)
+      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
+        after all the hard work was actually done by JF Bastien (Apple)
      <dt>Audience:
      <dd>EWG, SG12
      <dt>Toggle Diffs:
@@ -1410,7 +1411,7 @@ Possible extra rowspan handling
      <dt>Project:
      <dd><span>ISO JTC1/SC22/WG21: Programming Language C++</span>
      <dt>Source:
-     <dd><span><a href="https://github.com/jfbastien/papers/blob/master/source/P0907r0.bs">github.com/jfbastien/papers/blob/master/source/P0907r0.bs</a></span>
+     <dd><span><a href="https://quuxplusone.github.io/draft/twosc-conservative.html">https://quuxplusone.github.io/draft/twosc-conservative.html</a></span>
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -1419,6 +1420,8 @@ Possible extra rowspan handling
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
    <p>There is One True Representation for signed integers, and that representation is two’s complement.</p>
+   <p>However, undefined behavior on signed integer overflow is not obviously useless; and there is a
+   slight benefit in keeping users from getting too chummy with the implementation.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -1426,6 +1429,7 @@ Possible extra rowspan handling
     <li><a href="#intro"><span class="secno">1</span> <span class="content">Introduction</span></a>
     <li><a href="#word"><span class="secno">2</span> <span class="content">Proposed Wording</span></a>
     <li><a href="#scope"><span class="secno">3</span> <span class="content">Out of Scope</span></a>
+    <li><a href="#arthur"><span class="secno">3a</span> <span class="content">Arthur's Comments</span></a>
     <li><a href="#c-sign"><span class="secno">4</span> <span class="content">C Signed Integer Wording</span></a>
     <li><a href="#survey"><span class="secno">5</span> <span class="content">Survey of Signed Integer Representations</span></a>
     <li>
@@ -1458,16 +1462,17 @@ non-two’s complement machine.</p>
 currently allow for trap representations, extra padding bits, integral negative
 zero, and introduce undefined behavior and implementation-defined behavior for
 the sake of this <em>extremely</em> abstract machine.</p>
-   <p>Specifically, the current wording has the following effects:</p>
+   <p>Specifically, the current wording has the following effects. I propose to
+   fix the problems which are not <s>struck out</s>.</p>
    <ul>
     <li data-md="">
-     <p>Associativity and commutativity of integers is needlessly obtuse.</p>
+     <p><s>Associativity and commutativity of integers is needlessly obtuse.</s></p>
     <li data-md="">
-     <p>Naïve overflow checks, which are often security-critical, often get
+     <p><s>Naïve overflow checks, which are often security-critical, often get
 eliminated by compilers. This leads to exploitable code when the intent was
 clearly not to and the code, while naïve, was correctly performing security
 checks for two’s complement integers. Correct overflow checks are difficult
-to write and equally difficult to read, exponentially so in generic code.</p>
+to write and equally difficult to read, exponentially so in generic code.</s></p>
     <li data-md="">
      <p>Conversion between signed and unsigned are implementation-defined.</p>
     <li data-md="">
@@ -1475,11 +1480,10 @@ to write and equally difficult to read, exponentially so in generic code.</p>
 sign-extend an integer, which every modern CPU supports.</p>
     <li data-md="">
      <p><code class="highlight"><span class="k">constexpr</span></code> is further restrained by this extraneous undefined behavior.</p>
-    <li data-md="">
-     <p>Atomic integral are already two’s complement and have no undefined results,
+   </ul>
+   <p>Notice that atomic integral types are already two’s complement and have no undefined results,
 therefore even freestanding implementations already support two’s complement
 in C++.</p>
-   </ul>
    <p>Let’s stop pretending that the C++ abstract machine should represent integers as
 signed magnitude or ones' complement. These theoretical implementations are a
 different programming language, not our real-world C++. Users of C++ who require
@@ -1488,59 +1492,7 @@ pure-library solution, and so would the rest of us.</p>
    <p>This proposal leaves C unchanged, it merely restricts further the subset of C
 which applies to C++. The author will ensure that WG14 is made aware of this
 paper’s outcome.</p>
-   <p>A final argument to move to two’s complement is that few people spell "ones'
-complement" correctly according to Knuth <a data-link-type="biblio" href="#biblio-taocp">[TAoCP]</a>. Reducing the nerd-snipe
-potential inherent in C++ is a Good Thing™.</p>
-   <blockquote>
-    <p>Detail-oriented readers and copy editors should notice the position of the
-  apostrophe in terms like “two’s complement” and “ones’ complement”: A two’s
-  complement number is complemented with respect to a single power of 2, while a
-  ones’ complement number is complemented with respect to a long sequence of
-  1s. Indeed, there is also a “twos’ complement notation,” which has radix 3 and
-  complementation with respect to (2 . . . 22)<sub>3</sub>.</p>
-   </blockquote>
    <h2 class="heading settled" data-level="2" id="word"><span class="secno">2. </span><span class="content">Proposed Wording</span><a class="self-link" href="#word"></a></h2>
-   <p>Modify Program execution [<strong>intro.execution</strong>] ❡8:</p>
-   <blockquote>
-    <p>[<em>Note:</em> Operators can be regrouped according to the usual mathematical
-rules only where the operators really are associative or commutative.
-For example, in the following fragment</p>
-<pre class="highlight"><span class="kt">int</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">;</span>
-<span class="cm">/* ... */</span>
-<span class="n">a</span> <span class="o">=</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">32760</span> <span class="o">+</span> <span class="n">b</span> <span class="o">+</span> <span class="mi">5</span><span class="p">;</span>
-</pre>
-    <p>the expression statement behaves exactly the same as</p>
-<pre class="highlight"><span class="n">a</span> <span class="o">=</span> <span class="p">(</span><span class="p">(</span><span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="mi">32760</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span> <span class="o">+</span> <span class="mi">5</span><span class="p">)</span><span class="p">;</span>
-</pre>
-    <p>
-     due to the associativity and precedence of these operators. Thus, the result of
-the sum <code class="highlight"><span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="mi">32760</span><span class="p">)</span></code> is next added to <code class="highlight"><span class="n">b</span></code>, and that result is then added to 5
-which results in the value assigned to <code class="highlight"><span class="n">a</span></code>.
-     <del> On a machine in which overflows
-produce an exception and in which the range of values representable by an <code class="highlight"><span class="kt">int</span></code> is <code class="highlight"><span class="p">[</span><span class="o">-</span><span class="mi">32768</span><span class="p">,</span> <span class="o">+</span><span class="mi">32767</span><span class="p">]</span></code>, the implementation cannot rewrite this expression as</del>
-    </p>
-    <del>
-<pre class="highlight">  <span class="n">a</span> <span class="o">=</span> <span class="p">(</span><span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span> <span class="o">+</span> <span class="mi">32765</span><span class="p">)</span><span class="p">;</span>
-</pre>
-    </del>
-    <del>since if the values for <code class="highlight"><span class="n">a</span></code> and <code class="highlight"><span class="n">b</span></code> were, respectively, -32754 and -15, the sum <code class="highlight"><span class="n">a</span> <span class="o">+</span> <span class="n">b</span></code> would produce an exception while the original expression would not; nor
-can the expression be rewritten either as</del>
-    <del>
-<pre class="highlight">  <span class="n">a</span> <span class="o">=</span> <span class="p">(</span><span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="mi">32765</span><span class="p">)</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span><span class="p">;</span>
-</pre>
-    </del>
-    <del>or</del>
-    <del>
-<pre class="highlight">  <span class="n">a</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="p">(</span><span class="n">b</span> <span class="o">+</span> <span class="mi">32765</span><span class="p">)</span><span class="p">)</span><span class="p">;</span>
-</pre>
-    </del>
-    <del>since the values for <code class="highlight"><span class="n">a</span></code> and <code class="highlight"><span class="n">b</span></code> might have been, respectively, 4 and -8 or -17
-and 12. However on a machine in which overflows do not produce an exception and
-in which the results of overflows are reversible, the above expression statement
-can be rewritten by the implementation in any of the above ways because the same
-result will occur.</del>
-     —<em>end note</em>] 
-   </blockquote>
    <p>Modify Fundamental types [<strong>basic.fundamental</strong>] ❡4 onwards:</p>
    <blockquote>
     <p>Unsigned integers shall obey the laws of arithmetic modulo 2<sup>n</sup> where <em>n</em> is the number of bits in the value representation of that particular size of
@@ -1564,17 +1516,12 @@ Values of type <code class="highlight"><span class="kt">bool</span></code> parti
      Types <code class="highlight"><span class="kt">bool</span></code>, <code class="highlight"><span class="kt">char</span></code>, <code class="highlight"><span class="kt">char16_t</span></code>, <code class="highlight"><span class="kt">char32_t</span></code>, <code class="highlight"><span class="kt">wchar_t</span></code>, and the signed and
 unsigned integer types are collectively called <em>integral</em> types. A synonym for
 integral type is <em>integer type</em>. 
-     <del>The representations of integral types
-shall define values by use of a pure binary numeration system. [<em>Example:</em> This document permits two’s complement, ones' complement and signed magnitude
-representations for integral types. —<em>end example</em>]</del>
+     The representations of integral types
+shall define values by use of a <del>pure binary numeration system</del><ins>two's complement representation</ins>.</del>
     </p>
-    <ins>Signed integer types shall be repesented as two’s complement. Overflow in
-the positive direction shall wrap around from the maximum integer value for the
-type back to the minimum, and overflow in the negative direction shall wrap
-around from the minimum value for the type to the maximum.
-[<em>Note:</em> Addition, subtraction, and multiplication on signed and unsigned
-integral values with the same object representation produce a value with the
-same object representation, whereas division and modulo do not.
+    <ins>[<em>Note:</em> Addition, subtraction, and multiplication on signed and unsigned
+integral values with the same object representation, when the signed result is defined and representable,
+produce a value with the same object representation.
 —<em>end note</em>]</ins>
    </blockquote>
    <p>Modify Integral conversions [<strong>conv.integral</strong>] ❡1 onwards:</p>
@@ -1586,12 +1533,10 @@ an integer type.</p>
      If the destination type is unsigned, the resulting value is the least unsigned
 integer congruent to the source integer (modulo 2<sup>n</sup> where <em>n</em> is the
 number of bits used to represent the unsigned type). 
-     <del>[<em>Note:</em> In a two’s
-complement representation, t</del>
-     <ins>T</ins>
-     his conversion is conceptual and there is no change
+     [<em>Note:</em> <del>In a two’s
+complement representation, this </del><ins>This </ins>conversion is conceptual and there is no change
 in the bit pattern (if there is no truncation).
-     <del> —<em>end note</em>]</del>
+     —<em>end note</em>]
     </p>
     <p>
      If the destination type is signed, the value is unchanged if it can be
@@ -1615,8 +1560,8 @@ by the specified type. Otherwise, the
 unspecified</del>
      <ins>the object representation remains the same if the source
 and destination have the same size, or the least-significant source bits are
-retained if the destination is smaller than the source</ins>
-     . A value of a
+retained if the destination is smaller than the source</ins>.
+     A value of a
 scoped enumeration type can also be explicitly converted to a floating-point
 type; the result is the same as that of converting from the original value to
 the floating-point type.
@@ -1632,8 +1577,8 @@ range of the enumeration values, and otherwise,
 undefined</del>
      <ins>the object representation remains the same if the source and
 destination have the same size, or the least-significant source bits are
-retained if the destination is smaller than the source</ins>
-     .  A value of
+retained if the destination is smaller than the source</ins>.
+     A value of
 floating-point type can also be explicitly converted to an enumeration type.
 The resulting value is the same as converting the original value to the
 underlying type of the enumeration\iref{conv.fpint}, and subsequently to the
@@ -1649,16 +1594,17 @@ than or equal to the length in bits of the promoted left operand.</p>
     <p>
      The value of <code class="highlight"><span class="n">E1</span> <span class="o">&lt;</span><span class="o">&lt;</span> <span class="n">E2</span></code> is <code class="highlight"><span class="n">E1</span></code> left-shifted <code class="highlight"><span class="n">E2</span></code> bit positions; vacated bits
 are zero-filled. 
-     <del>If <code class="highlight"><span class="n">E1</span></code> has an unsigned type, t</del>
-     <ins>T</ins>
-     he value
+     If <code class="highlight"><span class="n">E1</span></code> has an unsigned type, the value
 of the result is E1×2<sup>E2</sup>, reduced modulo one more than the maximum
 value representable in the result type.
-     <del> Otherwise, if <code class="highlight"><span class="n">E1</span></code> has a signed
-type and non-negative value, and E1×2<sup>E2</sup> is representable in the
-corresponding unsigned type of the result type, then that value, converted to
-the result type, is the resulting value; otherwise, the behavior is
-undefined.</del>
+     Otherwise, if <code class="highlight"><span class="n">E1</span></code> has a signed
+type<del> and non-negative value</del>, <del>and E1×2<sup>E2</sup> is representable in the
+corresponding unsigned type of the result type</del>, then <del>that value,</del> <ins>the value of
+<code class="highlight"><span class="n">E1</span></code> is converted to the corresponding
+unsigned type of the result type; an unsigned result is computed using unsigned arithmetic as above;
+and the unsigned result, </ins>converted to
+the result type, is the resulting value<del>; otherwise, the behavior is
+undefined</del>.
     </p>
     <p>
      The value of <code class="highlight"><span class="n">E1</span> <span class="o">></span><span class="o">></span> <span class="n">E2</span></code> is <code class="highlight"><span class="n">E1</span></code> right-shifted <code class="highlight"><span class="n">E2</span></code> bit positions. If <code class="highlight"><span class="n">E1</span></code> has an
@@ -1672,24 +1618,6 @@ integral types is an arithmetic right shift, and performs sign-extension.
 —<em>end note</em>]</ins>
     </p>
    </blockquote>
-   <p>Modify Constant expressions [<strong>expr.const</strong>] ❡2:</p>
-   <blockquote>
-    <p>An expression <code class="highlight"><span class="n">e</span></code> is a <em>core constant expression</em> unless the evaluation of <code class="highlight"><span class="n">e</span></code>,
-following the rules of the abstract machine, would evaluate one of the following
-expressions:</p>
-    <p>[…]</p>
-    <ul>
-     <li data-md="">
-      <p>
-       an operation that would have undefined behavior as specified in Clause 4
-through 19 of this document [<em>Note</em>: including, for example, 
-       <del>signed
-integer overflow, </del>
-       certain pointer arithmetic, division
-by zero, or certain shift operations —<em>end note</em>]
-      </p>
-    </ul>
-   </blockquote>
    <p>Modify Enumeration declarations [<strong>dcl.enum</strong>] ❡8:</p>
    <blockquote>
     <p>
@@ -1699,32 +1627,23 @@ e<sub>min</sub> is the smallest enumerator and e<sub>max</sub> is the largest,
 the values of the enumeration are the values in the range b<sub>min</sub> to
 b<sub>max</sub>, defined as follows: 
      <del>Let <em>K</em> be 1 for a two’s complement
-representation and 0 for a ones' complement or sign-magnitude representation.</del>
-      b<sub>max</sub> is the smallest value greater than or equal to
-max(|e<sub>min</sub>| - 
-     <del>K</del>
-     <ins>1</ins>
-     , |e<sub>max</sub>|) and equal to 2<sup>M</sup>-1,
-where <em>M</em> is a non-negative integer. b<sub>min</sub> is zero if e<sub>min</sub> is non-negative and -(b<sub>max</sub>+
-     <del>K</del>
-     <ins>1</ins>
-     ) otherwise. The size of the smallest
+representation and 0 for a ones' complement or sign-magnitude representation.
+           b<sub>max</sub> is the smallest value greater than or equal to
+max(|e<sub>min</sub>| - K, |e<sub>max</sub>|) and equal to 2<sup>M</sup>-1,
+where <em>M</em> is a non-negative integer. b<sub>min</sub> is zero if e<sub>min</sub> is non-negative and
+-(b<sub>max</sub>+K) otherwise.</del>
+     <ins>Let <em>mask(e)</em> be <em>-(e+1)</em> when <em>e</em> is negative and <em>e</em> otherwise.
+     When e<sub>min</sub> is non-negative, let b<sub>min</sub> be zero; otherwise, let -b<sub>min</sub>
+     be the smallest integral power of 2 greater than or equal to <em>mask(e<sub>min</sub>)</em>.
+     Let b<sub>max</sub> be the smallest integer which is one less than an integral power of 2 and
+     which is greater than or equal to <em>max(b<sub>min</sub> - 1, mask(e<sub>max</sub>))</em>.
+     </ins>
+The size of the smallest
 bit-field large enough to hold all the values of the enumeration type is
 max(M,1) if b<sub>min</sub> is zero and M+1 otherwise. It is possible to define
 an enumeration that has values not defined by any of its enumerators. If the <em>enumerator-list</em> is empty, the values of the enumeration are as if the
 enumeration had a single enumerator with value 0.
     </p>
-   </blockquote>
-   <p>Modify <code class="highlight"><span class="n">numeric_limits</span></code> members [<strong>numeric.limits.members</strong>] ❡61 onwards:</p>
-   <blockquote>
-<pre class="highlight"><span class="k">static</span> <span class="k">constexpr</span> <span class="kt">bool</span> <span class="n">is_modulo</span><span class="p">;</span></pre>
-    <p><code class="highlight">true</code> if the type is modulo. A type is modulo if, for any operation involving <code class="highlight"><span class="o">+</span></code>, <code class="highlight"><span class="o">-</span></code>, or <code class="highlight"><span class="o">*</span></code> on values of that type whose result would fall outside the
-range <code class="highlight"><span class="p">[</span><span class="n">min</span><span class="p">(</span><span class="p">)</span><span class="p">,</span> <span class="n">max</span><span class="p">(</span><span class="p">)</span><span class="p">]</span></code>, the value returned differs from the true value by
-an integer multiple of <code class="highlight"><span class="n">max</span><span class="p">(</span><span class="p">)</span> <span class="o">-</span> <span class="n">min</span><span class="p">(</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span></code>.</p>
-    <del>[<em>Example:</em><code class="highlight"><span class="n">is_modulo</span></code> is <code class="highlight">false</code> for signed integer types
-unless an implementation, as an extension to this document,
-defines signed integer overflow to wrap.  —<em>end example</em>]</del>
-    <p>Meaningful for all specializations.</p>
    </blockquote>
    <p>Modify Class template <code class="highlight"><span class="n">ratio</span></code> [<strong>ratio.ratio</strong>] ❡1:</p>
    <blockquote>
@@ -1739,11 +1658,6 @@ its absolute value which is positive.
      his
 excludes the most negative value. —<em>end note</em>]
     </p>
-   </blockquote>
-   <p>Remove Specializations for integers [<strong>atomics.types.int</strong>] ❡7:</p>
-   <blockquote>
-    <del><em>Remarks:</em> For signed integer types, arithmetic is defined to use two’s
-complement representation. There are no undefined results.</del>
    </blockquote>
    <h2 class="heading settled" data-level="3" id="scope"><span class="secno">3. </span><span class="content">Out of Scope</span><a class="self-link" href="#scope"></a></h2>
    <p>This proposal focuses on the representation of signed integers, and on
@@ -1792,6 +1706,38 @@ knowing that overflow cannot occur (à la <code class="highlight"><span class="o
      <p>Endianness of integral storage (or endianness in general).</p>
     <li data-md="">
      <p>Bits per bytes, though we all know there are eight.</p>
+   </ul>
+   <p>These items could be tackled in separate proposals, unless the committee wants
+them tackled here. This paper expresses no preference in whether they should be
+addressed or how.</p>
+   <h2 class="heading settled" data-level="3" id="arthur"><span class="secno">3a. </span><span class="content">Arthur's Comments</span><a class="self-link" href="#scope"></a></h2>
+   <p>This proposal is merely pruned down from JF Bastien's P0907R0, based on the
+   work JF did to identify wording in need of changing. Arthur has not done his
+   own independent review of the entire Standard document.</p>
+   <p>Arthur noticed that the current wording in [dcl.enum] appears completely wrong
+   for negative enum values; so this paper is proposing a major rewrite of that
+   wording. This wording might be useful independent of the rest of this paper.
+   It should be examined closely, either way.
+   </p>
+   <p>A non-comprehensive list of related items purposely left out of this paper,
+   yet on which Arthur happens to have reasonably strongly held opinions that
+   may or may not agree with the reader's:</p>
+   <ul>
+    <li data-md="">
+     <p>Atomic integral types should not be a special case; signed atomic integral
+     types should preferably have "native" overflow behavior, not wrapping
+     two's-complement behavior. However, Arthur doesn't know the rationale behind
+     the current behavior of atomic.</p>
+    <li data-md="">
+     <p>Left and right shift with a right-hand-side equal to or wider than the
+bit-width of the left-hand-side should produce an "unspecified result", rather than
+having completely undefined behavior (or even unspecified behavior).</p>
+    <li data-md="">
+     <p>Left and right shift with a negative right-hand-side should produce an
+     "unspecified result", rather than having completely undefined behavior (or
+     even unspecified behavior).</p>
+    <li data-md="">
+     <p>Bits per byte should be fixed at eight.</p>
    </ul>
    <p>These items could be tackled in separate proposals, unless the committee wants
 them tackled here. This paper expresses no preference in whether they should be
@@ -2030,6 +1976,8 @@ integer esoterica.</p>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
+   <dt id="biblio-p0907r0">[P0907R0]
+   <dd>JF Bastien. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0907r0.html">Signed Integers are Two's Complement</a>. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0907r0.html">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0907r0.html</a>
    <dt id="biblio-c11">[C11]
    <dd><a href="http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf">Programming Languages — C</a>. URL: <a href="http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf">http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1570.pdf</a>
    <dt id="biblio-gcc">[GCC]
@@ -2038,6 +1986,4 @@ integer esoterica.</p>
    <dd><a href="https://llvm.org/docs/LangRef.html">LLVM Language Reference Manual</a>. URL: <a href="https://llvm.org/docs/LangRef.html">https://llvm.org/docs/LangRef.html</a>
    <dt id="biblio-msvc">[MSVC]
    <dd><a href="https://docs.microsoft.com/en-us/cpp/c-language/integers">MSVC C Implementation-Defined Behavior: Integers</a>. URL: <a href="https://docs.microsoft.com/en-us/cpp/c-language/integers">https://docs.microsoft.com/en-us/cpp/c-language/integers</a>
-   <dt id="biblio-taocp">[TAoCP]
-   <dd>Donald Knuth. The Art of Computer Programming, Volume 2 (3rd Ed.): Seminumerical Algorithms. 
   </dl>
