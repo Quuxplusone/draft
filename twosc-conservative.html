@@ -1402,7 +1402,7 @@ Possible extra rowspan handling
      <dt>Author:
      <dd>
       <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
-        after all the hard work was actually done by JF Bastien (Apple)
+        after much of the hard work was done by JF Bastien (Apple)
      <dt>Audience:
      <dd>EWG, SG12
      <dt>Toggle Diffs:
@@ -1420,8 +1420,12 @@ Possible extra rowspan handling
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
    <p>There is One True Representation for signed integers, and that representation is two’s complement.</p>
-   <p>However, undefined behavior on signed integer overflow is not obviously useless; and there is a
-   slight benefit in keeping users from getting too chummy with the implementation.</p>
+   <p>However, we are careful to distinguish the question of bit-level integer <em>representation</em> (i.e., two's
+   complement) from the various questions of how integer <em>arithmetic operations</em> should be mapped onto
+   the C++ abstract machine (e.g., whether signed overflow should remain undefined, turn into a trap, turn into
+   quiet wrapping, or so on). JF Bastien's <a data-link-type="biblio" href="#biblio-p0907r0">[P0907R0]</a>
+   proposes both two's-complement bitwise representation and quiet-wrapping arithmetic. The proposal you are
+   currently reading proposes <em>only</em> two's-complement bitwise representation.
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -1444,7 +1448,7 @@ Possible extra rowspan handling
    <p><a data-link-type="biblio" href="#biblio-c11">[C11]</a> Integer types allows three representations for signed integral types:</p>
    <ul>
     <li data-md="">
-     <p>Signed magnitude</p>
+     <p>Sign-magnitude</p>
     <li data-md="">
      <p>Ones' complement</p>
     <li data-md="">
@@ -1453,7 +1457,10 @@ Possible extra rowspan handling
    <p>See <a href="#c-sign">§4 C Signed Integer Wording</a> for full wording.</p>
    <p>C++ inherits these three signed integer representations from C. To the author’s
 knowledge no modern machine uses both C++ and a signed integer representation
-other than two’s complement (see <a href="#survey">§5 Survey of Signed Integer Representations</a>). None of <a data-link-type="biblio" href="#biblio-msvc">[MSVC]</a>, <a data-link-type="biblio" href="#biblio-gcc">[GCC]</a>, and <a data-link-type="biblio" href="#biblio-llvm">[LLVM]</a> support other representations. This means that the C++ that is taught
+other than two’s complement (see <a href="#survey">§5 Survey of Signed Integer Representations</a>). None of
+<a data-link-type="biblio" href="#biblio-msvc">[MSVC]</a>, <a data-link-type="biblio" href="#biblio-gcc">[GCC]</a>,
+and <a data-link-type="biblio" href="#biblio-llvm">[LLVM]</a> support other representations.
+This means that the C++ that is taught
 is effectively two’s complement, and the C++ that is written is two’s
 complement. It is extremely unlikely that there exist any significant code base
 developed for two’s complement machines that would actually work when run on a
@@ -1462,8 +1469,8 @@ non-two’s complement machine.</p>
 currently allow for trap representations, extra padding bits, integral negative
 zero, and introduce undefined behavior and implementation-defined behavior for
 the sake of this <em>extremely</em> abstract machine.</p>
-   <p>Specifically, the current wording has the following effects. I propose to
-   fix the problems which are not <s>struck out</s>.</p>
+   <p>Specifically, the current wording has the following effects.
+   Arthur proposes to fix the problems which are not <s>struck out</s>.</p>
    <ul>
     <li data-md="">
      <p><s>Associativity and commutativity of integers is needlessly obtuse.</s></p>
@@ -1474,22 +1481,57 @@ clearly not to and the code, while naïve, was correctly performing security
 checks for two’s complement integers. Correct overflow checks are difficult
 to write and equally difficult to read, exponentially so in generic code.</s></p>
     <li data-md="">
-     <p>Conversion between signed and unsigned are implementation-defined.</p>
+     <p>Conversions between signed and unsigned types are implementation-defined or worse.</p>
     <li data-md="">
      <p>There is no portable way to generate an arithmetic right-shift, or to
 sign-extend an integer, which every modern CPU supports.</p>
     <li data-md="">
      <p><code class="highlight"><span class="k">constexpr</span></code> is further restrained by this extraneous undefined behavior.</p>
    </ul>
-   <p>Notice that atomic integral types are already two’s complement and have no undefined results,
-therefore even freestanding implementations already support two’s complement
-in C++.</p>
-   <p>Let’s stop pretending that the C++ abstract machine should represent integers as
-signed magnitude or ones' complement. These theoretical implementations are a
-different programming language, not our real-world C++. Users of C++ who require
-signed magnitude or ones' complement integers would be better served by a
-pure-library solution, and so would the rest of us.</p>
-   <p>This proposal leaves C unchanged, it merely restricts further the subset of C
+   <p> The proposal you are now reading is intended to have the following specific effects on integral conversions
+   and integral bit-level operations, where the bit-level representation of integers is relevant:
+   <div class="figure">
+   <table class="data">
+    <tr><th>Expression</th><th>Current C++</th><th>Proposed C++</th><th>Relevant Wording</th></tr>
+    <tr><td><code>int8_t(uint8_t(255))</code></td><td>Implementation-defined value</td><td><code>-1</code></td><td>[conv.integral]</td></tr>
+    <tr><td><code>int8_t(uint16_t(255))</code></td><td>Implementation-defined value</td><td><code>-1</code></td><td>[conv.integral]</td></tr>
+    <tr><td><code>int8_t(uint16_t(511))</code></td><td>Implementation-defined value</td><td><code>-1</code></td><td>[conv.integral]</td></tr>
+    <tr><td><code>int8_t(e255)</code><br>
+    where <code>enum class E { e255=255 };</code></td><td>Unspecified value</td><td><code>-1</code></td><td>[expr.static.cast]</td></tr>
+    <tr><td><code>E(255)</code><br>
+    where <code>enum E : int8_t {}</code></td><td>Implementation-defined value</td><td><code>E(-1)</code></td><td>[expr.static.cast]</td></tr>
+    <tr><td><code>E(255)</code><br>
+    where <code>enum E { eMIN=-127, eMAX=128 }</code></td><td>Undefined behavior</td><td><code>E(-1)</code></td><td>[expr.static.cast]</td></tr>
+    <tr><td><code>(1 << 31)</code></td><td>Undefined behavior</td><td><code>INT_MIN</code></td><td>[expr.shift]</td></tr>
+    <tr><td><code>(1 << 32)</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>[expr.shift]</td></tr>
+    <tr><td><code>(1 << -1)</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>[expr.shift]</td></tr>
+    <tr><td><code>(-1 << 1)</code></td><td>Undefined behavior</td><td><code>-2</code></td><td>[expr.shift]</td></tr>
+    <tr><td><code>(-2 >> 1)</code></td><td>Implementation-defined value</td><td><code>-1</code></td><td>[expr.shift]</td></tr>
+   </table>
+   </div>
+   </p>
+   <p>
+   The proposal is intended to have the following specific <em>non-</em>effects on integral arithmetic
+   operations:
+   <div class="figure">
+   <table class="data">
+    <tr><th>Expression</th><th>Current C++</th><th>This Proposal</th><th>Under P0907R0</th></tr>
+    <tr><td><code>INT_MAX + 1</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td><code>INT_MIN</code></td></tr>
+    <tr><td><code>1000'000 * 1000'000</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td><code>-727379968</code>
+    <br>(assuming 32-bit <code>int</code>)</td></tr>
+    <tr><td><code>INT_MIN / -1</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>Undefined behavior</td></tr>
+    <tr><td><code>INT_MIN % -1</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>Undefined behavior</td></tr>
+   </table>
+   </div>
+   (Arthur believes that it would be nice for <code>(1 << 32)</code> and even <code>(1 << -1)</code> to produce
+   unspecified values, rather than undefined behavior; but the proposal you are now reading does not attempt to
+   propose that change.)
+   </p>
+   <p>Notice that atomic integral types are already two’s complement and have no undefined results;
+therefore even freestanding implementations must already support two’s complement somehow.</p>
+   <p>Users of C++ who require sign-magnitude or ones'-complement integers would be better served by a
+pure-library solution (and so would the rest of us).</p>
+   <p>This proposal leaves C unchanged; it merely restricts further the subset of C
 which applies to C++. The author will ensure that WG14 is made aware of this
 paper’s outcome.</p>
    <h2 class="heading settled" data-level="2" id="word"><span class="secno">2. </span><span class="content">Proposed Wording</span><a class="self-link" href="#word"></a></h2>
@@ -1618,7 +1660,7 @@ retained if the destination is smaller than the source</ins>.
      A value of
 floating-point type can also be explicitly converted to an enumeration type.
 The resulting value is the same as converting the original value to the
-underlying type of the enumeration\iref{conv.fpint}, and subsequently to the
+underlying type of the enumeration (conv.fpint), and subsequently to the
 enumeration type.
     </p>
    </blockquote>
@@ -1689,15 +1731,15 @@ its absolute value which is positive.
     </p>
    </blockquote>
    <h2 class="heading settled" data-level="3" id="scope"><span class="secno">3. </span><span class="content">Out of Scope</span><a class="self-link" href="#scope"></a></h2>
-   <p>This proposal focuses on the representation of signed integers, and on
-tightening the specification when that representation is constrained to two’s
-complement. It is out of scope for this proposal to deal with related issues
+   <p>This proposal focuses on the representation of signed integers.
+   It is out of scope for this proposal to deal with related issues
 which have more to them than simply the representation of signed integers.</p>
-   <p>A non-comprehensive list of items left purposefully out:</p>
+   <p>A non-comprehensive list of items purposely left out:</p>
    <ul>
     <li data-md="">
      <p>Left and right shift with a right-hand-side equal to or wider than the
-bit-width of the left-hand-side.</p>
+bit-width of the left-hand-side. (This must remain implementation-defined or worse,
+because of x86's behavior.)</p>
     <li data-md="">
      <p>Integral division or modulo by zero.</p>
     <li data-md="">
@@ -1706,11 +1748,11 @@ particular integral type by minus one.</p>
     <li data-md="">
      <p>Overflow of pointer arithmetic.</p>
     <li data-md="">
-     <p>Library solution for ones' complement integers.</p>
+     <p>Library solution for ones'-complement integers.</p>
     <li data-md="">
-     <p>Library solution for signed magnitude integers.</p>
+     <p>Library solution for sign-magnitude integers.</p>
     <li data-md="">
-     <p>Library solution for two’s complement integers with trapping or undefined
+     <p>Library solution for two’s-complement integers with trapping or undefined
 overflow sepantics.</p>
     <li data-md="">
      <p>Language support for explicit signed overflow truncation such as Swift’s
@@ -1736,9 +1778,7 @@ knowing that overflow cannot occur (à la <code class="highlight"><span class="o
     <li data-md="">
      <p>Bits per bytes, though we all know there are eight.</p>
    </ul>
-   <p>These items could be tackled in separate proposals, unless the committee wants
-them tackled here. This paper expresses no preference in whether they should be
-addressed or how.</p>
+   <p>These items could be tackled in separate proposals.</p>
    <h2 class="heading settled" data-level="3" id="arthur"><span class="secno">3a. </span><span class="content">Arthur's Comments</span><a class="self-link" href="#scope"></a></h2>
    <p>This proposal is merely pruned down from JF Bastien's P0907R0, based on the
    work JF did to identify wording in need of changing. Arthur has not done his
@@ -1769,13 +1809,10 @@ having completely undefined behavior (or even unspecified behavior).</p>
      <p>Bits per byte should be fixed at eight.</p>
     <li data-md="">
      <p>The object representation of a signed integral type should not be allowed to
-     have (visible) padding bits. (Implementations should remain free to use padding
+     have visible padding bits. (Implementations should remain free to use padding
      or parity bits "behind the scenes", but these bits if present should not interact
      with the representation of integral types according to the C++ abstract machine.)</p>
    </ul>
-   <p>These items could be tackled in separate proposals, unless the committee wants
-them tackled here. This paper expresses no preference in whether they should be
-addressed or how.</p>
    <h2 class="heading settled" data-level="4" id="c-sign"><span class="secno">4. </span><span class="content">C Signed Integer Wording</span><a class="self-link" href="#c-sign"></a></h2>
    <p>The following is the wording on integers from the C11 Standard.</p>
    <blockquote>
@@ -1862,7 +1899,7 @@ addressed or how.</p>
        <p>Descendants of the UNIVAC 1107, the UNIVAC 1100/2200 series, continue to do so, although ClearPath machines are a common platform that implement either the 1100/2200 architecture (the ClearPath IX series) or the Burroughs large systems architecture (the ClearPath NX series). Everything is common except the actual CPUs, which are implemented as ASICs. In addition to the IX (1100/2200) CPUs and the NX (Burroughs large systems) CPU, the architecture had Xeon (and briefly Itanium) CPUs. Unisys' goal was to provide an orderly transition for their 1100/2200 customers to a more modern architecture.</p>
      </ul>
     <li data-md="">
-     <p>Signed magnitude</p>
+     <p>Sign-magnitude</p>
      <ul>
       <li data-md="">
        <p>The IBM 700/7000 series scientific machines use sign/magnitude notation, except for the index registers which are two’s complement.</p>
