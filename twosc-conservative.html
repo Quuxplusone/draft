@@ -1488,6 +1488,13 @@ sign-extend an integer, which every modern CPU supports.</p>
     <li data-md="">
      <p><code class="highlight"><span class="k">constexpr</span></code> is further restrained by this extraneous undefined behavior.</p>
    </ul>
+   <p>Notice that atomic integral types are already two’s complement and have no undefined results;
+therefore even freestanding implementations must already support two’s complement somehow.</p>
+   <p>Users of C++ who require sign-magnitude or ones'-complement integers would be better served by a
+pure-library solution (and so would the rest of us).</p>
+   <p>This proposal leaves C unchanged; it merely restricts further the subset of C
+which applies to C++. The author will ensure that WG14 is made aware of this
+paper’s outcome.</p>
    <p> The proposal you are now reading is intended to have the following specific effects on integral conversions
    and integral bit-level operations, where the bit-level representation of integers is relevant:
    <div class="figure">
@@ -1509,8 +1516,6 @@ sign-extend an integer, which every modern CPU supports.</p>
     where <code>enum E { eMIN=-127, eMAX=128 }</code></td><td>Undefined behavior</td><td><code>E(-1)</code></td><td>[expr.static.cast]</td></tr>
     <tr><td><code>(1 << 31)</code></td><td>Implementation-defined value</td><td><code>INT_MIN</code></td><td>[expr.shift]</td></tr>
     <tr><td><code>(2 << 31)</code></td><td>Undefined behavior</td><td><code>0</code></td><td>[expr.shift]</td></tr>
-    <tr><td><code>(1 << 32)</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>[expr.shift]</td></tr>
-    <tr><td><code>(1 << -1)</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>[expr.shift]</td></tr>
     <tr><td><code>(-1 << 1)</code></td><td>Undefined behavior</td><td><code>-2</code></td><td>[expr.shift]</td></tr>
     <tr><td><code>(-2 >> 1)</code></td><td>Implementation-defined value</td><td><code>-1</code></td><td>[expr.shift]</td></tr>
    </table>
@@ -1518,28 +1523,25 @@ sign-extend an integer, which every modern CPU supports.</p>
    </p>
    <p>
    The proposal is intended to have the following specific <em>non-</em>effects on integral arithmetic
-   operations:
+   operations and on overwide bit-shifts:
    <div class="figure">
    <table class="data">
     <tr><th>Expression</th><th>Current C++</th><th>This Proposal</th><th>Under P0907R0</th></tr>
     <tr><td><code>INT_MAX + 1</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td><code>INT_MIN</code></td></tr>
     <tr><td><code>1000'000 * 1000'000</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td><code>-727379968</code>
     <br>(assuming 32-bit <code>int</code>)</td></tr>
+    <tr><td><code>uint16_t(65535) * uint16_t(65535)</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td><code>-131071</code>
+    <br>(assuming 32-bit <code>int</code>)</td></tr>
     <tr><td><code>INT_MIN / -1</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>Undefined behavior</td></tr>
     <tr><td><code>INT_MIN % -1</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>Undefined behavior</td></tr>
+    <tr><td><code>(1 << 32)</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>Undefined behavior</td></tr>
+    <tr><td><code>(1 << -1)</code></td><td>Undefined behavior</td><td>Undefined behavior</td><td>Undefined behavior</td></tr>
    </table>
    </div>
    (Arthur believes that it would be nice for <code>(1 << 32)</code> and even <code>(1 << -1)</code> to produce
    unspecified values, rather than undefined behavior; but the proposal you are now reading does not attempt to
    propose that change.)
    </p>
-   <p>Notice that atomic integral types are already two’s complement and have no undefined results;
-therefore even freestanding implementations must already support two’s complement somehow.</p>
-   <p>Users of C++ who require sign-magnitude or ones'-complement integers would be better served by a
-pure-library solution (and so would the rest of us).</p>
-   <p>This proposal leaves C unchanged; it merely restricts further the subset of C
-which applies to C++. The author will ensure that WG14 is made aware of this
-paper’s outcome.</p>
    <h2 class="heading settled" data-level="2" id="word"><span class="secno">2. </span><span class="content">Proposed Wording</span><a class="self-link" href="#word"></a></h2>
    <p>Modify Fundamental types [<strong>basic.fundamental</strong>] ❡1:</p>
    <blockquote>
