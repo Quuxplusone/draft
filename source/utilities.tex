@@ -11534,16 +11534,16 @@ then \tcode{xprime} is \tcode{x}.
 Otherwise, if \tcode{uses_allocator_v<T1,polymorphic_allocator>} is \tcode{true}
 \\
 and
-\tcode{is_constructible_v<T1,allocator_arg_t,polymorphic_allocator,Args1...>} is \tcode{true},
+\tcode{is_constructible_v<T1,allocator_arg_t,polymorphic_allocator&,Args1...>} is \tcode{true},
 \\
-then \tcode{xprime} is \tcode{tuple_cat(make_tuple(allocator_arg, *this), std::move(x))}.
+then \tcode{xprime} is \tcode{tuple_cat(tuple<allocator_arg_t, polymorphic_allocator&>(allocator_arg, *this), std::move(x))}.
 \item
 Otherwise, if \tcode{uses_allocator_v<T1,polymorphic_allocator>} is \tcode{true}
 \\
 and
-\tcode{is_constructible_v<T1,Args1...,polymorphic_allocator>} is \tcode{true},
+\tcode{is_constructible_v<T1,Args1...,polymorphic_allocator&>} is \tcode{true},
 \\
-then \tcode{xprime} is \tcode{tuple_cat(std::move(x), make_tuple(*this))}.
+then \tcode{xprime} is \tcode{tuple_cat(std::move(x), tuple<polymorphic_allocator&>(*this))}.
 \item
 Otherwise the program is ill formed.
 \end{itemize}
@@ -11561,22 +11561,22 @@ then \tcode{yprime} is \tcode{y}.
 Otherwise, if \tcode{uses_allocator_v<T2,polymorphic_allocator>} is \tcode{true}
 \\
 and
-\tcode{is_constructible_v<T2,allocator_arg_t,polymorphic_allocator,Args2...>} is \tcode{true},
+\tcode{is_constructible_v<T2,allocator_arg_t,polymorphic_allocator&,Args2...>} is \tcode{true},
 \\
-then \tcode{yprime} is \tcode{tuple_cat(make_tuple(allocator_arg, *this), std::move(y))}.
+then \tcode{yprime} is \tcode{tuple_cat(tuple<allocator_arg_t, polymorphic_allocator&>(allocator_arg, *this), std::move(y))}.
 \item
 Otherwise, if \tcode{uses_allocator_v<T2,polymorphic_allocator>} is \tcode{true}
 \\
 and
-\tcode{is_constructible_v<T2,Args2...,polymorphic_allocator>} is \tcode{true},
+\tcode{is_constructible_v<T2,Args2...,polymorphic_allocator&>} is \tcode{true},
 \\
 then
-\tcode{yprime} is \tcode{tuple_cat(std::move(y), make_tuple(*this))}.
+\tcode{yprime} is \tcode{tuple_cat(std::move(y), tuple<polymorphic_allocator&>(*this))}.
 \item
 Otherwise the program is ill formed.
 \end{itemize}
 
-Then, using \tcode{piecewise_construct}, \tcode{xprime}, and \tcode{yprime}
+Then, using \tcode{piecewise_construct}, \tcode{std::move(xprime)}, and \tcode{std::move(yprime)}
 as the constructor arguments,
 this function constructs a \tcode{pair<T1, T2>} object
 in the storage whose address is represented by \tcode{p}.
