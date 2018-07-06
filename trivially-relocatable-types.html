@@ -400,7 +400,7 @@ case (the usual case for most types) could be optimized into three calls to
 </p>
 
 <p>
-For reasons described elsewhere,<sup>TODO FIXME BUG HACK</sup> it seems reasonable
+For reasons described elsewhere,<sup><a href="#fn_Sane">[Sane]</a></sup> it seems reasonable
 to claim that move-assignment must always "do the sane thing," and therefore we
 might propose to define
 <pre>
@@ -418,126 +418,6 @@ thus completing the currently-incomplete trio with
 However, we do not propose "trivially swappable" at the present time.
 It can easily be added in a later paper.
 </p>
-
-<!--
-TODO FIXME BUG HACK: move this into a blog post and link to it above
-
-<p>
-Mingxin Wang<sup><a href="#fn_Wang">[Wang]</a></sup> has proposed
-that "swap" could be expressed in terms of "relocate". That is,
-any of the following are reasonable definitions of <code>std::swap</code>:
-<pre>
-    template&lt;class T>
-    void swap(T&amp; a, T&amp; b) noexcept(OMITTED)
-    {
-        if constexpr (CONDITION_1) {
-            char buffer[sizeof (T)];  // no alignment needed
-            memcpy(&amp;buffer, &amp;a, sizeof (T));
-            memcpy(&amp;a, &amp;b, sizeof (T));
-            memcpy(&amp;b, &amp;buffer, sizeof (T));
-        } else if constexpr (CONDITION_2) {
-            alignas(T) char buffer[sizeof (T)];
-            std::uninitialized_relocate((T*)buffer, &amp;a, 1);
-            std::uninitialized_relocate(&amp;a, &amp;b, 1);
-            std::uninitialized_relocate(&amp;b, (T*)buffer, 1);
-        } else {
-            T tmp(std::move(a));
-            a = std::move(b);
-            b = std::move(tmp);
-        }
-    }
-</pre>
-The first performs no <code>T</code> operations at all.
-The second performs three move-constructions and three destructions.
-The third performs one move-construction, two move-assignments, and one destruction.
-</p>
-
-<p>
-At the moment, the standard defines <code>swap</code>'s effects only vaguely
-as "Exchanges values"; thus it is plausible that the library vendor could
-define <code>CONDITION_1</code> as <code>is_trivially_relocatable_v&lt;T></code>
-and <code>CONDITION_2</code> as <code>is_relocatable_v&lt;T></code> (which is
-equivalent to <code>true</code> for all MoveConstructible types).
-The standard already seems to assume that the visible side-effects of
-"one move-construction, two move-assignments, and one destruction" must not
-significantly differ from the visible side-effects of "three move-constructions
-and three destructions," or else it would have specified <code>swap</code>'s
-effects actually in terms of "one move-construction, two move-assignments,
-and one destruction."
-</p>
-
-<p>
-However, some paranoid programmer might want to ask the question
-"Is the standard's assumption actually true of my <code>T</code>?"
-That is, "Is my <code>T</code> trivially relocatable <em>and also</em>
-does move-assigning dst from src perform essentially the same operation
-as destroying dst and then move-constructing dst from src?"
-</p>
-
-<p>
-The part of the question about the behavior of move-assignment might be
-separated out and given a name such as <code>is_sanely_move_assignable</code>,
-at which point we could write the definition
-<pre>
-    template&lt;class T>
-    struct is_trivially_swappable : bool_constant&lt;
-        is_trivially_relocatable_v&lt;T> and
-        is_sanely_move_assignable_v&lt;T>
-    > {};
-</pre>
-</p>
-
-<p>
-In a Concepts world, it would be extremely reasonable to claim that
-"<code>is_sanely_move_assignable</code>" essentially encapsulates the <em>semantic requirements</em>
-of the <code>MoveAssignable</code> syntactic concept. In Concepts, since
-semantic requirements cannot be indicated in source code, the library
-<em>must</em> assume that any <code>MoveAssignable</code> type also
-follows the semantic requirements; or, in short, the library must
-assume that "<code>is_sanely_move_assignable&lt;T></code> if-and-only-if
-<code>is_move_assignable&lt;T></code>." So, in a Concepts world,
-there is no need for the <code>sanely</code> variant; every operation
-must be assumed sane by definition.
-</p>
-
-<p>
-Therefore, assuming Concepts-with-semantic-requirements remains in C++2a,
-we conclude that
-<pre>
-    template&lt;class T>
-    struct is_trivially_swappable : bool_constant&lt;
-        is_trivially_relocatable_v&lt;T> and
-        is_move_assignable_v&lt;T>
-    > {};
-</pre>
-</p>
-
-<p>
-Notice that if <code>is_trivially_swappable_v&lt;T></code>, then
-<code>swap</code> will check, but never use, the fact that
-<code>is_move_assignable&lt;T></code>.
-One particular kind of type is often trivially relocatable but not
-move-assignable. In the standard, <code>string_view</code> is assignable and
-<code>optional&lt;T&amp;></code> doesn't exist, but you can imagine versions of
-both of those where <code>operator=</code> was deleted (to avert misuse,
-or simply to avert bikeshedding over what it should do). If the programmer
-has already gone out of his way to disable <code>a = std::move(b)</code>,
-a library's heroic efforts to reenable <code>std::swap(a, b)</code> are
-unlikely to be appreciated.
-</p>
-
-<p>
-Notice also that "trivially swappable" does not imply "will actually be
-swapped via <code>memcpy</code> in practice." Existing implementations of
-<code>std::swap</code> would remain conforming.
-</p>
-
-<p>
-I would happily add <code>std::is_trivially_swappable&lt;T></code> to
-this proposal, thus completing the currently-incomplete trio with
-<code>is_swappable</code> and <code>is_nothrow_swappable</code>.
-</p>
--->
 
 <h3><a name="hetero">5b. Heterogeneous relocation</a></h3>
 
@@ -697,11 +577,11 @@ Niall Douglas. P1029R0 "SG14 [[move_relocates]]" (May 2018).<br>
 http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf</a>.
 </dd>
 
-<dt><a name="fn_TCF">[TCF]</a></dt>
+<dt><a name="fn_Sane">[Sane]</a></dt>
 <dd>
-Arthur O'Dwyer. "Trivially-constructible-from" (July 2018).<br>
-<a href="https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/">
-https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/</a>.
+Arthur O'Dwyer. "Thoughts on 'sanely move-assignable'" (July 2018).<br>
+<a href="https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/">
+https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/</a>.
 </dd>
 
 <dt><a name="fn_SV">[SV]</a></dt>
@@ -712,6 +592,13 @@ that Boost.Container calls <code>static_vector</code>.
 less efficient element-by-element-move strategy; moving-out-of a
 <code>boost::container::static_vector</code> will not make the source vector
 <code>empty()</code>.
+</dd>
+
+<dt><a name="fn_TCF">[TCF]</a></dt>
+<dd>
+Arthur O'Dwyer. "Trivially-constructible-from" (July 2018).<br>
+<a href="https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/">
+https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/</a>.
 </dd>
 
 <dt><a name="fn_Wang">[Wang]</a></dt>
