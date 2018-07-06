@@ -7,16 +7,17 @@ Status: D
 Group: WG21
 URL:
 !Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs</a>
-!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d1132.html">rawgit.com/Quuxplusone/draft/gh-pages/d1132.html</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d1144.html">rawgit.com/Quuxplusone/draft/gh-pages/d1144.html</a>
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Editor: Mingxin Wang, wmx16835vv@163.com
-Abstract:
-  We define a verb `relocate`, tantamount to a move and a destroy, analogous to the existing verb `swap` which is tantamount to a move, two move-assignments, and a destroy.
-  We observe that the `relocate` operation for most (but not all) C++ types is tantamount to `memcpy`.
-  We provide a type-trait to detect situations when `relocate` is known to be tantamount to `memcpy`, for the benefit of library implementors.
-  Finally, we provide a portable way for any user-defined type (such as `boost::shared_ptr`) to warrant to the compiler that its `relocate` operation is equivalent to `memcpy`, thus gaining the same performance benefits as the standard library types.
-Date: 2018-07-06
 Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  We define a new algorithm "relocate" which is tantamount to a move and a destroy,
+  analogous to the existing algorithm "swap" which is tantamount to a move, two move-assignments, and a destroy.
+  For most (but not all) C++ types, the "relocate" operation is equivalent to a single <code>memcpy</code>.
+  For the benefit of library writers, we provide a standard type trait to detect types whose "relocate" is known to be equivalent to <code>memcpy</code>.
+  Finally, we provide a portable way for any user-defined type (such as <code>boost::shared_ptr</code>) to warrant to the implementation that its "relocate" is equivalent to <code>memcpy</code>, thus gaining the same performance benefits as the standard library types.
+Date: 2018-07-06
 </pre>
 
 <style>
@@ -33,34 +34,41 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 # Introduction and motivation # {#intro}
 
 If you are reading this paper, and you have not yet watched Arthur's session from C++Now 2018
-on "The Best Type Traits C++ Doesn't Have," it will help if you immediately stop reading and
-[[https://www.youtube.com/watch?v=MWBfmmg8-Yo|go watch]]
-the first 30 minutes of that video at 2x speed with the captions turned on.<sup><a href="#fn_Best">[Best]</a></sup>
+on [[Best|"The Best Type Traits C++ Doesn't Have,"]] it will help if you immediately stop reading and
+<a href="https://www.youtube.com/watch?v=MWBfmmg8-Yo">go watch</a>
+the first 30 minutes of that video at 2x speed with the captions turned on.
 It's going to be worth your 15 minutes. I'll wait.
 
 In the video, besides showing implementation techniques and benchmark results, we defined our
 terms. These terms are summarized briefly below.
 
-C++ has the verbs "move," "copy," and "destroy." To this list we propose to add the verb "relocate."
+C++17 knows the verbs "move," "copy," "destroy," and "swap," where "swap" is a higher-level operation
+composed of several lower-level operations. To this list we propose to add the verb "relocate,"
+which is a higher-level operation composed of exactly two lower-level operations.
 Given an object type `T` and memory addresses `src` and `dst`,
-the phrase "*relocate* a `T` from `src` to `dst`" means no more and no
+the phrase "<dfn dfn-type="abstract-op">relocate</dfn> a `T` from `src` to `dst`" means no more and no
 less than "*move-construct* `dst` from `src`, and then immediately
 *destroy* the object at `src`."
-From this verb, we get the adjective "relocatable." Any type which is both move-constructible and
-destructible is _relocatable_. The notion can be modified by adverbs: we say that a type
-is "nothrow relocatable" if its relocation operation is noexcept, and we say that a type
-is "trivially relocatable" if its relocation operation is trivial (which, just like trivial move-construction
+
+Just as the verb "swap" produces the adjective "swappable," the verb "relocate" produces the adjective
+"relocatable." Any type which is both move-constructible and
+destructible is <dfn dfn-type="abstract-op">relocatable</dfn>. The notion can be modified by adverbs: we say that a type
+is <dfn dfn-type="abstract-op">nothrow relocatable</dfn> if its relocation operation is noexcept, and we say that a type
+is <dfn dfn-type="abstract-op">trivially relocatable</dfn> if its relocation operation is trivial (which, just like trivial move-construction
 and trivial copy-construction, means "the operation is tantamount to a `memcpy`").
 
 Almost all relocatable types are trivially relocatable: `std::unique_ptr<int>`,
 `std::vector<int>`, `std::string`, `std::any`. Non-trivially relocatable
-types exist but are rare: `boost::interprocess::offset_ptr<int>`, TODO FIXME BUG HACK.
+types exist but are rare: `boost::interprocess::offset_ptr<int>`, for example.
 
-Arthur has established (via benchmarks<sup><a href="#fn_Bench">[Bench]</a></sup> such as those shown in the video)
+Issue:
+Can we come up with a second realistic example of a non-trivially relocatable type?
+
+Arthur has established (via [[Bench|benchmarks]] such as those shown in the video)
 that if standard library code had a reliable way of detecting "trivial relocatability," we could optimize
 that case and get a speed boost of up to 3x on routines that perform reallocation, such as
 
-```c++
+```
     std::vector<R>::resize
     std::vector<R>::reserve
     std::vector<R>::emplace_back
@@ -69,16 +77,15 @@ that case and get a speed boost of up to 3x on routines that perform reallocatio
 
 Furthermore, Mingxin Wang points out that we can use the same "trivially relocatability" property to shrink the code
 generated by small-buffer-optimized (SBO) type-erasing wrappers such as `std::function` and `std::any`.
-For these types, a _move_ of the wrapper object is implemented in terms of a
-_relocation_ of the contained object. (See for example
-[[https://github.com/llvm-mirror/libcxx/blob/8fdc491860efbccb65ab2f01ec25e13b024da538/include/any#L389-L394|libc++'s `std::any`]],
+For these types, a *move* of the wrapper object is implemented in terms of a
+*relocation* of the contained object. (See for example [[Any|libc++'s `std::any`]],
 where the function that performs the relocation operation is confusingly named `__move`.)
-In general, the _relocate_ operation for a contained type `C` involves calls to `C`'s
+In general, the *relocate* operation for a contained type `C` involves calls to `C`'s
 move constructor and destructor, which must be uniquely codegenned for each different `C`; the
-number of instantiations of _relocate_ scales linearly with the count of distinct types `C`
+number of instantiations of *relocate* scales linearly with the count of distinct types `C`
 in the program.
-But for any trivially relocatable `C`, its _relocate_ operation depends only on the number of
-bytes being `memcpy`ed, and so the number of instantiations of _relocate_ scales linearly with the count
+But for any trivially relocatable `C`, its *relocate* operation depends only on the number of
+bytes being `memcpy`ed, and so the number of instantiations of *relocate* scales linearly with the count
 of distinct *sizes* of `C` being used in the program; or indeed, linearly with the count
 of distinct *sizes of SBO buffer* being used in the program.
 
@@ -86,22 +93,22 @@ A smaller number of instantiations means faster compile times, a smaller text se
 "hotter" code (because a relatively higher proportion of your code now fits in icache).
 
 In between these two scenarios, we also find the move-constructor of `fixed_capacity_vector<R,N>`,
-which can be implemented as an element-by-element _move_ (leaving the source vector's elements in their
-moved-from state), or can be implemented more efficiently as an element-by-element _relocate_ (leaving
+which can be implemented as an element-by-element *move* (leaving the source vector's elements in their
+moved-from state), or can be implemented more efficiently as an element-by-element *relocate* (leaving
 the source vector empty).
 
 Note:
 The name `fixed_capacity_vector` is my preferred name for the type
 that Boost.Container calls `static_vector`.
 `boost::container::static_vector<R,N>` implements the
-less efficient element-by-element-move strategy; moving-out-of a
+less efficient element-by-element-move strategy. Moving-out-of a
 `boost::container::static_vector` will not make the source vector
 `empty()`.
 
 
 # Design goals # {#design-goals}
 
-Every C++ type already _is_ or _is not_ trivially relocatable. This proposal is not about
+Every C++ type already *is* or *is not* trivially relocatable. This proposal is not about
 "making more types trivially relocatable."
 
 The optimizations discussed above are purely in the domain of library vendors. If you're writing
@@ -109,9 +116,9 @@ a vector, and you detect that your element type `T` is trivially relocatable, th
 whether you do any special optimization in that case is merely a Quality of Implementation (QoI) issue.
 This proposal is not about "standardizing certain library optimizations."
 
-What C++ lacks is a standard way for library vendors to _detect_ the (existing) trivial relocatability
+What C++ lacks is a standard way for library vendors to *detect* the (existing) trivial relocatability
 of a type `T`, so that they can reliably apply their (existing) optimizations.
-All we really need is to add _detection_, and then all the optimizations described above will naturally
+All we really need is to add *detection*, and then all the optimizations described above will naturally
 emerge without any further special effort by WG21.
 
 Today we can detect the trivial relocatability of several of these categories, via the following definition.
@@ -130,7 +137,7 @@ We'll take this as our starting point.
     static_assert(is_trivially_relocatable< decltype(lam) >::value);
 ```
 
-## Important use case \#1: Standard library types such as `std::string` ## {#use1}
+## Use case #1: Standard library types such as `std::string` ## {#use1}
 
 In order to optimize `std::vector<std::string>::resize`, we must come up with a way to achieve
 ```c++
@@ -146,7 +153,7 @@ That is, we can solve this use-case with "magic" that is confined to the headers
 The programmer doesn't have to learn anything new, so far.
 
 
-## Important use case \#2: Program-defined types with defaulted special members ## {#use2}
+## Use case #2: Program-defined types with defaulted special members ## {#use2}
 
 In order to optimize the SBO `std::function` in any meaningful sense,
 we must come up with a way to achieve
@@ -165,8 +172,8 @@ Therefore, presumably we should be able to use the same solution for lambdas as 
     static_assert(is_trivially_relocatable< A >::value);
 ```
 Here `struct A` follows the Rule of Zero: its move-constructor and destructor are both defaulted.
-If they were also _trivial_, then we'd be done. In fact they are non-trivial; and yet, because the type
-is composited from trivially relocatable types, the type as a whole *is* trivially relocatable.
+If they were also *trivial*, then we'd be done. In fact they are non-trivial; and yet, because the type's
+bases and members are all of trivially relocatable types, the type as a whole *is* trivially relocatable.
 
 This use-case asks specifically that we achieve the program above without breaking the "Rule of Zero."
 We do not want to require the programmer to annotate `struct A` with a special attribute, or
@@ -174,7 +181,7 @@ a special member typedef, or anything like that. We want it to Just Work. Even f
 This is a much uglier problem than use-case #1. It requires core-language support.
 
 
-## Lesser use case \#3: Program-defined types with non-defaulted special members ## {#use3}
+## Use case #3: Program-defined types with non-defaulted special members ## {#use3}
 
 In order to optimize `std::vector<boost::shared_ptr<T>>::resize`,
 we must come up with a way to achieve
@@ -200,17 +207,17 @@ available and "crackable" in *this* translation unit, but unavailable in some ot
 This would lead to ODR violations and generally really bad stuff. So we can't possibly achieve this
 without `[SOME ADDITIONAL CODE HERE]`.)
 
-I call this a "lesser" case because it is the only one that requires us to design the syntax of
+This use-case is the only one that requires us to design the syntax of
 `[SOME ADDITIONAL CODE HERE]`. In use-case #1, any special syntax is hidden inside the
 implementation's own headers. In use-case #2, our design goal is to *avoid* special syntax.
-In use-case #3, we must design syntax.
+In use-case #3, WG21 must design user-facing syntax.
 
 Therefore, I believe it would be acceptable to punt on use-case #3 and come back to it later.
 We say, "Sure, that would be nice, but there's no syntax for it. Be glad that it works for
 core-language and library types. Ask again in three years."  And as long as we leave the design
 space open, I believe we wouldn't lose anything by delaying a solution to use-case #3.
 
-This paper does propose a solution for use-case #3 — which in turn provides a
+This paper does propose a standard syntax for use-case #3 — which in turn provides a
 *simple and portable* solution to use-case #1 for library vendors. However, this
 solution is detachable from the rest of this paper.
 
@@ -224,20 +231,20 @@ attribute is adopted, library vendors will certainly use it in their implementat
 but if the attribute is rejected, library vendors could still achieve use-case #1
 by adding partial specializations of `is_trivially_relocatable`.
 
-- A new type trait, `is_trivially_relocatable<T>`, in the `<type_traits>`
-  header. This is the *detection* mechanism.
+  - A new type trait, `is_trivially_relocatable<T>`, in the `<type_traits>`
+    header. This is the *detection* mechanism.
 
-- A new attribute, `[[trivially_relocatable]]`, in the core language.
-  This is the *opt-in* mechanism for program-defined types.
+  - A new attribute, `[[trivially_relocatable]]`, in the core language.
+    This is the *opt-in* mechanism for program-defined types.
 
-- A new core-language rule by which the `[[trivially_relocatable]]` attribute
-  is "inherited" according to the Rule of Zero.
+  - A new core-language rule by which the `[[trivially_relocatable]]` attribute
+    is "inherited" according to the Rule of Zero.
 
-- A new standard algorithm, `uninitialized_relocate(first, last, d_first)`,
-  in the `<memory>` header.
+  - A new standard algorithm, `uninitialized_relocate(first, last, d_first)`,
+    in the `<memory>` header.
 
-- Additional type traits, `is_relocatable<T>` and `is_nothrow_relocatable<T>`,
-  in the `<type_traits>` header.
+  - Additional type traits, `is_relocatable<T>` and `is_nothrow_relocatable<T>`,
+    in the `<type_traits>` header.
 
 The first and third bullets in that list motivate the second bullet. In order to achieve use-case #2,
 we *must* define a core-language mechanism by which we can "inherit" trivial relocatability.
@@ -254,7 +261,7 @@ we *must* define a core-language mechanism by which we can "inherit" trivial rel
 ```
 I propose that `std::is_trivially_relocatable<T>` should be just a plain old
 class template, exactly like `std::is_trivially_destructible<T>` and so on.
-The core language *should not know or care*<sup><a href="#fn_Contra">[Contra]</a></sup> that this class template exists.
+The core language *should not know or care* [[Contra]] that this class template exists.
 
 I propose that the opt-in mechanism should be an attribute. The programmer will mark
 `C` trivially relocatable like this:
@@ -284,17 +291,18 @@ by their absence.
 
 # Proposed wording for C++20 # {#wording}
 
-The wording in this section is relative to WG21 draft N4750,<sup><a href="#N4750">[N4750]</a></sup>
+The wording in this section is relative to [[N4750|WG21 draft N4750]],
 that is, the current draft of the C++17 standard.
 
-**TODO FIXME BUG HACK**
+Issue:
+there is no wording here
 
 
 # Further considerations and directions # {#further}
 
 ## Trivially swappable types ## {#trivially-swappable}
 
-Mingxin Wang<sup><a href="#fn_Wang">[Wang]</a></sup> has proposed that "swap"
+[[Wang|Mingxin Wang has proposed]] that "swap"
 could be expressed in terms of "relocate". `std::swap` today is
 typically implemented in terms of one move-construction, two move-assignments,
 and one destruction; but there is nothing in the Standard that prevents a library
@@ -302,7 +310,7 @@ vendor from implementing it as three relocations, which in the trivially-relocat
 case (the usual case for most types) could be optimized into three calls to
 `memcpy`.
 
-For reasons described elsewhere,<sup>TODO FIXME BUG HACK</sup> it seems reasonable
+For reasons [[Sane|described elsewhere]], it seems reasonable
 to claim that move-assignment must always "do the sane thing," and therefore we
 might propose to define
 ```c++
@@ -362,16 +370,17 @@ void uninitialized_relocate(FwdIt first, FwdIt last, OutIt d_first) {
 This implementation could be used to quickly relocate an array of
 `int*` into an array of `unique_ptr<int>`
 (but not vice versa). It could also be used to quickly relocate an array of
-`T` into an array of `tombstone::optional<T>`.<sup><a href="#fn_Best">[Best]</a></sup>
+`T` into an array of `tombstone::optional<T>`. (The concept of "tombstone optional"
+is described in [[Best]].)
 All we'd need is for somebody to set the value of `is_trivially_relocatable_from`
 appropriately for each pair of types in the program.
 
-I think this is a very intriguing idea. The detection syntax is fairly obvious:
-`is_trivially_relocatable_from`. But I don't see what the opt-in syntax
+I think this is a very intriguing idea. The detection syntax (`is_trivially_relocatable_from`)
+is fairly obvious. But I don't see what the opt-in syntax
 would look like on a program-defined class such as `tombstone::optional`.
 Let's leave that problem alone for a few years and see what develops.
 
-We could provide the detection trait `is_trivially_relocatable_from` today,
+We could conceivably provide the detection trait `is_trivially_relocatable_from` today,
 with deliberately curtailed semantics, e.g.:
 ```c++
     template<class T, class U>
@@ -408,96 +417,262 @@ trait, but vendors are presumably well aware of specific special cases that they
 *could* detect and optimize today —
 for example, a `std::copy` from an array of `int*` into
 an array of `const int*`, or from an array of 64-bit `long` into
-an array of 64-bit `long long`.<sup><a href="#fn_TCF">[TCF]</a></sup>
-Today vendors choose not to perform these optimizations.
+an array of 64-bit `long long` (see [[TCF]]).
+Today vendors generally choose not to perform these optimizations.
 
 
 # Acknowledgements # {#acknowledgements}
 
-Thanks to Elias Kosunen and Niall Douglas for their feedback on drafts of this paper.
+Thanks to Elias Kosunen and Niall Douglas for their feedback on early drafts of this paper.
+
+
+Appendix A: Straw polls requested {#polls}
+==========
+
+## Polls for LEWG ## {#lewg-polls}
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>The algorithm `uninitialized_relocate(first, last, d_first)` should be added to the `<memory>` header,
+as proposed in this paper.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>The type trait `is_relocatable<T>` (and its `_v` version) should be added to the `<type_traits>` header, as proposed in this paper.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>If `is_relocatable<T>` *is* added, then we should also add `is_nothrow_relocatable<T>` (and its `_v` version), as proposed in this paper.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>The type trait `is_trivially_relocatable<T>` (and its `_v` version) should be added to the `<type_traits>` header, under that exact name, as proposed in this paper.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>We approve of a trait with the semantics of `is_trivially_relocatable<T>`, but not necessarily under that exact name. (For example, `is_bitwise_relocatable`.)</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>If `is_trivially_relocatable<T>` *is* added, under that exact name, then the type trait `is_trivially_swappable<T>` (and its `_v` version) should also be added to the `<type_traits>` header.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+</table>
+
+
+## Polls for EWG ## {#ewg-polls}
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>We approve of the general idea that user-defined classes should be able to warrant their own trivial relocatability.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>We approve of the general idea that user-defined classes which follow the Rule of Zero should inherit the trivial relocatability of their bases and members.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>Nobody should be able to warrant the trivial relocatability of `class C` except for `class C` itself (i.e., we do not want to see a customization point analogous to `std::hash`).</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>If a trait with the semantics of `is_trivially_relocatable<T>` is added to the `<type_traits>` header, the programmer should be permitted to specialize it for program-defined types (i.e., we want to see that trait itself become a customization point analogous to `std::hash`).</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>A class should be able to warrant its own trivial relocatability via the attribute `[[trivially_relocatable]]`, as proposed in this paper.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>A class should be able to warrant its own trivial relocatability via some attribute, but not necessarily under that exact name.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>A class should be able to warrant its own trivial relocatability as proposed in this paper, but via a contextual keyword rather than an attribute.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+</table>
+
+
+Appendix B: Sample code {#samples}
+======================
+
+## Defining a trivially relocatable function object ## {#sample-deducing}
+
+The following sample illustrates [[#use2]]. Here `A` is a program-defined type
+following the Rule of Zero. Because all of its bases and members are warranted as
+trivially relocatable, and its move-constructor and destructor are both defaulted,
+the compiler concludes that `A` itself is trivially relocatable.
+```
+    #include <string>
+    #include <type_traits>
+
+    // Assume that the library vendor has taken care of this part.
+    static_assert(std::is_trivially_relocatable_v< std::string >);
+
+    struct A {
+        std::string s;
+        std::string operator()(std::string t) const { return s + t; }
+    };
+
+    static_assert(std::is_trivially_relocatable_v< A >);
+```
+
+The following sample, involving an implementation-defined closure type,
+also illustrates [[#use2]].
+```
+    #include <string>
+    #include <type_traits>
+
+    // Assume that the library vendor has taken care of this part.
+    static_assert(std::is_trivially_relocatable_v< std::string >);
+
+    auto a = [s = std::string("hello")](std::string t) {
+        return s + t;
+    };
+
+    static_assert(std::is_trivially_relocatable_v< decltype(a) >);
+```
+
+## Warranting that a user-defined relocation operation is equivalent to `memcpy` ## {#sample-opting-in}
+
+The following sample illustrates [[#use3]]. The rules proposed in this paper ensure
+that any type with non-trivial user-defined move and destructor operations will be
+considered non-trivially relocatable by default.
+```
+    #include <type_traits>
+
+    struct C {
+        const char *s = nullptr;
+        C(const char *s) : s(s) {}
+        C(C&& rhs) : s(rhs.s) { rhs.s = nullptr; }
+        ~C() { delete s; }
+    };
+
+    static_assert(not std::is_trivially_relocatable_v< C >);
+
+    struct D : C {};
+
+    static_assert(not std::is_trivially_relocatable_v< D >);
+```
+
+The programmer may apply the `[[trivially_relocatable]]` attribute to override the compiler's default
+behavior and warrant (under penalty of undefined behavior) that this type is in fact trivially relocatable.
+```
+    #include <type_traits>
+
+    struct [[trivially_relocatable]] E {
+        const char *s = nullptr;
+        E(const char *s) : s(s) {}
+        E(C&& rhs) : s(rhs.s) { rhs.s = nullptr; }
+        ~E() { delete s; }
+    };
+
+    static_assert(std::is_trivially_relocatable_v< E >);
+
+    struct F : E {};
+
+    static_assert(std::is_trivially_relocatable_v< F >);
+```
+
+
+## Reference implementation of `std::uninitialized_relocate` ## {#sample-uninit-relocate}
+
+Issue: there is no sample code here yet
+
+
+## Conditionally trivial relocation (`std::optional`) ## {#sample-conditional}
+
+Issue: there is no sample code here yet
+
 
 <pre class=biblio>
 {
-	"SV": {
-		"authors": [
-			"Microsoft"
-		],
-		"title": "CComPtr::operator& Operator",
-		"href": "https://msdn.microsoft.com/en-us/library/31k6d0k7.aspx",
-		"date": "2015"
-	},
-	"Best": {
-		"authors": [
-			"Arthur O'Dwyer"
-		],
-		"title": "The Best Type Traits C++ Doesn't Have (video)",
-		"href": "https://www.youtube.com/watch?v=MWBfmmg8-Yo",
-                "date": "April 2018"
-	},
-	"Bench": {
-		"authors": [
-			"Arthur O'Dwyer"
-		],
-		"title": "Benchmark code from \"The Best Type Traits C++ Doesn't Have\"",
-		"href": "https://github.com/Quuxplusone/from-scratch/blob/095b246d4dc9b88fbdbb6c38771866c0a25289db/cppnow2018/benchmark-relocatable.cc",
-                "date": "April 2018"
-	},
-	"Contra": {
-		"authors": [
-			"Arthur O'Dwyer"
-		],
-		"title": "_Contra_ built-in library types",
-		"href": "https://quuxplusone.github.io/blog/2018/04/15/built-in-library-types/",
-                "date": "April 2018"
-	},
-	"LWG2139": {
-		"authors": [
-			"Loïc Joly"
-		],
-		"title": "LWG 2139: What is a user-defined type?",
-		"href": "https://cplusplus.github.io/LWG/issue2139",
-                "date": "March 2012–June 2018"
-	},
-	"LWG3119": {
-		"authors": [
-			"Hubert Tong"
-		],
-		"title": "LWG 3119: Program-definedness of closure types",
-		"href": "https://cplusplus.github.io/LWG/issue3119",
-                "date": "June 2018—"
-	},
-	"N4750": {
-		"authors": [
-			"ISO/IEC JTC1/SC22/WG21 - The C++ Standards Committee",
-			"Richard Smith"
-		],
-		"title": "N4750: Working Draft, Standard for Programming Language C++",
-		"href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf",
-		"date": "May 2018"
-	},
-	"P1029R0": {
-		"authors": [
-			"Niall Douglas"
-		],
-		"title": "P1029R0: SG14 `[[move_relocates]]`",
-		"href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf",
-		"date": "May 2018"
-	},
-	"TCF": {
-		"authors": [
-			"Arthur O'Dwyer"
-		],
-		"title": "Trivially-constructible-from",
-		"href": "https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/",
-		"date": "July 2018"
-	},
-	"Wang": {
-		"authors": [
-			"Mingxin Wang"
-		],
-		"title": "Better Performance in Polymorphic Programming: Trivially Swappable",
-		"href": "https://groups.google.com/a/isocpp.org/d/msg/std-proposals/HGCHVSRwSMk/k7Ir-rmxBgAJ",
-		"date": "June 2018"
-	},
+  "Any": {
+    "authors": [
+      "Eric Fiselier"
+    ],
+    "title": "libc++ implementation of <code>std::any</code>",
+    "href": "https://github.com/llvm-mirror/libcxx/blob/8fdc491860efbccb65ab2f01ec25e13b024da538/include/any#L389-L394",
+    "date": "July 2016"
+  },
+  "SV": {
+    "authors": [
+      "Microsoft"
+    ],
+    "title": "CComPtr::operator& Operator",
+    "href": "https://msdn.microsoft.com/en-us/library/31k6d0k7.aspx",
+    "date": "2015"
+  },
+  "Best": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "The Best Type Traits C++ Doesn't Have (video)",
+    "href": "https://www.youtube.com/watch?v=MWBfmmg8-Yo",
+    "date": "April 2018"
+  },
+  "Bench": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "Benchmark code from \"The Best Type Traits C++ Doesn't Have\"",
+    "href": "https://github.com/Quuxplusone/from-scratch/blob/095b246d4dc9b88fbdbb6c38771866c0a25289db/cppnow2018/benchmark-relocatable.cc",
+    "date": "April 2018"
+  },
+  "Contra": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "_Contra_ built-in library types",
+    "href": "https://quuxplusone.github.io/blog/2018/04/15/built-in-library-types/",
+    "date": "April 2018"
+  },
+  "LWG2139": {
+    "authors": [
+      "Loïc Joly"
+    ],
+    "title": "LWG 2139: What is a user-defined type?",
+    "href": "https://cplusplus.github.io/LWG/issue2139",
+    "date": "March 2012–June 2018"
+  },
+  "LWG3119": {
+    "authors": [
+      "Hubert Tong"
+    ],
+    "title": "LWG 3119: Program-definedness of closure types",
+    "href": "https://cplusplus.github.io/LWG/issue3119",
+    "date": "June 2018—"
+  },
+  "N4750": {
+    "authors": [
+      "ISO/IEC JTC1/SC22/WG21 - The C++ Standards Committee",
+      "Richard Smith"
+    ],
+    "title": "N4750: Working Draft, Standard for Programming Language C++",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf",
+    "date": "May 2018"
+  },
+  "P1029R0": {
+    "authors": [
+      "Niall Douglas"
+    ],
+    "title": "P1029R0: SG14 `[[move_relocates]]`",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf",
+    "date": "May 2018"
+  },
+  "Sane": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "Thoughts on 'sanely move-assignable'",
+    "href": "https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/",
+    "date": "July 2018"
+  },
+  "TCF": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "Trivially-constructible-from",
+    "href": "https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/",
+    "date": "July 2018"
+  },
+  "Wang": {
+    "authors": [
+      "Mingxin Wang"
+    ],
+    "title": "Better Performance in Polymorphic Programming: Trivially Swappable",
+    "href": "https://groups.google.com/a/isocpp.org/d/msg/std-proposals/HGCHVSRwSMk/k7Ir-rmxBgAJ",
+    "date": "June 2018"
+  }
 }
 </pre>
