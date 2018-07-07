@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -559,6 +559,12 @@ Today vendors generally choose not to perform these optimizations.
 
 Thanks to Elias Kosunen and Niall Douglas for their feedback on early drafts of this paper.
 
+Thanks to Pablo Halpern for [[N4158]], to which this paper bears a striking and coincidental resemblance —
+including the meaning assigned to the word "trivial," and the library-algorithm approach to avoiding the
+problems with "lame duck objects" discussed in
+<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm#Alternative%20move%20designs">the final section</a>
+of [[N1377]].
+
 
 Appendix A: Straw polls requested {#polls}
 ==========
@@ -613,6 +619,9 @@ as proposed in this paper.</th>
 <th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
 
 <tr><th><small>A class should be able to warrant its own trivial relocatability as proposed in this paper, but via a contextual keyword rather than an attribute.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>To simplify [[#sample-conditional]], if an attribute with the semantics of `[[trivially_relocatable]]` is added, it should take a boolean argument.</th>
 <th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
 </table>
 
@@ -701,15 +710,154 @@ behavior and warrant (under penalty of undefined behavior) that this type is in 
 
 ## Reference implementation of `std::uninitialized_relocate` ## {#sample-uninit-relocate}
 
+<small>
 ```
 template<class InputIterator, class ForwardIterator>
-  ForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,
-                                     ForwardIterator result);
+ForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,
+                                       ForwardIterator result)
+{
+    using T = typename iterator_traits<ForwardIterator>::value_type;
+    using U = std::remove_ref_t<decltype(std::move(*first))>;
+    constexpr bool memcpyable = (std::is_same_v<T, U> && std::is_trivially_relocatable_v<T>);
+    constexpr bool both_contiguous = (std::is_pointer_v<InputIterator> && std::is_pointer_v<ForwardIterator>);
+
+    if constexpr (memcpyable && both_contiguous) {
+        std::size_t nbytes = (char *)last - (char *)first;
+        if (nbytes != 0) {
+            std::memmove(std::addressof(*result), std::addressof(*first), nbytes);
+        }
+    } else if constexpr (memcpyable) {
+        for (; first != last; (void)++result, ++first) {
+            std::memmove(std::addressof(*result), std::addressof(*first), sizeof (T));
+        }
+    } else {
+        for (; first != last; (void)++result, ++first) {
+            ::new (static_cast<void*>(std::addressof(*result))) T(std::move(*first));
+            std::destroy_at(std::addressof(*first));
+        }
+    }
+}
 ```
+</small>
 
-## Conditionally trivial relocation (`std::optional`) ## {#sample-conditional}
+The code in the first branch must use `memmove`, rather than `memcpy`, to preserve the
+formally specified behavior in the case that the source range overlaps the destination range.
 
-Issue: there is no sample code here yet
+The code in the second branch, which performs one `memmove` per element, probably
+doesn't have much of a performance benefit, and might be eliminated by library vendors.
+
+
+## Conditionally trivial relocation ## {#sample-conditional}
+
+We expect, but do not require, that `std::optional<T>` should be trivially relocatable
+if and only if `T` itself is trivially relocatable. We propose no dedicated syntax for conditional
+`[[trivially_relocatable]]`.
+
+The following abbreviated implementation shows how to achieve an `optional<T>` which
+has the same trivial-move-constructibility as `T`, the same trivial-destructibility
+as `T`, and the same trivial-relocatability as `T`.
+
+<small>
+```
+template<class T>
+class optional :
+    optional_a<T, is_trivially_relocatable<T>>
+{
+    using optional_a<T, is_trivially_relocatable<T>>::optional_a;
+};
+
+template<class T, bool R>
+class optional_a :
+    optional_b<T, is_trivially_destructible<T>, is_trivially_move_constructible<T>>
+{
+    using optional_b<T, is_trivially_destructible<T>,
+        is_trivially_move_constructible<T>>::optional_b;
+};
+
+template<class T>
+class [[trivially_relocatable]] optional_a<T, true> :
+    optional_b<T, is_trivially_destructible<T>, is_trivially_move_constructible<T>>
+{
+    using optional_b<T, is_trivially_destructible<T>,
+        is_trivially_move_constructible<T>>::optional_b;
+};
+
+template<class T, bool D, bool M>
+class optional_b {
+    union {
+        char dummy_;
+        T value_;
+    };
+    bool engaged_ = false;
+
+    optional_b() = default;
+    optional_b(inplace_t, Args&& args...) :
+        engaged_(true), value_(std::forward<Args>(args)...) {}
+    optional_b(optional_b&& rhs) {
+        if (rhs.engaged_) {
+            engaged_ = true;
+            ::new (std::addressof(value_)) T(std::move(rhs.value_));
+        }
+    }
+    ~optional_b() {
+        if (engaged_) value_.~T();
+    }
+};
+
+template<class T>
+class optional_b<T, false, true> {
+    union {
+        char dummy_;
+        T value_;
+    };
+    bool engaged_ = false;
+
+    optional_b() = default;
+    optional_b(inplace_t, Args&& args...) :
+        engaged_(true), value_(std::forward<Args>(args)...) {}
+    optional_b(optional_b&&) = default;
+    ~optional_b() {
+        if (engaged_) value_.~T();
+    }
+};
+
+template<class T>
+class optional_b<T, true, false> {
+    union {
+        char dummy_;
+        T value_;
+    };
+    bool engaged_ = false;
+
+    optional_b() = default;
+    optional_b(inplace_t, Args&& args...) :
+        engaged_(true), value_(std::forward<Args>(args)...) {}
+    optional_b(optional_b&& rhs) {
+        if (rhs.engaged_) {
+            engaged_ = true;
+            ::new (std::addressof(value_)) T(std::move(rhs.value_));
+        }
+    }
+    ~optional_b() = default;
+};
+
+template<class T>
+class optional_b<T, true, true> {
+    union {
+        char dummy_;
+        T value_;
+    };
+    bool engaged_ = false;
+
+    optional_b() = default;
+    optional_b(inplace_t, Args&& args...) :
+        engaged_(true), value_(std::forward<Args>(args)...) {}
+
+    optional_b(optional_b&&) = default;
+    ~optional_b() = default;
+};
+```
+</small>
 
 
 <pre class=biblio>
@@ -761,6 +909,24 @@ Issue: there is no sample code here yet
     "title": "LWG 3119: Program-definedness of closure types",
     "href": "https://cplusplus.github.io/LWG/issue3119",
     "date": "June 2018—"
+  },
+  "N1377": {
+    "authors": [
+      "Howard Hinnant",
+      "Peter Dimov",
+      "Dave Abrahams"
+    ],
+    "title": "N1377: A Proposal to Add Move Semantics Support to the C++ Language",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm",
+    "date": "September 2002"
+  },
+  "N4158": {
+    "authors": [
+      "Pablo Halpern"
+    ],
+    "title": "N4158: Destructive Move (Rev 1)",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf",
+    "date": "October 2014"
   },
   "N4750": {
     "authors": [
