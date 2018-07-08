@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 0
-!Draft Revision: 3
+!Draft Revision: 4
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -42,23 +42,21 @@ C++17 knows the verbs "move," "copy," "destroy," and "swap," where "swap" is a h
 composed of several lower-level operations. To this list we propose to add the verb "relocate,"
 which is a higher-level operation composed of exactly two lower-level operations.
 Given an object type `T` and memory addresses `src` and `dst`,
-the phrase "<dfn dfn-type="abstract-op">relocate</dfn> a `T` from `src` to `dst`" means no more and no
+the phrase "<b><i>relocate</i></b> a `T` from `src` to `dst`" means no more and no
 less than "*move-construct* `dst` from `src`, and then immediately
 *destroy* the object at `src`."
 
 Just as the verb "swap" produces the adjective "swappable," the verb "relocate" produces the adjective
 "relocatable." Any type which is both move-constructible and
-destructible is <dfn dfn-type="abstract-op">relocatable</dfn>. The notion can be modified by adverbs: we say that a type
-is <dfn dfn-type="abstract-op">nothrow relocatable</dfn> if its relocation operation is noexcept, and we say that a type
-is <dfn dfn-type="abstract-op">trivially relocatable</dfn> if its relocation operation is trivial (which, just like trivial move-construction
+destructible is <b><i>relocatable</i></b>. The notion can be modified by adverbs: we say that a type
+is <b><i>nothrow relocatable</i></b> if its relocation operation is noexcept, and we say that a type
+is <b><i>[$trivially relocatable$]</i></b> if its relocation operation is trivial (which, just like trivial move-construction
 and trivial copy-construction, means "the operation is tantamount to a `memcpy`").
 
 Almost all relocatable types are trivially relocatable: `std::unique_ptr<int>`,
 `std::vector<int>`, `std::string`, `std::any`. Non-trivially relocatable
 types exist but are rare: `boost::interprocess::offset_ptr<int>`, for example.
-
-Issue:
-Can we come up with a second realistic example of a non-trivially relocatable type?
+See [[#non-trivial-samples]].
 
 Arthur has established (see [[Bench]])
 that if standard library code had a reliable way of detecting "trivial relocatability," we could optimize
@@ -117,21 +115,10 @@ of a type `T`, so that they can reliably apply their (existing) optimizations.
 All we really need is to add *detection*, and then all the optimizations described above will naturally
 emerge without any further special effort by WG21.
 
-Today we can detect the trivial relocatability of several of these categories, via the following definition.
-We'll take this as our starting point.
+Library vendors today often (correctly) infer that any *trivially copyable* type is trivially relocatable.
+However, we would like to do even better. The following three use-cases are important for improving the
+performance of real programs:
 
-```c++
-    #include <type_traits>
-    template<class T>
-    struct is_trivially_relocatable : bool_constant<
-        is_trivially_move_constructible_v<T> and
-        is_trivially_destructible_v<T>
-    > {};
-
-    auto lam = [x=42]{};
-    static_assert(is_trivially_relocatable< int >::value);
-    static_assert(is_trivially_relocatable< decltype(lam) >::value);
-```
 
 ## Standard library types such as `std::string` ## {#use1}
 
@@ -312,11 +299,19 @@ that is, the current draft of the C++17 standard.
 
 ## Relocation operation ## {#wording-operation}
 
-Issue:
-there is no core wording here for the definition of "the relocation operation", namely, a move and a destroy;
-does that belong somewhere like <a href="http://eel.is/c++draft/definitions">[definitions]</a>? probably not,
-as it needs to be referenced from core
+Add a new section in <a href="http://eel.is/c++draft/definitions">[definitions]</a>:
 
+Issue: [definitions] is probably the wrong place for the core-language definition of "relocation operation"
+
+<small><blockquote>
+
+: <dfn dfn-type="abstract-op">relocation operation</dfn>
+
+:: the homogeneous binary operation performed on a range by `std::uninitialized_relocate`, consisting of a move-construction immediately followed by a destruction of the source object
+
+</blockquote></small>
+
+Issue: this definition of "relocation operation" is not good
 
 ## Algorithm `uninitialized_relocate` ## {#wording-uninit-relocate}
 
@@ -364,8 +359,45 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
 
 ## Trivially relocatable type ## {#wording-inheritance}
 
-Issue:
-there is no core wording here for what it means to be a "trivially relocatable type" (i.e. the inheritance rules)
+Issue: Where in the Standard should we place the definition of "trivially relocatable"?
+
+Add a new section somewhere:
+
+<small><blockquote>
+An object type `T` is a <dfn dfn-type="abstract-op">trivially relocatable</dfn> type if it is:
+
+  - a type which is move-constructible, trivially move-constructible, and trivially destructible, or
+
+  - a class type marked with the `[[trivially_relocatable]]` attribute, or
+
+  - a class type which:
+
+    - has either a defaulted, non-deleted move constructor or no move constructor and a defaulted, non-deleted copy constructor,
+
+    - has a defaulted, non-deleted destructor,
+
+    - either is final, or has a final destructor, or has a non-virtual destructor,
+
+    - has no virtual base classes,
+
+    - has no members which are not trivially relocatable, and
+
+    - has no base classes which are not trivially relocatable.
+
+[*Note:* For a trivially relocatable type, its [$relocation operation$] (such as the relocation operations
+performed by the library functions `std::swap` and `std::vector::resize`) is tantamount
+to a simple copy of the underlying bytes. *—end note*]
+
+[*Note:* It is intended that most standard library types be trivially relocatable types. *—end note*]
+
+</blockquote></small>
+
+Note: We could simplify the wording by removing the special case that treats a non-overrideable
+virtual destructor the same way as a non-virtual destructor. However, this would lead to the compiler's failing
+to identify certain (unrealistic) class types as trivially relocatable, when in fact it has enough
+information to infer that they *are* trivially relocatable in practice. This would leave room for a
+"better" implementation. I tentatively prefer to make the core concept as strong as possible, optimizing
+for maximum performance rather than simplicity of specification.
 
 
 ## `[[trivially_relocatable]]` attribute ## {#wording-attribute}
@@ -860,6 +892,104 @@ class optional_b<T, true, true> {
 </small>
 
 
+Appendix C: Examples of non-trivially relocatable class types {#non-trivial-samples}
+=============================================================
+
+## Class contains pointer to self ## {#non-trivial-sample-string}
+
+As far as I know, no library vendor actually ships a `std::string` that looks like this,
+but it is not entirely far-fetched to imagine a small-buffer optimization that
+would be implemented this way. The same principle applies to any small-buffer-optimized
+class.
+
+<small>
+```
+struct string {
+    char *data_ = sso();
+    size_t size_ = 0;
+    size_t capacity_ = 0;
+
+    char *sso() const { return (char*)&capacity_; }
+    size_t size_of_sso() const { return sizeof(*this) - offsetof(string, capacity_) - 1; }
+    const char *data() const { return data_; }
+
+    string() = default;
+    string(const char *s) : size_(strlen(s)) {
+        if (size_ < size_of_sso()) {
+            strcpy(sso(), s);
+        } else {
+            capacity_ = size_;
+            data_ = strdup(s);
+        }
+    }
+    string(string&& s) : size_(s.size_) {
+        memcpy(this, &s, sizeof(*this));
+        if (s.data_ == s.sso())
+            data_ = sso();
+        else
+            s.data_ = nullptr;
+    }
+    ~string() {
+        if (data_ != sso())
+            free(data_);
+    }
+};
+```
+</small>
+
+
+## Class invariant depends on `this` ## {#non-trivial-sample-offset-ptr}
+
+The `offset_ptr` provided by [[Boost.Interprocess]] is an example of this category.
+
+<small>
+```
+struct offset_ptr {
+    uintptr_t value_;
+
+    uintptr_t here() const { return uintptr_t(this); }
+    uintptr_t distance_to(void *p) const { return uintptr_t(p) - here(); }
+    void *get() const { return (void*)(here() + value_); }
+
+    offset_ptr() : value_(distance_to(nullptr)) {}
+    offset_ptr(void *p) : value_(distance_to(p)) {}
+    offset_ptr(const offset_ptr& rhs) : value_(distance_to(rhs.get())) {}
+    offset_ptr& operator=(const offset_ptr& rhs) {
+        value_ = distance_to(rhs.get());
+        return *this;
+    }
+    ~offset_ptr() = default;
+};
+```
+</small>
+
+
+## Program invariant depends on `this` ## {#non-trivial-sample-registry}
+
+This example was suggested by Mingxin Wang.
+In the following snippet, `struct Widget` is relocatable, but not
+trivially relocatable, because the relocation operation of destroying a `Widget` at point A
+and constructing a new `Widget` at point B has behavior that is observably different
+from a simple `memcpy`.
+
+<small>
+```
+std::set<void *> registry;
+
+struct registered_object {
+    registered_object() { registry.insert(this); }
+    registered_object(registered_object&&) = default;
+    registered_object(const registered_object&) = default;
+    registered_object& operator=(registered_object&&) = default;
+    registered_object& operator=(const registered_object&) = default;
+    ~registered_object() { registry.erase(this); }
+};
+
+struct Widget : registered_object {};
+```
+</small>
+
+
 <pre class=biblio>
 {
   "Any": {
@@ -885,6 +1015,14 @@ class optional_b<T, true, true> {
     "title": "Benchmark code from \"The Best Type Traits C++ Doesn't Have\"",
     "href": "https://github.com/Quuxplusone/from-scratch/blob/095b246d/cppnow2018/benchmark-relocatable.cc",
     "date": "April 2018"
+  },
+  "Boost.Interprocess": {
+    "authors": [
+      "Ion Gaztañaga"
+    ],
+    "title": "Mapping Address Independent Pointer: offset_ptr",
+    "href": "https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html",
+    "date": "2005"
   },
   "Contra": {
     "authors": [
