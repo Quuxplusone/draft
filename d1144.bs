@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 0
-!Draft Revision: 4
+!Draft Revision: 5
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -138,7 +138,7 @@ The programmer doesn't have to learn anything new, so far.
 
 ## Program-defined types with defaulted special members ## {#use2}
 
-Note: The term "program-defined types" is defined in [[LWG2139]] and [[LWG3119]].
+Note: The term "program-defined types" is defined in [[!LWG2139]] and [[!LWG3119]].
 
 In order to optimize the SBO `std::function` in any meaningful sense,
 we must come up with a way to achieve
@@ -293,7 +293,7 @@ trivially relocatable class is shown in [[#sample-conditional]].
 
 # Proposed wording for C++20 # {#wording}
 
-The wording in this section is relative to [[N4750|WG21 draft N4750]],
+The wording in this section is relative to [[!N4750|WG21 draft N4750]],
 that is, the current draft of the C++17 standard.
 
 
@@ -364,13 +364,13 @@ Issue: Where in the Standard should we place the definition of "trivially reloca
 Add a new section somewhere:
 
 <small><blockquote>
-An object type `T` is a <dfn dfn-type="abstract-op">trivially relocatable</dfn> type if it is:
+A move-constructible, destructible object type `T` is a <dfn dfn-type="abstract-op">trivially relocatable</dfn> type if it is:
 
-  - a type which is move-constructible, trivially move-constructible, and trivially destructible, or
+  - a trivially copyable type, or
 
-  - a class type marked with the `[[trivially_relocatable]]` attribute, or
+  - a (possibly cv-qualified) class type marked with the `[[trivially_relocatable]]` attribute, or
 
-  - a class type which:
+  - a (possibly cv-qualified) class type which:
 
     - has either a defaulted, non-deleted move constructor or no move constructor and a defaulted, non-deleted copy constructor,
 
@@ -380,11 +380,13 @@ An object type `T` is a <dfn dfn-type="abstract-op">trivially relocatable</dfn> 
 
     - has no virtual base classes,
 
-    - has no members which are not trivially relocatable, and
+    - has no `mutable` members,
 
-    - has no base classes which are not trivially relocatable.
+    - all of whose members are either of reference type or of trivially relocatable type, and
 
-[*Note:* For a trivially relocatable type, its [$relocation operation$] (such as the relocation operations
+    - all of whose base classes are trivially relocatable.
+
+[*Note:* For a trivially relocatable type, the [$relocation operation$] (such as the relocation operations
 performed by the library functions `std::swap` and `std::vector::resize`) is tantamount
 to a simple copy of the underlying bytes. *—end note*]
 
@@ -398,6 +400,14 @@ to identify certain (unrealistic) class types as trivially relocatable, when in 
 information to infer that they *are* trivially relocatable in practice. This would leave room for a
 "better" implementation. I tentatively prefer to make the core concept as strong as possible, optimizing
 for maximum performance rather than simplicity of specification.
+
+Note: There is no special treatment for `volatile` subobjects. Using `memmove` on `volatile` subobjects
+can result in tearing of reads and writes. The resolutions of [[!CWG496]] and [[!CWG1746]] aimed to evict
+`volatile` objects and subobjects from the set of "trivially copyable types," but these changes were reverted
+in the resolution of [[!CWG2094]] (2016). As of C++17, bytewise copying of `volatile` subobjects is permitted
+by [[!basic.types]].
+
+Issue: Arthur is not sure what to do about `mutable` members, so they are disallowed for now.
 
 
 ## `[[trivially_relocatable]]` attribute ## {#wording-attribute}
@@ -443,7 +453,7 @@ Add new entries to Table 46 in <a href="http://eel.is/c++draft/meta.unary.prop">
 </tr>
 <tr>
 <td>`template<class T> struct is_trivially_relocatable;`</td>
-<td>`T` is a trivially relocatable type.</td>
+<td>`T` is a [$trivially relocatable$] type.</td>
 <td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
 </tr>
 </table>
@@ -504,6 +514,8 @@ So, should we add a heterogeneous `is_relocatable_from`?
 Notice that `uninitialized_copy` and `uninitialized_move`
 are already heterogeneous.
 Here is what a heterogeneous `uninitialized_relocate` would look like.
+
+<small>
 ```c++
 template<class FwdIt, class OutIt>
 void uninitialized_relocate(FwdIt first, FwdIt last, OutIt d_first) {
@@ -533,6 +545,8 @@ void uninitialized_relocate(FwdIt first, FwdIt last, OutIt d_first) {
     return d_first;
 }
 ```
+</small>
+
 This implementation could be used to quickly relocate an array of
 `int*` into an array of `unique_ptr<int>`
 (but not vice versa). It could also be used to quickly relocate an array of
@@ -548,6 +562,8 @@ Let's leave that problem alone for a few years and see what develops.
 
 We could conceivably provide the detection trait `is_trivially_relocatable_from` today,
 with deliberately curtailed semantics, e.g.:
+
+<small>
 ```c++
     template<class T, class U>
     struct is_trivially_relocatable_from : bool_constant<
@@ -559,8 +575,12 @@ with deliberately curtailed semantics, e.g.:
     template<class T, class U>
     struct is_trivially_relocatable_from<T, U&&> : is_trivially_relocatable_from<T, U> {};
 ```
+</small>
+
 plus permission for vendors to extend the trait via partial specializations on
 a QoI basis:
+
+<small>
 ```c++
     template<class T>
     struct is_trivially_relocatable_from<unique_ptr<T>, T*> : true_type {};
@@ -569,6 +589,8 @@ a QoI basis:
     struct is_trivially_relocatable_from<int, unsigned> : true_type {};
     // and so on
 ```
+</small>
+
 However, if we do this, we may soon find that programmers are adding specializations
 of `is_trivially_relocatable_from` to their own programs, because they find it
 makes their code run faster. It will become a de-facto customization point, and we will
@@ -651,6 +673,9 @@ as proposed in this paper.</th>
 <th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
 
 <tr><th><small>A class should be able to warrant its own trivial relocatability as proposed in this paper, but via a contextual keyword rather than an attribute.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+<tr><th><small>Trivial relocatability should be assumed by default. Classes such as those in [[#non-trivial-samples|Appendix C]] should indicate their non-trivial relocatability via an opt-in mechanism.</th>
 <th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
 
 <tr><th><small>To simplify [[#sample-conditional]], if an attribute with the semantics of `[[trivially_relocatable]]` is added, it should take a boolean argument.</th>
@@ -897,40 +922,39 @@ Appendix C: Examples of non-trivially relocatable class types {#non-trivial-samp
 
 ## Class contains pointer to self ## {#non-trivial-sample-string}
 
-As far as I know, no library vendor actually ships a `std::string` that looks like this,
-but it is not entirely far-fetched to imagine a small-buffer optimization that
-would be implemented this way. The same principle applies to any small-buffer-optimized
-class.
+This fictional `short_string` illustrates a mechanism that can apply
+to any small-buffer-optimized class. [[Function|libc++'s std::function]]
+uses this mechanism (on a 24-byte buffer) and is thus not trivially relocatable.
+
+However, different mechanisms for small-buffer optimization exist.
+[[Any|libc++'s std::any]] also achieves small-buffer optimization
+on a 24-byte buffer, without sacrificing trivial relocatability.
 
 <small>
 ```
-struct string {
-    char *data_ = sso();
+struct short_string {
+    char *data_ = buffer_;
     size_t size_ = 0;
-    size_t capacity_ = 0;
+    char buffer_[8] = {};
 
-    char *sso() const { return (char*)&capacity_; }
-    size_t size_of_sso() const { return sizeof(*this) - offsetof(string, capacity_) - 1; }
     const char *data() const { return data_; }
 
-    string() = default;
-    string(const char *s) : size_(strlen(s)) {
-        if (size_ < size_of_sso()) {
-            strcpy(sso(), s);
-        } else {
-            capacity_ = size_;
+    short_string() = default;
+    short_string(const char *s) : size_(strlen(s)) {
+        if (size_ < sizeof buffer_)
+            strcpy(buffer_, s);
+        else
             data_ = strdup(s);
-        }
     }
-    string(string&& s) : size_(s.size_) {
+    short_string(short_string&& s) {
         memcpy(this, &s, sizeof(*this));
-        if (s.data_ == s.sso())
-            data_ = sso();
+        if (s.data_ == s.buffer_)
+            data_ = buffer_;
         else
             s.data_ = nullptr;
     }
-    ~string() {
-        if (data_ != sso())
+    ~short_string() {
+        if (data_ != buffer_)
             free(data_);
     }
 };
@@ -1000,6 +1024,11 @@ struct Widget : registered_object {};
     "href": "https://github.com/llvm-mirror/libcxx/blob/8fdc4918/include/any#L389-L394",
     "date": "July 2016"
   },
+  "basic.types": {
+    "title": "N4750, [basic.types] clauses 2, 3, and 9",
+    "href": "http://eel.is/c++draft/basic.types#2",
+    "date": "May 2018"
+  },
   "Best": {
     "authors": [
       "Arthur O'Dwyer"
@@ -1032,11 +1061,42 @@ struct Widget : registered_object {};
     "href": "https://quuxplusone.github.io/blog/2018/04/15/built-in-library-types/",
     "date": "April 2018"
   },
+  "CWG496": {
+    "authors": [
+      "John Maddock"
+    ],
+    "title": "Is a volatile-qualified type really a POD?",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496",
+    "date": "December 2004–October 2012"
+  },
+  "CWG1746": {
+    "authors": [
+      "Walter Brown"
+    ],
+    "title": "Are volatile scalar types trivially copyable?",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746",
+    "date": "September 2013–January 2014"
+  },
+  "CWG2094": {
+    "authors": [
+      "Daveed Vandevoorde"
+    ],
+    "title": "Trivial copy/move constructor for class with volatile member",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094",
+    "date": "March 2015–June 2016"
+  },
+  "Function": {
+    "authors": [
+      "Howard Hinnant et al"
+    ],
+    "title": "libc++ implementation of std::function",
+    "href": "https://github.com/llvm-mirror/libcxx/blob/4e7ffcaa/include/functional#L1719-L1734"
+  },
   "LWG2139": {
     "authors": [
       "Loïc Joly"
     ],
-    "title": "LWG 2139: What is a user-defined type?",
+    "title": "What is a user-defined type?",
     "href": "https://cplusplus.github.io/LWG/issue2139",
     "date": "March 2012–June 2018"
   },
@@ -1044,7 +1104,7 @@ struct Widget : registered_object {};
     "authors": [
       "Hubert Tong"
     ],
-    "title": "LWG 3119: Program-definedness of closure types",
+    "title": "Program-definedness of closure types",
     "href": "https://cplusplus.github.io/LWG/issue3119",
     "date": "June 2018—"
   },

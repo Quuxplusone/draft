@@ -1494,7 +1494,7 @@ pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>4
+     <dd>5
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs</a>
      <dt>Current:
@@ -1572,6 +1572,7 @@ Finally, we provide a portable way for any user-defined type (such as <code clas
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
+      <li><a href="#normative"><span class="secno"></span> <span class="content">Normative References</span></a>
       <li><a href="#informative"><span class="secno"></span> <span class="content">Informative References</span></a>
      </ol>
     <li><a href="#issues-index"><span class="secno"></span> <span class="content">Issues Index</span></a>
@@ -1821,7 +1822,7 @@ that is, the current draft of the C++17 standard.</p>
    <p class="issue" id="issue-ffbbd33c"><a class="self-link" href="#issue-ffbbd33c"></a> Where in the Standard should we place the definition of "trivially relocatable"?</p>
    <p>Add a new section somewhere:</p>
    <p><small></small></p>
-   <blockquote><small> An object type <code class="highlight"><span class="n">T</span></code> is a <dfn class="dfn-paneled" data-dfn-type="abstract-op" data-export="" id="abstract-opdef-trivially-relocatable">trivially relocatable</dfn> type if it is:<p></p> <ul><li data-md=""><p>a type which is move-constructible, trivially move-constructible, and trivially destructible, or</p> </li><li data-md=""><p>a class type marked with the <code class="highlight"><span class="p">[[</span><span class="n">trivially_relocatable</span><span class="p">]]</span></code> attribute, or</p> </li><li data-md=""><p>a class type which:</p> <ul><li data-md=""><p>has either a defaulted, non-deleted move constructor or no move constructor and a defaulted, non-deleted copy constructor,</p> </li><li data-md=""><p>has a defaulted, non-deleted destructor,</p> </li><li data-md=""><p>either is final, or has a final destructor, or has a non-virtual destructor,</p> </li><li data-md=""><p>has no virtual base classes,</p> </li><li data-md=""><p>has no members which are not trivially relocatable, and</p> </li><li data-md=""><p>has no base classes which are not trivially relocatable.</p> </li></ul></li></ul> <p>[<em>Note:</em> For a trivially relocatable type, its <a data-link-type="abstract-op" href="#abstract-opdef-relocation-operation" id="ref-for-abstract-opdef-relocation-operation">relocation operation</a> (such as the relocation operations
+   <blockquote><small> A move-constructible, destructible object type <code class="highlight"><span class="n">T</span></code> is a <dfn class="dfn-paneled" data-dfn-type="abstract-op" data-export="" id="abstract-opdef-trivially-relocatable">trivially relocatable</dfn> type if it is:<p></p> <ul><li data-md=""><p>a trivially copyable type, or</p> </li><li data-md=""><p>a (possibly cv-qualified) class type marked with the <code class="highlight"><span class="p">[[</span><span class="n">trivially_relocatable</span><span class="p">]]</span></code> attribute, or</p> </li><li data-md=""><p>a (possibly cv-qualified) class type which:</p> <ul><li data-md=""><p>has either a defaulted, non-deleted move constructor or no move constructor and a defaulted, non-deleted copy constructor,</p> </li><li data-md=""><p>has a defaulted, non-deleted destructor,</p> </li><li data-md=""><p>either is final, or has a final destructor, or has a non-virtual destructor,</p> </li><li data-md=""><p>has no virtual base classes,</p> </li><li data-md=""><p>has no <code class="highlight"><span class="k">mutable</span></code> members,</p> </li><li data-md=""><p>all of whose members are either of reference type or of trivially relocatable type, and</p> </li><li data-md=""><p>all of whose base classes are trivially relocatable.</p> </li></ul></li></ul> <p>[<em>Note:</em> For a trivially relocatable type, the <a data-link-type="abstract-op" href="#abstract-opdef-relocation-operation" id="ref-for-abstract-opdef-relocation-operation">relocation operation</a> (such as the relocation operations
 performed by the library functions <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">swap</span></code> and <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">::</span><span class="n">resize</span></code>) is tantamount
 to a simple copy of the underlying bytes. <em>—end note</em>]</p> <p>[<em>Note:</em> It is intended that most standard library types be trivially relocatable types. <em>—end note</em>]</p> </small></blockquote>
    <p class="note" role="note"><span>Note:</span> We could simplify the wording by removing the special case that treats a non-overrideable
@@ -1830,6 +1831,11 @@ to identify certain (unrealistic) class types as trivially relocatable, when in 
 information to infer that they <em>are</em> trivially relocatable in practice. This would leave room for a
 "better" implementation. I tentatively prefer to make the core concept as strong as possible, optimizing
 for maximum performance rather than simplicity of specification.</p>
+   <p class="note" role="note"><span>Note:</span> There is no special treatment for <code class="highlight"><span class="k">volatile</span></code> subobjects. Using <code class="highlight"><span class="n">memmove</span></code> on <code class="highlight"><span class="k">volatile</span></code> subobjects
+can result in tearing of reads and writes. The resolutions of <a data-link-type="biblio" href="#biblio-cwg496">[CWG496]</a> and <a data-link-type="biblio" href="#biblio-cwg1746">[CWG1746]</a> aimed to evict <code class="highlight"><span class="k">volatile</span></code> objects and subobjects from the set of "trivially copyable types," but these changes were reverted
+in the resolution of <a data-link-type="biblio" href="#biblio-cwg2094">[CWG2094]</a> (2016). As of C++17, bytewise copying of <code class="highlight"><span class="k">volatile</span></code> subobjects is permitted
+by <a data-link-type="biblio" href="#biblio-basictypes">[basic.types]</a>.</p>
+   <p class="issue" id="issue-96e4965a"><a class="self-link" href="#issue-96e4965a"></a> Arthur is not sure what to do about <code class="highlight"><span class="k">mutable</span></code> members, so they are disallowed for now.</p>
    <h3 class="heading settled" data-level="4.5" id="wording-attribute"><span class="secno">4.5. </span><span class="content"><code class="highlight"><span class="p">[[</span><span class="n">trivially_relocatable</span><span class="p">]]</span></code> attribute</span><a class="self-link" href="#wording-attribute"></a></h3>
    <p>Add a new section after <a href="http://eel.is/c++draft/dcl.attr.nouniqueaddr">[dcl.attr.nouniqueattr]</a>:</p>
    <p><small></small></p>
@@ -1849,7 +1855,7 @@ observable side-effects of relocation other than a copy of the underlying bytes,
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <table> <tbody><tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr> <tr> <td><code class="highlight"><span class="k">template</span><span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">></span> <span class="k">struct</span> <span class="n">is_relocatable</span><span class="p">;</span></code></td> <td><code class="highlight"><span class="n">is_move_constructible_v</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code> is <code class="highlight">true</code> and <code class="highlight"><span class="n">is_destructible_v</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code> is <code class="highlight">true</code></td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><span class="kt">void</span></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><span class="k">template</span><span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">></span> <span class="k">struct</span> <span class="n">is_nothrow_relocatable</span><span class="p">;</span></code></td> <td><code class="highlight"><span class="n">is_relocatable_v</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code> is <code class="highlight">true</code> and both the indicated move-constructor and the destructor are known not to throw any exceptions.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><span class="kt">void</span></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><span class="k">template</span><span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">></span> <span class="k">struct</span> <span class="n">is_trivially_relocatable</span><span class="p">;</span></code></td> <td><code class="highlight"><span class="n">T</span></code> is a trivially relocatable type.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><span class="kt">void</span></code>, or an array of unknown bound.</td> </tr> </tbody></table> </small>
+    <small> <table> <tbody><tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr> <tr> <td><code class="highlight"><span class="k">template</span><span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">></span> <span class="k">struct</span> <span class="n">is_relocatable</span><span class="p">;</span></code></td> <td><code class="highlight"><span class="n">is_move_constructible_v</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code> is <code class="highlight">true</code> and <code class="highlight"><span class="n">is_destructible_v</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code> is <code class="highlight">true</code></td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><span class="kt">void</span></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><span class="k">template</span><span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">></span> <span class="k">struct</span> <span class="n">is_nothrow_relocatable</span><span class="p">;</span></code></td> <td><code class="highlight"><span class="n">is_relocatable_v</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code> is <code class="highlight">true</code> and both the indicated move-constructor and the destructor are known not to throw any exceptions.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><span class="kt">void</span></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><span class="k">template</span><span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">></span> <span class="k">struct</span> <span class="n">is_trivially_relocatable</span><span class="p">;</span></code></td> <td><code class="highlight"><span class="n">T</span></code> is a <a data-link-type="abstract-op" href="#abstract-opdef-trivially-relocatable" id="ref-for-abstract-opdef-trivially-relocatable①">trivially relocatable</a> type.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><span class="kt">void</span></code>, or an array of unknown bound.</td> </tr> </tbody></table> </small>
    </blockquote>
    <h3 class="heading settled" data-level="4.7" id="wording-concept"><span class="secno">4.7. </span><span class="content"><code class="highlight"><span class="n">Relocatable</span></code> concept</span><a class="self-link" href="#wording-concept"></a></h3>
    <p>Add a new section after <a href="http://eel.is/c++draft/concept.moveconstructible">[concept.moveconstructible]</a>:</p>
@@ -1887,7 +1893,8 @@ and we have the precedent of a heterogeneous <code class="highlight"><span class
 So, should we add a heterogeneous <code class="highlight"><span class="n">is_relocatable_from</span></code>?</p>
    <p>Notice that <code class="highlight"><span class="n">uninitialized_copy</span></code> and <code class="highlight"><span class="n">uninitialized_move</span></code> are already heterogeneous.
 Here is what a heterogeneous <code class="highlight"><span class="n">uninitialized_relocate</span></code> would look like.</p>
-<pre class="language-c++ highlight"><span class="n">template</span><span class="o">&lt;</span><span class="n">class</span> <span class="n">FwdIt</span><span class="p">,</span> <span class="n">class</span> <span class="n">OutIt</span><span class="o">></span>
+   <p><small></small></p>
+   <small> <pre class="language-c++ highlight"><span class="n">template</span><span class="o">&lt;</span><span class="n">class</span> <span class="n">FwdIt</span><span class="p">,</span> <span class="n">class</span> <span class="n">OutIt</span><span class="o">></span>
 <span class="kt">void</span> <span class="n">uninitialized_relocate</span><span class="p">(</span><span class="n">FwdIt</span> <span class="n">first</span><span class="p">,</span> <span class="n">FwdIt</span> <span class="n">last</span><span class="p">,</span> <span class="n">OutIt</span> <span class="n">d_first</span><span class="p">)</span> <span class="p">{</span>
     <span class="n">using</span> <span class="n">SrcT</span> <span class="o">=</span> <span class="n">remove_cvref_t</span><span class="o">&lt;</span><span class="n">decltype</span><span class="p">(</span><span class="o">*</span><span class="n">first</span><span class="p">)</span><span class="o">></span><span class="p">;</span>
     <span class="n">using</span> <span class="n">DstT</span> <span class="o">=</span> <span class="n">remove_cvref_t</span><span class="o">&lt;</span><span class="n">decltype</span><span class="p">(</span><span class="o">*</span><span class="n">d_first</span><span class="p">)</span><span class="o">></span><span class="p">;</span>
@@ -1914,17 +1921,18 @@ Here is what a heterogeneous <code class="highlight"><span class="n">uninitializ
     <span class="p">}</span>
     <span class="k">return</span> <span class="n">d_first</span><span class="p">;</span>
 <span class="p">}</span>
-</pre>
-   This implementation could be used to quickly relocate an array of <code class="highlight"><span class="kt">int</span><span class="o">*</span></code> into an array of <code class="highlight"><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">></span></code> (but not vice versa). It could also be used to quickly relocate an array of <code class="highlight"><span class="n">T</span></code> into an array of <code class="highlight"><span class="n">tombstone</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code>. (The concept of "tombstone optional"
+</pre></small> 
+   <p>This implementation could be used to quickly relocate an array of <code class="highlight"><span class="kt">int</span><span class="o">*</span></code> into an array of <code class="highlight"><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">></span></code> (but not vice versa). It could also be used to quickly relocate an array of <code class="highlight"><span class="n">T</span></code> into an array of <code class="highlight"><span class="n">tombstone</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span></code>. (The concept of "tombstone optional"
 is described in <a data-link-type="biblio" href="#biblio-best">[Best]</a>.)
-All we’d need is for somebody to set the value of <code class="highlight"><span class="n">is_trivially_relocatable_from</span></code> appropriately for each pair of types in the program. 
+All we’d need is for somebody to set the value of <code class="highlight"><span class="n">is_trivially_relocatable_from</span></code> appropriately for each pair of types in the program.</p>
    <p>I think this is a very intriguing idea. The detection syntax (<code class="highlight"><span class="n">is_trivially_relocatable_from</span></code>)
 is fairly obvious. But I don’t see what the opt-in syntax
 would look like on a program-defined class such as <code class="highlight"><span class="n">tombstone</span><span class="o">::</span><span class="n">optional</span></code>.
 Let’s leave that problem alone for a few years and see what develops.</p>
    <p>We could conceivably provide the detection trait <code class="highlight"><span class="n">is_trivially_relocatable_from</span></code> today,
 with deliberately curtailed semantics, e.g.:</p>
-<pre class="language-c++ highlight">    <span class="n">template</span><span class="o">&lt;</span><span class="n">class</span> <span class="n">T</span><span class="p">,</span> <span class="n">class</span> <span class="n">U</span><span class="o">></span>
+   <p><small></small></p>
+   <small> <pre class="language-c++ highlight">    <span class="n">template</span><span class="o">&lt;</span><span class="n">class</span> <span class="n">T</span><span class="p">,</span> <span class="n">class</span> <span class="n">U</span><span class="o">></span>
     <span class="k">struct</span> <span class="nl">is_trivially_relocatable_from</span> <span class="p">:</span> <span class="n">bool_constant</span><span class="o">&lt;</span>
         <span class="n">is_trivially_relocatable_v</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span> <span class="n">and</span>
         <span class="n">is_same_v</span><span class="o">&lt;</span><span class="n">U</span><span class="p">,</span> <span class="n">remove_cvref_t</span><span class="o">&lt;</span><span class="n">T</span><span class="o">>></span>
@@ -1933,20 +1941,21 @@ with deliberately curtailed semantics, e.g.:</p>
     <span class="k">struct</span> <span class="n">is_trivially_relocatable_from</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span> <span class="n">U</span><span class="o">&amp;></span> <span class="o">:</span> <span class="n">is_trivially_relocatable_from</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span> <span class="n">U</span><span class="o">></span> <span class="p">{};</span>
     <span class="n">template</span><span class="o">&lt;</span><span class="n">class</span> <span class="n">T</span><span class="p">,</span> <span class="n">class</span> <span class="n">U</span><span class="o">></span>
     <span class="k">struct</span> <span class="n">is_trivially_relocatable_from</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span> <span class="n">U</span><span class="o">&amp;&amp;></span> <span class="o">:</span> <span class="n">is_trivially_relocatable_from</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span> <span class="n">U</span><span class="o">></span> <span class="p">{};</span>
-</pre>
-   plus permission for vendors to extend the trait via partial specializations on
-a QoI basis: 
-<pre class="language-c++ highlight">    <span class="n">template</span><span class="o">&lt;</span><span class="n">class</span> <span class="n">T</span><span class="o">></span>
+</pre></small> 
+   <p>plus permission for vendors to extend the trait via partial specializations on
+a QoI basis:</p>
+   <p><small></small></p>
+   <small> <pre class="language-c++ highlight">    <span class="n">template</span><span class="o">&lt;</span><span class="n">class</span> <span class="n">T</span><span class="o">></span>
     <span class="k">struct</span> <span class="n">is_trivially_relocatable_from</span><span class="o">&lt;</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">T</span><span class="o">></span><span class="p">,</span> <span class="n">T</span><span class="o">*></span> <span class="o">:</span> <span class="n">true_type</span> <span class="p">{};</span>
     <span class="n">template</span><span class="o">&lt;</span><span class="n">class</span> <span class="n">T</span><span class="o">></span>
     <span class="k">struct</span> <span class="n">is_trivially_relocatable_from</span><span class="o">&lt;</span><span class="k">const</span> <span class="n">T</span><span class="o">*</span><span class="p">,</span> <span class="n">T</span><span class="o">*></span> <span class="o">:</span> <span class="n">true_type</span> <span class="p">{};</span>
     <span class="k">struct</span> <span class="n">is_trivially_relocatable_from</span><span class="o">&lt;</span><span class="kt">int</span><span class="p">,</span> <span class="kt">unsigned</span><span class="o">></span> <span class="o">:</span> <span class="n">true_type</span> <span class="p">{};</span>
     <span class="c1">// and so on</span>
-</pre>
-   However, if we do this, we may soon find that programmers are adding specializations
+</pre></small> 
+   <p>However, if we do this, we may soon find that programmers are adding specializations
 of <code class="highlight"><span class="n">is_trivially_relocatable_from</span></code> to their own programs, because they find it
 makes their code run faster. It will become a de-facto customization point, and we will
-never be able to "fix it right" for fear of breaking programmers' existing code. 
+never be able to "fix it right" for fear of breaking programmers' existing code.</p>
    <p>Therefore, I believe that we should <em>not</em> pursue "heterogeneous" relocation
 operations at the present time.</p>
    <p>Note that vendors are already free to optimize heterogeneous operations inside
@@ -2068,6 +2077,13 @@ as proposed in this paper.</small>
       <th>_
      <tr>
       <th><small>A class should be able to warrant its own trivial relocatability as proposed in this paper, but via a contextual keyword rather than an attribute.</small>
+      <th>_
+      <th>_
+      <th>_
+      <th>_
+      <th>_
+     <tr>
+      <th><small>Trivial relocatability should be assumed by default. Classes such as those in <a href="#non-trivial-samples">Appendix C</a> should indicate their non-trivial relocatability via an opt-in mechanism.</small>
       <th>_
       <th>_
       <th>_
@@ -2289,38 +2305,34 @@ as <code class="highlight"><span class="n">T</span></code>, and the same trivial
 </pre></small> 
    <h2 class="heading settled" id="non-trivial-samples"><span class="content">Appendix C: Examples of non-trivially relocatable class types</span><a class="self-link" href="#non-trivial-samples"></a></h2>
    <h3 class="heading settled" id="non-trivial-sample-string"><span class="content">Class contains pointer to self</span><a class="self-link" href="#non-trivial-sample-string"></a></h3>
-   <p>As far as I know, no library vendor actually ships a <code class="highlight"><span class="n">std</span><span class="o">::</span><span class="n">string</span></code> that looks like this,
-but it is not entirely far-fetched to imagine a small-buffer optimization that
-would be implemented this way. The same principle applies to any small-buffer-optimized
-class.</p>
+   <p>This fictional <code class="highlight"><span class="n">short_string</span></code> illustrates a mechanism that can apply
+to any small-buffer-optimized class. <a data-link-type="biblio" href="#biblio-function">libc++'s std::function</a> uses this mechanism (on a 24-byte buffer) and is thus not trivially relocatable.</p>
+   <p>However, different mechanisms for small-buffer optimization exist. <a data-link-type="biblio" href="#biblio-any">libc++'s std::any</a> also achieves small-buffer optimization
+on a 24-byte buffer, without sacrificing trivial relocatability.</p>
    <p><small></small></p>
-   <small> <pre class="highlight"><span class="k">struct</span> <span class="n">string</span> <span class="p">{</span>
-    <span class="kt">char</span> <span class="o">*</span><span class="n">data_</span> <span class="o">=</span> <span class="n">sso</span><span class="p">();</span>
+   <small> <pre class="highlight"><span class="k">struct</span> <span class="n">short_string</span> <span class="p">{</span>
+    <span class="kt">char</span> <span class="o">*</span><span class="n">data_</span> <span class="o">=</span> <span class="n">buffer_</span><span class="p">;</span>
     <span class="kt">size_t</span> <span class="n">size_</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-    <span class="kt">size_t</span> <span class="n">capacity_</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="kt">char</span> <span class="n">buffer_</span><span class="p">[</span><span class="mi">8</span><span class="p">]</span> <span class="o">=</span> <span class="p">{};</span>
 
-    <span class="kt">char</span> <span class="o">*</span><span class="nf">sso</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="p">(</span><span class="kt">char</span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">capacity_</span><span class="p">;</span> <span class="p">}</span>
-    <span class="kt">size_t</span> <span class="nf">size_of_sso</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="k">sizeof</span><span class="p">(</span><span class="o">*</span><span class="k">this</span><span class="p">)</span> <span class="o">-</span> <span class="n">offsetof</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">capacity_</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span> <span class="p">}</span>
     <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="nf">data</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="n">data_</span><span class="p">;</span> <span class="p">}</span>
 
-    <span class="n">string</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
-    <span class="n">string</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">s</span><span class="p">)</span> <span class="o">:</span> <span class="n">size_</span><span class="p">(</span><span class="n">strlen</span><span class="p">(</span><span class="n">s</span><span class="p">))</span> <span class="p">{</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">size_</span> <span class="o">&lt;</span> <span class="n">size_of_sso</span><span class="p">())</span> <span class="p">{</span>
-            <span class="n">strcpy</span><span class="p">(</span><span class="n">sso</span><span class="p">(),</span> <span class="n">s</span><span class="p">);</span>
-        <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
-            <span class="n">capacity_</span> <span class="o">=</span> <span class="n">size_</span><span class="p">;</span>
+    <span class="n">short_string</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+    <span class="n">short_string</span><span class="p">(</span><span class="k">const</span> <span class="kt">char</span> <span class="o">*</span><span class="n">s</span><span class="p">)</span> <span class="o">:</span> <span class="n">size_</span><span class="p">(</span><span class="n">strlen</span><span class="p">(</span><span class="n">s</span><span class="p">))</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">size_</span> <span class="o">&lt;</span> <span class="k">sizeof</span> <span class="n">buffer_</span><span class="p">)</span>
+            <span class="n">strcpy</span><span class="p">(</span><span class="n">buffer_</span><span class="p">,</span> <span class="n">s</span><span class="p">);</span>
+        <span class="k">else</span>
             <span class="n">data_</span> <span class="o">=</span> <span class="n">strdup</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
-        <span class="p">}</span>
     <span class="p">}</span>
-    <span class="n">string</span><span class="p">(</span><span class="n">string</span><span class="o">&amp;&amp;</span> <span class="n">s</span><span class="p">)</span> <span class="o">:</span> <span class="n">size_</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">size_</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">short_string</span><span class="p">(</span><span class="n">short_string</span><span class="o">&amp;&amp;</span> <span class="n">s</span><span class="p">)</span> <span class="p">{</span>
         <span class="n">memcpy</span><span class="p">(</span><span class="k">this</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">s</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="o">*</span><span class="k">this</span><span class="p">));</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">data_</span> <span class="o">==</span> <span class="n">s</span><span class="p">.</span><span class="n">sso</span><span class="p">())</span>
-            <span class="n">data_</span> <span class="o">=</span> <span class="n">sso</span><span class="p">();</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">data_</span> <span class="o">==</span> <span class="n">s</span><span class="p">.</span><span class="n">buffer_</span><span class="p">)</span>
+            <span class="n">data_</span> <span class="o">=</span> <span class="n">buffer_</span><span class="p">;</span>
         <span class="k">else</span>
             <span class="n">s</span><span class="p">.</span><span class="n">data_</span> <span class="o">=</span> <span class="k">nullptr</span><span class="p">;</span>
     <span class="p">}</span>
-    <span class="o">~</span><span class="n">string</span><span class="p">()</span> <span class="p">{</span>
-        <span class="k">if</span> <span class="p">(</span><span class="n">data_</span> <span class="o">!=</span> <span class="n">sso</span><span class="p">())</span>
+    <span class="o">~</span><span class="n">short_string</span><span class="p">()</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">data_</span> <span class="o">!=</span> <span class="n">buffer_</span><span class="p">)</span>
             <span class="n">free</span><span class="p">(</span><span class="n">data_</span><span class="p">);</span>
     <span class="p">}</span>
 <span class="p">};</span>
@@ -2502,6 +2514,23 @@ from a simple <code class="highlight"><span class="n">memcpy</span></code>.</p>
    <li><a href="#abstract-opdef-trivially-relocatable">trivially relocatable</a><span>, in §4.4</span>
   </ul>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
+  <h3 class="no-num no-ref heading settled" id="normative"><span class="content">Normative References</span><a class="self-link" href="#normative"></a></h3>
+  <dl>
+   <dt id="biblio-basictypes">[BASIC.TYPES]
+   <dd><a href="http://eel.is/c++draft/basic.types#2">N4750, [basic.types] clauses 2, 3, and 9</a>. May 2018. URL: <a href="http://eel.is/c++draft/basic.types#2">http://eel.is/c++draft/basic.types#2</a>
+   <dt id="biblio-cwg1746">[CWG1746]
+   <dd>Walter Brown. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746">Are volatile scalar types trivially copyable?</a>. September 2013–January 2014. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746</a>
+   <dt id="biblio-cwg2094">[CWG2094]
+   <dd>Daveed Vandevoorde. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094">Trivial copy/move constructor for class with volatile member</a>. March 2015–June 2016. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094</a>
+   <dt id="biblio-cwg496">[CWG496]
+   <dd>John Maddock. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496">Is a volatile-qualified type really a POD?</a>. December 2004–October 2012. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496</a>
+   <dt id="biblio-lwg2139">[LWG2139]
+   <dd>Loïc Joly. <a href="https://cplusplus.github.io/LWG/issue2139">What is a user-defined type?</a>. March 2012–June 2018. URL: <a href="https://cplusplus.github.io/LWG/issue2139">https://cplusplus.github.io/LWG/issue2139</a>
+   <dt id="biblio-lwg3119">[LWG3119]
+   <dd>Hubert Tong. <a href="https://cplusplus.github.io/LWG/issue3119">Program-definedness of closure types</a>. June 2018—. URL: <a href="https://cplusplus.github.io/LWG/issue3119">https://cplusplus.github.io/LWG/issue3119</a>
+   <dt id="biblio-n4750">[N4750]
+   <dd>ISO/IEC JTC1/SC22/WG21 - The C++ Standards Committee; Richard Smith. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf">N4750: Working Draft, Standard for Programming Language C++</a>. May 2018. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf</a>
+  </dl>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
    <dt id="biblio-any">[Any]
@@ -2514,16 +2543,12 @@ from a simple <code class="highlight"><span class="n">memcpy</span></code>.</p>
    <dd>Ion Gaztañaga. <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html">Mapping Address Independent Pointer: offset_ptr</a>. 2005. URL: <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html">https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html</a>
    <dt id="biblio-contra">[Contra]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/04/15/built-in-library-types/">Contra built-in library types</a>. April 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/04/15/built-in-library-types/">https://quuxplusone.github.io/blog/2018/04/15/built-in-library-types/</a>
-   <dt id="biblio-lwg2139">[LWG2139]
-   <dd>Loïc Joly. <a href="https://cplusplus.github.io/LWG/issue2139">LWG 2139: What is a user-defined type?</a>. March 2012–June 2018. URL: <a href="https://cplusplus.github.io/LWG/issue2139">https://cplusplus.github.io/LWG/issue2139</a>
-   <dt id="biblio-lwg3119">[LWG3119]
-   <dd>Hubert Tong. <a href="https://cplusplus.github.io/LWG/issue3119">LWG 3119: Program-definedness of closure types</a>. June 2018—. URL: <a href="https://cplusplus.github.io/LWG/issue3119">https://cplusplus.github.io/LWG/issue3119</a>
+   <dt id="biblio-function">[Function]
+   <dd>Howard Hinnant et al. <a href="https://github.com/llvm-mirror/libcxx/blob/4e7ffcaa/include/functional#L1719-L1734">libc++ implementation of std::function</a>. URL: <a href="https://github.com/llvm-mirror/libcxx/blob/4e7ffcaa/include/functional#L1719-L1734">https://github.com/llvm-mirror/libcxx/blob/4e7ffcaa/include/functional#L1719-L1734</a>
    <dt id="biblio-n1377">[N1377]
    <dd>Howard Hinnant; Peter Dimov; Dave Abrahams. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm">N1377: A Proposal to Add Move Semantics Support to the C++ Language</a>. September 2002. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm</a>
    <dt id="biblio-n4158">[N4158]
    <dd>Pablo Halpern. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf">N4158: Destructive Move (Rev 1)</a>. October 2014. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf</a>
-   <dt id="biblio-n4750">[N4750]
-   <dd>ISO/IEC JTC1/SC22/WG21 - The C++ Standards Committee; Richard Smith. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf">N4750: Working Draft, Standard for Programming Language C++</a>. May 2018. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf</a>
    <dt id="biblio-sane">[Sane]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/">Thoughts on "sanely move-assignable"</a>. July 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/">https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/</a>
    <dt id="biblio-tcf">[TCF]
@@ -2536,6 +2561,7 @@ from a simple <code class="highlight"><span class="n">memcpy</span></code>.</p>
    <div class="issue"> [definitions] is probably the wrong place for the core-language definition of "relocation operation"<a href="#issue-75ffe201"> ↵ </a></div>
    <div class="issue"> this definition of "relocation operation" is not good<a href="#issue-7c86f5f7"> ↵ </a></div>
    <div class="issue"> Where in the Standard should we place the definition of "trivially relocatable"?<a href="#issue-ffbbd33c"> ↵ </a></div>
+   <div class="issue"> Arthur is not sure what to do about <code class="highlight"><span class="k">mutable</span></code> members, so they are disallowed for now.<a href="#issue-96e4965a"> ↵ </a></div>
   </div>
   <aside class="dfn-panel" data-for="abstract-opdef-relocation-operation">
    <b><a href="#abstract-opdef-relocation-operation">#abstract-opdef-relocation-operation</a></b><b>Referenced in:</b>
@@ -2547,6 +2573,7 @@ from a simple <code class="highlight"><span class="n">memcpy</span></code>.</p>
    <b><a href="#abstract-opdef-trivially-relocatable">#abstract-opdef-trivially-relocatable</a></b><b>Referenced in:</b>
    <ul>
     <li><a href="#ref-for-abstract-opdef-trivially-relocatable">1. Introduction and motivation</a>
+    <li><a href="#ref-for-abstract-opdef-trivially-relocatable①">4.6. Type traits is_relocatable etc.</a>
    </ul>
   </aside>
 <script>/* script-dfn-panel */
