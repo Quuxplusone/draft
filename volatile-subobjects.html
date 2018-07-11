@@ -1445,15 +1445,17 @@ pre .property::before, pre .property::after {
    <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-07-11">2018-07-11</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
-     <dt>Author:
+     <dt>Authors:
      <dd>
       <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
+     <dd>
+      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:cxx@jfbastien.com">JF Bastien</a>
      <dt>Audience:
      <dd>EWG
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>1
+     <dd>2
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/volatile-subobjects.bs">github.com/Quuxplusone/draft/blob/gh-pages/volatile-subobjects.bs</a>
      <dt>Current:
@@ -1472,7 +1474,8 @@ non-trivially copyable.
 CWG issues 1746 and 2094 (2013–2016) changed it back, so that if a class type had both a volatile subobject and defaulted
 special members, it was trivially copyable.
 This is where we stand today.
-This paper proposes that class types with volatile subobjects should have their copy and move operations default to deleted.</p>
+This paper proposes that class types with volatile subobjects should have their copy and move operations default to deleted.
+We propose this change because the authors do not know of any correct usage of copying structs with volatile subobjects.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -1520,6 +1523,11 @@ But it does have at least one use, in the embedded-systems niche:</p>
     <span class="p">}</span>
 </pre>
    <p>This example motivates classes with volatile-qualified NSDMs. It does not motivate <em>copying</em> those classes.</p>
+   <p>In some rare cases the programmer might actually want to copy all of <code class="highlight"><span class="n">regs</span></code> at once. In that case, the status quo
+is harmful, rather than helpful. The status quo is to generate a defaulted copy constructor that copies bytes
+out of the source object in an unspecified manner, ignoring whatever system-specific concerns led the
+programmer to mark the members <code class="highlight"><span class="k">volatile</span></code> in the first place.</p>
+   <p>Further, JF Bastien adds, placing a struct with volatile members on the stack is nonsensical.</p>
    <h2 class="heading settled" data-level="2" id="history"><span class="secno">2. </span><span class="content">History</span><a class="self-link" href="#history"></a></h2>
    <h3 class="heading settled" data-level="2.1" id="cwg496"><span class="secno">2.1. </span><span class="content">CWG 496: Is a volatile-qualified type really a POD?</span><a class="self-link" href="#cwg496"></a></h3>
    <p>In December 2004, John Maddock <a data-link-type="biblio" href="#biblio-cwg496">writes</a>:</p>
@@ -1686,7 +1694,7 @@ via <code class="highlight"><span class="n">memcpy</span></code>/<code class="hi
 even though the copying is happening between many discrete (sub)objects that are each
 volatile-qualified.</p>
    <p>Library vendors also have no incentive to change their behavior here; it seems to be
-strictly non-conforming, but the optimization for _non_-volatile NSDMs is too valuable to
+strictly non-conforming, but the optimization for <em>non</em>-volatile NSDMs is too valuable to
 give up, and there is currently no way for a library to detect the presence of volatile NSDMs
 nested within a class.</p>
    <h2 class="heading settled" data-level="4" id="solution"><span class="secno">4. </span><span class="content">The proposed solution</span><a class="self-link" href="#solution"></a></h2>
@@ -1707,6 +1715,9 @@ nested within a class.</p>
    <p>That is, the presence of a <code class="highlight"><span class="k">volatile</span></code>-qualified NSDM in a class should cause the class’s copy constructor
 and copy assignment operator to be defaulted as deleted. The library would continue to detect a Rule-of-Zero-following,
 volatile-NSDM-having class as <code class="highlight"><span class="n">is_trivially_copyable</span></code>; but it would also detect it as <code class="highlight"><span class="n">not</span> <span class="n">is_copy_constructible</span></code> and <code class="highlight"><span class="n">not</span> <span class="n">is_move_constructible</span></code>, so it wouldn’t try to <code class="highlight"><span class="n">memcpy</span></code> its bytes, and so our tearing problem would be solved.</p>
+   <p>This solution does not change any ABI, because it merely removes (useless, dangerous) functions that were generated before.
+In particular, this proposal preserves the <i>trivial copyability</i> of structs with volatile members, so that it
+preserves the calling convention by which they may be returned in registers on IA64.</p>
    <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <p>The wording in this section is relative to <a data-link-type="biblio" href="#biblio-n4750">WG21 draft N4750</a>,
 that is, the current draft of the C++17 standard. We quote many unchanged
