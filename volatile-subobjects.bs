@@ -1,0 +1,458 @@
+<pre class='metadata'>
+Title: Copying volatile subobjects is non-trivial
+Shortname: Dxxxx
+Revision: 0
+!Draft Revision: 1
+Audience: EWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/volatile-subobjects.bs">github.com/Quuxplusone/draft/blob/gh-pages/volatile-subobjects.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/volatile-subobjects.html">rawgit.com/Quuxplusone/draft/gh-pages/volatile-subobjects.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  In C++11, if a class type had both a volatile subobject and defaulted special members, it was trivially copyable.
+  CWG issue 496 (2004–2012) changed this so that if a class type had both a volatile subobject and defaulted special members, it was
+  non-trivially copyable.
+  CWG issues 1746 and 2094 (2013–2016) changed it back, so that if a class type had both a volatile subobject and defaulted
+  special members, it was trivially copyable.
+  This is where we stand today.
+  This paper proposes that class types with volatile subobjects should have their copy and move operations default to deleted.
+Date: 2018-07-11
+</pre>
+
+<style>
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+
+# Motivation for volatile subobjects # {#motivation}
+
+Volatile-qualifying a specific non-static data member (NSDM) of a class doesn't sound like a very useful thing to do.
+But it does have at least one use, in the embedded-systems niche:
+
+```c++
+    struct MemoryMappedRegisters {
+        volatile uint32_t r0;
+        volatile uint32_t r1;
+        volatile uint32_t r2;
+        volatile uint32_t r3;
+    };
+
+    MemoryMappedRegisters& g_registers = *(MemoryMappedRegisters*)0x4200;
+
+    void foo(MemoryMappedRegisters& regs) {
+        ...
+        // This access is defined by our implementation to perform a 4-byte store
+        // followed by two 4-byte loads.
+        regs.r0 = 0x1234;
+        auto x = regs.r1;
+        auto y = regs.r1;  // re-load from the same register
+        ...
+    }
+```
+
+This example motivates classes with volatile-qualified NSDMs. It does not motivate *copying* those classes.
+
+
+# History # {#history}
+
+## CWG 496: Is a volatile-qualified type really a POD? ## {#cwg496}
+
+In December 2004, John Maddock [[!CWG496|writes]]:
+
+> In 6.9 [basic.types] paragraph 10, the standard makes it quite clear that volatile qualified types are PODs:
+>
+> > Arithmetic types (6.9.1 [basic.fundamental]), enumeration types, pointer types, and pointer to member types
+> > (6.9.2 [basic.compound]), and cv-qualified versions of these types (6.9.3 [basic.type.qualifier]) are
+> > collectively called <b><i>scalar types</i></b>. Scalar types, POD-struct types, POD-union types (clause 12 [class]),
+> > arrays of such types and cv-qualified versions of these types (6.9.3 [basic.type.qualifier]) are
+> > collectively called <b><i>POD types</i></b>.
+>
+> However in 6.9 [basic.types] paragraph 3, the standard makes it clear that PODs can be copied “as if” they
+> were a collection of bytes by memcpy:
+>
+> > For any POD type T, if two pointers to T point to distinct T objects obj1 and obj2, where neither obj1
+> > nor obj2 is a base-class subobject, if the value of obj1 is copied into obj2, using the std::memcpy
+> > library function, obj2 shall subsequently hold the same value as obj1.
+>
+> The problem with this is that a volatile qualified type may need to be copied in a specific way
+> (by copying using only atomic operations on multithreaded platforms, for example) in order to avoid
+> the “memory tearing” that may occur with a byte-by-byte copy.
+
+Proposed resolution, October 2012:
+
+Change 6.9 [basic.types] paragraph 9 as follows:
+
+> ...Scalar types, trivially copyable class types, arrays of such types, and
+> <del>cv-qualified</del> <ins>non-volatile const-qualified</ins> versions of these types are collectively called
+> <i>trivially copyable types</i>. Scalar types, trivial class types...
+
+Change 10.1.7.1 [dcl.type.cv] paragraphs 6-7 as follows:
+
+> <ins>What constitutes an access to an object that has volatile-qualified type is implementation-defined.</ins>
+> If an attempt is made to refer to an object defined with a volatile-qualified type through the use of a glvalue
+> with a non-volatile-qualified type, the program behavior is undefined.
+>
+> [*Note:* `volatile` is a hint to the implementation to avoid aggressive optimization involving the object because
+> the value of the object might be changed by means undetectable by an implementation. <ins>Furthermore, for some implementations,
+> `volatile` might indicate that special hardware instructions are required to access the object.</ins>
+> See 4.6 [intro.execution] for detailed semantics. In general, the semantics of `volatile` are intended to be the same
+> in C++ as they are in C. *—end note*]
+
+Change 15.8 [class.copy] paragraph 12 as follows:
+
+> A copy/move constructor for class `X` is <i>trivial</i> if it is not user-provided, its declared parameter type is
+> the same as if it had been implicitly declared, and if
+>
+> - class `X` has no virtual functions and no virtual base classes, and
+>
+> - <ins>class `X` has no non-static data members of volatile-qualified type, and</ins>
+>
+> ...
+
+Change 15.8 [class.copy] paragraph 25 as follows:
+
+> A copy/move assignment operator for class `X` is <i>trivial</i> if it is not user-provided, its declared
+> parameter type is the same as if it had been implicitly declared, and if
+>
+> - class `X` has no virtual functions and no virtual base classes, and
+>
+> - <ins>class `X` has no non-static data members of volatile-qualified type, and</ins>
+>
+> ...
+
+
+## CWG 1746: Are volatile scalar types trivially copyable? ## {#cwg1746}
+
+In September 2013, Walter Brown [[!CWG1746|writes]]:
+
+> According to 6.9 [basic.types] paragraph 9,
+>
+> > Arithmetic types (6.9.1 [basic.fundamental]), enumeration types, pointer types, pointer to member types
+> > (6.9.2 [basic.compound]), std::nullptr_t, and cv-qualified versions of these types
+> > (6.9.3 [basic.type.qualifier]) are collectively called <i>scalar types</i>... Scalar types, trivially
+> > copyable class types (Clause 12 [class]), arrays of such types, and non-volatile const-qualified versions
+> > of these types (6.9.3 [basic.type.qualifier]) are collectively called <i>trivially copyable types</i>.
+>
+> This is confusing, because “scalar types” include volatile-qualified types, but the intent of the
+> definition of “trivially copyable type” appears to be to exclude volatile-qualified types.
+> Perhaps the second quoted sentence should read something like,
+>
+> > A non-volatile type `T` or an array of such `T` is called a <i>trivially copyable type</i> if `T` is either a
+> > scalar type or a trivially copyable class type.
+>
+> (Note that the following sentence, defining “trivial type,” has a similar formal issue, although it
+> has no actual significance because all cv-qualifiers are permitted.)
+
+Proposed resolution, January 2014:
+
+Change 6.9 [basic.types] paragraph 10 as follows:
+
+> ...<del>Scalar</del> <ins>Cv-unqualified scalar</ins> types, trivially copyable class types,
+> arrays of such types, and non-volatile const-qualified versions of these
+> types are collectively called <i>trivially copyable types</i>...
+
+
+## CWG 2094: Trivial move/copy constructor for class with volatile member ## {#cwg2094}
+
+In March 2015, Daveed Vandevoorde [[!CWG2094|writes]]:
+
+> The resolution of issue 496 included the addition of 15.8 [class.copy] paragraph 25.2, making a class's
+> copy/move constructor non-trivial if it has a non-static data member of volatile-qualified type.
+> This change breaks the IA-64 ABI, so it has been requested that CWG reconsider this aspect of the resolution.
+>
+> On a related note, the resolution of issue 496 also changed 6.9 [basic.types] paragraph 9, which makes
+> volatile-qualified scalar types “trivial” but not “trivially copyable.” It is not clear why there is
+> a distinction made here; the only actual use of “trivial type” in the Standard appears to be in the
+> description of `qsort`, which should probably use “trivially copyable.” (See also issue 1746.)
+
+Notes from the February 2016 meeting:
+
+> CWG agreed with the suggested direction for the changes in 15.8 [class.copy]; the use of “trivial”
+> will be dealt with separately and not as part of the resolution of this issue.
+
+Proposed resolution, June 2016:
+
+Change 6.9 [basic.types] paragraph 9 as follows:
+
+> ...called <i>POD types</i>. Cv-unqualified scalar types, trivially copyable class types,
+> arrays of such types, and <del>non-volatile const-qualified</del> <ins>cv-qualified</ins> versions of these
+> types are collectively called <i>trivially copyable types</i>. Scalar types...
+
+Delete bullet 12.2 of 15.8 [class.copy]:
+
+> A copy/move constructor for class `X` is <i>trivial</i> if it is not user-provided,
+> its parameter-type-list is equivalent to the parameter-type-list of an implicit declaration, and if
+>
+> ...
+>
+> - <del>class `X` has no non-static data members of volatile-qualified type, and</del>
+>
+> ...
+
+Delete bullet 25.2 of 15.8 [class.copy]:
+
+> A copy/move assignment operator for class `X` is <i>trivial</i> if it is not user-provided,
+> its parameter-type-list is equivalent to the parameter-type-list of an implicit
+> declaration, and if
+>
+> ...
+>
+> - <del>class `X` has no non-static data members of volatile-qualified type, and</del>
+
+
+# The problem # {#problem}
+
+Library vendors use `std::is_trivially_copyable` to detect object types that can be copied
+via `memcpy`/`memmove`. This idiom does not work when volatile NSDMs are in play.
+
+```c++
+    #include <algorithm>
+    struct S {
+        volatile int i;
+    };
+    void foo(S *dst, S *src, int n) {
+        std::copy_n(src, n, dst);
+    }
+```
+
+Today, both libc++ and libstdc++ generate a single `memmove` to perform the copy of `src` to `dst`,
+even though the copying is happening between many discrete (sub)objects that are each
+volatile-qualified.
+
+Library vendors also have no incentive to change their behavior here; it seems to be
+strictly non-conforming, but the optimization for _non_-volatile NSDMs is too valuable to
+give up, and there is currently no way for a library to detect the presence of volatile NSDMs
+nested within a class.
+
+
+# The proposed solution # {#solution}
+
+Whereas
+
+- the current semantics by which volatile NSDMs are copied (trivially) are untenable for library vendors,
+
+- [[!CWG496]] and [[!CWG2094]] show there is no consensus to *change* the semantics by which volatile NSDMs are copied (to make it non-trivial),
+
+- nobody has yet presented a use-case for wanting to copy volatile NSDMs at all,
+
+we propose that
+
+- volatile NSDMs should not be copyable.
+
+That is, the presence of a `volatile`-qualified NSDM in a class should cause the class's copy constructor
+and copy assignment operator to be defaulted as deleted. The library would continue to detect a Rule-of-Zero-following,
+volatile-NSDM-having class as `is_trivially_copyable`; but it would also detect it as `not is_copy_constructible` and
+`not is_move_constructible`, so it wouldn't try to `memcpy` its bytes, and so our tearing problem would be solved.
+
+
+# Proposed wording # {#wording}
+
+The wording in this section is relative to [[!N4750|WG21 draft N4750]],
+that is, the current draft of the C++17 standard. We quote many unchanged
+passages here for reference.
+
+[basic.types] #3 is unchanged:
+
+> For any trivially copyable type `T`, if two pointers to `T` point to distinct `T` objects `obj1` and `obj2`,
+> where neither `obj1` nor `obj2` is a potentially-overlapping subobject, if the underlying bytes making up
+> `obj1` are copied into `obj2`, `obj2` shall subsequently hold the same value as `obj1`.
+
+[basic.types] #9 is changed only editorially for clarity ([[PR2255]]):
+
+> Arithmetic types, enumeration types, pointer types, pointer-to-member types, `std::nullptr_t`, and
+> cv-qualified versions of these types are collectively called <i>scalar types</i>. <del>Cv-unqualified scalar</del>
+> <ins>Scalar</ins> types,
+> trivially copyable class types, arrays of such types, and cv-qualified versions of these types are
+> collectively called <i>trivially copyable types</i>. Scalar types, trivial class types, arrays of such types
+> and cv-qualified versions of these types are collectively called <i>trivial types</i>. Scalar types,
+> standard-layout class types, arrays of such types and cv-qualified versions of these types
+> are collectively called <i>standard-layout types</i>.
+
+[class.copy.ctor] #6 is unchanged:
+
+> If the class definition does not explicitly declare a copy constructor, a non-explicit one is declared <i>implicitly</i>.
+> If the class definition declares a move constructor or move assignment operator, the implicitly declared copy
+> constructor is defined as deleted; otherwise, it is defined as defaulted. The latter case is deprecated
+> if the class has a user-declared copy assignment operator or a user-declared destructor.
+
+[class.copy.ctor] #7 is unchanged:
+
+> The implicitly-declared copy constructor for a class `X` will have the form
+> ```
+> X::X(const X&)
+> ```
+> if each potentially constructed subobject of a class type `M` (or array thereof) has a copy constructor
+> whose first parameter is of type `const M&` or `const volatile M&`. Otherwise, the implicitly-declared
+> copy constructor will have the form
+> ```
+> X::X(X&)
+> ```
+
+[class.copy.ctor] #8 is unchanged:
+
+> If the definition of a class `X` does not explicitly declare a move constructor, a non-explicit one will
+> be implicitly declared as defaulted if and only if
+>
+> - `X` does not have a user-declared copy constructor,
+>
+> - `X` does not have a user-declared copy assignment operator,
+>
+> - `X` does not have a user-declared move assignment operator, and
+>
+> - `X` does not have a user-declared destructor.
+>
+> [*Note:* When the move constructor is not implicitly declared or explicitly supplied, expressions that
+> otherwise would have invoked the move constructor may instead invoke a copy constructor. *—end note*]
+
+Change [class.copy.ctor] #10:
+
+> An implicitly-declared copy/move constructor is an inline public member of its class.
+> A defaulted copy/move constructor for a class `X` is defined as deleted if `X` has:
+>
+>   - a potentially constructed subobject type `M` (or array thereof) that cannot be copied/moved
+>     because overload resolution, as applied to find `M`’s corresponding constructor, results
+>     in an ambiguity or a function that is deleted or inaccessible from the defaulted constructor,
+>
+>   - a variant member whose corresponding constructor as selected by overload resolution is non-trivial,
+>
+>   - <ins>a non-static data member of `volatile` type (or array thereof), or</ins>
+>
+>   - any potentially constructed subobject of a type with a destructor that is deleted or inaccessible
+>     from the defaulted constructor, or,
+>
+>   - for the copy constructor, a non-static data member of rvalue reference type.
+>
+> A defaulted move constructor that is defined as deleted is ignored by overload resolution.
+> [*Note:* A deleted move constructor would otherwise interfere with initialization from an rvalue
+> which can use the copy constructor instead. *—end note*]
+
+[class.copy.ctor] #11 is unchanged:
+
+> A copy/move constructor for class `X` is <i>trivial</i> if it is not user-provided and if:
+>
+>   - class X has no virtual functions and no virtual base classes, and
+>
+>   - the constructor selected to copy/move each direct base class subobject is trivial, and
+>
+>   - for each non-static data member of `X` that is of class type (or array thereof),
+>     the constructor selected to copy/move that member is trivial;
+>
+> otherwise the copy/move constructor is <i>non-trivial</i>.
+
+[class.copy.assign] #2 is unchanged:
+
+> If the class definition does not explicitly declare a copy assignment operator, one is
+> declared <i>implicitly</i>. If the class definition declares a move constructor or move
+> assignment operator, the implicitly declared copy assignment operator is defined as deleted;
+> otherwise, it is defined as defaulted. The latter case is deprecated if the class has
+> a user-declared copy constructor or a user-declared destructor.
+>
+> The implicitly-declared copy assignment operator for a class `X` will have the form
+> ```
+> X& X::operator=(const X&)
+> ```
+> if
+>
+>   - each direct base class `B` of `X` has a copy assignment operator whose parameter is
+>     of type `const B&`, `const volatile B&`, or `B`, and
+>
+>   - for all the non-static data members of `X` that are of a class type `M` (or array thereof),
+>     each such class type has a copy assignment operator whose parameter is of type `const M&`,
+>     `const volatile M&`, or `M`.
+>
+> Otherwise, the implicitly-declared copy assignment operator will have the form
+> ```
+> X& X::operator=(X&)
+> ```
+
+[class.copy.assign] #4 is unchanged:
+
+> If the definition of a class `X` does not explicitly declare a move assignment operator,
+> one will be implicitly declared as defaulted if and only if
+>
+>   - `X` does not have a user-declared copy constructor,
+>
+>   - `X` does not have a user-declared move constructor,
+>
+>   - `X` does not have a user-declared copy assignment operator, and
+>
+>   - `X` does not have a user-declared destructor.
+
+Change [class.copy.assign] #7:
+
+> A defaulted copy/move assignment operator for class `X` is defined as deleted if `X` has:
+>
+>   - a variant member with a non-trivial corresponding assignment operator and `X` is a union-like class, or
+>
+>   - a non-static data member of `const` non-class type (or array thereof), or
+>
+>   - <ins>a non-static data member of `volatile` type (or array thereof), or</ins>
+>
+>   - a non-static data member of reference type, or
+>
+>   - a direct non-static data member of class type `M` (or array thereof) or a direct base class `M`
+>     that cannot be copied/moved because overload resolution, as applied to find `M`’s corresponding
+>     assignment operator, results in an ambiguity or a function that is deleted or inaccessible
+>     from the defaulted assignment operator.
+>
+> A defaulted move assignment operator that is defined as deleted is ignored by overload resolution.
+
+[class.copy.assign] #9 is unchanged:
+
+> A copy/move assignment operator for class `X` is <i>trivial</i> if it is not user-provided and if:
+>
+>   - class `X` has no virtual functions and no virtual base classes, and
+>
+>   - the assignment operator selected to copy/move each direct base class subobject is trivial, and
+>
+>   - for each non-static data member of `X` that is of class type (or array thereof), the assignment
+>     operator selected to copy/move that member is trivial;
+>
+> otherwise the copy/move assignment operator is <i>non-trivial</i>.
+
+
+<pre class=biblio>
+{
+  "basic.types": {
+    "title": "N4750, [basic.types] clauses 2, 3, and 9",
+    "href": "http://eel.is/c++draft/basic.types#2",
+    "date": "May 2018"
+  },
+  "CWG496": {
+    "authors": [
+      "John Maddock"
+    ],
+    "title": "Is a volatile-qualified type really a POD?",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496",
+    "date": "December 2004–October 2012"
+  },
+  "CWG1746": {
+    "authors": [
+      "Walter Brown"
+    ],
+    "title": "Are volatile scalar types trivially copyable?",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746",
+    "date": "September 2013–January 2014"
+  },
+  "CWG2094": {
+    "authors": [
+      "Daveed Vandevoorde"
+    ],
+    "title": "Trivial copy/move constructor for class with volatile member",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094",
+    "date": "March 2015–June 2016"
+  },
+  "PR2255": {
+    "authors": [
+        "Arthur O'Dwyer"
+    ],
+    "title": "'cv-qualified versions of cv-unqualified scalar types' are just 'scalar types'",
+    "href": "https://github.com/cplusplus/draft/pull/2255",
+    "date": "July 2018"
+  }
+}
+</pre>
