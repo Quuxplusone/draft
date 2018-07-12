@@ -1494,7 +1494,7 @@ pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>6
+     <dd>7
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs</a>
      <dt>Current:
@@ -1835,9 +1835,12 @@ to identify certain (unrealistic) class types as trivially relocatable, when in 
 information to infer that they <em>are</em> trivially relocatable in practice. This would leave room for a
 "better" implementation beneath ours. I tentatively prefer to optimize for maximum performance over spec simplicity.</p>
    <p class="note" role="note"><span>Note:</span> There is no special treatment for <code class="highlight"><span class="k">volatile</span></code> subobjects. Using <code class="highlight"><span class="n">memmove</span></code> on <code class="highlight"><span class="k">volatile</span></code> subobjects
-can result in tearing of reads and writes. The resolutions of <a data-link-type="biblio" href="#biblio-cwg496">[CWG496]</a> and <a data-link-type="biblio" href="#biblio-cwg1746">[CWG1746]</a> aimed to evict <code class="highlight"><span class="k">volatile</span></code> objects and subobjects from the set of "trivially copyable types," but these changes were reverted
-in the resolution of <a data-link-type="biblio" href="#biblio-cwg2094">[CWG2094]</a> (2016). As of C++17, bytewise copying of <code class="highlight"><span class="k">volatile</span></code> subobjects is permitted
+can cause tearing of reads and writes. Issues <a data-link-type="biblio" href="#biblio-cwg496">[CWG496]</a> and <a data-link-type="biblio" href="#biblio-cwg1746">[CWG1746]</a> aimed to evict <code class="highlight"><span class="k">volatile</span></code> objects and subobjects from the set of "trivially copyable types," but these changes were reverted
+by <a data-link-type="biblio" href="#biblio-cwg2094">[CWG2094]</a> (2016). As of C++17, bytewise copying of <code class="highlight"><span class="k">volatile</span></code> subobjects is permitted
 by <a data-link-type="biblio" href="#biblio-basictypes">[basic.types]</a>. Arthur has a paper coming for this.</p>
+   <p class="note" role="note"><span>Note:</span> There is no special treatment for possibly overlapping subobjects. Using <code class="highlight"><span class="n">memmove</span></code> on possibly overlapping
+subobjects can overwrite unrelated objects in the vicinity of the destination. This paper introduces
+no <em>new</em> issues in this area. See <a data-link-type="biblio" href="#biblio-subobjects">[Subobjects]</a>.</p>
    <p class="issue" id="issue-a0d45ced"><a class="self-link" href="#issue-a0d45ced"></a> Must we also say that the relevant move constructor (resp. copy constructor) must be public and unambiguous?</p>
    <div class="issue" id="issue-97d92dd0">
     <a class="self-link" href="#issue-97d92dd0"></a> Consider the following test case—<wbr>
@@ -1987,6 +1990,8 @@ Today vendors generally choose not to perform these optimizations.</p>
    <p>Thanks to Elias Kosunen and Niall Douglas for their feedback on early drafts of this paper.</p>
    <p>Thanks to Pablo Halpern for <a data-link-type="biblio" href="#biblio-n4158">[N4158]</a>, to which this paper bears a striking and coincidental resemblance —<wbr>including the meaning assigned to the word "trivial," and the library-algorithm approach to avoiding the
 problems with "lame duck objects" discussed in <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm#Alternative%20move%20designs">the final section</a> of <a data-link-type="biblio" href="#biblio-n1377">[N1377]</a>.</p>
+   <p>Many thanks to Matt Godbolt for allowing me to place the prototype implementation on Compiler Explorer Beta
+(a.k.a. <a href="https://godbolt.org/g/TA2Xmy">godbolt.org/beta</a>).</p>
    <h2 class="heading settled" id="polls"><span class="content">Appendix A: Straw polls requested</span><a class="self-link" href="#polls"></a></h2>
    <h3 class="heading settled" id="lewg-polls"><span class="content">Polls for LEWG</span><a class="self-link" href="#lewg-polls"></a></h3>
    <table class="def">
@@ -2200,6 +2205,7 @@ behavior and warrant (under penalty of undefined behavior) that this type is in 
         <span class="n">std</span><span class="o">::</span><span class="kt">size_t</span> <span class="n">nbytes</span> <span class="o">=</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">last</span> <span class="o">-</span> <span class="p">(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="n">first</span><span class="p">;</span>
         <span class="k">if</span> <span class="p">(</span><span class="n">nbytes</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
             <span class="n">std</span><span class="o">::</span><span class="n">memmove</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">addressof</span><span class="p">(</span><span class="o">*</span><span class="n">result</span><span class="p">),</span> <span class="n">std</span><span class="o">::</span><span class="n">addressof</span><span class="p">(</span><span class="o">*</span><span class="n">first</span><span class="p">),</span> <span class="n">nbytes</span><span class="p">);</span>
+            <span class="n">result</span> <span class="o">+=</span> <span class="p">(</span><span class="n">last</span> <span class="o">-</span> <span class="n">first</span><span class="p">);</span>
         <span class="p">}</span>
     <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nf">constexpr</span> <span class="p">(</span><span class="n">memcpyable</span><span class="p">)</span> <span class="p">{</span>
         <span class="k">for</span> <span class="p">(;</span> <span class="n">first</span> <span class="o">!=</span> <span class="n">last</span><span class="p">;</span> <span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="o">++</span><span class="n">result</span><span class="p">,</span> <span class="o">++</span><span class="n">first</span><span class="p">)</span> <span class="p">{</span>
@@ -2211,6 +2217,7 @@ behavior and warrant (under penalty of undefined behavior) that this type is in 
             <span class="n">std</span><span class="o">::</span><span class="n">destroy_at</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">addressof</span><span class="p">(</span><span class="o">*</span><span class="n">first</span><span class="p">));</span>
         <span class="p">}</span>
     <span class="p">}</span>
+    <span class="k">return</span> <span class="n">result</span><span class="p">;</span>
 <span class="p">}</span>
 </pre></small> 
    <p>The code in the first branch must use <code class="highlight"><span class="n">memmove</span></code>, rather than <code class="highlight"><span class="n">memcpy</span></code>, to preserve the
@@ -2581,6 +2588,8 @@ from a simple <code class="highlight"><span class="n">memcpy</span></code>.</p>
    <dd>Pablo Halpern. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf">N4158: Destructive Move (Rev 1)</a>. October 2014. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf</a>
    <dt id="biblio-sane">[Sane]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/">Thoughts on "sanely move-assignable"</a>. July 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/">https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/</a>
+   <dt id="biblio-subobjects">[Subobjects]
+   <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/">When is a trivially copyable object not trivially copyable?</a>. July 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/">https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/</a>
    <dt id="biblio-tcf">[TCF]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/">Trivially-constructible-from</a>. July 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/">https://quuxplusone.github.io/blog/2018/07/03/trivially-constructible-from/</a>
    <dt id="biblio-wang">[Wang]
