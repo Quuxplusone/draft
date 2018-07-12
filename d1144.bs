@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 0
-!Draft Revision: 6
+!Draft Revision: 7
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -403,10 +403,14 @@ information to infer that they *are* trivially relocatable in practice. This wou
 "better" implementation beneath ours. I tentatively prefer to optimize for maximum performance over spec simplicity.
 
 Note: There is no special treatment for `volatile` subobjects. Using `memmove` on `volatile` subobjects
-can result in tearing of reads and writes. The resolutions of [[!CWG496]] and [[!CWG1746]] aimed to evict
+can cause tearing of reads and writes. Issues [[!CWG496]] and [[!CWG1746]] aimed to evict
 `volatile` objects and subobjects from the set of "trivially copyable types," but these changes were reverted
-in the resolution of [[!CWG2094]] (2016). As of C++17, bytewise copying of `volatile` subobjects is permitted
+by [[!CWG2094]] (2016). As of C++17, bytewise copying of `volatile` subobjects is permitted
 by [[!basic.types]]. Arthur has a paper coming for this.
+
+Note: There is no special treatment for possibly overlapping subobjects. Using `memmove` on possibly overlapping
+subobjects can overwrite unrelated objects in the vicinity of the destination. This paper introduces
+no *new* issues in this area. See [[Subobjects]].
 
 Issue: Must we also say that the relevant move constructor (resp. copy constructor) must be public and unambiguous?
 
@@ -646,6 +650,9 @@ problems with "lame duck objects" discussed in
 <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm#Alternative%20move%20designs">the final section</a>
 of [[N1377]].
 
+Many thanks to Matt Godbolt for allowing me to place the prototype implementation on Compiler Explorer Beta
+(a.k.a. <a href="https://godbolt.org/g/TA2Xmy">godbolt.org/beta</a>).
+
 
 Appendix A: Straw polls requested {#polls}
 =================================
@@ -809,6 +816,7 @@ ForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,
         std::size_t nbytes = (char *)last - (char *)first;
         if (nbytes != 0) {
             std::memmove(std::addressof(*result), std::addressof(*first), nbytes);
+            result += (last - first);
         }
     } else if constexpr (memcpyable) {
         for (; first != last; (void)++result, ++first) {
@@ -820,6 +828,7 @@ ForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,
             std::destroy_at(std::addressof(*first));
         }
     }
+    return result;
 }
 ```
 </small>
@@ -1194,6 +1203,14 @@ Issue: no benchmarks yet
     ],
     "title": "Thoughts on \"sanely move-assignable\"",
     "href": "https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/",
+    "date": "July 2018"
+  },
+  "Subobjects": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "When is a trivially copyable object not trivially copyable?",
+    "href": "https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/",
     "date": "July 2018"
   },
   "TCF": {
