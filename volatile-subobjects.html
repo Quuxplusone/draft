@@ -1445,6 +1445,8 @@ pre .property::before, pre .property::after {
    <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-07-11">2018-07-11</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
+     <dt>Issue Tracking:
+     <dd><a href="#issues-index">Inline In Spec</a>
      <dt>Authors:
      <dd>
       <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
@@ -1455,7 +1457,7 @@ pre .property::before, pre .property::after {
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>2
+     <dd>3
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/volatile-subobjects.bs">github.com/Quuxplusone/draft/blob/gh-pages/volatile-subobjects.bs</a>
      <dt>Current:
@@ -1497,6 +1499,7 @@ We propose this change because the authors do not know of any correct usage of c
       <li><a href="#normative"><span class="secno"></span> <span class="content">Normative References</span></a>
       <li><a href="#informative"><span class="secno"></span> <span class="content">Informative References</span></a>
      </ol>
+    <li><a href="#issues-index"><span class="secno"></span> <span class="content">Issues Index</span></a>
    </ol>
   </nav>
   <main>
@@ -1718,6 +1721,21 @@ volatile-NSDM-having class as <code class="highlight"><span class="n">is_trivial
    <p>This solution does not change any ABI, because it merely removes (useless, dangerous) functions that were generated before.
 In particular, this proposal preserves the <i>trivial copyability</i> of structs with volatile members, so that it
 preserves the calling convention by which they may be returned in registers on IA64.</p>
+   <div class="issue" id="issue-2bb6e0ec">
+    <a class="self-link" href="#issue-2bb6e0ec"></a> Hmm, I now think this is wrong. Trivial copyability
+(<a href="https://timsong-cpp.github.io/cppwp/class#prop-1">[class.prop]/1</a>) requires at least one non-deleted
+copy-or-move constructor-or-assignment-operator; and our struct will no longer have that. Also, tcanens points
+to special wording in <a href="https://timsong-cpp.github.io/cppwp/class.temporary#3">[class.temporary]/3</a> that permits returning our struct in registers only if it has a non-deleted copy-or-move constructor.
+Specifically: 
+<pre class="language-c++ highlight"><span class="k">struct</span> <span class="n">S</span> <span class="p">{</span> <span class="k">volatile</span> <span class="kt">int</span> <span class="n">i</span><span class="p">;</span> <span class="p">};</span>
+<span class="n">S</span> <span class="nf">foo</span><span class="p">()</span> <span class="p">{</span> <span class="k">return</span> <span class="n">S</span><span class="p">{</span><span class="mi">42</span><span class="p">};</span> <span class="p">}</span>  <span class="c1">// returns in %eax today</span>
+</pre>
+    Whereas if we delete all the constructors: 
+<pre class="language-c++ highlight"><span class="k">struct</span> <span class="n">S</span> <span class="p">{</span> <span class="k">volatile</span> <span class="kt">int</span> <span class="n">i</span><span class="p">;</span> <span class="n">S</span><span class="p">(</span><span class="k">const</span> <span class="n">S</span><span class="o">&amp;</span><span class="p">)</span> <span class="o">=</span> <span class="n">delete</span><span class="p">;</span> <span class="p">};</span>
+<span class="n">S</span> <span class="nf">foo</span><span class="p">()</span> <span class="p">{</span> <span class="k">return</span> <span class="n">S</span><span class="p">{</span><span class="mi">42</span><span class="p">};</span> <span class="p">}</span>  <span class="c1">// returns on the stack today</span>
+</pre>
+    This means we might have no choice but to break ABI. 
+   </div>
    <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <p>The wording in this section is relative to <a data-link-type="biblio" href="#biblio-n4750">WG21 draft N4750</a>,
 that is, the current draft of the C++17 standard. We quote many unchanged
@@ -1741,6 +1759,32 @@ collectively called <i>trivially copyable types</i>. Scalar types, trivial class
 and cv-qualified versions of these types are collectively called <i>trivial types</i>. Scalar types,
 standard-layout class types, arrays of such types and cv-qualified versions of these types
 are collectively called <i>standard-layout types</i>. 
+   </blockquote>
+   <p>[class.prop] #1 is unchanged:</p>
+   <blockquote>
+    <p>A <i>trivially copyable class</i> is a class:</p>
+    <ul>
+     <li data-md="">
+      <p>where each copy constructor, move constructor, copy assignment operator, and move
+assignment operator is either deleted or trivial,</p>
+     <li data-md="">
+      <p>that has at least one non-deleted copy constructor, move constructor, copy assignment
+operator, or move assignment operator, and</p>
+     <li data-md="">
+      <p>that has a trivial, non-deleted destructor.</p>
+    </ul>
+   </blockquote>
+   <p>[class.temporary] #3 is unchanged:</p>
+   <blockquote>
+    <p>When an object of class type <code class="highlight"><span class="n">X</span></code> is passed to or returned from a function, if each copy constructor,
+move constructor, and destructor of <code class="highlight"><span class="n">X</span></code> is either trivial or deleted, and <code class="highlight"><span class="n">X</span></code> has at least one
+non-deleted copy or move constructor, implementations are permitted to create a temporary object
+to hold the function parameter or result object. The temporary object is constructed from the function
+argument or return value, respectively, and the function’s parameter or return object is
+initialized as if by using the non-deleted trivial constructor to copy the temporary (even if
+that constructor is inaccessible or would not be selected by overload resolution to perform a
+copy or move of the object). [<em>Note:</em> This latitude is granted to allow objects of class type
+to be passed to or returned from functions in registers. <em>—end note</em>]</p>
    </blockquote>
    <p>[class.copy.ctor] #6 is unchanged:</p>
    <blockquote>
@@ -2032,3 +2076,21 @@ operator selected to copy/move that member is trivial;</p>
    <dt id="biblio-pr2255">[PR2255]
    <dd>Arthur O'Dwyer. <a href="https://github.com/cplusplus/draft/pull/2255">'cv-qualified versions of cv-unqualified scalar types' are just 'scalar types'</a>. July 2018. URL: <a href="https://github.com/cplusplus/draft/pull/2255">https://github.com/cplusplus/draft/pull/2255</a>
   </dl>
+  <h2 class="no-num no-ref heading settled" id="issues-index"><span class="content">Issues Index</span><a class="self-link" href="#issues-index"></a></h2>
+  <div style="counter-reset:issue">
+   <div class="issue">
+     Hmm, I now think this is wrong. Trivial copyability
+(<a href="https://timsong-cpp.github.io/cppwp/class#prop-1">[class.prop]/1</a>) requires at least one non-deleted
+copy-or-move constructor-or-assignment-operator; and our struct will no longer have that. Also, tcanens points
+to special wording in <a href="https://timsong-cpp.github.io/cppwp/class.temporary#3">[class.temporary]/3</a> that permits returning our struct in registers only if it has a non-deleted copy-or-move constructor.
+Specifically: 
+<pre class="language-c++ highlight"><span class="k">struct</span> <span class="n">S</span> <span class="p">{</span> <span class="k">volatile</span> <span class="kt">int</span> <span class="n">i</span><span class="p">;</span> <span class="p">};</span>
+<span class="n">S</span> <span class="nf">foo</span><span class="p">()</span> <span class="p">{</span> <span class="k">return</span> <span class="n">S</span><span class="p">{</span><span class="mi">42</span><span class="p">};</span> <span class="p">}</span>  <span class="c1">// returns in %eax today</span>
+</pre>
+    Whereas if we delete all the constructors: 
+<pre class="language-c++ highlight"><span class="k">struct</span> <span class="n">S</span> <span class="p">{</span> <span class="k">volatile</span> <span class="kt">int</span> <span class="n">i</span><span class="p">;</span> <span class="n">S</span><span class="p">(</span><span class="k">const</span> <span class="n">S</span><span class="o">&amp;</span><span class="p">)</span> <span class="o">=</span> <span class="n">delete</span><span class="p">;</span> <span class="p">};</span>
+<span class="n">S</span> <span class="nf">foo</span><span class="p">()</span> <span class="p">{</span> <span class="k">return</span> <span class="n">S</span><span class="p">{</span><span class="mi">42</span><span class="p">};</span> <span class="p">}</span>  <span class="c1">// returns on the stack today</span>
+</pre>
+    This means we might have no choice but to break ABI. <a href="#issue-2bb6e0ec"> ↵ </a>
+   </div>
+  </div>

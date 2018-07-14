@@ -2,7 +2,7 @@
 Title: Copying volatile subobjects is non-trivial
 Shortname: Dxxxx
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: EWG
 Status: D
 Group: WG21
@@ -261,6 +261,25 @@ This solution does not change any ABI, because it merely removes (useless, dange
 In particular, this proposal preserves the <i>trivial copyability</i> of structs with volatile members, so that it
 preserves the calling convention by which they may be returned in registers on IA64.
 
+<div class="issue">
+Hmm, I now think this is wrong. Trivial copyability
+(<a href="https://timsong-cpp.github.io/cppwp/class#prop-1">[class.prop]/1</a>) requires at least one non-deleted
+copy-or-move constructor-or-assignment-operator; and our struct will no longer have that. Also, tcanens points
+to special wording in <a href="https://timsong-cpp.github.io/cppwp/class.temporary#3">[class.temporary]/3</a>
+that permits returning our struct in registers only if it has a non-deleted copy-or-move constructor.
+Specifically:
+```c++
+struct S { volatile int i; };
+S foo() { return S{42}; }  // returns in %eax today
+```
+Whereas if we delete all the constructors:
+```c++
+struct S { volatile int i; S(const S&) = delete; };
+S foo() { return S{42}; }  // returns on the stack today
+```
+This means we might have no choice but to break ABI.
+</div>
+
 
 # Proposed wording # {#wording}
 
@@ -284,6 +303,30 @@ passages here for reference.
 > and cv-qualified versions of these types are collectively called <i>trivial types</i>. Scalar types,
 > standard-layout class types, arrays of such types and cv-qualified versions of these types
 > are collectively called <i>standard-layout types</i>.
+
+[class.prop] #1 is unchanged:
+
+> A <i>trivially copyable class</i> is a class:
+>
+>   - where each copy constructor, move constructor, copy assignment operator, and move
+>     assignment operator is either deleted or trivial,
+>
+>   - that has at least one non-deleted copy constructor, move constructor, copy assignment
+>     operator, or move assignment operator, and
+>
+>   - that has a trivial, non-deleted destructor.
+
+[class.temporary] #3 is unchanged:
+
+> When an object of class type `X` is passed to or returned from a function, if each copy constructor,
+> move constructor, and destructor of `X` is either trivial or deleted, and `X` has at least one
+> non-deleted copy or move constructor, implementations are permitted to create a temporary object
+> to hold the function parameter or result object. The temporary object is constructed from the function
+> argument or return value, respectively, and the function's parameter or return object is
+> initialized as if by using the non-deleted trivial constructor to copy the temporary (even if
+> that constructor is inaccessible or would not be selected by overload resolution to perform a
+> copy or move of the object). [*Note:* This latitude is granted to allow objects of class type
+> to be passed to or returned from functions in registers. *—end note*]
 
 [class.copy.ctor] #6 is unchanged:
 
