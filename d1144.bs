@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 0
-!Draft Revision: 8
+!Draft Revision: 9
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -54,8 +54,8 @@ is <b><i>[$trivially relocatable$]</i></b> if its relocation operation is trivia
 and trivial copy-construction, means "the operation is tantamount to a `memcpy`").
 
 Almost all relocatable types are trivially relocatable: `std::unique_ptr<int>`,
-`std::vector<int>`, `std::string`, `std::any`. Non-trivially relocatable
-types exist but are rare; see [[#non-trivial-samples]].
+`std::vector<int>`, `std::string`. Non-trivially relocatable types
+exist but are rare; see [[#non-trivial-samples]].
 
 Arthur has established (see [[Bench]])
 that if standard library code had a reliable way of detecting "trivial relocatability," we could optimize
@@ -79,7 +79,7 @@ relocatable `C` in the program. A smaller number of instantiations means faster 
 a smaller text section, and perhaps "hotter" code (because a relatively higher proportion of your
 code now fits in icache).
 
-In between these two scenarios, we also find the move-constructor of `fixed_capacity_vector<R,N>`,
+In between these two scenarios is the move-constructor of `fixed_capacity_vector<R,N>`,
 which can be implemented as an element-by-element *move* (leaving the source vector's elements in their
 moved-from state), or can be implemented more efficiently as an element-by-element *relocate* (leaving
 the source vector empty).
@@ -92,8 +92,58 @@ less efficient element-by-element-move strategy. Moving-out-of a
 `boost::container::static_vector` will not make the source vector
 `empty()`.
 
-Finally, some concurrent data structures might reasonably assert the trivial relocatability of
+Some concurrent data structures might reasonably assert the trivial relocatability of
 their elements, just as they sometimes assert the stronger property of trivial *copyability* today.
+
+
+## Real-world code already does it wrong ## {#doing-it-wrong}
+
+Finally, and importantly, many real-world codebases contain templates which require
+trivial relocatability of their template parameters, but currently have no way to *check*
+trivial relocatability. For example, [[Folly]] requires the programmer to warrant the trivial
+relocatability of any type stored in a `folly::fbvector`.
+
+```c++
+    class Widget {
+        std::vector<int> lst_;
+    };
+
+    folly::fbvector<Widget> vec;  // FAILS AT COMPILE TIME for lack of warrant
+```
+
+But this merely encourages the programmer to add the warrant and continue. An incorrect
+warrant will be discovered only at runtime, via undefined behavior. (See [[#non-trivial-sample-list]]
+and [[FollyIssue889]].)
+
+```c++
+    class Gadget {
+        std::list<int> lst_;
+    };
+    // sigh, add the warrant on autopilot
+    template<> struct folly::IsRelocatable<Gadget> : std::true_type {};
+
+    folly::fbvector<Gadget> vec;  // CRASHES AT RUNTIME due to fraudulent warrant
+```
+
+If this proposal is adopted, then Folly can start using `static_assert(std::is_trivially_relocatable_v<T>)`
+in the implementation of `fbvector`, and the programmer can stop writing explicit warrants in the vast majority
+of cases, *and* the programmer can start writing assertions of correctness, which aids maintainability and
+can even find real bugs. Example:
+
+```c++
+    class Widget {
+        std::vector<int> lst_;
+    };
+    static_assert(std::is_trivially_relocatable_v<Widget>);  // correctly SUCCEEDS
+
+    class Gadget {
+        std::list<int> lst_;
+    };
+    static_assert(std::is_trivially_relocatable_v<Gadget>);  // correctly FAILS
+```
+
+The improvement in user experience for real-world codebases (such as [[Folly]], [[EASTL]], BDE, Qt, etc.)
+is the most important benefit to be gained by this proposal.
 
 
 # Design goals # {#design-goals}
@@ -576,9 +626,7 @@ void uninitialized_relocate(FwdIt first, FwdIt last, OutIt d_first) {
 
 This implementation could be used to quickly relocate an array of
 `int*` into an array of `unique_ptr<int>`
-(but not vice versa). It could also be used to quickly relocate an array of
-`T` into an array of `tombstone::optional<T>`. (The concept of "tombstone optional"
-is described in [[Best]].)
+(but not vice versa).
 All we'd need is for somebody to set the value of `is_trivially_relocatable_from`
 appropriately for each pair of types in the program.
 
@@ -624,7 +672,7 @@ makes their code run faster. It will become a de-facto customization point, and 
 never be able to "fix it right" for fear of breaking programmers' existing code.
 
 Therefore, I believe that we should *not* pursue "heterogeneous" relocation
-operations at the present time.
+operations in C++20.
 
 Note that vendors are already free to optimize heterogeneous operations inside
 library algorithms, under the as-if rule. We lack a portable and generic detection
@@ -970,7 +1018,7 @@ uses this mechanism (on a 24-byte buffer) and is thus not trivially relocatable.
 
 However, different mechanisms for small-buffer optimization exist.
 [[LibcxxAny|libc++'s std::any]] also achieves small-buffer optimization
-on a 24-byte buffer, without sacrificing trivial relocatability.
+on a 24-byte buffer, without (necessarily) sacrificing trivial relocatability.
 
 <small>
 ```
@@ -1004,6 +1052,42 @@ struct short_string {
 </small>
 
 
+## Allocated memory contains pointer to self ## {#non-trivial-sample-list}
+
+`std::list` needs somewhere to store its "past-the-end" node, commonly referred to
+as the "sentinel node," whose `prev` pointer points to the list's last node.
+If the sentinel node is allocated on the heap, then `std::list` can be trivially
+relocatable; but if the sentinel node is placed within the `list` object itself
+(as happens on libc++ and libstdc++), then relocating the `list` object requires
+fixing up the list's last node's `next` pointer so that it points to the
+new sentinel node inside the destination `list` object. This fixup of an arbitrary
+heap object cannot be simulated by `memcpy`.
+
+Traditional implementations of `std::set` and `std::map` also store a "past-the-end"
+node inside themselves and thus also fall into this category.
+
+<small>
+```
+struct node {
+    node *prev_ = nullptr;
+    node *next_ = nullptr;
+};
+struct list {
+    node n_;
+    iterator begin() { return iterator(n_.next_); }
+    iterator end() { return iterator(&n_); }
+    list(list&& l) {
+        if (l.n_.next_) l.n_.next_->prev_ = &n_;  // fixup
+        if (l.n_.prev_) l.n_.prev_->next_ = &n_;  // fixup
+        n_ = l.n_;
+        l.n_ = node{};
+    }
+    // ...
+};
+```
+</small>
+
+
 ## Class invariant depends on `this` ## {#non-trivial-sample-offset-ptr}
 
 The `offset_ptr` provided by [[Boost.Interprocess]] is an example of this category.
@@ -1032,7 +1116,6 @@ struct offset_ptr {
 
 ## Program invariant depends on `this` ## {#non-trivial-sample-registry}
 
-This example was suggested by Mingxin Wang.
 In the following snippet, `struct Widget` is relocatable, but not
 trivially relocatable, because the relocation operation of destroying a `Widget` at point A
 and constructing a new `Widget` at point B has behavior that is observably different
@@ -1063,6 +1146,7 @@ A prototype Clang/libc++ implementation is at
 
 - [github.com/Quuxplusone/clang/tree/trivially-relocatable](https://github.com/Quuxplusone/clang/tree/trivially-relocatable)
 - [github.com/Quuxplusone/libcxx/tree/trivially-relocatable](https://github.com/Quuxplusone/libcxx/tree/trivially-relocatable)
+- <a href="https://godbolt.org/g/TA2Xmy">godbolt.org</a>, under the name "x86-64 clang (experimental P1144)"
 
 Issue: no benchmarks yet
 
@@ -1151,6 +1235,13 @@ Issue: no benchmarks yet
     ],
     "title": "Folly documentation on \"Object Relocation\"",
     "href": "https://github.com/facebook/folly/blob/master/folly/docs/FBVector.md#object-relocation"
+  },
+  "FollyIssue889": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "Traits.h marks std::list as trivially relocatable, but in fact it is not",
+    "href": "https://github.com/facebook/folly/issues/889"
   },
   "LibcxxAny": {
     "authors": [
