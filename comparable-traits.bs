@@ -1,0 +1,217 @@
+<pre class='metadata'>
+Title: Type traits for structural comparison
+Shortname: Dxxxx
+Revision: 0
+!Draft Revision: 1
+Audience: LEWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/comparable-traits.bs">github.com/Quuxplusone/draft/blob/gh-pages/comparable-traits.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/comparable-traits.html">rawgit.com/Quuxplusone/draft/gh-pages/comparable-traits.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Following on the heels of [[P0732|P0732 "Class Types in Non-Type Template Parameters"]], we propose the new
+  type-trait <code>has_strong_structural_equality&lt;T&gt;</code>.
+  This trait improves code maintainability by letting the programmer <code>static_assert</code>
+  an important property of their class types.
+Date: 2018-07-25
+</pre>
+
+<style>
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+
+# Strong structural equality should be static-assertable # {#structural-equality}
+
+If [[P0732]] is adopted into C++20, then the concept of "having strong structural equality" will become important
+to programmers. Take this class type for example:
+
+```c++
+template<class CharT, std::size_t N>
+struct basic_fixed_string
+{
+    constexpr basic_fixed_string(const CharT (&foo)[N+1])
+        { std::copy_n(foo, N+1, m_data); }
+    friend auto operator <=> (const basic_fixed_string &,
+                              const basic_fixed_string &) = default;
+    CharT m_data[N+1];
+};
+```
+
+[[P0732]] proposes that this type's `operator<=>` is a "structural comparison operator"
+(because it is defaulted, and invokes only other structural comparison operators). And, since it yields
+`strong_ordering`, P0732 proposes that the type has what we call "strong structural ordering," which
+is a superset of "strong structural equality" — and <em>that</em> is the property required by P0732 for
+using values of user-defined type as template non-type parameters.
+
+The proposal you are now reading assumes that P0732 will soon be adopted into C++2a, so that
+"strong structural equality" becomes an important property of types in C++2a. I propose that
+C++ should permit the programmer to test the presence or absence of this property.
+Example:
+
+```c++
+static_assert(std::has_strong_structural_equality_v< basic_fixed_string<5> >);
+```
+
+This permits maintainability-minded programmers to express their intention in code.
+
+```c++
+template<class CharT, std::size_t N>
+struct broken_fixed_string
+{
+    constexpr broken_fixed_string(const CharT (&foo)[N+1])
+        { std::copy_n(foo, N+1, m_data); }
+    friend auto operator <=> (const broken_fixed_string& a,
+                              const broken_fixed_string& b)
+        { return std::memcmp(a.m_data, b.m_data, N+1) <=> 0; }
+    CharT m_data[N+1];
+};
+static_assert(std::has_strong_structural_equality_v<broken_fixed_string<5>>,
+    "broken_fixed_string lacks the strong structural equality we expected");
+
+// ... possibly many lines of code here ...
+
+template<auto V> struct A {};
+A<broken_fixed_string("hello")> a;
+```
+
+In the snippet above, we get a nice descriptive `static_assert` failure, instead of an
+unfriendly spew of diagnostics on the line that tries to instantiate `A`.
+
+
+# This feature requires support from the compiler # {#compiler-builtin}
+
+The programmer cannot implement this type-trait in standard C++2a. They can get very close:
+
+```c++
+template<auto V> constexpr int Test() { return 0; }
+
+template<class T, class = int>
+struct HasStrongStructuralEquality : std::false_type {};
+
+template<class T>
+struct HasStrongStructuralEquality<T, decltype(Test<T{}>())> : std::true_type {};
+
+static_assert(HasStrongStructuralEquality< int >::value);
+static_assert(!HasStrongStructuralEquality< std::string >::value);
+```
+
+But this approach falters when `T` is not constexpr default-constructible.
+We have seen this obstacle before; it produced the [[SO|now-deprecated]] type-trait `is_literal_type<T>`, which likewise
+cannot be implemented in standard C++. The present situation is exactly analogous.
+
+
+# Provide a full complement of type traits # {#batteries-included}
+
+We propose the following type-traits, with their accompanying `_v` versions.
+For exposition purposes only, we provide sample implementations in terms of
+a hypothetical GCC/Clang builtin `__has_structural_comparison(T)`.
+
+<small>
+```c++
+template<class T> struct has_structural_comparison :
+    bool_constant< __has_structural_comparison(T) > {};
+
+template<class T> struct has_strong_structural_ordering :
+    bool_constant<
+        __has_structural_comparison(T) &&
+        is_convertible_v<decltype(declval<T>() <=> declval<T>()), strong_ordering>
+    > {};
+
+template<class T> struct has_strong_structural_equality :
+    bool_constant<
+        __has_structural_comparison(T) &&
+        is_convertible_v<decltype(declval<T>() <=> declval<T>()), strong_equality>
+    > {};
+
+template<class T> struct has_weak_structural_ordering :
+    bool_constant<
+        __has_structural_comparison(T) &&
+        is_convertible_v<decltype(declval<T>() <=> declval<T>()), weak_ordering>
+    > {};
+
+template<class T> struct has_weak_structural_equality :
+    bool_constant<
+        __has_structural_comparison(T) &&
+        is_convertible_v<decltype(declval<T>() <=> declval<T>()), weak_equality>
+    > {};
+
+template<class T> struct has_partial_structural_ordering :
+    bool_constant<
+        __has_structural_comparison(T) &&
+        is_convertible_v<decltype(declval<T>() <=> declval<T>()), partial_ordering>
+    > {};
+```
+</small>
+
+# Proposed wording # {#wording}
+
+Add new entries to Table 46 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
+
+<small><blockquote>
+<table>
+<tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr>
+<tr>
+<td>`template<class T> struct has_structural_comparison;`</td>
+<td>For a glvalue `x` of type `const T`, the expression `x <=> x` either does not invoke a three-way comparison operator or invokes a structural comparison operator (15.9.1).</td>
+<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+</tr>
+<tr>
+<td>`template<class T> struct has_strong_structural_ordering;`</td>
+<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::strong_ordering`.</td>
+<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+</tr>
+<tr>
+<td>`template<class T> struct has_strong_structural_equality;`</td>
+<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::strong_equality`.</td>
+<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+</tr>
+<tr>
+<td>`template<class T> struct has_weak_structural_ordering;`</td>
+<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::weak_ordering`.</td>
+<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+</tr>
+<tr>
+<td>`template<class T> struct has_weak_structural_equality;`</td>
+<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::weak_equality`.</td>
+<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+</tr>
+<tr>
+<td>`template<class T> struct has_strong_structural_ordering;`</td>
+<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::strong_ordering`.</td>
+<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+</tr>
+<tr>
+<td>`template<class T> struct has_partial_structural_ordering;`</td>
+<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::partial_ordering`.</td>
+<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+</tr>
+</table>
+</blockquote></small>
+
+<pre class=biblio>
+{
+  "P0732": {
+    "title": "Class Types in Non-Type Template Parameters",
+    "authors": [
+        "Jeff Snyder",
+        "Louis Dionne"
+    ],
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf",
+    "date": "June 2018"
+  },
+  "SO": {
+    "title": "Deprecated std::is_literal_type in C++17",
+    "authors": [
+      "plasmacel",
+      "Nicol Bolas"
+    ],
+    "href": "https://stackoverflow.com/questions/40351816/deprecated-stdis-literal-type-in-c17",
+    "date": "October 2016"
+  }
+}
+</pre>
