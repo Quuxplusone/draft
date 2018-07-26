@@ -1496,9 +1496,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Draft Revision:
      <dd>10
      <dt>Current Source:
-     <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs</a>
+     <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs</a>
      <dt>Current:
-     <dd><a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d1144.html">rawgit.com/Quuxplusone/draft/gh-pages/d1144.html</a>
+     <dd><a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d1144.html">rawgit.com/Quuxplusone/draft/gh-pages/d1144-object-relocation.html</a>
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -1870,13 +1870,12 @@ However, this would lead to the compiler’s failing
 to identify certain (unrealistic) class types as trivially relocatable, when in fact it has enough
 information to infer that they <em>are</em> trivially relocatable in practice. This would leave room for a
 "better" implementation beneath ours. I tentatively prefer to optimize for maximum performance over spec simplicity.</p>
-   <p class="note" role="note"><span>Note:</span> There is no special treatment for <code class="highlight"><c- k="">volatile</c-></code> subobjects. Using <code class="highlight"><c- n="">memmove</c-></code> on <code class="highlight"><c- k="">volatile</c-></code> subobjects
-can cause tearing of reads and writes. Issues <a data-link-type="biblio" href="#biblio-cwg496">[CWG496]</a> and <a data-link-type="biblio" href="#biblio-cwg1746">[CWG1746]</a> aimed to evict <code class="highlight"><c- k="">volatile</c-></code> objects and subobjects from the set of "trivially copyable types," but these changes were reverted
-by <a data-link-type="biblio" href="#biblio-cwg2094">[CWG2094]</a> (2016). As of C++17, bytewise copying of <code class="highlight"><c- k="">volatile</c-></code> subobjects is permitted
-by <a data-link-type="biblio" href="#biblio-basictypes">[basic.types]</a>. Arthur has a paper coming for this.</p>
+   <p class="note" role="note"><span>Note:</span> There is no special treatment for volatile subobjects. Using <code class="highlight"><c- n="">memmove</c-></code> on volatile subobjects
+can cause tearing of reads and writes. This paper introduces no <em>new</em> issues in this area;
+see <a data-link-type="biblio" href="#biblio-subobjects">[Subobjects]</a>. Problems with <code class="highlight"><c- k="">volatile</c-></code> are addressed by <a data-link-type="biblio" href="#biblio-p1153r0">[P1153R0]</a> and by an upcoming paper from JF Bastien.</p>
    <p class="note" role="note"><span>Note:</span> There is no special treatment for possibly overlapping subobjects. Using <code class="highlight"><c- n="">memmove</c-></code> on possibly overlapping
 subobjects can overwrite unrelated objects in the vicinity of the destination. This paper introduces
-no <em>new</em> issues in this area. See <a data-link-type="biblio" href="#biblio-subobjects">[Subobjects]</a>.</p>
+no <em>new</em> issues in this area; see <a data-link-type="biblio" href="#biblio-subobjects">[Subobjects]</a>.</p>
    <p class="issue" id="issue-a0d45ced"><a class="self-link" href="#issue-a0d45ced"></a> Must we also say that the relevant move constructor (resp. copy constructor) must be public and unambiguous?</p>
    <div class="issue" id="issue-97d92dd0">
     <a class="self-link" href="#issue-97d92dd0"></a> Consider the following test case—<wbr>
@@ -2623,14 +2622,6 @@ from a simple <code class="highlight"><c- n="">memcpy</c-></code>.</p>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
   <h3 class="no-num no-ref heading settled" id="normative"><span class="content">Normative References</span><a class="self-link" href="#normative"></a></h3>
   <dl>
-   <dt id="biblio-basictypes">[BASIC.TYPES]
-   <dd><a href="http://eel.is/c++draft/basic.types#2">N4750, [basic.types] clauses 2, 3, and 9</a>. May 2018. URL: <a href="http://eel.is/c++draft/basic.types#2">http://eel.is/c++draft/basic.types#2</a>
-   <dt id="biblio-cwg1746">[CWG1746]
-   <dd>Walter Brown. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746">Are volatile scalar types trivially copyable?</a>. September 2013–January 2014. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746</a>
-   <dt id="biblio-cwg2094">[CWG2094]
-   <dd>Daveed Vandevoorde. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094">Trivial copy/move constructor for class with volatile member</a>. March 2015–June 2016. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094</a>
-   <dt id="biblio-cwg496">[CWG496]
-   <dd>John Maddock. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496">Is a volatile-qualified type really a POD?</a>. December 2004–October 2012. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496</a>
    <dt id="biblio-lwg2139">[LWG2139]
    <dd>Loïc Joly. <a href="https://cplusplus.github.io/LWG/issue2139">What is a user-defined type?</a>. March 2012–June 2018. URL: <a href="https://cplusplus.github.io/LWG/issue2139">https://cplusplus.github.io/LWG/issue2139</a>
    <dt id="biblio-lwg3119">[LWG3119]
@@ -2670,6 +2661,8 @@ from a simple <code class="highlight"><c- n="">memcpy</c-></code>.</p>
    <dd>Denis Bider. <a href="http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0023r0.pdf">P0023R0: Relocator: Efficiently Moving Objects</a>. April 2016. URL: <a href="http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0023r0.pdf">http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0023r0.pdf</a>
    <dt id="biblio-p1029r0">[P1029R0]
    <dd>Niall Douglas. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf">P1029R0: SG14 `[[move_relocates]]`</a>. May 2018. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf</a>
+   <dt id="biblio-p1153r0">[P1153R0]
+   <dd>Arthur O'Dwyer; JF Bastien. P1153R0: Copying volatile subobjects is not trivial. July 2018. 
    <dt id="biblio-sane">[Sane]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/">Thoughts on "sanely move-assignable"</a>. July 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/">https://quuxplusone.github.io/blog/2018/07/06/thoughts-on-sanely-move-assignable/</a>
    <dt id="biblio-subobjects">[Subobjects]

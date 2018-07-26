@@ -1,5 +1,9 @@
 
-all: volatile-subobjects.html d1144.html comparable-traits.html
+all: \
+    d1144-object-relocation.html \
+    d1153-volatile-subobjects.html \
+    d1154-comparable-traits.html \
+    d1155-more-implicit-moves.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
