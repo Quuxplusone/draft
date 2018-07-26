@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>DxxxxR0: Copying volatile subobjects is non-trivial</title>
+  <title>DxxxxR0: Type traits for structural comparison</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1441,27 +1441,23 @@ pre .property::before, pre .property::after {
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">DxxxxR0<br>Copying volatile subobjects is non-trivial</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-07-11">2018-07-11</time></span></h2>
+   <h1 class="p-name no-ref" id="title">DxxxxR0<br>Type traits for structural comparison</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-07-25">2018-07-25</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
-     <dt>Issue Tracking:
-     <dd><a href="#issues-index">Inline In Spec</a>
-     <dt>Authors:
+     <dt>Author:
      <dd>
       <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
-     <dd>
-      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:cxx@jfbastien.com">JF Bastien</a>
      <dt>Audience:
-     <dd>EWG
+     <dd>LEWG
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>3
+     <dd>1
      <dt>Current Source:
-     <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/volatile-subobjects.bs">github.com/Quuxplusone/draft/blob/gh-pages/volatile-subobjects.bs</a>
+     <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/comparable-traits.bs">github.com/Quuxplusone/draft/blob/gh-pages/comparable-traits.bs</a>
      <dt>Current:
-     <dd><a href="https://rawgit.com/Quuxplusone/draft/gh-pages/volatile-subobjects.html">rawgit.com/Quuxplusone/draft/gh-pages/volatile-subobjects.html</a>
+     <dd><a href="https://rawgit.com/Quuxplusone/draft/gh-pages/comparable-traits.html">rawgit.com/Quuxplusone/draft/gh-pages/comparable-traits.html</a>
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -1469,465 +1465,130 @@ pre .property::before, pre .property::after {
   </div>
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
-   <p>In C++11, if a class type had both a volatile subobject and defaulted special members, it was trivially copyable.
+   <p>Following on the heels of <a data-link-type="biblio" href="#biblio-p0732">P0732 "Class Types in Non-Type Template Parameters"</a>, we propose the new
 
-CWG issue 496 (2004–2012) changed this so that if a class type had both a volatile subobject and defaulted special members, it was
-non-trivially copyable.
-CWG issues 1746 and 2094 (2013–2016) changed it back, so that if a class type had both a volatile subobject and defaulted
-special members, it was trivially copyable.
-This is where we stand today.
-This paper proposes that class types with volatile subobjects should have their copy and move operations default to deleted.
-We propose this change because the authors do not know of any correct usage of copying structs with volatile subobjects.</p>
+type-trait <code class="highlight"><c- n="">has_strong_structural_equality</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-></code>.
+This trait improves code maintainability by letting the programmer <code class="highlight"><c- k="">static_assert</c-></code> an important property of their class types.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
    <ol class="toc" role="directory">
-    <li><a href="#motivation"><span class="secno">1</span> <span class="content">Motivation for volatile subobjects</span></a>
-    <li>
-     <a href="#history"><span class="secno">2</span> <span class="content">History</span></a>
-     <ol class="toc">
-      <li><a href="#cwg496"><span class="secno">2.1</span> <span class="content">CWG 496: Is a volatile-qualified type really a POD?</span></a>
-      <li><a href="#cwg1746"><span class="secno">2.2</span> <span class="content">CWG 1746: Are volatile scalar types trivially copyable?</span></a>
-      <li><a href="#cwg2094"><span class="secno">2.3</span> <span class="content">CWG 2094: Trivial move/copy constructor for class with volatile member</span></a>
-     </ol>
-    <li><a href="#problem"><span class="secno">3</span> <span class="content">The problem</span></a>
-    <li><a href="#solution"><span class="secno">4</span> <span class="content">The proposed solution</span></a>
-    <li><a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording</span></a>
+    <li><a href="#structural-equality"><span class="secno">1</span> <span class="content">Strong structural equality should be static-assertable</span></a>
+    <li><a href="#compiler-builtin"><span class="secno">2</span> <span class="content">This feature requires support from the compiler</span></a>
+    <li><a href="#batteries-included"><span class="secno">3</span> <span class="content">Provide a full complement of type traits</span></a>
+    <li><a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
-      <li><a href="#normative"><span class="secno"></span> <span class="content">Normative References</span></a>
       <li><a href="#informative"><span class="secno"></span> <span class="content">Informative References</span></a>
      </ol>
-    <li><a href="#issues-index"><span class="secno"></span> <span class="content">Issues Index</span></a>
    </ol>
   </nav>
   <main>
-   <h2 class="heading settled" data-level="1" id="motivation"><span class="secno">1. </span><span class="content">Motivation for volatile subobjects</span><a class="self-link" href="#motivation"></a></h2>
-   <p>Volatile-qualifying a specific non-static data member (NSDM) of a class doesn’t sound like a very useful thing to do.
-But it does have at least one use, in the embedded-systems niche:</p>
-<pre class="language-c++ highlight">    <c- k="">struct</c-> <c- n="">MemoryMappedRegisters</c-> <c- p="">{</c->
-        <c- k="">volatile</c-> <c- b="">uint32_t</c-> <c- n="">r0</c-><c- p="">;</c->
-        <c- k="">volatile</c-> <c- b="">uint32_t</c-> <c- n="">r1</c-><c- p="">;</c->
-        <c- k="">volatile</c-> <c- b="">uint32_t</c-> <c- n="">r2</c-><c- p="">;</c->
-        <c- k="">volatile</c-> <c- b="">uint32_t</c-> <c- n="">r3</c-><c- p="">;</c->
-    <c- p="">};</c->
+   <h2 class="heading settled" data-level="1" id="structural-equality"><span class="secno">1. </span><span class="content">Strong structural equality should be static-assertable</span><a class="self-link" href="#structural-equality"></a></h2>
+   <p>If <a data-link-type="biblio" href="#biblio-p0732">[P0732]</a> is adopted into C++20, then the concept of "having strong structural equality" will become important
+to programmers. Take this class type for example:</p>
+<pre class="language-c++ highlight"><c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">CharT</c-><c- p="">,</c-> <c- n="">std</c-><c- o="">::</c-><c- b="">size_t</c-> <c- n="">N</c-><c- o="">></c->
+<c- k="">struct</c-> <c- n="">basic_fixed_string</c->
+<c- p="">{</c->
+    <c- n="">constexpr</c-> <c- n="">basic_fixed_string</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">CharT</c-> <c- p="">(</c-><c- o="">&amp;</c-><c- n="">foo</c-><c- p="">)[</c-><c- n="">N</c-><c- o="">+</c-><c- mi="">1</c-><c- p="">])</c->
+        <c- p="">{</c-> <c- n="">std</c-><c- o="">::</c-><c- n="">copy_n</c-><c- p="">(</c-><c- n="">foo</c-><c- p="">,</c-> <c- n="">N</c-><c- o="">+</c-><c- mi="">1</c-><c- p="">,</c-> <c- n="">m_data</c-><c- p="">);</c-> <c- p="">}</c->
+    <c- n="">friend</c-> <c- k="">auto</c-> <c- n="">operator</c-> <c- o="">&lt;=></c-> <c- p="">(</c-><c- k="">const</c-> <c- n="">basic_fixed_string</c-> <c- o="">&amp;</c-><c- p="">,</c->
+                              <c- k="">const</c-> <c- n="">basic_fixed_string</c-> <c- o="">&amp;</c-><c- p="">)</c-> <c- o="">=</c-> <c- k="">default</c-><c- p="">;</c->
+    <c- n="">CharT</c-> <c- n="">m_data</c-><c- p="">[</c-><c- n="">N</c-><c- o="">+</c-><c- mi="">1</c-><c- p="">];</c->
+<c- p="">};</c->
+</pre>
+   <p><a data-link-type="biblio" href="#biblio-p0732">[P0732]</a> proposes that this type’s <code class="highlight"><c- k="">operator</c-><c- o="">&lt;=></c-></code> is a "structural comparison operator"
+(because it is defaulted, and invokes only other structural comparison operators). And, since it yields <code class="highlight"><c- n="">strong_ordering</c-></code>, P0732 proposes that the type has what we call "strong structural ordering," which
+is a superset of "strong structural equality" — and <em>that</em> is the property required by P0732 for
+using values of user-defined type as template non-type parameters.</p>
+   <p>The proposal you are now reading assumes that P0732 will soon be adopted into C++2a, so that
+"strong structural equality" becomes an important property of types in C++2a. I propose that
+C++ should permit the programmer to test the presence or absence of this property.
+Example:</p>
+<pre class="language-c++ highlight"><c- n="">static_assert</c-><c- p="">(</c-><c- n="">std</c-><c- o="">::</c-><c- n="">has_strong_structural_equality_v</c-><c- o="">&lt;</c-> <c- n="">basic_fixed_string</c-><c- o="">&lt;</c-><c- mi="">5</c-><c- o="">></c-> <c- o="">></c-><c- p="">);</c->
+</pre>
+   <p>This permits maintainability-minded programmers to express their intention in code.</p>
+<pre class="language-c++ highlight"><c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">CharT</c-><c- p="">,</c-> <c- n="">std</c-><c- o="">::</c-><c- b="">size_t</c-> <c- n="">N</c-><c- o="">></c->
+<c- k="">struct</c-> <c- n="">broken_fixed_string</c->
+<c- p="">{</c->
+    <c- n="">constexpr</c-> <c- n="">broken_fixed_string</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">CharT</c-> <c- p="">(</c-><c- o="">&amp;</c-><c- n="">foo</c-><c- p="">)[</c-><c- n="">N</c-><c- o="">+</c-><c- mi="">1</c-><c- p="">])</c->
+        <c- p="">{</c-> <c- n="">std</c-><c- o="">::</c-><c- n="">copy_n</c-><c- p="">(</c-><c- n="">foo</c-><c- p="">,</c-> <c- n="">N</c-><c- o="">+</c-><c- mi="">1</c-><c- p="">,</c-> <c- n="">m_data</c-><c- p="">);</c-> <c- p="">}</c->
+    <c- n="">friend</c-> <c- k="">auto</c-> <c- n="">operator</c-> <c- o="">&lt;=></c-> <c- p="">(</c-><c- k="">const</c-> <c- n="">broken_fixed_string</c-><c- o="">&amp;</c-> <c- n="">a</c-><c- p="">,</c->
+                              <c- k="">const</c-> <c- n="">broken_fixed_string</c-><c- o="">&amp;</c-> <c- n="">b</c-><c- p="">)</c->
+        <c- p="">{</c-> <c- k="">return</c-> <c- n="">std</c-><c- o="">::</c-><c- n="">memcmp</c-><c- p="">(</c-><c- n="">a</c-><c- p="">.</c-><c- n="">m_data</c-><c- p="">,</c-> <c- n="">b</c-><c- p="">.</c-><c- n="">m_data</c-><c- p="">,</c-> <c- n="">N</c-><c- o="">+</c-><c- mi="">1</c-><c- p="">)</c-> <c- o="">&lt;=></c-> <c- mi="">0</c-><c- p="">;</c-> <c- p="">}</c->
+    <c- n="">CharT</c-> <c- n="">m_data</c-><c- p="">[</c-><c- n="">N</c-><c- o="">+</c-><c- mi="">1</c-><c- p="">];</c->
+<c- p="">};</c->
+<c- n="">static_assert</c-><c- p="">(</c-><c- n="">std</c-><c- o="">::</c-><c- n="">has_strong_structural_equality_v</c-><c- o="">&lt;</c-><c- n="">broken_fixed_string</c-><c- o="">&lt;</c-><c- mi="">5</c-><c- o="">>></c-><c- p="">,</c->
+    <c- s="">"broken_fixed_string lacks the strong structural equality we expected"</c-><c- p="">);</c->
 
-    <c- n="">MemoryMappedRegisters</c-><c- o="">&amp;</c-> <c- n="">g_registers</c-> <c- o="">=</c-> <c- o="">*</c-><c- p="">(</c-><c- n="">MemoryMappedRegisters</c-><c- o="">*</c-><c- p="">)</c-><c- mh="">0x4200</c-><c- p="">;</c->
+<c- c1="">// ... possibly many lines of code here ...</c->
+<c- c1=""></c->
+<c- n="">template</c-><c- o="">&lt;</c-><c- k="">auto</c-> <c- n="">V</c-><c- o="">></c-> <c- k="">struct</c-> <c- n="">A</c-> <c- p="">{};</c->
+<c- n="">A</c-><c- o="">&lt;</c-><c- n="">broken_fixed_string</c-><c- p="">(</c-><c- s="">"hello"</c-><c- p="">)</c-><c- o="">></c-> <c- n="">a</c-><c- p="">;</c->
+</pre>
+   <p>In the snippet above, we get a nice descriptive <code class="highlight"><c- k="">static_assert</c-></code> failure, instead of an
+unfriendly spew of diagnostics on the line that tries to instantiate <code class="highlight"><c- n="">A</c-></code>.</p>
+   <h2 class="heading settled" data-level="2" id="compiler-builtin"><span class="secno">2. </span><span class="content">This feature requires support from the compiler</span><a class="self-link" href="#compiler-builtin"></a></h2>
+   <p>The programmer cannot implement this type-trait in standard C++2a. They can get very close:</p>
+<pre class="language-c++ highlight"><c- n="">template</c-><c- o="">&lt;</c-><c- k="">auto</c-> <c- n="">V</c-><c- o="">></c-> <c- n="">constexpr</c-> <c- b="">int</c-> <c- n="">Test</c-><c- p="">()</c-> <c- p="">{</c-> <c- k="">return</c-> <c- mi="">0</c-><c- p="">;</c-> <c- p="">}</c->
 
-    <c- b="">void</c-> <c- nf="">foo</c-><c- p="">(</c-><c- n="">MemoryMappedRegisters</c-><c- o="">&amp;</c-> <c- n="">regs</c-><c- p="">)</c-> <c- p="">{</c->
-        <c- p="">...</c->
-        <c- c1="">// This access is defined by our implementation to perform a 4-byte store</c->
-<c- c1=""></c->        <c- c1="">// followed by two 4-byte loads.</c->
-<c- c1=""></c->        <c- n="">regs</c-><c- p="">.</c-><c- n="">r0</c-> <c- o="">=</c-> <c- mh="">0x1234</c-><c- p="">;</c->
-        <c- k="">auto</c-> <c- n="">x</c-> <c- o="">=</c-> <c- n="">regs</c-><c- p="">.</c-><c- n="">r1</c-><c- p="">;</c->
-        <c- k="">auto</c-> <c- n="">y</c-> <c- o="">=</c-> <c- n="">regs</c-><c- p="">.</c-><c- n="">r1</c-><c- p="">;</c->  <c- c1="">// re-load from the same register</c->
-<c- c1=""></c->        <c- p="">...</c->
-    <c- p="">}</c->
+<c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- p="">,</c-> <c- n="">class</c-> <c- o="">=</c-> <c- b="">int</c-><c- o="">></c->
+<c- k="">struct</c-> <c- nl="">HasStrongStructuralEquality</c-> <c- p="">:</c-> <c- n="">std</c-><c- o="">::</c-><c- n="">false_type</c-> <c- p="">{};</c->
+
+<c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c->
+<c- k="">struct</c-> <c- n="">HasStrongStructuralEquality</c-><c- o="">&lt;</c-><c- n="">T</c-><c- p="">,</c-> <c- n="">decltype</c-><c- p="">(</c-><c- n="">Test</c-><c- o="">&lt;</c-><c- n="">T</c-><c- p="">{}</c-><c- o="">></c-><c- p="">())</c-><c- o="">></c-> <c- o="">:</c-> <c- n="">std</c-><c- o="">::</c-><c- n="">true_type</c-> <c- p="">{};</c->
+
+<c- n="">static_assert</c-><c- p="">(</c-><c- n="">HasStrongStructuralEquality</c-><c- o="">&lt;</c-> <c- b="">int</c-> <c- o="">>::</c-><c- n="">value</c-><c- p="">);</c->
+<c- n="">static_assert</c-><c- p="">(</c-><c- o="">!</c-><c- n="">HasStrongStructuralEquality</c-><c- o="">&lt;</c-> <c- n="">std</c-><c- o="">::</c-><c- n="">string</c-> <c- o="">>::</c-><c- n="">value</c-><c- p="">);</c->
 </pre>
-   <p>This example motivates classes with volatile-qualified NSDMs. It does not motivate <em>copying</em> those classes.</p>
-   <p>In some rare cases the programmer might actually want to copy all of <code class="highlight"><c- n="">regs</c-></code> at once. In that case, the status quo
-is harmful, rather than helpful. The status quo is to generate a defaulted copy constructor that copies bytes
-out of the source object in an unspecified manner, ignoring whatever system-specific concerns led the
-programmer to mark the members <code class="highlight"><c- k="">volatile</c-></code> in the first place.</p>
-   <p>Further, placing a struct with volatile members on the stack is nonsensical.</p>
-   <h2 class="heading settled" data-level="2" id="history"><span class="secno">2. </span><span class="content">History</span><a class="self-link" href="#history"></a></h2>
-   <h3 class="heading settled" data-level="2.1" id="cwg496"><span class="secno">2.1. </span><span class="content">CWG 496: Is a volatile-qualified type really a POD?</span><a class="self-link" href="#cwg496"></a></h3>
-   <p>In December 2004, John Maddock <a data-link-type="biblio" href="#biblio-cwg496">writes</a>:</p>
+   <p>But this approach falters when <code class="highlight"><c- n="">T</c-></code> is not constexpr default-constructible.
+We have seen this obstacle before; it produced the <a data-link-type="biblio" href="#biblio-so">now-deprecated</a> type-trait <code class="highlight"><c- n="">is_literal_type</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-></code>, which likewise
+cannot be implemented in standard C++. The present situation is exactly analogous.</p>
+   <h2 class="heading settled" data-level="3" id="batteries-included"><span class="secno">3. </span><span class="content">Provide a full complement of type traits</span><a class="self-link" href="#batteries-included"></a></h2>
+   <p>We propose the following type-traits, with their accompanying <code class="highlight"><c- n="">_v</c-></code> versions.
+For exposition purposes only, we provide sample implementations in terms of
+a hypothetical GCC/Clang builtin <code class="highlight"><c- n="">__has_structural_comparison</c-><c- p="">(</c-><c- n="">T</c-><c- p="">)</c-></code>.</p>
+   <p><small></small></p>
+   <small> <pre class="language-c++ highlight"><c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- nl="">has_structural_comparison</c-> <c- p="">:</c->
+    <c- n="">bool_constant</c-><c- o="">&lt;</c-> <c- n="">__has_structural_comparison</c-><c- p="">(</c-><c- n="">T</c-><c- p="">)</c-> <c- o="">></c-> <c- p="">{};</c->
+
+<c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- nl="">has_strong_structural_ordering</c-> <c- p="">:</c->
+    <c- n="">bool_constant</c-><c- o="">&lt;</c->
+        <c- n="">__has_structural_comparison</c-><c- p="">(</c-><c- n="">T</c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
+        <c- n="">is_convertible_v</c-><c- o="">&lt;</c-><c- n="">decltype</c-><c- p="">(</c-><c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()</c-> <c- o="">&lt;=></c-> <c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()),</c-> <c- n="">strong_ordering</c-><c- o="">></c->
+    <c- o="">></c-> <c- p="">{};</c->
+
+<c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- nl="">has_strong_structural_equality</c-> <c- p="">:</c->
+    <c- n="">bool_constant</c-><c- o="">&lt;</c->
+        <c- n="">__has_structural_comparison</c-><c- p="">(</c-><c- n="">T</c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
+        <c- n="">is_convertible_v</c-><c- o="">&lt;</c-><c- n="">decltype</c-><c- p="">(</c-><c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()</c-> <c- o="">&lt;=></c-> <c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()),</c-> <c- n="">strong_equality</c-><c- o="">></c->
+    <c- o="">></c-> <c- p="">{};</c->
+
+<c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- nl="">has_weak_structural_ordering</c-> <c- p="">:</c->
+    <c- n="">bool_constant</c-><c- o="">&lt;</c->
+        <c- n="">__has_structural_comparison</c-><c- p="">(</c-><c- n="">T</c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
+        <c- n="">is_convertible_v</c-><c- o="">&lt;</c-><c- n="">decltype</c-><c- p="">(</c-><c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()</c-> <c- o="">&lt;=></c-> <c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()),</c-> <c- n="">weak_ordering</c-><c- o="">></c->
+    <c- o="">></c-> <c- p="">{};</c->
+
+<c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- nl="">has_weak_structural_equality</c-> <c- p="">:</c->
+    <c- n="">bool_constant</c-><c- o="">&lt;</c->
+        <c- n="">__has_structural_comparison</c-><c- p="">(</c-><c- n="">T</c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
+        <c- n="">is_convertible_v</c-><c- o="">&lt;</c-><c- n="">decltype</c-><c- p="">(</c-><c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()</c-> <c- o="">&lt;=></c-> <c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()),</c-> <c- n="">weak_equality</c-><c- o="">></c->
+    <c- o="">></c-> <c- p="">{};</c->
+
+<c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- nl="">has_partial_structural_ordering</c-> <c- p="">:</c->
+    <c- n="">bool_constant</c-><c- o="">&lt;</c->
+        <c- n="">__has_structural_comparison</c-><c- p="">(</c-><c- n="">T</c-><c- p="">)</c-> <c- o="">&amp;&amp;</c->
+        <c- n="">is_convertible_v</c-><c- o="">&lt;</c-><c- n="">decltype</c-><c- p="">(</c-><c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()</c-> <c- o="">&lt;=></c-> <c- n="">declval</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-><c- p="">()),</c-> <c- n="">partial_ordering</c-><c- o="">></c->
+    <c- o="">></c-> <c- p="">{};</c->
+</pre></small> 
+   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
+   <p>Add new entries to Table 46 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:</p>
+   <p><small></small></p>
    <blockquote>
-    <p>In 6.9 [basic.types] paragraph 10, the standard makes it quite clear that volatile qualified types are PODs:</p>
-    <blockquote>
-     <p>Arithmetic types (6.9.1 [basic.fundamental]), enumeration types, pointer types, and pointer to member types
-(6.9.2 [basic.compound]), and cv-qualified versions of these types (6.9.3 [basic.type.qualifier]) are
-collectively called <b><i>scalar types</i></b>. Scalar types, POD-struct types, POD-union types (clause 12 [class]),
-arrays of such types and cv-qualified versions of these types (6.9.3 [basic.type.qualifier]) are
-collectively called <b><i>POD types</i></b>.</p>
-    </blockquote>
-    <p>However in 6.9 [basic.types] paragraph 3, the standard makes it clear that PODs can be copied “as if” they
-were a collection of bytes by memcpy:</p>
-    <blockquote>
-     <p>For any POD type T, if two pointers to T point to distinct T objects obj1 and obj2, where neither obj1
-nor obj2 is a base-class subobject, if the value of obj1 is copied into obj2, using the std::memcpy
-library function, obj2 shall subsequently hold the same value as obj1.</p>
-    </blockquote>
-    <p>The problem with this is that a volatile qualified type may need to be copied in a specific way
-(by copying using only atomic operations on multithreaded platforms, for example) in order to avoid
-the “memory tearing” that may occur with a byte-by-byte copy.</p>
-   </blockquote>
-   <p>Proposed resolution, October 2012:</p>
-   <p>Change 6.9 [basic.types] paragraph 9 as follows:</p>
-   <blockquote>
-    <p>...Scalar types, trivially copyable class types, arrays of such types, and</p>
-    <del>cv-qualified</del>
-    <ins>non-volatile const-qualified</ins>
-     versions of these types are collectively called <i>trivially copyable types</i>. Scalar types, trivial class types... 
-   </blockquote>
-   <p>Change 10.1.7.1 [dcl.type.cv] paragraphs 6-7 as follows:</p>
-   <blockquote>
-    <ins>What constitutes an access to an object that has volatile-qualified type is implementation-defined.</ins>
-     If an attempt is made to refer to an object defined with a volatile-qualified type through the use of a glvalue
-with a non-volatile-qualified type, the program behavior is undefined. 
-    <p>
-     [<em>Note:</em> <code class="highlight"><c- k="">volatile</c-></code> is a hint to the implementation to avoid aggressive optimization involving the object because
-the value of the object might be changed by means undetectable by an implementation. 
-     <ins>Furthermore, for some implementations, <code class="highlight"><c- k="">volatile</c-></code> might indicate that special hardware instructions are required to access the object.</ins>
-      See 4.6 [intro.execution] for detailed semantics. In general, the semantics of <code class="highlight"><c- k="">volatile</c-></code> are intended to be the same
-in C++ as they are in C. <em>—end note</em>]
-    </p>
-   </blockquote>
-   <p>Change 15.8 [class.copy] paragraph 12 as follows:</p>
-   <blockquote>
-    <p>A copy/move constructor for class <code class="highlight"><c- n="">X</c-></code> is <i>trivial</i> if it is not user-provided, its declared parameter type is
-the same as if it had been implicitly declared, and if</p>
-    <ul>
-     <li data-md="">
-      <p>class <code class="highlight"><c- n="">X</c-></code> has no virtual functions and no virtual base classes, and</p>
-     <li data-md="">
-      <ins>class <code class="highlight"><c- n="">X</c-></code> has no non-static data members of volatile-qualified type, and</ins>
-    </ul>
-    <p>...</p>
-   </blockquote>
-   <p>Change 15.8 [class.copy] paragraph 25 as follows:</p>
-   <blockquote>
-    <p>A copy/move assignment operator for class <code class="highlight"><c- n="">X</c-></code> is <i>trivial</i> if it is not user-provided, its declared
-parameter type is the same as if it had been implicitly declared, and if</p>
-    <ul>
-     <li data-md="">
-      <p>class <code class="highlight"><c- n="">X</c-></code> has no virtual functions and no virtual base classes, and</p>
-     <li data-md="">
-      <ins>class <code class="highlight"><c- n="">X</c-></code> has no non-static data members of volatile-qualified type, and</ins>
-    </ul>
-    <p>...</p>
-   </blockquote>
-   <h3 class="heading settled" data-level="2.2" id="cwg1746"><span class="secno">2.2. </span><span class="content">CWG 1746: Are volatile scalar types trivially copyable?</span><a class="self-link" href="#cwg1746"></a></h3>
-   <p>In September 2013, Walter Brown <a data-link-type="biblio" href="#biblio-cwg1746">writes</a>:</p>
-   <blockquote>
-    <p>According to 6.9 [basic.types] paragraph 9,</p>
-    <blockquote>
-     <p>Arithmetic types (6.9.1 [basic.fundamental]), enumeration types, pointer types, pointer to member types
-(6.9.2 [basic.compound]), std::nullptr_t, and cv-qualified versions of these types
-(6.9.3 [basic.type.qualifier]) are collectively called <i>scalar types</i>... Scalar types, trivially
-copyable class types (Clause 12 [class]), arrays of such types, and non-volatile const-qualified versions
-of these types (6.9.3 [basic.type.qualifier]) are collectively called <i>trivially copyable types</i>.</p>
-    </blockquote>
-    <p>This is confusing, because “scalar types” include volatile-qualified types, but the intent of the
-definition of “trivially copyable type” appears to be to exclude volatile-qualified types.
-Perhaps the second quoted sentence should read something like,</p>
-    <blockquote>
-     <p>A non-volatile type <code class="highlight"><c- n="">T</c-></code> or an array of such <code class="highlight"><c- n="">T</c-></code> is called a <i>trivially copyable type</i> if <code class="highlight"><c- n="">T</c-></code> is either a
-scalar type or a trivially copyable class type.</p>
-    </blockquote>
-    <p>(Note that the following sentence, defining “trivial type,” has a similar formal issue, although it
-has no actual significance because all cv-qualifiers are permitted.)</p>
-   </blockquote>
-   <p>Proposed resolution, January 2014:</p>
-   <p>Change 6.9 [basic.types] paragraph 10 as follows:</p>
-   <blockquote>
-    <p>
-     ...
-     <del>Scalar</del>
-     <ins>Cv-unqualified scalar</ins>
-      types, trivially copyable class types,
-arrays of such types, and non-volatile const-qualified versions of these
-types are collectively called <i>trivially copyable types</i>...
-    </p>
-   </blockquote>
-   <h3 class="heading settled" data-level="2.3" id="cwg2094"><span class="secno">2.3. </span><span class="content">CWG 2094: Trivial move/copy constructor for class with volatile member</span><a class="self-link" href="#cwg2094"></a></h3>
-   <p>In March 2015, Daveed Vandevoorde <a data-link-type="biblio" href="#biblio-cwg2094">writes</a>:</p>
-   <blockquote>
-    <p>The resolution of issue 496 included the addition of 15.8 [class.copy] paragraph 25.2, making a class’s
-copy/move constructor non-trivial if it has a non-static data member of volatile-qualified type.
-This change breaks the IA-64 ABI, so it has been requested that CWG reconsider this aspect of the resolution.</p>
-    <p>On a related note, the resolution of issue 496 also changed 6.9 [basic.types] paragraph 9, which makes
-volatile-qualified scalar types “trivial” but not “trivially copyable.” It is not clear why there is
-a distinction made here; the only actual use of “trivial type” in the Standard appears to be in the
-description of <code class="highlight"><c- n="">qsort</c-></code>, which should probably use “trivially copyable.” (See also issue 1746.)</p>
-   </blockquote>
-   <p>Notes from the February 2016 meeting:</p>
-   <blockquote>
-    <p>CWG agreed with the suggested direction for the changes in 15.8 [class.copy]; the use of “trivial”
-will be dealt with separately and not as part of the resolution of this issue.</p>
-   </blockquote>
-   <p>Proposed resolution, June 2016:</p>
-   <p>Change 6.9 [basic.types] paragraph 9 as follows:</p>
-   <blockquote>
-    <p>
-     ...called <i>POD types</i>. Cv-unqualified scalar types, trivially copyable class types,
-arrays of such types, and 
-     <del>non-volatile const-qualified</del>
-     <ins>cv-qualified</ins>
-      versions of these
-types are collectively called <i>trivially copyable types</i>. Scalar types...
-    </p>
-   </blockquote>
-   <p>Delete bullet 12.2 of 15.8 [class.copy]:</p>
-   <blockquote>
-    <p>A copy/move constructor for class <code class="highlight"><c- n="">X</c-></code> is <i>trivial</i> if it is not user-provided,
-its parameter-type-list is equivalent to the parameter-type-list of an implicit declaration, and if</p>
-    <p>...</p>
-    <ul>
-     <li data-md="">
-      <del>class <code class="highlight"><c- n="">X</c-></code> has no non-static data members of volatile-qualified type, and</del>
-    </ul>
-    <p>...</p>
-   </blockquote>
-   <p>Delete bullet 25.2 of 15.8 [class.copy]:</p>
-   <blockquote>
-    <p>A copy/move assignment operator for class <code class="highlight"><c- n="">X</c-></code> is <i>trivial</i> if it is not user-provided,
-its parameter-type-list is equivalent to the parameter-type-list of an implicit
-declaration, and if</p>
-    <p>...</p>
-    <ul>
-     <li data-md="">
-      <del>class <code class="highlight"><c- n="">X</c-></code> has no non-static data members of volatile-qualified type, and</del>
-    </ul>
-   </blockquote>
-   <h2 class="heading settled" data-level="3" id="problem"><span class="secno">3. </span><span class="content">The problem</span><a class="self-link" href="#problem"></a></h2>
-   <p>Library vendors use <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">is_trivially_copyable</c-></code> to detect object types that can be copied
-via <code class="highlight"><c- n="">memcpy</c-></code>/<code class="highlight"><c- n="">memmove</c-></code>. This idiom does not work when volatile NSDMs are in play.</p>
-<pre class="language-c++ highlight">    <c- cp="">#include</c-> &lt;algorithm><c- cp=""></c->
-<c- cp=""></c->    <c- k="">struct</c-> <c- n="">S</c-> <c- p="">{</c->
-        <c- k="">volatile</c-> <c- b="">int</c-> <c- n="">i</c-><c- p="">;</c->
-    <c- p="">};</c->
-    <c- b="">void</c-> <c- nf="">foo</c-><c- p="">(</c-><c- n="">S</c-> <c- o="">*</c-><c- n="">dst</c-><c- p="">,</c-> <c- n="">S</c-> <c- o="">*</c-><c- n="">src</c-><c- p="">,</c-> <c- b="">int</c-> <c- n="">n</c-><c- p="">)</c-> <c- p="">{</c->
-        <c- n="">std</c-><c- o="">::</c-><c- n="">copy_n</c-><c- p="">(</c-><c- n="">src</c-><c- p="">,</c-> <c- n="">n</c-><c- p="">,</c-> <c- n="">dst</c-><c- p="">);</c->
-    <c- p="">}</c->
-</pre>
-   <p>Today, both libc++ and libstdc++ generate a single <code class="highlight"><c- n="">memmove</c-></code> to perform the copy of <code class="highlight"><c- n="">src</c-></code> to <code class="highlight"><c- n="">dst</c-></code>,
-even though the copying is happening between many discrete (sub)objects that are each
-volatile-qualified.</p>
-   <p>Library vendors also have no incentive to change their behavior here; it seems to be
-strictly non-conforming, but the optimization for <em>non</em>-volatile NSDMs is too valuable to
-give up, and there is currently no way for a library to detect the presence of volatile NSDMs
-nested within a class.</p>
-   <h2 class="heading settled" data-level="4" id="solution"><span class="secno">4. </span><span class="content">The proposed solution</span><a class="self-link" href="#solution"></a></h2>
-   <p>Whereas</p>
-   <ul>
-    <li data-md="">
-     <p>the current semantics by which volatile NSDMs are copied (trivially) are untenable for library vendors,</p>
-    <li data-md="">
-     <p><a data-link-type="biblio" href="#biblio-cwg496">[CWG496]</a> and <a data-link-type="biblio" href="#biblio-cwg2094">[CWG2094]</a> show there is no consensus to <em>change</em> the semantics by which volatile NSDMs are copied (to make it non-trivial),</p>
-    <li data-md="">
-     <p>nobody has yet presented a use-case for wanting to copy volatile NSDMs at all,</p>
-   </ul>
-   <p>we propose that</p>
-   <ul>
-    <li data-md="">
-     <p>volatile NSDMs should not be copyable.</p>
-   </ul>
-   <p>That is, the presence of a <code class="highlight"><c- k="">volatile</c-></code>-qualified NSDM in a class should cause the class’s copy constructor
-and copy assignment operator to be defaulted as deleted. The library would continue to detect a Rule-of-Zero-following,
-volatile-NSDM-having class as <code class="highlight"><c- n="">is_trivially_copyable</c-></code>; but it would also detect it as <code class="highlight"><c- n="">not</c-> <c- n="">is_copy_constructible</c-></code> and <code class="highlight"><c- n="">not</c-> <c- n="">is_move_constructible</c-></code>, so it wouldn’t try to <code class="highlight"><c- n="">memcpy</c-></code> its bytes, and so our tearing problem would be solved.</p>
-   <p>This solution does not change any ABI, because it merely removes (useless, dangerous) functions that were generated before.
-In particular, this proposal preserves the <i>trivial copyability</i> of structs with volatile members, so that it
-preserves the calling convention by which they may be returned in registers on IA64.</p>
-   <div class="issue" id="issue-2bb6e0ec">
-    <a class="self-link" href="#issue-2bb6e0ec"></a> Hmm, I now think this is wrong. Trivial copyability
-(<a href="https://timsong-cpp.github.io/cppwp/class#prop-1">[class.prop]/1</a>) requires at least one non-deleted
-copy-or-move constructor-or-assignment-operator; and our struct will no longer have that. Also, tcanens points
-to special wording in <a href="https://timsong-cpp.github.io/cppwp/class.temporary#3">[class.temporary]/3</a> that permits returning our struct in registers only if it has a non-deleted copy-or-move constructor.
-Specifically: 
-<pre class="language-c++ highlight"><c- k="">struct</c-> <c- n="">S</c-> <c- p="">{</c-> <c- k="">volatile</c-> <c- b="">int</c-> <c- n="">i</c-><c- p="">;</c-> <c- p="">};</c->
-<c- n="">S</c-> <c- nf="">foo</c-><c- p="">()</c-> <c- p="">{</c-> <c- k="">return</c-> <c- n="">S</c-><c- p="">{</c-><c- mi="">42</c-><c- p="">};</c-> <c- p="">}</c->  <c- c1="">// returns in %eax today</c->
-</pre>
-    Whereas if we delete all the constructors: 
-<pre class="language-c++ highlight"><c- k="">struct</c-> <c- n="">S</c-> <c- p="">{</c-> <c- k="">volatile</c-> <c- b="">int</c-> <c- n="">i</c-><c- p="">;</c-> <c- n="">S</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">S</c-><c- o="">&amp;</c-><c- p="">)</c-> <c- o="">=</c-> <c- n="">delete</c-><c- p="">;</c-> <c- p="">};</c->
-<c- n="">S</c-> <c- nf="">foo</c-><c- p="">()</c-> <c- p="">{</c-> <c- k="">return</c-> <c- n="">S</c-><c- p="">{</c-><c- mi="">42</c-><c- p="">};</c-> <c- p="">}</c->  <c- c1="">// returns on the stack today</c->
-</pre>
-    This means we might have no choice but to break ABI. 
-   </div>
-   <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
-   <p>The wording in this section is relative to <a data-link-type="biblio" href="#biblio-n4750">WG21 draft N4750</a>,
-that is, the current draft of the C++17 standard. We quote many unchanged
-passages here for reference.</p>
-   <p>[basic.types] #3 is unchanged:</p>
-   <blockquote>
-    <p>For any trivially copyable type <code class="highlight"><c- n="">T</c-></code>, if two pointers to <code class="highlight"><c- n="">T</c-></code> point to distinct <code class="highlight"><c- n="">T</c-></code> objects <code class="highlight"><c- n="">obj1</c-></code> and <code class="highlight"><c- n="">obj2</c-></code>,
-where neither <code class="highlight"><c- n="">obj1</c-></code> nor <code class="highlight"><c- n="">obj2</c-></code> is a potentially-overlapping subobject, if the underlying bytes making up <code class="highlight"><c- n="">obj1</c-></code> are copied into <code class="highlight"><c- n="">obj2</c-></code>, <code class="highlight"><c- n="">obj2</c-></code> shall subsequently hold the same value as <code class="highlight"><c- n="">obj1</c-></code>.</p>
-   </blockquote>
-   <p>[basic.types] #9 is changed only editorially for clarity (<a data-link-type="biblio" href="#biblio-pr2255">[PR2255]</a>):</p>
-   <blockquote>
-    <p>
-     Arithmetic types, enumeration types, pointer types, pointer-to-member types, <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">nullptr_t</c-></code>, and
-cv-qualified versions of these types are collectively called <i>scalar types</i>. 
-     <del>Cv-unqualified scalar</del>
-    </p>
-    <ins>Scalar</ins>
-     types,
-trivially copyable class types, arrays of such types, and cv-qualified versions of these types are
-collectively called <i>trivially copyable types</i>. Scalar types, trivial class types, arrays of such types
-and cv-qualified versions of these types are collectively called <i>trivial types</i>. Scalar types,
-standard-layout class types, arrays of such types and cv-qualified versions of these types
-are collectively called <i>standard-layout types</i>. 
-   </blockquote>
-   <p>[class.prop] #1 is unchanged:</p>
-   <blockquote>
-    <p>A <i>trivially copyable class</i> is a class:</p>
-    <ul>
-     <li data-md="">
-      <p>where each copy constructor, move constructor, copy assignment operator, and move
-assignment operator is either deleted or trivial,</p>
-     <li data-md="">
-      <p>that has at least one non-deleted copy constructor, move constructor, copy assignment
-operator, or move assignment operator, and</p>
-     <li data-md="">
-      <p>that has a trivial, non-deleted destructor.</p>
-    </ul>
-   </blockquote>
-   <p>[class.temporary] #3 is unchanged:</p>
-   <blockquote>
-    <p>When an object of class type <code class="highlight"><c- n="">X</c-></code> is passed to or returned from a function, if each copy constructor,
-move constructor, and destructor of <code class="highlight"><c- n="">X</c-></code> is either trivial or deleted, and <code class="highlight"><c- n="">X</c-></code> has at least one
-non-deleted copy or move constructor, implementations are permitted to create a temporary object
-to hold the function parameter or result object. The temporary object is constructed from the function
-argument or return value, respectively, and the function’s parameter or return object is
-initialized as if by using the non-deleted trivial constructor to copy the temporary (even if
-that constructor is inaccessible or would not be selected by overload resolution to perform a
-copy or move of the object). [<em>Note:</em> This latitude is granted to allow objects of class type
-to be passed to or returned from functions in registers. <em>—end note</em>]</p>
-   </blockquote>
-   <p>[class.copy.ctor] #6 is unchanged:</p>
-   <blockquote>
-    <p>If the class definition does not explicitly declare a copy constructor, a non-explicit one is declared <i>implicitly</i>.
-If the class definition declares a move constructor or move assignment operator, the implicitly declared copy
-constructor is defined as deleted; otherwise, it is defined as defaulted. The latter case is deprecated
-if the class has a user-declared copy assignment operator or a user-declared destructor.</p>
-   </blockquote>
-   <p>[class.copy.ctor] #7 is unchanged:</p>
-   <blockquote>
-    <p>The implicitly-declared copy constructor for a class <code class="highlight"><c- n="">X</c-></code> will have the form</p>
-<pre class="highlight"><c- n="">X</c-><c- o="">::</c-><c- n="">X</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">X</c-><c- o="">&amp;</c-><c- p="">)</c->
-</pre>
-    if each potentially constructed subobject of a class type <code class="highlight"><c- n="">M</c-></code> (or array thereof) has a copy constructor
-whose first parameter is of type <code class="highlight"><c- k="">const</c-> <c- n="">M</c-><c- o="">&amp;</c-></code> or <code class="highlight"><c- k="">const</c-> <c- k="">volatile</c-> <c- n="">M</c-><c- o="">&amp;</c-></code>. Otherwise, the implicitly-declared
-copy constructor will have the form 
-<pre class="highlight"><c- n="">X</c-><c- o="">::</c-><c- n="">X</c-><c- p="">(</c-><c- n="">X</c-><c- o="">&amp;</c-><c- p="">)</c->
-</pre>
-   </blockquote>
-   <p>[class.copy.ctor] #8 is unchanged:</p>
-   <blockquote>
-    <p>If the definition of a class <code class="highlight"><c- n="">X</c-></code> does not explicitly declare a move constructor, a non-explicit one will
-be implicitly declared as defaulted if and only if</p>
-    <ul>
-     <li data-md="">
-      <p><code class="highlight"><c- n="">X</c-></code> does not have a user-declared copy constructor,</p>
-     <li data-md="">
-      <p><code class="highlight"><c- n="">X</c-></code> does not have a user-declared copy assignment operator,</p>
-     <li data-md="">
-      <p><code class="highlight"><c- n="">X</c-></code> does not have a user-declared move assignment operator, and</p>
-     <li data-md="">
-      <p><code class="highlight"><c- n="">X</c-></code> does not have a user-declared destructor.</p>
-    </ul>
-    <p>[<em>Note:</em> When the move constructor is not implicitly declared or explicitly supplied, expressions that
-otherwise would have invoked the move constructor may instead invoke a copy constructor. <em>—end note</em>]</p>
-   </blockquote>
-   <p>Change [class.copy.ctor] #10:</p>
-   <blockquote>
-    <p>An implicitly-declared copy/move constructor is an inline public member of its class.
-A defaulted copy/move constructor for a class <code class="highlight"><c- n="">X</c-></code> is defined as deleted if <code class="highlight"><c- n="">X</c-></code> has:</p>
-    <ul>
-     <li data-md="">
-      <p>a potentially constructed subobject type <code class="highlight"><c- n="">M</c-></code> (or array thereof) that cannot be copied/moved
-because overload resolution, as applied to find <code class="highlight"><c- n="">M</c-></code>’s corresponding constructor, results
-in an ambiguity or a function that is deleted or inaccessible from the defaulted constructor,</p>
-     <li data-md="">
-      <p>a variant member whose corresponding constructor as selected by overload resolution is non-trivial,</p>
-     <li data-md="">
-      <ins>a non-static data member of <code class="highlight"><c- k="">volatile</c-></code> type (or array thereof), or</ins>
-     <li data-md="">
-      <p>any potentially constructed subobject of a type with a destructor that is deleted or inaccessible
-from the defaulted constructor, or,</p>
-     <li data-md="">
-      <p>for the copy constructor, a non-static data member of rvalue reference type.</p>
-    </ul>
-    <p>A defaulted move constructor that is defined as deleted is ignored by overload resolution.
-[<em>Note:</em> A deleted move constructor would otherwise interfere with initialization from an rvalue
-which can use the copy constructor instead. <em>—end note</em>]</p>
-   </blockquote>
-   <p>[class.copy.ctor] #11 is unchanged:</p>
-   <blockquote>
-    <p>A copy/move constructor for class <code class="highlight"><c- n="">X</c-></code> is <i>trivial</i> if it is not user-provided and if:</p>
-    <ul>
-     <li data-md="">
-      <p>class X has no virtual functions and no virtual base classes, and</p>
-     <li data-md="">
-      <p>the constructor selected to copy/move each direct base class subobject is trivial, and</p>
-     <li data-md="">
-      <p>for each non-static data member of <code class="highlight"><c- n="">X</c-></code> that is of class type (or array thereof),
-the constructor selected to copy/move that member is trivial;</p>
-    </ul>
-    <p>otherwise the copy/move constructor is <i>non-trivial</i>.</p>
-   </blockquote>
-   <p>[class.copy.assign] #2 is unchanged:</p>
-   <blockquote>
-    <p>If the class definition does not explicitly declare a copy assignment operator, one is
-declared <i>implicitly</i>. If the class definition declares a move constructor or move
-assignment operator, the implicitly declared copy assignment operator is defined as deleted;
-otherwise, it is defined as defaulted. The latter case is deprecated if the class has
-a user-declared copy constructor or a user-declared destructor.</p>
-    <p>The implicitly-declared copy assignment operator for a class <code class="highlight"><c- n="">X</c-></code> will have the form</p>
-<pre class="highlight"><c- n="">X</c-><c- o="">&amp;</c-> <c- n="">X</c-><c- o="">::</c-><c- k="">operator</c-><c- o="">=</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">X</c-><c- o="">&amp;</c-><c- p="">)</c->
-</pre>
-    if 
-    <ul>
-     <li data-md="">
-      <p>each direct base class <code class="highlight"><c- n="">B</c-></code> of <code class="highlight"><c- n="">X</c-></code> has a copy assignment operator whose parameter is
-of type <code class="highlight"><c- k="">const</c-> <c- n="">B</c-><c- o="">&amp;</c-></code>, <code class="highlight"><c- k="">const</c-> <c- k="">volatile</c-> <c- n="">B</c-><c- o="">&amp;</c-></code>, or <code class="highlight"><c- n="">B</c-></code>, and</p>
-     <li data-md="">
-      <p>for all the non-static data members of <code class="highlight"><c- n="">X</c-></code> that are of a class type <code class="highlight"><c- n="">M</c-></code> (or array thereof),
-each such class type has a copy assignment operator whose parameter is of type <code class="highlight"><c- k="">const</c-> <c- n="">M</c-><c- o="">&amp;</c-></code>, <code class="highlight"><c- k="">const</c-> <c- k="">volatile</c-> <c- n="">M</c-><c- o="">&amp;</c-></code>, or <code class="highlight"><c- n="">M</c-></code>.</p>
-    </ul>
-    <p>Otherwise, the implicitly-declared copy assignment operator will have the form</p>
-<pre class="highlight"><c- n="">X</c-><c- o="">&amp;</c-> <c- n="">X</c-><c- o="">::</c-><c- k="">operator</c-><c- o="">=</c-><c- p="">(</c-><c- n="">X</c-><c- o="">&amp;</c-><c- p="">)</c->
-</pre>
-   </blockquote>
-   <p>[class.copy.assign] #4 is unchanged:</p>
-   <blockquote>
-    <p>If the definition of a class <code class="highlight"><c- n="">X</c-></code> does not explicitly declare a move assignment operator,
-one will be implicitly declared as defaulted if and only if</p>
-    <ul>
-     <li data-md="">
-      <p><code class="highlight"><c- n="">X</c-></code> does not have a user-declared copy constructor,</p>
-     <li data-md="">
-      <p><code class="highlight"><c- n="">X</c-></code> does not have a user-declared move constructor,</p>
-     <li data-md="">
-      <p><code class="highlight"><c- n="">X</c-></code> does not have a user-declared copy assignment operator, and</p>
-     <li data-md="">
-      <p><code class="highlight"><c- n="">X</c-></code> does not have a user-declared destructor.</p>
-    </ul>
-   </blockquote>
-   <p>Change [class.copy.assign] #7:</p>
-   <blockquote>
-    <p>A defaulted copy/move assignment operator for class <code class="highlight"><c- n="">X</c-></code> is defined as deleted if <code class="highlight"><c- n="">X</c-></code> has:</p>
-    <ul>
-     <li data-md="">
-      <p>a variant member with a non-trivial corresponding assignment operator and <code class="highlight"><c- n="">X</c-></code> is a union-like class, or</p>
-     <li data-md="">
-      <p>a non-static data member of <code class="highlight"><c- k="">const</c-></code> non-class type (or array thereof), or</p>
-     <li data-md="">
-      <ins>a non-static data member of <code class="highlight"><c- k="">volatile</c-></code> type (or array thereof), or</ins>
-     <li data-md="">
-      <p>a non-static data member of reference type, or</p>
-     <li data-md="">
-      <p>a direct non-static data member of class type <code class="highlight"><c- n="">M</c-></code> (or array thereof) or a direct base class <code class="highlight"><c- n="">M</c-></code> that cannot be copied/moved because overload resolution, as applied to find <code class="highlight"><c- n="">M</c-></code>’s corresponding
-assignment operator, results in an ambiguity or a function that is deleted or inaccessible
-from the defaulted assignment operator.</p>
-    </ul>
-    <p>A defaulted move assignment operator that is defined as deleted is ignored by overload resolution.</p>
-   </blockquote>
-   <p>[class.copy.assign] #9 is unchanged:</p>
-   <blockquote>
-    <p>A copy/move assignment operator for class <code class="highlight"><c- n="">X</c-></code> is <i>trivial</i> if it is not user-provided and if:</p>
-    <ul>
-     <li data-md="">
-      <p>class <code class="highlight"><c- n="">X</c-></code> has no virtual functions and no virtual base classes, and</p>
-     <li data-md="">
-      <p>the assignment operator selected to copy/move each direct base class subobject is trivial, and</p>
-     <li data-md="">
-      <p>for each non-static data member of <code class="highlight"><c- n="">X</c-></code> that is of class type (or array thereof), the assignment
-operator selected to copy/move that member is trivial;</p>
-    </ul>
-    <p>otherwise the copy/move assignment operator is <i>non-trivial</i>.</p>
+    <p></p>
+    <small> <table> <tbody><tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr> <tr> <td><code class="highlight"><c- k="">template</c-><c- o="">&lt;</c-><c- k="">class</c-> <c- nc="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- n="">has_structural_comparison</c-><c- p="">;</c-></code></td> <td>For a glvalue <code class="highlight"><c- n="">x</c-></code> of type <code class="highlight"><c- k="">const</c-> <c- n="">T</c-></code>, the expression <code class="highlight"><c- n="">x</c-> <c- o="">&lt;=></c-> <c- n="">x</c-></code> either does not invoke a three-way comparison operator or invokes a structural comparison operator (15.9.1).</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><c- b="">void</c-></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><c- k="">template</c-><c- o="">&lt;</c-><c- k="">class</c-> <c- nc="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- n="">has_strong_structural_ordering</c-><c- p="">;</c-></code></td> <td><code class="highlight"><c- n="">has_structural_comparison_v</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-></code> is <code class="highlight">true</code> and the expression <code class="highlight"><c- n="">x</c-> <c- o="">&lt;=></c-> <c- n="">x</c-></code> is convertible to <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">strong_ordering</c-></code>.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><c- b="">void</c-></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><c- k="">template</c-><c- o="">&lt;</c-><c- k="">class</c-> <c- nc="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- n="">has_strong_structural_equality</c-><c- p="">;</c-></code></td> <td><code class="highlight"><c- n="">has_structural_comparison_v</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-></code> is <code class="highlight">true</code> and the expression <code class="highlight"><c- n="">x</c-> <c- o="">&lt;=></c-> <c- n="">x</c-></code> is convertible to <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">strong_equality</c-></code>.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><c- b="">void</c-></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><c- k="">template</c-><c- o="">&lt;</c-><c- k="">class</c-> <c- nc="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- n="">has_weak_structural_ordering</c-><c- p="">;</c-></code></td> <td><code class="highlight"><c- n="">has_structural_comparison_v</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-></code> is <code class="highlight">true</code> and the expression <code class="highlight"><c- n="">x</c-> <c- o="">&lt;=></c-> <c- n="">x</c-></code> is convertible to <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">weak_ordering</c-></code>.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><c- b="">void</c-></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><c- k="">template</c-><c- o="">&lt;</c-><c- k="">class</c-> <c- nc="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- n="">has_weak_structural_equality</c-><c- p="">;</c-></code></td> <td><code class="highlight"><c- n="">has_structural_comparison_v</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-></code> is <code class="highlight">true</code> and the expression <code class="highlight"><c- n="">x</c-> <c- o="">&lt;=></c-> <c- n="">x</c-></code> is convertible to <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">weak_equality</c-></code>.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><c- b="">void</c-></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><c- k="">template</c-><c- o="">&lt;</c-><c- k="">class</c-> <c- nc="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- n="">has_strong_structural_ordering</c-><c- p="">;</c-></code></td> <td><code class="highlight"><c- n="">has_structural_comparison_v</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-></code> is <code class="highlight">true</code> and the expression <code class="highlight"><c- n="">x</c-> <c- o="">&lt;=></c-> <c- n="">x</c-></code> is convertible to <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">strong_ordering</c-></code>.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><c- b="">void</c-></code>, or an array of unknown bound.</td> </tr> <tr> <td><code class="highlight"><c- k="">template</c-><c- o="">&lt;</c-><c- k="">class</c-> <c- nc="">T</c-><c- o="">></c-> <c- k="">struct</c-> <c- n="">has_partial_structural_ordering</c-><c- p="">;</c-></code></td> <td><code class="highlight"><c- n="">has_structural_comparison_v</c-><c- o="">&lt;</c-><c- n="">T</c-><c- o="">></c-></code> is <code class="highlight">true</code> and the expression <code class="highlight"><c- n="">x</c-> <c- o="">&lt;=></c-> <c- n="">x</c-></code> is convertible to <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">partial_ordering</c-></code>.</td> <td>T shall be a complete type, <i>cv</i> <code class="highlight"><c- b="">void</c-></code>, or an array of unknown bound.</td> </tr> </tbody></table> </small>
    </blockquote>
   </main>
 <script>
@@ -2060,37 +1721,10 @@ operator selected to copy/move that member is trivial;</p>
 })();
 </script>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
-  <h3 class="no-num no-ref heading settled" id="normative"><span class="content">Normative References</span><a class="self-link" href="#normative"></a></h3>
-  <dl>
-   <dt id="biblio-cwg1746">[CWG1746]
-   <dd>Walter Brown. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746">Are volatile scalar types trivially copyable?</a>. September 2013–January 2014. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#1746</a>
-   <dt id="biblio-cwg2094">[CWG2094]
-   <dd>Daveed Vandevoorde. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094">Trivial copy/move constructor for class with volatile member</a>. March 2015–June 2016. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#2094</a>
-   <dt id="biblio-cwg496">[CWG496]
-   <dd>John Maddock. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496">Is a volatile-qualified type really a POD?</a>. December 2004–October 2012. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496">http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_defects.html#496</a>
-   <dt id="biblio-n4750">[N4750]
-   <dd>Richard Smith. <a href="https://wg21.link/n4750">Working Draft, Standard for Programming Language C++</a>. 7 May 2018. URL: <a href="https://wg21.link/n4750">https://wg21.link/n4750</a>
-  </dl>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
-   <dt id="biblio-pr2255">[PR2255]
-   <dd>Arthur O'Dwyer. <a href="https://github.com/cplusplus/draft/pull/2255">'cv-qualified versions of cv-unqualified scalar types' are just 'scalar types'</a>. July 2018. URL: <a href="https://github.com/cplusplus/draft/pull/2255">https://github.com/cplusplus/draft/pull/2255</a>
+   <dt id="biblio-p0732">[P0732]
+   <dd>Jeff Snyder; Louis Dionne. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf">Class Types in Non-Type Template Parameters</a>. June 2018. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf</a>
+   <dt id="biblio-so">[SO]
+   <dd>plasmacel; Nicol Bolas. <a href="https://stackoverflow.com/questions/40351816/deprecated-stdis-literal-type-in-c17">Deprecated std::is_literal_type in C++17</a>. October 2016. URL: <a href="https://stackoverflow.com/questions/40351816/deprecated-stdis-literal-type-in-c17">https://stackoverflow.com/questions/40351816/deprecated-stdis-literal-type-in-c17</a>
   </dl>
-  <h2 class="no-num no-ref heading settled" id="issues-index"><span class="content">Issues Index</span><a class="self-link" href="#issues-index"></a></h2>
-  <div style="counter-reset:issue">
-   <div class="issue">
-     Hmm, I now think this is wrong. Trivial copyability
-(<a href="https://timsong-cpp.github.io/cppwp/class#prop-1">[class.prop]/1</a>) requires at least one non-deleted
-copy-or-move constructor-or-assignment-operator; and our struct will no longer have that. Also, tcanens points
-to special wording in <a href="https://timsong-cpp.github.io/cppwp/class.temporary#3">[class.temporary]/3</a> that permits returning our struct in registers only if it has a non-deleted copy-or-move constructor.
-Specifically: 
-<pre class="language-c++ highlight"><c- k="">struct</c-> <c- n="">S</c-> <c- p="">{</c-> <c- k="">volatile</c-> <c- b="">int</c-> <c- n="">i</c-><c- p="">;</c-> <c- p="">};</c->
-<c- n="">S</c-> <c- nf="">foo</c-><c- p="">()</c-> <c- p="">{</c-> <c- k="">return</c-> <c- n="">S</c-><c- p="">{</c-><c- mi="">42</c-><c- p="">};</c-> <c- p="">}</c->  <c- c1="">// returns in %eax today</c->
-</pre>
-    Whereas if we delete all the constructors: 
-<pre class="language-c++ highlight"><c- k="">struct</c-> <c- n="">S</c-> <c- p="">{</c-> <c- k="">volatile</c-> <c- b="">int</c-> <c- n="">i</c-><c- p="">;</c-> <c- n="">S</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">S</c-><c- o="">&amp;</c-><c- p="">)</c-> <c- o="">=</c-> <c- n="">delete</c-><c- p="">;</c-> <c- p="">};</c->
-<c- n="">S</c-> <c- nf="">foo</c-><c- p="">()</c-> <c- p="">{</c-> <c- k="">return</c-> <c- n="">S</c-><c- p="">{</c-><c- mi="">42</c-><c- p="">};</c-> <c- p="">}</c->  <c- c1="">// returns on the stack today</c->
-</pre>
-    This means we might have no choice but to break ABI. <a href="#issue-2bb6e0ec"> ↵ </a>
-   </div>
-  </div>
