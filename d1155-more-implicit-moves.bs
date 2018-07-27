@@ -1,0 +1,307 @@
+<pre class='metadata'>
+Title: More implicit moves
+Shortname: D1155
+Revision: 0
+!Draft Revision: 0
+Audience: EWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d1155-more-implicit-moves.html">rawgit.com/Quuxplusone/draft/gh-pages/d1155-more-implicit-moves.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Programmers expect <code>return x;</code> to trigger copy elision; or, at worst, to <i>implicitly move</i>
+  from <code>x</code> instead of copying. Occasionally, C++ violates their expectations and performs
+  an expensive copy anyway.
+  Based on our experience using Clang to diagnose unexpected copies in Chromium, Mozilla,
+  and LibreOffice, we propose to change the standard so that these copies will be replaced with
+  <i>implicit moves</i>.
+Date: 2018-07-25
+</pre>
+
+<style>
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+
+# Background # {#background}
+
+Each version of C++ has improved the efficiency of returning objects by value. By the middle of the last
+decade, copy elision was reliable (if not technically guaranteed) in situations like this:
+
+```c++
+Widget one() {
+    return Widget();  // copy elision
+}
+Widget two() {
+    Widget result;
+    return result;  // copy elision
+}
+```
+
+In C++11, a completely new feature was added: a change to overload resolution which I will call
+*implicit move*. Even when copy elision is impossible, the compiler is sometimes
+required to *implicitly move* a returned object into the return slot:
+
+```c++
+std::shared_ptr<Base> three() {
+    std::shared_ptr<Base> result;
+    return result;  // copy elision
+}
+std::shared_ptr<Base> four() {
+    std::shared_ptr<Derived> result;
+    return result;  // no copy elision, but implicitly moved (not copied)
+}
+```
+
+The wording for this optimization was amended by [[!CWG1579]]. The current wording in
+<a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> says:
+
+> In the following copy-initialization contexts, a move operation might be used instead of a copy operation:
+>
+>   - If the *expression* in a `return` statement is a (possibly parenthesized) *id-expression* that
+>     names an object with automatic storage duration declared in the body or *parameter-declaration-clause*
+>     of the innermost enclosing function or *lambda-expression*, or
+>
+>   - if the operand of a *throw-expression* is the name of a non-volatile automatic object
+>     (other than a <b>function</b> or catch-clause parameter) whose scope does not extend beyond
+>     the end of the innermost enclosing *try-block* (if there is one),
+>
+> overload resolution to select the constructor for the copy is first performed as if the object were
+> designated by an rvalue. If the first overload resolution fails or was not performed, or if the type
+> of the first parameter of the selected <b>constructor</b> is not an rvalue reference to <b>the object's</b> type
+> (possibly cv-qualified), overload resolution is performed again, considering the object as an lvalue.
+
+The bolded phrases above indicate places where the wording diverges from a naïve programmer's intuition.
+Consider the following <a href="https://godbolt.org/g/poynjg">examples</a>...
+
+
+## Slicing is pessimized ## {#slicing}
+
+because of the bolded phrase <b>the object's</b>.
+
+```c++
+std::shared_ptr<Base> five() {
+    std::shared_ptr<Derived> result;
+    return result;  // no copy elision, but implicitly moved (never copied)
+}
+Base six() {
+    Derived result;
+    return result;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+Note: The comment in `six` matches the current Standard wording, and matches Clang's behavior.
+GCC's behavior *already*, since GCC 8.1, is to do the implicit move.
+
+## Non-constructor conversion is pessimized ## {#conversion}
+
+because of the bolded phrase <b>constructor</b>.
+
+```c++
+template<class T>
+struct Red {
+    template<class U> Red(const Red<U> &);
+    template<class U> Red(Red<U>&&);
+};
+
+template<class T>
+struct Blue {
+    template<class U> operator Blue<U>() const &;
+    template<class U> operator Blue<U>() &&;
+};
+
+Red<Base> seven() {
+    Red<Derived> w;
+    return w;  // no copy elision, but implicitly moved (never copied)
+}
+Blue<Base> eight() {
+    Blue<Derived> w;
+    return w;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+## Throwing is pessimized ## {#throwing}
+
+because of the bolded phrase <b>function</b> [parameter].
+
+```c++
+void nine() {
+    Widget w;
+    throw w;  // non-guaranteed copy elision, but implicitly moved (never copied)
+}
+Widget ten(Widget w) {
+    return w;  // no copy elision, but implicitly moved (never copied)
+}
+void eleven(Widget w) {
+    throw w;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+Note: The comment in `eleven` matches the current Standard wording, and matches GCC's behavior.
+Clang's behavior *already*, since Clang 4.0.1 or earlier, is to do the implicit move.
+
+We propose to remove all three of these unnecessary limitations.
+
+
+# Proposed wording # {#wording}
+
+Modify
+<a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:
+
+> In the following copy-initialization contexts, a move operation might be used instead of a copy operation:
+>
+>   - If the *expression* in a `return` statement is a (possibly parenthesized) *id-expression* that
+>     names an object with automatic storage duration declared in the body or *parameter-declaration-clause*
+>     of the innermost enclosing function or *lambda-expression*, or
+>
+>   - if the operand of a *throw-expression* is the name of a non-volatile automatic object
+>     (other than a <del>function or</del> catch-clause parameter) whose scope does not extend beyond
+>     the end of the innermost enclosing *try-block* (if there is one),
+>
+> overload resolution to select the constructor for the copy is first performed as if the object were
+> designated by an rvalue. If the first overload resolution fails or was not performed, <del>or if the type
+> of the first parameter of the selected constructor is not an rvalue reference to the object's type
+> (possibly cv-qualified),</del> overload resolution is performed again, considering the object as an lvalue.
+> [*Note:* This two-stage overload resolution must be performed regardless of whether copy elision will occur.
+> It determines the constructor to be called if elision is not performed, and the selected constructor
+> must be accessible even if the call is elided. —*end note*]
+
+Note: I believe that the two instances of the word "constructor" in the note remain correct. They refer to
+the constructor selected to initialize the object in the return slot, as the very last step of the conversion
+sequence. This proposed change merely permits the conversion sequence to be longer than a single step; for
+example, it might involve a derived-to-base conversion followed by a move-constructor, or a user-defined
+conversion operator followed by a move-constructor. In either case, that move-constructor is the "constructor
+to be called," as far as the note is concerned, and the note is correct that the constructor must be accessible
+even if elision is performed.
+
+
+# Implementation experience # {#implementation}
+
+This feature has effectively already been implemented in Clang since February 2018; see [[D43322]].
+Under the diagnostic option `-Wreturn-std-move` (which is enabled as part of `-Wmove`, `-Wmost`, and `-Wall`),
+the compiler performs overload resolution according to *both* rules — the standard rule and also
+the rule proposed in this proposal. If the two resolutions produce different results, then Clang
+emits a warning diagnostic explaining that the return value will not be implicitly moved and
+suggesting that the programmer add an explicit `std::move`.
+
+
+## Plenitude of true positives ## {#true-positives}
+
+These warning diagnostics have proven helpful on real code.
+Many instances have been reported of code that is currently accidentally pessimized,
+and which would become optimized (with no loss of correctness) if this proposal were adopted:
+
+  - [[SG14]]: a clever trick to reduce code duplication by using conversion operators,
+    rather than converting constructors, turned out to cause unnecessary copying in a common use-case.
+
+  - [[Chromium]]: a non-standard container library used `iterator::operator const_iterator() &&`
+    instead of `const_iterator::const_iterator(iterator&&)`.
+    (The actual committed diff is <a href="https://chromium-review.googlesource.com/c/chromium/src/+/1025435">here</a>.)
+
+  - [[LibreOffice]]: "An explicit std::move would be needed in the return statements, as there's a
+    conversion from `VclPtrInstance` to base class `VclPtr` involved."
+
+However, we must note that about half of the true positives from the diagnostic are on code
+like the following example, which is not affected by this proposal:
+
+```c++
+void foo(std::string&& s) {
+    s += "foo";
+    return s;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+See [[Khronos]], [[Folly]], and three of the four diffs in [[Chromium]].
+Some number of programmers certainly expect a move here.
+However, we believe that the rule "references are never implicitly moved-from" is teachable, and there
+is no need to meddle with it for C++20. In these cases, we are happy to explain that the programmer
+should either add `std::move` or stop passing by rvalue-reference in the first place.
+
+[[AWS]] is a particularly egregious variation:
+
+```c++
+void foo() {
+    std::string&& s = "hello world";
+    return s;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+From <a href="https://github.com/aws/aws-sdk-cpp/commit/ded84836cd7bf15aa2375a6c1f7143f34d985df1#diff-2ce19b694bb11d0ff1676f740d32f98dL136">the committed diff</a>
+we can see that this programmer may be beyond our ability to help.
+
+
+## Lack of false positives ## {#false-positives}
+
+In five months we have received a single "false positive" report ([[Mozilla]]), which complained that the move-constructor suggested
+by Clang was *not significantly more efficient* than the actually selected copy-constructor. The programmer preferred not
+to add the suggested `std::move` because the code ugliness was not worth the minor performance gain.
+This proposal would give Mozilla that minor performance gain without the ugliness — the best of both worlds!
+
+We have never received any bug report that any move-constructor suggested by Clang would have been incorrect.
+
+
+<pre class=biblio>
+{
+  "AWS": {
+    "title": "Use const references to extend lifetime of temporaries",
+    "href": "https://github.com/aws/aws-sdk-cpp/issues/847",
+    "date": "April 2018"
+  },
+  "Chromium": {
+    "title": "clean up and enable Wreturn-std-move",
+    "href": "https://bugs.chromium.org/p/chromium/issues/detail?id=832211",
+    "date": "April 2018"
+  },
+  "CWG1579": {
+    "title": "Return by converting move constructor",
+    "authors": [
+        "Jeffrey Yasskin"
+    ],
+    "href": "http://open-std.org/JTC1/SC22/WG21/docs/cwg_defects.html#1579",
+    "date": "October 2012"
+  },
+  "D43322": {
+    "title": "Diagnose cases of 'return x' that should be 'return std::move(x)' for efficiency",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://reviews.llvm.org/D43322",
+    "date": "February 2018"
+  },
+  "Folly": {
+    "title": "fix -Wreturn-std-move errors",
+    "href": "https://github.com/facebook/folly/commit/b5105fc5581eef1af2a809b7a3a50ac820e572ae",
+    "date": "April 2018"
+  },
+  "LibreOffice": {
+    "title": "-Werror,-Wreturn-std-move (recent Clang trunk)",
+    "authors": [
+      "Stephan Bergmann"
+    ],
+    "href": "https://cgit.freedesktop.org/libreoffice/core/commit/?id=74b6e61dde64c5e24bffacda6f67dbf3d1fc7032",
+    "date": "April 2018"
+  },
+  "Mozilla": {
+    "title": "Various '-Wreturn-std-move' build warnings with clang 7.0 (trunk), for cases where return invokes (cheap) string copy-constructor rather than move constructor",
+    "href": "https://bugzilla.mozilla.org/show_bug.cgi?id=1454848",
+    "date": "April 2018"
+  },
+  "Khronos": {
+    "title": "Use std::move(str) suggested with -Wreturn-std-move",
+    "href": "https://github.com/KhronosGroup/SPIRV-Tools/issues/1521",
+    "date": "April 2018"
+  },
+  "SG14": {
+    "title": "inplace_function implicit conversion chooses copy over move",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://github.com/WG21-SG14/SG14/issues/125",
+    "date": "February 2018"
+  }
+}
+</pre>
