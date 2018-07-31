@@ -1227,7 +1227,7 @@ Possible extra rowspan handling
       text-align: center;
     }
   </style>
-  <meta content="Bikeshed version f2724b884e685e8c0b00d94cd6bede515ba6b45d" name="generator">
+  <meta content="Bikeshed version 9c7b3c1bf4afcf8eca4fd3a1529a298ee35be006" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 ins  {background-color: #CCFFCC; text-decoration: underline;}
@@ -1453,7 +1453,7 @@ pre .property::before, pre .property::after {
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>0
+     <dd>2
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs</a>
      <dt>Current:
@@ -1465,7 +1465,7 @@ pre .property::before, pre .property::after {
   </div>
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
-   <p>Programmers expect <code class="highlight"><c- k="">return</c-> <c- n="">x</c-><c- p="">;</c-></code> to trigger copy elision; or, at worst, to <i>implicitly move</i> from <code class="highlight"><c- n="">x</c-></code> instead of copying. Occasionally, C++ violates their expectations and performs
+   <p>Programmers expect <code class="highlight"><c- k>return</c-> <c- n>x</c-><c- p>;</c-></code> to trigger copy elision; or, at worst, to <i>implicitly move</i> from <code class="highlight"><c- n>x</c-></code> instead of copying. Occasionally, C++ violates their expectations and performs
 an expensive copy anyway.
 Based on our experience using Clang to diagnose unexpected copies in Chromium, Mozilla,
 and LibreOffice, we propose to change the standard so that these copies will be replaced with <i>implicit moves</i>.</p>
@@ -1487,6 +1487,7 @@ and LibreOffice, we propose to change the standard so that these copies will be 
       <li><a href="#true-positives"><span class="secno">3.1</span> <span class="content">Plenitude of true positives</span></a>
       <li><a href="#false-positives"><span class="secno">3.2</span> <span class="content">Lack of false positives</span></a>
      </ol>
+    <li><a href="#acknowledgments"><span class="secno">4</span> <span class="content">Acknowledgments</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -1499,33 +1500,33 @@ and LibreOffice, we propose to change the standard so that these copies will be 
    <h2 class="heading settled" data-level="1" id="background"><span class="secno">1. </span><span class="content">Background</span><a class="self-link" href="#background"></a></h2>
    <p>Each version of C++ has improved the efficiency of returning objects by value. By the middle of the last
 decade, copy elision was reliable (if not technically guaranteed) in situations like this:</p>
-<pre class="language-c++ highlight"><c- n="">Widget</c-> <c- nf="">one</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- k="">return</c-> <c- n="">Widget</c-><c- p="">();</c->  <c- c1="">// copy elision</c->
-<c- c1=""></c-><c- p="">}</c->
-<c- n="">Widget</c-> <c- nf="">two</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">Widget</c-> <c- n="">result</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">result</c-><c- p="">;</c->  <c- c1="">// copy elision</c->
-<c- c1=""></c-><c- p="">}</c->
+<pre class="language-c++ highlight"><c- n>Widget</c-> <c- nf>one</c-><c- p>()</c-> <c- p>{</c->
+    <c- k>return</c-> <c- n>Widget</c-><c- p>();</c->  <c- c1>// copy elision</c->
+<c- p>}</c->
+<c- n>Widget</c-> <c- nf>two</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>Widget</c-> <c- n>result</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>result</c-><c- p>;</c->  <c- c1>// copy elision</c->
+<c- p>}</c->
 </pre>
    <p>In C++11, a completely new feature was added: a change to overload resolution which I will call <em>implicit move</em>. Even when copy elision is impossible, the compiler is sometimes
 required to <em>implicitly move</em> a returned object into the return slot:</p>
-<pre class="language-c++ highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">shared_ptr</c-><c- o="">&lt;</c-><c- n="">Base</c-><c- o="">></c-> <c- n="">three</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">std</c-><c- o="">::</c-><c- n="">shared_ptr</c-><c- o="">&lt;</c-><c- n="">Base</c-><c- o="">></c-> <c- n="">result</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">result</c-><c- p="">;</c->  <c- c1="">// copy elision</c->
-<c- c1=""></c-><c- p="">}</c->
-<c- n="">std</c-><c- o="">::</c-><c- n="">shared_ptr</c-><c- o="">&lt;</c-><c- n="">Base</c-><c- o="">></c-> <c- n="">four</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">std</c-><c- o="">::</c-><c- n="">shared_ptr</c-><c- o="">&lt;</c-><c- n="">Derived</c-><c- o="">></c-> <c- n="">result</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">result</c-><c- p="">;</c->  <c- c1="">// no copy elision, but implicitly moved (not copied)</c->
-<c- c1=""></c-><c- p="">}</c->
+<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- n>Base</c-><c- o>></c-> <c- n>three</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- n>Base</c-><c- o>></c-> <c- n>result</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>result</c-><c- p>;</c->  <c- c1>// copy elision</c->
+<c- p>}</c->
+<c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- n>Base</c-><c- o>></c-> <c- n>four</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- n>Derived</c-><c- o>></c-> <c- n>result</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>result</c-><c- p>;</c->  <c- c1>// no copy elision, but implicitly moved (not copied)</c->
+<c- p>}</c->
 </pre>
    <p>The wording for this optimization was amended by <a data-link-type="biblio" href="#biblio-cwg1579">[CWG1579]</a>. The current wording in <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> says:</p>
    <blockquote>
     <p>In the following copy-initialization contexts, a move operation might be used instead of a copy operation:</p>
     <ul>
-     <li data-md="">
-      <p>If the <em>expression</em> in a <code class="highlight"><c- k="">return</c-></code> statement is a (possibly parenthesized) <em>id-expression</em> that
+     <li data-md>
+      <p>If the <em>expression</em> in a <code class="highlight"><c- k>return</c-></code> statement is a (possibly parenthesized) <em>id-expression</em> that
 names an object with automatic storage duration declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</p>
-     <li data-md="">
+     <li data-md>
       <p>if the operand of a <em>throw-expression</em> is the name of a non-volatile automatic object
 (other than a <b>function</b> or catch-clause parameter) whose scope does not extend beyond
 the end of the innermost enclosing <em>try-block</em> (if there is one),</p>
@@ -1538,55 +1539,55 @@ of the first parameter of the selected <b>constructor</b> is not an rvalue refer
    <p>The bolded phrases above indicate places where the wording diverges from a naïve programmer’s intuition.
 Consider the following <a href="https://godbolt.org/g/poynjg">examples</a>...</p>
    <h3 class="heading settled" data-level="1.1" id="slicing"><span class="secno">1.1. </span><span class="content">Slicing is pessimized</span><a class="self-link" href="#slicing"></a></h3>
-   <p>because of the bolded phrase <b>the object’s</b>.</p>
-<pre class="language-c++ highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">shared_ptr</c-><c- o="">&lt;</c-><c- n="">Base</c-><c- o="">></c-> <c- n="">five</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">std</c-><c- o="">::</c-><c- n="">shared_ptr</c-><c- o="">&lt;</c-><c- n="">Derived</c-><c- o="">></c-> <c- n="">result</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">result</c-><c- p="">;</c->  <c- c1="">// no copy elision, but implicitly moved (never copied)</c->
-<c- c1=""></c-><c- p="">}</c->
-<c- n="">Base</c-> <c- n="">six</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">Derived</c-> <c- n="">result</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">result</c-><c- p="">;</c->  <c- c1="">// no copy elision, and no implicit move (the object is copied)</c->
-<c- c1=""></c-><c- p="">}</c->
+   <p>Slicing is pessimized because of the bolded phrase <b>the object’s</b>.</p>
+<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- n>Base</c-><c- o>></c-> <c- n>five</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- n>Derived</c-><c- o>></c-> <c- n>result</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>result</c-><c- p>;</c->  <c- c1>// no copy elision, but implicitly moved (never copied)</c->
+<c- p>}</c->
+<c- n>Base</c-> <c- n>six</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>Derived</c-> <c- n>result</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>result</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
+<c- p>}</c->
 </pre>
-   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n="">six</c-></code> matches the current Standard wording, and matches Clang’s behavior.
+   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n>six</c-></code> matches the current Standard wording, and matches Clang’s behavior.
 GCC’s behavior <em>already</em>, since GCC 8.1, is to do the implicit move.</p>
    <h3 class="heading settled" data-level="1.2" id="conversion"><span class="secno">1.2. </span><span class="content">Non-constructor conversion is pessimized</span><a class="self-link" href="#conversion"></a></h3>
-   <p>because of the bolded phrase <b>constructor</b>.</p>
-<pre class="language-c++ highlight"><c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c->
-<c- k="">struct</c-> <c- n="">Red</c-> <c- p="">{</c->
-    <c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">U</c-><c- o="">></c-> <c- n="">Red</c-><c- p="">(</c-><c- k="">const</c-> <c- n="">Red</c-><c- o="">&lt;</c-><c- n="">U</c-><c- o="">></c-> <c- o="">&amp;</c-><c- p="">);</c->
-    <c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">U</c-><c- o="">></c-> <c- n="">Red</c-><c- p="">(</c-><c- n="">Red</c-><c- o="">&lt;</c-><c- n="">U</c-><c- o="">>&amp;&amp;</c-><c- p="">);</c->
-<c- p="">};</c->
+   <p>Non-constructor conversion is pessimized because of the bolded phrase <b>constructor</b>.</p>
+<pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
+<c- k>struct</c-> <c- n>Red</c-> <c- p>{</c->
+    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>U</c-><c- o>></c-> <c- n>Red</c-><c- p>(</c-><c- k>const</c-> <c- n>Red</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-> <c- o>&amp;</c-><c- p>);</c->
+    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>U</c-><c- o>></c-> <c- n>Red</c-><c- p>(</c-><c- n>Red</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;&amp;</c-><c- p>);</c->
+<c- p>};</c->
 
-<c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">T</c-><c- o="">></c->
-<c- k="">struct</c-> <c- n="">Blue</c-> <c- p="">{</c->
-    <c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">U</c-><c- o="">></c-> <c- n="">operator</c-> <c- n="">Blue</c-><c- o="">&lt;</c-><c- n="">U</c-><c- o="">></c-><c- p="">()</c-> <c- k="">const</c-> <c- o="">&amp;</c-><c- p="">;</c->
-    <c- n="">template</c-><c- o="">&lt;</c-><c- n="">class</c-> <c- n="">U</c-><c- o="">></c-> <c- n="">operator</c-> <c- n="">Blue</c-><c- o="">&lt;</c-><c- n="">U</c-><c- o="">></c-><c- p="">()</c-> <c- o="">&amp;&amp;</c-><c- p="">;</c->
-<c- p="">};</c->
+<c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
+<c- k>struct</c-> <c- n>Blue</c-> <c- p>{</c->
+    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>U</c-><c- o>></c-> <c- n>operator</c-> <c- n>Blue</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-><c- p>()</c-> <c- k>const</c-> <c- o>&amp;</c-><c- p>;</c->
+    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>U</c-><c- o>></c-> <c- n>operator</c-> <c- n>Blue</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-><c- p>()</c-> <c- o>&amp;&amp;</c-><c- p>;</c->
+<c- p>};</c->
 
-<c- n="">Red</c-><c- o="">&lt;</c-><c- n="">Base</c-><c- o="">></c-> <c- n="">seven</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">Red</c-><c- o="">&lt;</c-><c- n="">Derived</c-><c- o="">></c-> <c- n="">w</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">w</c-><c- p="">;</c->  <c- c1="">// no copy elision, but implicitly moved (never copied)</c->
-<c- c1=""></c-><c- p="">}</c->
-<c- n="">Blue</c-><c- o="">&lt;</c-><c- n="">Base</c-><c- o="">></c-> <c- n="">eight</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">Blue</c-><c- o="">&lt;</c-><c- n="">Derived</c-><c- o="">></c-> <c- n="">w</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">w</c-><c- p="">;</c->  <c- c1="">// no copy elision, and no implicit move (the object is copied)</c->
-<c- c1=""></c-><c- p="">}</c->
+<c- n>Red</c-><c- o>&lt;</c-><c- n>Base</c-><c- o>></c-> <c- n>seven</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>Red</c-><c- o>&lt;</c-><c- n>Derived</c-><c- o>></c-> <c- n>w</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// no copy elision, but implicitly moved (never copied)</c->
+<c- p>}</c->
+<c- n>Blue</c-><c- o>&lt;</c-><c- n>Base</c-><c- o>></c-> <c- n>eight</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>Blue</c-><c- o>&lt;</c-><c- n>Derived</c-><c- o>></c-> <c- n>w</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
+<c- p>}</c->
 </pre>
    <h3 class="heading settled" data-level="1.3" id="throwing"><span class="secno">1.3. </span><span class="content">Throwing is pessimized</span><a class="self-link" href="#throwing"></a></h3>
-   <p>because of the bolded phrase <b>function</b> [parameter].</p>
-<pre class="language-c++ highlight"><c- b="">void</c-> <c- nf="">nine</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">Widget</c-> <c- n="">w</c-><c- p="">;</c->
-    <c- n="">throw</c-> <c- n="">w</c-><c- p="">;</c->  <c- c1="">// non-guaranteed copy elision, but implicitly moved (never copied)</c->
-<c- c1=""></c-><c- p="">}</c->
-<c- n="">Widget</c-> <c- nf="">ten</c-><c- p="">(</c-><c- n="">Widget</c-> <c- n="">w</c-><c- p="">)</c-> <c- p="">{</c->
-    <c- k="">return</c-> <c- n="">w</c-><c- p="">;</c->  <c- c1="">// no copy elision, but implicitly moved (never copied)</c->
-<c- c1=""></c-><c- p="">}</c->
-<c- b="">void</c-> <c- nf="">eleven</c-><c- p="">(</c-><c- n="">Widget</c-> <c- n="">w</c-><c- p="">)</c-> <c- p="">{</c->
-    <c- n="">throw</c-> <c- n="">w</c-><c- p="">;</c->  <c- c1="">// no copy elision, and no implicit move (the object is copied)</c->
-<c- c1=""></c-><c- p="">}</c->
+   <p>Throwing is pessimized because of the bolded phrase <b>function</b> [parameter].</p>
+<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>nine</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>Widget</c-> <c- n>w</c-><c- p>;</c->
+    <c- n>throw</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// non-guaranteed copy elision, but implicitly moved (never copied)</c->
+<c- p>}</c->
+<c- n>Widget</c-> <c- nf>ten</c-><c- p>(</c-><c- n>Widget</c-> <c- n>w</c-><c- p>)</c-> <c- p>{</c->
+    <c- k>return</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// no copy elision, but implicitly moved (never copied)</c->
+<c- p>}</c->
+<c- b>void</c-> <c- nf>eleven</c-><c- p>(</c-><c- n>Widget</c-> <c- n>w</c-><c- p>)</c-> <c- p>{</c->
+    <c- n>throw</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
+<c- p>}</c->
 </pre>
-   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n="">eleven</c-></code> matches the current Standard wording, and matches GCC’s behavior.
+   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n>eleven</c-></code> matches the current Standard wording, and matches GCC’s behavior.
 Clang’s behavior <em>already</em>, since Clang 4.0.1 or earlier, is to do the implicit move.</p>
    <p>We propose to remove all three of these unnecessary limitations.</p>
    <h2 class="heading settled" data-level="2" id="wording"><span class="secno">2. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
@@ -1594,10 +1595,10 @@ Clang’s behavior <em>already</em>, since Clang 4.0.1 or earlier, is to do the 
    <blockquote>
     <p>In the following copy-initialization contexts, a move operation might be used instead of a copy operation:</p>
     <ul>
-     <li data-md="">
-      <p>If the <em>expression</em> in a <code class="highlight"><c- k="">return</c-></code> statement is a (possibly parenthesized) <em>id-expression</em> that
+     <li data-md>
+      <p>If the <em>expression</em> in a <code class="highlight"><c- k>return</c-></code> statement is a (possibly parenthesized) <em>id-expression</em> that
 names an object with automatic storage duration declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</p>
-     <li data-md="">
+     <li data-md>
       <p>
        if the operand of a <em>throw-expression</em> is the name of a non-volatile automatic object
 (other than a 
@@ -1619,59 +1620,60 @@ must be accessible even if the call is elided. —<em>end note</em>]
     </p>
    </blockquote>
    <p class="note" role="note"><span>Note:</span> I believe that the two instances of the word "constructor" in the note remain correct. They refer to
-the constructor selected to initialize the object in the return slot, as the very last step of the conversion
+the constructor selected to initialize the result object, as the very last step of the conversion
 sequence. This proposed change merely permits the conversion sequence to be longer than a single step; for
 example, it might involve a derived-to-base conversion followed by a move-constructor, or a user-defined
-conversion operator followed by a move-constructor. In either case, that move-constructor is the "constructor
-to be called," as far as the note is concerned, and the note is correct that the constructor must be accessible
-even if elision is performed.</p>
+conversion operator followed by a move-constructor. In either case, as far as the note is concerned,
+that ultimate move-constructor is the "constructor to be called." The note is correct that this
+constructor must be accessible even if elision is performed.</p>
    <h2 class="heading settled" data-level="3" id="implementation"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#implementation"></a></h2>
    <p>This feature has effectively already been implemented in Clang since February 2018; see <a data-link-type="biblio" href="#biblio-d43322">[D43322]</a>.
-Under the diagnostic option <code class="highlight"><c- o="">-</c-><c- n="">Wreturn</c-><c- o="">-</c-><c- n="">std</c-><c- o="">-</c-><c- n="">move</c-></code> (which is enabled as part of <code class="highlight"><c- o="">-</c-><c- n="">Wmove</c-></code>, <code class="highlight"><c- o="">-</c-><c- n="">Wmost</c-></code>, and <code class="highlight"><c- o="">-</c-><c- n="">Wall</c-></code>),
+Under the diagnostic option <code class="highlight"><c- o>-</c-><c- n>Wreturn</c-><c- o>-</c-><c- n>std</c-><c- o>-</c-><c- n>move</c-></code> (which is enabled as part of <code class="highlight"><c- o>-</c-><c- n>Wmove</c-></code>, <code class="highlight"><c- o>-</c-><c- n>Wmost</c-></code>, and <code class="highlight"><c- o>-</c-><c- n>Wall</c-></code>),
 the compiler performs overload resolution according to <em>both</em> rules — the standard rule and also
 the rule proposed in this proposal. If the two resolutions produce different results, then Clang
 emits a warning diagnostic explaining that the return value will not be implicitly moved and
-suggesting that the programmer add an explicit <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">move</c-></code>.</p>
+suggesting that the programmer add an explicit <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-></code>.</p>
    <h3 class="heading settled" data-level="3.1" id="true-positives"><span class="secno">3.1. </span><span class="content">Plenitude of true positives</span><a class="self-link" href="#true-positives"></a></h3>
    <p>These warning diagnostics have proven helpful on real code.
 Many instances have been reported of code that is currently accidentally pessimized,
 and which would become optimized (with no loss of correctness) if this proposal were adopted:</p>
    <ul>
-    <li data-md="">
+    <li data-md>
      <p><a data-link-type="biblio" href="#biblio-sg14">[SG14]</a>: a clever trick to reduce code duplication by using conversion operators,
 rather than converting constructors, turned out to cause unnecessary copying in a common use-case.</p>
-    <li data-md="">
-     <p><a data-link-type="biblio" href="#biblio-chromium">[Chromium]</a>: a non-standard container library used <code class="highlight"><c- n="">iterator</c-><c- o="">::</c-><c- k="">operator</c-> <c- n="">const_iterator</c-><c- p="">()</c-> <c- o="">&amp;&amp;</c-></code> instead of <code class="highlight"><c- n="">const_iterator</c-><c- o="">::</c-><c- n="">const_iterator</c-><c- p="">(</c-><c- n="">iterator</c-><c- o="">&amp;&amp;</c-><c- p="">)</c-></code>.
+    <li data-md>
+     <p><a data-link-type="biblio" href="#biblio-chromium">[Chromium]</a>: a non-standard container library used <code class="highlight"><c- n>iterator</c-><c- o>::</c-><c- k>operator</c-> <c- n>const_iterator</c-><c- p>()</c-> <c- o>&amp;&amp;</c-></code> instead of <code class="highlight"><c- n>const_iterator</c-><c- o>::</c-><c- n>const_iterator</c-><c- p>(</c-><c- n>iterator</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code>.
 (The actual committed diff is <a href="https://chromium-review.googlesource.com/c/chromium/src/+/1025435">here</a>.)</p>
-    <li data-md="">
+    <li data-md>
      <p><a data-link-type="biblio" href="#biblio-libreoffice">[LibreOffice]</a>: "An explicit std::move would be needed in the return statements, as there’s a
-conversion from <code class="highlight"><c- n="">VclPtrInstance</c-></code> to base class <code class="highlight"><c- n="">VclPtr</c-></code> involved."</p>
+conversion from <code class="highlight"><c- n>VclPtrInstance</c-></code> to base class <code class="highlight"><c- n>VclPtr</c-></code> involved."</p>
    </ul>
    <p>However, we must note that about half of the true positives from the diagnostic are on code
 like the following example, which is not affected by this proposal:</p>
-<pre class="language-c++ highlight"><c- b="">void</c-> <c- nf="">foo</c-><c- p="">(</c-><c- n="">std</c-><c- o="">::</c-><c- n="">string</c-><c- o="">&amp;&amp;</c-> <c- n="">s</c-><c- p="">)</c-> <c- p="">{</c->
-    <c- n="">s</c-> <c- o="">+=</c-> <c- s="">"foo"</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">s</c-><c- p="">;</c->  <c- c1="">// no copy elision, and no implicit move (the object is copied)</c->
-<c- c1=""></c-><c- p="">}</c->
+<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>twelve</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>&amp;&amp;</c-> <c- n>s</c-><c- p>)</c-> <c- p>{</c->
+    <c- n>s</c-> <c- o>+=</c-> <c- s>"foo"</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>s</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
+<c- p>}</c->
 </pre>
    <p>See <a data-link-type="biblio" href="#biblio-khronos">[Khronos]</a>, <a data-link-type="biblio" href="#biblio-folly">[Folly]</a>, and three of the four diffs in <a data-link-type="biblio" href="#biblio-chromium">[Chromium]</a>.
 Some number of programmers certainly expect a move here.
 However, we believe that the rule "references are never implicitly moved-from" is teachable, and there
 is no need to meddle with it for C++20. In these cases, we are happy to explain that the programmer
-should either add <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">move</c-></code> or stop passing by rvalue-reference in the first place.</p>
-   <p><a data-link-type="biblio" href="#biblio-aws">[AWS]</a> is a particularly egregious variation:</p>
-<pre class="language-c++ highlight"><c- b="">void</c-> <c- nf="">foo</c-><c- p="">()</c-> <c- p="">{</c->
-    <c- n="">std</c-><c- o="">::</c-><c- n="">string</c-><c- o="">&amp;&amp;</c-> <c- n="">s</c-> <c- o="">=</c-> <c- s="">"hello world"</c-><c- p="">;</c->
-    <c- k="">return</c-> <c- n="">s</c-><c- p="">;</c->  <c- c1="">// no copy elision, and no implicit move (the object is copied)</c->
-<c- c1=""></c-><c- p="">}</c->
+should either add <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-></code> or stop passing by rvalue-reference in the first place.</p>
+   <p><a data-link-type="biblio" href="#biblio-aws">[AWS]</a> is a particularly egregious variation. (The committed diff is <a href="https://github.com/aws/aws-sdk-cpp/commit/ded84836cd7bf15aa2375a6c1f7143f34d985df1#diff-2ce19b694bb11d0ff1676f740d32f98dL136">here</a>.)</p>
+<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>thirteen</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>&amp;&amp;</c-> <c- n>s</c-> <c- o>=</c-> <c- s>"hello world"</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>s</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
+<c- p>}</c->
 </pre>
-   <p>From <a href="https://github.com/aws/aws-sdk-cpp/commit/ded84836cd7bf15aa2375a6c1f7143f34d985df1#diff-2ce19b694bb11d0ff1676f740d32f98dL136">the committed diff</a> we can see that this programmer may be beyond our ability to help.</p>
    <h3 class="heading settled" data-level="3.2" id="false-positives"><span class="secno">3.2. </span><span class="content">Lack of false positives</span><a class="self-link" href="#false-positives"></a></h3>
    <p>In five months we have received a single "false positive" report (<a data-link-type="biblio" href="#biblio-mozilla">[Mozilla]</a>), which complained that the move-constructor suggested
 by Clang was <em>not significantly more efficient</em> than the actually selected copy-constructor. The programmer preferred not
-to add the suggested <code class="highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">move</c-></code> because the code ugliness was not worth the minor performance gain.
+to add the suggested <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-></code> because the code ugliness was not worth the minor performance gain.
 This proposal would give Mozilla that minor performance gain without the ugliness — the best of both worlds!</p>
    <p>We have never received any bug report that any move-constructor suggested by Clang would have been incorrect.</p>
+   <h2 class="heading settled" data-level="4" id="acknowledgments"><span class="secno">4. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
+   <p>Thanks to Lukas Bergdoll for his feedback on an early draft of this proposal.</p>
   </main>
 <script>
 (function() {
