@@ -1227,7 +1227,7 @@ Possible extra rowspan handling
       text-align: center;
     }
   </style>
-  <meta content="Bikeshed version 9c7b3c1bf4afcf8eca4fd3a1529a298ee35be006" name="generator">
+  <meta content="Bikeshed version ca499dee738ad325bae89163f1eee6d8a2978cf4" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 ins  {background-color: #CCFFCC; text-decoration: underline;}
@@ -1442,7 +1442,7 @@ pre .property::before, pre .property::after {
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1155R0<br>More implicit moves</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-07-25">2018-07-25</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-08-11">2018-08-11</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Author:
@@ -1453,7 +1453,7 @@ pre .property::before, pre .property::after {
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>2
+     <dd>3
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs</a>
      <dt>Current:
@@ -1509,7 +1509,7 @@ decade, copy elision was reliable (if not technically guaranteed) in situations 
 <c- p>}</c->
 </pre>
    <p>In C++11, a completely new feature was added: a change to overload resolution which I will call <em>implicit move</em>. Even when copy elision is impossible, the compiler is sometimes
-required to <em>implicitly move</em> a returned object into the return slot:</p>
+required to <em>implicitly move</em> the <code class="highlight"><c- k>return</c-></code> statement’s operand into the result object:</p>
 <pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- n>Base</c-><c- o>></c-> <c- n>three</c-><c- p>()</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- n>Base</c-><c- o>></c-> <c- n>result</c-><c- p>;</c->
     <c- k>return</c-> <c- n>result</c-><c- p>;</c->  <c- c1>// copy elision</c->
@@ -1624,7 +1624,7 @@ the constructor selected to initialize the result object, as the very last step 
 sequence. This proposed change merely permits the conversion sequence to be longer than a single step; for
 example, it might involve a derived-to-base conversion followed by a move-constructor, or a user-defined
 conversion operator followed by a move-constructor. In either case, as far as the note is concerned,
-that ultimate move-constructor is the "constructor to be called." The note is correct that this
+that ultimate move-constructor is the "constructor to be called." The note is correct when it says that this
 constructor must be accessible even if elision is performed.</p>
    <h2 class="heading settled" data-level="3" id="implementation"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#implementation"></a></h2>
    <p>This feature has effectively already been implemented in Clang since February 2018; see <a data-link-type="biblio" href="#biblio-d43322">[D43322]</a>.
@@ -1650,7 +1650,7 @@ conversion from <code class="highlight"><c- n>VclPtrInstance</c-></code> to base
    </ul>
    <p>However, we must note that about half of the true positives from the diagnostic are on code
 like the following example, which is not affected by this proposal:</p>
-<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>twelve</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>&amp;&amp;</c-> <c- n>s</c-><c- p>)</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>string</c-> <c- n>twelve</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>&amp;&amp;</c-> <c- n>s</c-><c- p>)</c-> <c- p>{</c->
     <c- n>s</c-> <c- o>+=</c-> <c- s>"foo"</c-><c- p>;</c->
     <c- k>return</c-> <c- n>s</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
 <c- p>}</c->
@@ -1661,7 +1661,7 @@ However, we believe that the rule "references are never implicitly moved-from" i
 is no need to meddle with it for C++20. In these cases, we are happy to explain that the programmer
 should either add <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-></code> or stop passing by rvalue-reference in the first place.</p>
    <p><a data-link-type="biblio" href="#biblio-aws">[AWS]</a> is a particularly egregious variation. (The committed diff is <a href="https://github.com/aws/aws-sdk-cpp/commit/ded84836cd7bf15aa2375a6c1f7143f34d985df1#diff-2ce19b694bb11d0ff1676f740d32f98dL136">here</a>.)</p>
-<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>thirteen</c-><c- p>()</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>string</c-> <c- n>thirteen</c-><c- p>()</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>&amp;&amp;</c-> <c- n>s</c-> <c- o>=</c-> <c- s>"hello world"</c-><c- p>;</c->
     <c- k>return</c-> <c- n>s</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
 <c- p>}</c->

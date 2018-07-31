@@ -2,7 +2,7 @@
 Title: More implicit moves
 Shortname: D1155
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: EWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   Based on our experience using Clang to diagnose unexpected copies in Chromium, Mozilla,
   and LibreOffice, we propose to change the standard so that these copies will be replaced with
   <i>implicit moves</i>.
-Date: 2018-07-25
+Date: 2018-08-11
 </pre>
 
 <style>
@@ -44,7 +44,7 @@ Widget two() {
 
 In C++11, a completely new feature was added: a change to overload resolution which I will call
 *implicit move*. Even when copy elision is impossible, the compiler is sometimes
-required to *implicitly move* a returned object into the return slot:
+required to *implicitly move* the `return` statement's operand into the result object:
 
 ```c++
 std::shared_ptr<Base> three() {
@@ -175,7 +175,7 @@ the constructor selected to initialize the result object, as the very last step 
 sequence. This proposed change merely permits the conversion sequence to be longer than a single step; for
 example, it might involve a derived-to-base conversion followed by a move-constructor, or a user-defined
 conversion operator followed by a move-constructor. In either case, as far as the note is concerned,
-that ultimate move-constructor is the "constructor to be called." The note is correct that this
+that ultimate move-constructor is the "constructor to be called." The note is correct when it says that this
 constructor must be accessible even if elision is performed.
 
 
@@ -209,7 +209,7 @@ However, we must note that about half of the true positives from the diagnostic 
 like the following example, which is not affected by this proposal:
 
 ```c++
-void twelve(std::string&& s) {
+std::string twelve(std::string&& s) {
     s += "foo";
     return s;  // no copy elision, and no implicit move (the object is copied)
 }
@@ -225,7 +225,7 @@ should either add `std::move` or stop passing by rvalue-reference in the first p
 <a href="https://github.com/aws/aws-sdk-cpp/commit/ded84836cd7bf15aa2375a6c1f7143f34d985df1#diff-2ce19b694bb11d0ff1676f740d32f98dL136">here</a>.)
 
 ```c++
-void thirteen() {
+std::string thirteen() {
     std::string&& s = "hello world";
     return s;  // no copy elision, and no implicit move (the object is copied)
 }
