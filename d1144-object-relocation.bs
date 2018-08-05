@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 0
-!Draft Revision: 10
+!Draft Revision: 11
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -416,6 +416,8 @@ A move-constructible, destructible object type `T` is a <dfn dfn-type="abstract-
 
   - a trivially copyable type, or
 
+  - an array of trivially relocatable type, or
+
   - a (possibly cv-qualified) class type declared with the `[[trivially_relocatable]]` attribute, or
 
   - a (possibly cv-qualified) class type which:
@@ -506,6 +508,11 @@ relocation operations involving that type (such as those performed by the librar
 If a class type is declared with the `trivially_relocatable` attribute, and the program relies on
 observable side-effects of relocation other than a copy of the underlying bytes, the behavior is undefined.
 </blockquote></small>
+
+Issue: "If a type `T` is declared with the `trivially_relocatable` attribute, and `T` is either not move-constructible
+or not destructible, the program is ill-formed." We might want to replace this wording with
+a mere "Note" <em>encouraging</em> implementations to diagnose.
+See <a href="https://godbolt.org/g/rB4LPx">this example</a> where a diagnostic might be unwanted.
 
 
 ## Type traits `is_relocatable` etc. ## {#wording-traits}
@@ -686,8 +693,11 @@ Today vendors generally choose not to perform these optimizations.
 
 Thanks to Elias Kosunen, Niall Douglas, and John Bandela for their feedback on early drafts of this paper.
 
-Many thanks to Matt Godbolt for allowing me to install the prototype implementation on Compiler Explorer
+Many thanks to Matt Godbolt for allowing me to install the prototype Clang implementation on Compiler Explorer
 (<a href="https://godbolt.org/g/TA2Xmy">godbolt.org</a>). See also [[Announcing]].
+
+Thanks to Nicolas Lesser for his feedback on drafts of this paper, and for his many review comments on the
+Clang implementation.
 
 Thanks to Pablo Halpern for [[N4158]], to which this paper bears a striking and coincidental resemblance —
 including the meaning assigned to the word "trivial," and the library-algorithm approach to avoiding the
