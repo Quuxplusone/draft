@@ -2,7 +2,7 @@
 Title: More implicit moves
 Shortname: D1155
 Revision: 0
-!Draft Revision: 4
+!Draft Revision: 5
 Audience: EWG
 Status: D
 Group: WG21
@@ -147,7 +147,7 @@ Clang's behavior *already*, since Clang 4.0.1 or earlier, is to do the implicit 
 We propose to remove all three of these unnecessary limitations.
 
 
-# Proposed wording # {#wording}
+# Proposed wording relative to N4762 # {#wording}
 
 Modify
 <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:
@@ -177,6 +177,38 @@ example, it might involve a derived-to-base conversion followed by a move-constr
 conversion operator followed by a move-constructor. In either case, as far as the quoted note is concerned,
 that ultimate move-constructor is the "constructor to be called," and indeed it must be accessible
 even if elision is performed.
+
+
+# Proposed wording relative to P0527r1 # {#wording-alt}
+
+David Stone's [[P0527]] "Implicitly move from rvalue references in return statements" proposes to
+alter the current rules "references are never implicitly moved-from" and "the active exception object
+is never implicitly moved-from." It accomplishes this by significantly refactoring clause
+<a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a>.
+
+In the case that [[P0527]]'s changes are adopted into C++2a, we propose to modify the new
+<a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:
+
+> A *movable entity* is a non-volatile object or an rvalue reference to a non-volatile type,
+> in either case with automatic storage duration. <del>The underlying type of a movable entity is
+> the type of the object or the referenced type, respectively.</del> In the following
+> copy-initialization contexts, a move operation might be used instead of a copy operation:
+>
+>   - If the *expression* in a `return` statement is a (possibly parenthesized) *id-expression* that
+>     names a movable entity declared in the body or *parameter-declaration-clause*
+>     of the innermost enclosing function or *lambda-expression*, or
+>
+>   - if the operand of a *throw-expression* is a (possibly parenthesized) *id-expression* that
+>     names a movable entity whose scope does not extend beyond
+>     the end of the innermost enclosing *try-block* (if there is one),
+>
+> overload resolution to select the constructor for the copy is first performed as if the entity were
+> designated by an rvalue. If the first overload resolution fails or was not performed, <del>or if the type
+> of the first parameter of the selected constructor is not an rvalue reference to the (possibly cv-qualified)
+> underlying type of the movable entity,</del> overload resolution is performed again, considering the entity as an lvalue.
+> [*Note:* This two-stage overload resolution must be performed regardless of whether copy elision will occur.
+> It determines the constructor to be called if elision is not performed, and the selected constructor
+> must be accessible even if the call is elided. —*end note*]
 
 
 # Implementation experience # {#implementation}
@@ -216,11 +248,6 @@ std::string twelve(std::string&& s) {
 ```
 
 See [[Khronos]], [[Folly]], and three of the four diffs in [[Chromium]].
-Some number of programmers certainly expect a move here.
-However, we believe that the rule "references are never implicitly moved-from" is teachable, and there
-is no need to meddle with it for C++20. In these cases, we are happy to explain that the programmer
-should either add `std::move` or stop passing by rvalue-reference in the first place.
-
 [[AWS]] is a particularly egregious variation. (The committed diff is
 <a href="https://github.com/aws/aws-sdk-cpp/commit/ded84836cd7bf15aa2375a6c1f7143f34d985df1#diff-2ce19b694bb11d0ff1676f740d32f98dL136">here</a>.)
 
@@ -231,6 +258,10 @@ std::string thirteen() {
 }
 ```
 
+Some number of programmers certainly expect a move here, and in fact [[P0527]] proposes
+to implicitly move in both of these cases. This paper does not conflict with [[P0527]],
+and we provide [an alternative wording](#wording-alt) for the case that [[P0527]] is adopted.
+
 
 ## Lack of false positives ## {#false-positives}
 
@@ -239,12 +270,13 @@ by Clang was *not significantly more efficient* than the actually selected copy-
 to add the suggested `std::move` because the code ugliness was not worth the minor performance gain.
 This proposal would give Mozilla that minor performance gain without the ugliness — the best of both worlds!
 
-We have never received any bug report that any move-constructor suggested by Clang would have been incorrect.
+We have never received any bug report that the move-constructor suggested by Clang would have been incorrect.
 
 
 # Acknowledgments # {#acknowledgments}
 
 Thanks to Lukas Bergdoll for his copious feedback on drafts of this proposal.
+Thanks to David Stone for [[P0527]].
 
 
 <pre class=biblio>
@@ -280,6 +312,11 @@ Thanks to Lukas Bergdoll for his copious feedback on drafts of this proposal.
     "href": "https://github.com/facebook/folly/commit/b5105fc5581eef1af2a809b7a3a50ac820e572ae",
     "date": "April 2018"
   },
+  "Khronos": {
+    "title": "Use std::move(str) suggested with -Wreturn-std-move",
+    "href": "https://github.com/KhronosGroup/SPIRV-Tools/issues/1521",
+    "date": "April 2018"
+  },
   "LibreOffice": {
     "title": "-Werror,-Wreturn-std-move (recent Clang trunk)",
     "authors": [
@@ -293,10 +330,13 @@ Thanks to Lukas Bergdoll for his copious feedback on drafts of this proposal.
     "href": "https://bugzilla.mozilla.org/show_bug.cgi?id=1454848",
     "date": "April 2018"
   },
-  "Khronos": {
-    "title": "Use std::move(str) suggested with -Wreturn-std-move",
-    "href": "https://github.com/KhronosGroup/SPIRV-Tools/issues/1521",
-    "date": "April 2018"
+  "P0527": {
+    "title": "Implicitly move from rvalue references in return statements",
+    "authors": [
+      "David Stone"
+    ],
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0527r1.html",
+    "date": "November 2017"
   },
   "SG14": {
     "title": "inplace_function implicit conversion chooses copy over move",
