@@ -2,7 +2,7 @@
 Title: More implicit moves
 Shortname: D1155
 Revision: 0
-!Draft Revision: 5
+!Draft Revision: 6
 Audience: EWG
 Status: D
 Group: WG21
@@ -18,10 +18,11 @@ Abstract:
   Based on our experience using Clang to diagnose unexpected copies in Chromium, Mozilla,
   and LibreOffice, we propose to change the standard so that these copies will be replaced with
   <i>implicit moves</i>.
-Date: 2018-08-11
+Date: 2018-08-15
 </pre>
 
 <style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
@@ -67,84 +68,114 @@ The wording for this optimization was amended by [[CWG1579]]. The current wordin
 >     of the innermost enclosing function or *lambda-expression*, or
 >
 >   - if the operand of a *throw-expression* is the name of a non-volatile automatic object
->     (other than a <b>function</b> or catch-clause parameter) whose scope does not extend beyond
+>     (other than a <hilite>function</hilite> or catch-clause parameter) whose scope does not extend beyond
 >     the end of the innermost enclosing *try-block* (if there is one),
 >
 > overload resolution to select the constructor for the copy is first performed as if the object were
 > designated by an rvalue. If the first overload resolution fails or was not performed, or if the type
-> of the first parameter of the selected <b>constructor</b> is not an rvalue reference to <b>the object's</b> type
+> of the first parameter of the selected <hilite>constructor</hilite> is not an <hilite>rvalue
+> reference</hilite> to <hilite>the object's</hilite> type
 > (possibly cv-qualified), overload resolution is performed again, considering the object as an lvalue.
 
-The bolded phrases above indicate places where the wording diverges from a naïve programmer's intuition.
-Consider the following <a href="https://godbolt.org/g/poynjg">examples</a>...
+The highlighted phrases above indicate places where the wording diverges from a naïve programmer's intuition.
+Consider the following <a href="https://godbolt.org/g/9n8cwh">examples</a>...
+
+
+## Throwing is pessimized ## {#throwing}
+
+Throwing is pessimized because of the highlighted word <hilite>function</hilite> [parameter].
+
+```c++
+void five() {
+    Widget w;
+    throw w;  // non-guaranteed copy elision, but implicitly moved (never copied)
+}
+Widget six(Widget w) {
+    return w;  // no copy elision, but implicitly moved (never copied)
+}
+void seven(Widget w) {
+    throw w;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+Note: The comment in `seven` matches the current Standard wording, and matches GCC's behavior.
+Clang's behavior *already*, since Clang 4.0.1 or earlier, is to do the implicit move.
+
+
+## Non-constructor conversion is pessimized ## {#conversion}
+
+Non-constructor conversion is pessimized because of the highlighted word <hilite>constructor</hilite>.
+
+```c++
+struct From {
+    From(Widget const &);
+    From(Widget&&);
+};
+
+struct To {
+    operator Widget() const &;
+    operator Widget() &&;
+};
+
+From eight() {
+    Widget w;
+    return w;  // no copy elision, but implicitly moved (never copied)
+}
+Widget nine() {
+    To t;
+    return t;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+
+## By-value sinks are pessimized ## {#sinks}
+
+By-value sinks are pessimized because of the highlighted phrase <hilite>rvalue reference</hilite>.
+
+```c++
+struct Fish {
+    Fish(Widget const &);
+    Fish(Widget&&);
+};
+
+struct Fowl {
+    Fowl(Widget);
+};
+
+Fish ten() {
+    Widget w;
+    return w;  // no copy elision, but implicitly moved (never copied)
+}
+Fowl eleven() {
+    Widget w;
+    return w;  // no copy elision, and no implicit move (the Widget object is copied)
+}
+```
+
+Note: The comment in `eleven` matches the current Standard wording, and matches Clang's behavior.
+GCC's behavior *already*, since GCC 5.1, is to do the implicit move.
 
 
 ## Slicing is pessimized ## {#slicing}
 
-Slicing is pessimized because of the bolded phrase <b>the object's</b>.
+Slicing is pessimized because of the highlighted phrase <hilite>the object's</hilite>.
 
 ```c++
-std::shared_ptr<Base> five() {
+std::shared_ptr<Base> twelve() {
     std::shared_ptr<Derived> result;
     return result;  // no copy elision, but implicitly moved (never copied)
 }
-Base six() {
+Base thirteen() {
     Derived result;
     return result;  // no copy elision, and no implicit move (the object is copied)
 }
 ```
 
-Note: The comment in `six` matches the current Standard wording, and matches Clang's behavior.
+Note: The comment in `thirteen` matches the current Standard wording, and matches Clang's behavior.
 GCC's behavior *already*, since GCC 8.1, is to do the implicit move.
 
-## Non-constructor conversion is pessimized ## {#conversion}
 
-Non-constructor conversion is pessimized because of the bolded phrase <b>constructor</b>.
-
-```c++
-template<class T>
-struct Red {
-    template<class U> Red(const Red<U> &);
-    template<class U> Red(Red<U>&&);
-};
-
-template<class T>
-struct Blue {
-    template<class U> operator Blue<U>() const &;
-    template<class U> operator Blue<U>() &&;
-};
-
-Red<Base> seven() {
-    Red<Derived> w;
-    return w;  // no copy elision, but implicitly moved (never copied)
-}
-Blue<Base> eight() {
-    Blue<Derived> w;
-    return w;  // no copy elision, and no implicit move (the object is copied)
-}
-```
-
-## Throwing is pessimized ## {#throwing}
-
-Throwing is pessimized because of the bolded phrase <b>function</b> [parameter].
-
-```c++
-void nine() {
-    Widget w;
-    throw w;  // non-guaranteed copy elision, but implicitly moved (never copied)
-}
-Widget ten(Widget w) {
-    return w;  // no copy elision, but implicitly moved (never copied)
-}
-void eleven(Widget w) {
-    throw w;  // no copy elision, and no implicit move (the object is copied)
-}
-```
-
-Note: The comment in `eleven` matches the current Standard wording, and matches GCC's behavior.
-Clang's behavior *already*, since Clang 4.0.1 or earlier, is to do the implicit move.
-
-We propose to remove all three of these unnecessary limitations.
+We propose to remove all four of these unnecessary limitations.
 
 
 # Proposed wording relative to N4762 # {#wording}
@@ -182,8 +213,8 @@ even if elision is performed.
 # Proposed wording relative to P0527r1 # {#wording-alt}
 
 David Stone's [[P0527]] "Implicitly move from rvalue references in return statements" proposes to
-alter the current rules "references are never implicitly moved-from" and "the active exception object
-is never implicitly moved-from." It accomplishes this by significantly refactoring clause
+alter the current rules "references are never implicitly moved-from" and "catch-clause parameters
+are never implicitly moved-from." It accomplishes this by significantly refactoring clause
 <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a>.
 
 In the case that [[P0527]]'s changes are adopted into C++2a, we propose to modify the new
@@ -220,6 +251,8 @@ the rule proposed in this proposal. If the two resolutions produce different res
 emits a warning diagnostic explaining that the return value will not be implicitly moved and
 suggesting that the programmer add an explicit `std::move`.
 
+However, the Clang diagnostic does not diagnose the "By-value sinks" examples above (`ten` and `eleven`).
+
 
 ## Plenitude of true positives ## {#true-positives}
 
@@ -241,7 +274,7 @@ However, we must note that about half of the true positives from the diagnostic 
 like the following example, which is not affected by this proposal:
 
 ```c++
-std::string twelve(std::string&& s) {
+std::string fourteen(std::string&& s) {
     s += "foo";
     return s;  // no copy elision, and no implicit move (the object is copied)
 }
@@ -252,7 +285,7 @@ See [[Khronos]], [[Folly]], and three of the four diffs in [[Chromium]].
 <a href="https://github.com/aws/aws-sdk-cpp/commit/ded84836cd7bf15aa2375a6c1f7143f34d985df1#diff-2ce19b694bb11d0ff1676f740d32f98dL136">here</a>.)
 
 ```c++
-std::string thirteen() {
+std::string fifteen() {
     std::string&& s = "hello world";
     return s;  // no copy elision, and no implicit move (the object is copied)
 }
@@ -275,8 +308,9 @@ We have never received any bug report that the move-constructor suggested by Cla
 
 # Acknowledgments # {#acknowledgments}
 
-Thanks to Lukas Bergdoll for his copious feedback on drafts of this proposal.
-Thanks to David Stone for [[P0527]].
+- Thanks to Lukas Bergdoll for his copious feedback.
+- Thanks to David Stone for [[P0527]].
+- Thanks to Barry Revzin (see [[Revzin]]) for pointing out the "By-value sinks" case.
 
 
 <pre class=biblio>
@@ -337,6 +371,16 @@ Thanks to David Stone for [[P0527]].
     ],
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0527r1.html",
     "date": "November 2017"
+  },
+  "Revzin": {
+    "title": "std-proposals thread: By-value sinks",
+    "authors": [
+      "Barry Revzin",
+      "Howard Hinnant",
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://groups.google.com/a/isocpp.org/d/msg/std-proposals/eeLS8vI05nM/_BP-8YTPDAAJ",
+    "date": "August 2018"
   },
   "SG14": {
     "title": "inplace_function implicit conversion chooses copy over move",
