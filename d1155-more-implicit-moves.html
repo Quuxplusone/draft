@@ -1227,7 +1227,7 @@ Possible extra rowspan handling
       text-align: center;
     }
   </style>
-  <meta content="Bikeshed version aab07fa3563472bb567b6a05ef64a9084da53327" name="generator">
+  <meta content="Bikeshed version a816d78e14132d4d4d2ee44ccaf1b8bc90ac75d5" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
@@ -1443,7 +1443,7 @@ pre .property::before, pre .property::after {
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1155R0<br>More implicit moves</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-08-15">2018-08-15</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-08-18">2018-08-18</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Author:
@@ -1454,7 +1454,7 @@ pre .property::before, pre .property::after {
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>6
+     <dd>7
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs</a>
      <dt>Current:
@@ -1570,8 +1570,8 @@ Consider the following <a href="https://godbolt.org/g/9n8cwh">examples</a>...</p
     <c- n>throw</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
 <c- p>}</c->
 </pre>
-   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n>seven</c-></code> matches the current Standard wording, and matches GCC’s behavior.
-Clang’s behavior <em>already</em>, since Clang 4.0.1 or earlier, is to do the implicit move.</p>
+   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n>seven</c-></code> matches the current Standard wording, and matches the behavior of GCC.
+Most compilers (Clang 4.0.1+, MSVC 2015+, ICC 16.0.3+) already do this implicit move.</p>
    <h3 class="heading settled" data-level="1.2" id="conversion"><span class="secno">1.2. </span><span class="content">Non-constructor conversion is pessimized</span><a class="self-link" href="#conversion"></a></h3>
    <p>
     Non-constructor conversion is pessimized because of the highlighted word 
@@ -1621,8 +1621,8 @@ Clang’s behavior <em>already</em>, since Clang 4.0.1 or earlier, is to do the 
     <c- k>return</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the Widget object is copied)</c->
 <c- p>}</c->
 </pre>
-   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n>eleven</c-></code> matches the current Standard wording, and matches Clang’s behavior.
-GCC’s behavior <em>already</em>, since GCC 5.1, is to do the implicit move.</p>
+   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n>eleven</c-></code> matches the current Standard wording, and matches the behavior of
+Clang, ICC, and MSVC. One compiler (GCC 5.1+) already does this implicit move.</p>
    <h3 class="heading settled" data-level="1.4" id="slicing"><span class="secno">1.4. </span><span class="content">Slicing is pessimized</span><a class="self-link" href="#slicing"></a></h3>
    <p>
     Slicing is pessimized because of the highlighted phrase 
@@ -1638,8 +1638,8 @@ GCC’s behavior <em>already</em>, since GCC 5.1, is to do the implicit move.</p
     <c- k>return</c-> <c- n>result</c-><c- p>;</c->  <c- c1>// no copy elision, and no implicit move (the object is copied)</c->
 <c- p>}</c->
 </pre>
-   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n>thirteen</c-></code> matches the current Standard wording, and matches Clang’s behavior.
-GCC’s behavior <em>already</em>, since GCC 8.1, is to do the implicit move.</p>
+   <p class="note" role="note"><span>Note:</span> The comment in <code class="highlight"><c- n>thirteen</c-></code> matches the current Standard wording, and matches the behavior
+of Clang and MSVC. Some compilers (GCC 8.1+, ICC 18.0.0+) already do this implicit move.</p>
    <p>We propose to remove all four of these unnecessary limitations.</p>
    <h2 class="heading settled" data-level="2" id="wording"><span class="secno">2. </span><span class="content">Proposed wording relative to N4762</span><a class="self-link" href="#wording"></a></h2>
    <p>Modify <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:</p>
@@ -1716,10 +1716,10 @@ must be accessible even if the call is elided. —<em>end note</em>]
    <p>This feature has effectively already been implemented in Clang since February 2018; see <a data-link-type="biblio" href="#biblio-d43322">[D43322]</a>.
 Under the diagnostic option <code class="highlight"><c- o>-</c-><c- n>Wreturn</c-><c- o>-</c-><c- n>std</c-><c- o>-</c-><c- n>move</c-></code> (which is enabled as part of <code class="highlight"><c- o>-</c-><c- n>Wmove</c-></code>, <code class="highlight"><c- o>-</c-><c- n>Wmost</c-></code>, and <code class="highlight"><c- o>-</c-><c- n>Wall</c-></code>),
 the compiler performs overload resolution according to <em>both</em> rules — the standard rule and also
-the rule proposed in this proposal. If the two resolutions produce different results, then Clang
-emits a warning diagnostic explaining that the return value will not be implicitly moved and
+a rule similar to the one proposed in this proposal. If the two resolutions produce different results,
+then Clang emits a warning diagnostic explaining that the return value will not be implicitly moved and
 suggesting that the programmer add an explicit <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-></code>.</p>
-   <p>However, the Clang diagnostic does not diagnose the "By-value sinks" examples above (<code class="highlight"><c- n>ten</c-></code> and <code class="highlight"><c- n>eleven</c-></code>).</p>
+   <p>However, Clang does not diagnose the examples from <a href="#sinks">§1.3 By-value sinks</a>.</p>
    <h3 class="heading settled" data-level="4.1" id="true-positives"><span class="secno">4.1. </span><span class="content">Plenitude of true positives</span><a class="self-link" href="#true-positives"></a></h3>
    <p>These warning diagnostics have proven helpful on real code.
 Many instances have been reported of code that is currently accidentally pessimized,
@@ -1756,7 +1756,7 @@ and we provide <a href="#wording-alt">an alternative wording</a> for the case th
 by Clang was <em>not significantly more efficient</em> than the actually selected copy-constructor. The programmer preferred not
 to add the suggested <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-></code> because the code ugliness was not worth the minor performance gain.
 This proposal would give Mozilla that minor performance gain without the ugliness — the best of both worlds!</p>
-   <p>We have never received any bug report that the move-constructor suggested by Clang would have been incorrect.</p>
+   <p>We have never received any report that Clang’s suggested move would have been incorrect.</p>
    <h2 class="heading settled" data-level="5" id="acknowledgments"><span class="secno">5. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <ul>
     <li data-md>

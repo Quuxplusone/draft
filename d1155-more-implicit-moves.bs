@@ -2,7 +2,7 @@
 Title: More implicit moves
 Shortname: D1155
 Revision: 0
-!Draft Revision: 6
+!Draft Revision: 7
 Audience: EWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   Based on our experience using Clang to diagnose unexpected copies in Chromium, Mozilla,
   and LibreOffice, we propose to change the standard so that these copies will be replaced with
   <i>implicit moves</i>.
-Date: 2018-08-15
+Date: 2018-08-18
 </pre>
 
 <style>
@@ -98,8 +98,8 @@ void seven(Widget w) {
 }
 ```
 
-Note: The comment in `seven` matches the current Standard wording, and matches GCC's behavior.
-Clang's behavior *already*, since Clang 4.0.1 or earlier, is to do the implicit move.
+Note: The comment in `seven` matches the current Standard wording, and matches the behavior of GCC.
+Most compilers (Clang 4.0.1+, MSVC 2015+, ICC 16.0.3+) already do this implicit move.
 
 
 ## Non-constructor conversion is pessimized ## {#conversion}
@@ -152,8 +152,8 @@ Fowl eleven() {
 }
 ```
 
-Note: The comment in `eleven` matches the current Standard wording, and matches Clang's behavior.
-GCC's behavior *already*, since GCC 5.1, is to do the implicit move.
+Note: The comment in `eleven` matches the current Standard wording, and matches the behavior of
+Clang, ICC, and MSVC. One compiler (GCC 5.1+) already does this implicit move.
 
 
 ## Slicing is pessimized ## {#slicing}
@@ -171,8 +171,8 @@ Base thirteen() {
 }
 ```
 
-Note: The comment in `thirteen` matches the current Standard wording, and matches Clang's behavior.
-GCC's behavior *already*, since GCC 8.1, is to do the implicit move.
+Note: The comment in `thirteen` matches the current Standard wording, and matches the behavior
+of Clang and MSVC. Some compilers (GCC 8.1+, ICC 18.0.0+) already do this implicit move.
 
 
 We propose to remove all four of these unnecessary limitations.
@@ -247,11 +247,11 @@ In the case that [[P0527]]'s changes are adopted into C++2a, we propose to modif
 This feature has effectively already been implemented in Clang since February 2018; see [[D43322]].
 Under the diagnostic option `-Wreturn-std-move` (which is enabled as part of `-Wmove`, `-Wmost`, and `-Wall`),
 the compiler performs overload resolution according to *both* rules — the standard rule and also
-the rule proposed in this proposal. If the two resolutions produce different results, then Clang
-emits a warning diagnostic explaining that the return value will not be implicitly moved and
+a rule similar to the one proposed in this proposal. If the two resolutions produce different results,
+then Clang emits a warning diagnostic explaining that the return value will not be implicitly moved and
 suggesting that the programmer add an explicit `std::move`.
 
-However, the Clang diagnostic does not diagnose the "By-value sinks" examples above (`ten` and `eleven`).
+However, Clang does not diagnose the examples from [[#sinks|§1.3 By-value sinks]].
 
 
 ## Plenitude of true positives ## {#true-positives}
@@ -303,7 +303,7 @@ by Clang was *not significantly more efficient* than the actually selected copy-
 to add the suggested `std::move` because the code ugliness was not worth the minor performance gain.
 This proposal would give Mozilla that minor performance gain without the ugliness — the best of both worlds!
 
-We have never received any bug report that the move-constructor suggested by Clang would have been incorrect.
+We have never received any report that Clang's suggested move would have been incorrect.
 
 
 # Acknowledgments # {#acknowledgments}
