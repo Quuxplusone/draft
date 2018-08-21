@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 0
-!Draft Revision: 12
+!Draft Revision: 13
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -438,13 +438,13 @@ A move-constructible, destructible object type `T` is a <dfn dfn-type="abstract-
 
   - a (possibly cv-qualified) class type which:
 
-    - either has a defaulted, non-deleted move constructor, or
-          has no move constructor, a defaulted, non-deleted copy constructor,
-          and no `mutable` or `volatile` subobjects,
+    - has no user-provided move constructors,
 
-    - has a defaulted, non-deleted destructor,
+    - either has at least one move constructor or has no user-provided copy constructors,
 
-    - either is final, or has a final destructor, or has a non-virtual destructor,
+    - has no user-provided or deleted destructors,
+
+    - either is final, or has a final destructor, or has no virtual destructors,
 
     - has no virtual base classes,
 
@@ -480,61 +480,42 @@ and "destructible" are library concepts, not core language concepts, so maybe it
 to use them here.
 
 <div class="issue">
-To explain the prohibition on `mutable` and `volatile` subobjects,
-consider the following test cases—
+Consider the following test cases—
 <small>
 ```c++
-    struct M {
-        M() = default;
-        M(M&);
-        M(const M&) = default;
-    };
-    static_assert( std::is_trivially_move_constructible_v<M> );
-    static_assert( std::is_trivially_destructible_v<M> );
-    static_assert( std::is_trivially_relocatable_v<M> );
-
     struct N {
+        struct M {
+            M(M&);
+            M(const M&) = default;
+        };
         mutable M m;
+        N(const N&) = default;
     };
-    static_assert( std::is_trivially_move_constructible_v<N> );
-    static_assert( std::is_trivially_destructible_v<N> );
-    static_assert( std::is_trivially_relocatable_v<N> );
+    static_assert(not std::is_trivially_relocatable_v<N>);
 
-    struct [[trivially_relocatable]] O {
-        O(const O&);
-        mutable int o;
+    struct [[trivially_relocatable]] I {
+        I(I&&);
     };
-    static_assert( std::is_trivially_relocatable_v<O> );
-
-    struct T : N {
-        T(const T&) = default;
-    };
-    static_assert( !std::is_trivially_move_constructible_v<T> );
-    static_assert( std::is_trivially_destructible_v<T> );
-    static_assert( !std::is_trivially_relocatable_v<T> );
-
-    struct U : N {};
-    static_assert( std::is_trivially_move_constructible_v<U> );
-    static_assert( std::is_trivially_destructible_v<U> );
-    static_assert( std::is_trivially_relocatable_v<U> );
-
-    struct V {
-        O o;
-    };
-    static_assert( std::is_trivially_relocatable_v<V> );
-
-    struct W {
-        O o;
-        W(const W&) = default;
-    };
-    static_assert( !std::is_trivially_relocatable_v<W> ); // unfortunately
+    struct J : I {
+        J(const J&);
+        J(J&&) = default;
+    }
+    static_assert(std::is_trivially_relocatable_v<J>);
 ```
 </small>
-We would like to find a rule such that every type which is both
-trivially move-constructible and trivially destructible (`M`, `N`, `U`)
-is automatically trivially relocatable. However, we *must* find a rule
-that makes `T` non-trivially relocatable, because the declaration
-`T t2(std::move(t));` invokes the user-provided copy constructor `M(M&)`.
+We *must* find a rule that makes `N` non-trivially relocatable,
+because the declaration `N n2(std::move(n));`
+invokes user-provided copy constructor `M(M&)`.
+
+We would *like* to find a rule that makes `J` trivially relocatable,
+because the `J : I` pattern is used to implement "conditionally trivial relocatability"
+for all allocator-aware containers in my libc++ reference implementation.
+(The move-constructor and destructor of `J` are moved into a base class template `I`
+which is conditionally marked with `[[trivially_relocatable]]`. The copy constructor,
+assignment operators, etc. are not moved into the base class because they are not
+expected to interfere with trivial relocatability.)
+If the `[[trivially_relocatable]]` attribute were modified to take a boolean parameter,
+we might not care about this `J` example.
 </div>
 
 
