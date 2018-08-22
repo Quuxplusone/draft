@@ -1494,7 +1494,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>13
+     <dd>14
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs</a>
      <dt>Current:
@@ -1874,7 +1874,7 @@ that is, the current draft of the C++17 standard.</p>
    <h3 class="heading settled" data-level="4.4" id="wording-inheritance"><span class="secno">4.4. </span><span class="content">Trivially relocatable type</span><a class="self-link" href="#wording-inheritance"></a></h3>
    <p>Add a new section in <a href="http://eel.is/c++draft/basic.types">[basic.types]</a>:</p>
    <p><small></small></p>
-   <blockquote><small> A move-constructible, destructible object type <code class="highlight"><c- n>T</c-></code> is a <dfn class="dfn-paneled" data-dfn-type="abstract-op" data-export id="abstract-opdef-trivially-relocatable">trivially relocatable</dfn> type if it is:<p></p> <ul><li data-md><p>a trivially copyable type, or</p> </li><li data-md><p>an array of trivially relocatable type, or</p> </li><li data-md><p>a (possibly cv-qualified) class type declared with the <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> attribute, or</p> </li><li data-md><p>a (possibly cv-qualified) class type which:</p> <ul><li data-md><p>has no user-provided move constructors,</p> </li><li data-md><p>either has at least one move constructor or has no user-provided copy constructors,</p> </li><li data-md><p>has no user-provided or deleted destructors,</p> </li><li data-md><p>either is final, or has a final destructor, or has no virtual destructors,</p> </li><li data-md><p>has no virtual base classes,</p> </li><li data-md><p>all of whose members are either of reference type or of trivially relocatable type, and</p> </li><li data-md><p>all of whose base classes are trivially relocatable.</p> </li></ul></li></ul> <p>[<em>Note:</em> For a trivially relocatable type, the <a data-link-type="abstract-op" href="#abstract-opdef-relocation-operation" id="ref-for-abstract-opdef-relocation-operation">relocation operation</a> (such as the relocation operations
+   <blockquote><small> A move-constructible, destructible object type <code class="highlight"><c- n>T</c-></code> is a <dfn class="dfn-paneled" data-dfn-type="abstract-op" data-export id="abstract-opdef-trivially-relocatable">trivially relocatable</dfn> type if it is:<p></p> <ul><li data-md><p>a trivially copyable type, or</p> </li><li data-md><p>an array of trivially relocatable type, or</p> </li><li data-md><p>a (possibly cv-qualified) class type declared with the <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> attribute, or</p> </li><li data-md><p>a (possibly cv-qualified) class type which:</p> <ul><li data-md><p>has no user-provided move constructors,</p> </li><li data-md><p>either has at least one move constructor or has no user-provided copy constructors,</p> </li><li data-md><p>has no user-provided or deleted destructors,</p> </li><li data-md><p>either is final, or has a final destructor, or has no virtual destructors,</p> </li><li data-md><p>has no virtual base classes,</p> </li><li data-md><p>has no <code class="highlight"><c- k>mutable</c-></code> or <code class="highlight"><c- k>volatile</c-></code> members,</p> </li><li data-md><p>all of whose members are either of reference type or of trivially relocatable type, and</p> </li><li data-md><p>all of whose base classes are trivially relocatable.</p> </li></ul></li></ul> <p>[<em>Note:</em> For a trivially relocatable type, the <a data-link-type="abstract-op" href="#abstract-opdef-relocation-operation" id="ref-for-abstract-opdef-relocation-operation">relocation operation</a> (such as the relocation operations
 performed by the library functions <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>::</c-><c- n>resize</c-></code>) is tantamount
 to a simple copy of the underlying bytes. <em>—end note</em>]</p> <p>[<em>Note:</em> It is intended that most standard library types be trivially relocatable types. <em>—end note</em>]</p> </small></blockquote>
    <p class="note" role="note"><span>Note:</span> We could simplify the wording by removing the words "either is final, or has a final destructor, or".
@@ -1892,16 +1892,28 @@ no <em>new</em> issues in this area; see <a data-link-type="biblio" href="#bibli
 We imply this via the words "A move-constructible, destructible object type". However, "move-constructible"
 and "destructible" are library concepts, not core language concepts, so maybe it is inappropriate
 to use them here.</p>
-   <div class="issue" id="issue-2cb10e0c">
-    <a class="self-link" href="#issue-2cb10e0c"></a> Consider the following test cases—<wbr><small> <pre class="language-c++ highlight">    <c- k>struct</c-> <c- n>N</c-> <c- p>{</c->
-        <c- k>struct</c-> <c- n>M</c-> <c- p>{</c->
-            <c- n>M</c-><c- p>(</c-><c- n>M</c-><c- o>&amp;</c-><c- p>);</c->
-            <c- n>M</c-><c- p>(</c-><c- k>const</c-> <c- n>M</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+   <div class="issue" id="issue-b03b0df9">
+    <a class="self-link" href="#issue-b03b0df9"></a> Consider the following test cases—<wbr><small> <pre class="language-c++ highlight">    <c- k>struct</c-> <c- n>A</c-> <c- p>{</c->
+        <c- k>struct</c-> <c- n>MA</c-> <c- p>{</c->
+            <c- n>MA</c-><c- p>(</c-><c- n>MA</c-><c- o>&amp;</c-><c- p>);</c->
+            <c- n>MA</c-><c- p>(</c-><c- k>const</c-> <c- n>MA</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+            <c- n>MA</c-><c- p>(</c-><c- n>MA</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
         <c- p>};</c->
-        <c- n>mutable</c-> <c- n>M</c-> <c- n>m</c-><c- p>;</c->
-        <c- n>N</c-><c- p>(</c-><c- k>const</c-> <c- n>N</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+        <c- n>mutable</c-> <c- n>MA</c-> <c- n>ma</c-><c- p>;</c->
+        <c- n>A</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
     <c- p>};</c->
-    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>N</c-><c- o>></c-><c- p>);</c->
+    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>A</c-><c- o>></c-><c- p>);</c->
+
+    <c- k>struct</c-> <c- n>B</c-> <c- p>{</c->
+        <c- k>struct</c-> <c- n>MB</c-> <c- p>{</c->
+            <c- n>MB</c-><c- p>(</c-><c- k>const</c-> <c- k>volatile</c-> <c- n>MB</c-><c- o>&amp;</c-><c- p>);</c->
+            <c- n>MB</c-><c- p>(</c-><c- k>const</c-> <c- n>MB</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+            <c- n>MB</c-><c- p>(</c-><c- n>MB</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+        <c- p>};</c->
+        <c- k>volatile</c-> <c- n>MB</c-> <c- n>mb</c-><c- p>;</c->
+        <c- n>B</c-><c- p>(</c-><c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+    <c- p>};</c->
+    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>B</c-><c- o>></c-><c- p>);</c->
 
     <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>I</c-> <c- p>{</c->
         <c- n>I</c-><c- p>(</c-><c- n>I</c-><c- o>&amp;&amp;</c-><c- p>);</c->
@@ -1909,10 +1921,10 @@ to use them here.</p>
     <c- k>struct</c-> <c- nl>J</c-> <c- p>:</c-> <c- n>I</c-> <c- p>{</c->
         <c- n>J</c-><c- p>(</c-><c- k>const</c-> <c- n>J</c-><c- o>&amp;</c-><c- p>);</c->
         <c- n>J</c-><c- p>(</c-><c- n>J</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- p>}</c->
+    <c- p>};</c->
     <c- n>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>J</c-><c- o>></c-><c- p>);</c->
-</pre></small> We <em>must</em> find a rule that makes <code class="highlight"><c- n>N</c-></code> non-trivially relocatable,
-because the declaration <code class="highlight"><c- n>N</c-> <c- nf>n2</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>n</c-><c- p>));</c-></code> invokes user-provided copy constructor <code class="highlight"><c- n>M</c-><c- p>(</c-><c- n>M</c-><c- o>&amp;</c-><c- p>)</c-></code>. 
+</pre></small> We <em>must</em> find a rule that makes neither <code class="highlight"><c- n>A</c-></code> nor <code class="highlight"><c- n>B</c-></code> trivially relocatable,
+because the move-construction <code class="highlight"><c- n>A</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>a</c-><c- p>))</c-></code> invokes user-provided copy constructor <code class="highlight"><c- n>MA</c-><c- p>(</c-><c- n>MA</c-><c- o>&amp;</c-><c- p>)</c-></code> and the move-construction <code class="highlight"><c- n>B</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>b</c-><c- p>))</c-></code> invokes user-provided copy constructor <code class="highlight"><c- n>MB</c-><c- p>(</c-><c- k>const</c-> <c- k>volatile</c-> <c- n>MB</c-><c- o>&amp;</c-><c- p>)</c-></code>. 
     <p>We would <em>like</em> to find a rule that makes <code class="highlight"><c- n>J</c-></code> trivially relocatable,
 because the <code class="highlight"><c- nl>J</c-> <c- p>:</c-> <c- n>I</c-></code> pattern is used to implement "conditionally trivial relocatability"
 for all allocator-aware containers in my libc++ reference implementation.
@@ -2719,15 +2731,27 @@ We imply this via the words "A move-constructible, destructible object type". Ho
 and "destructible" are library concepts, not core language concepts, so maybe it is inappropriate
 to use them here.<a href="#issue-f1c9711d"> ↵ </a></div>
    <div class="issue">
-     Consider the following test cases—<wbr><small> <pre class="language-c++ highlight">    <c- k>struct</c-> <c- n>N</c-> <c- p>{</c->
-        <c- k>struct</c-> <c- n>M</c-> <c- p>{</c->
-            <c- n>M</c-><c- p>(</c-><c- n>M</c-><c- o>&amp;</c-><c- p>);</c->
-            <c- n>M</c-><c- p>(</c-><c- k>const</c-> <c- n>M</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+     Consider the following test cases—<wbr><small> <pre class="language-c++ highlight">    <c- k>struct</c-> <c- n>A</c-> <c- p>{</c->
+        <c- k>struct</c-> <c- n>MA</c-> <c- p>{</c->
+            <c- n>MA</c-><c- p>(</c-><c- n>MA</c-><c- o>&amp;</c-><c- p>);</c->
+            <c- n>MA</c-><c- p>(</c-><c- k>const</c-> <c- n>MA</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+            <c- n>MA</c-><c- p>(</c-><c- n>MA</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
         <c- p>};</c->
-        <c- n>mutable</c-> <c- n>M</c-> <c- n>m</c-><c- p>;</c->
-        <c- n>N</c-><c- p>(</c-><c- k>const</c-> <c- n>N</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+        <c- n>mutable</c-> <c- n>MA</c-> <c- n>ma</c-><c- p>;</c->
+        <c- n>A</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
     <c- p>};</c->
-    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>N</c-><c- o>></c-><c- p>);</c->
+    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>A</c-><c- o>></c-><c- p>);</c->
+
+    <c- k>struct</c-> <c- n>B</c-> <c- p>{</c->
+        <c- k>struct</c-> <c- n>MB</c-> <c- p>{</c->
+            <c- n>MB</c-><c- p>(</c-><c- k>const</c-> <c- k>volatile</c-> <c- n>MB</c-><c- o>&amp;</c-><c- p>);</c->
+            <c- n>MB</c-><c- p>(</c-><c- k>const</c-> <c- n>MB</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+            <c- n>MB</c-><c- p>(</c-><c- n>MB</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+        <c- p>};</c->
+        <c- k>volatile</c-> <c- n>MB</c-> <c- n>mb</c-><c- p>;</c->
+        <c- n>B</c-><c- p>(</c-><c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+    <c- p>};</c->
+    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>B</c-><c- o>></c-><c- p>);</c->
 
     <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>I</c-> <c- p>{</c->
         <c- n>I</c-><c- p>(</c-><c- n>I</c-><c- o>&amp;&amp;</c-><c- p>);</c->
@@ -2735,10 +2759,10 @@ to use them here.<a href="#issue-f1c9711d"> ↵ </a></div>
     <c- k>struct</c-> <c- nl>J</c-> <c- p>:</c-> <c- n>I</c-> <c- p>{</c->
         <c- n>J</c-><c- p>(</c-><c- k>const</c-> <c- n>J</c-><c- o>&amp;</c-><c- p>);</c->
         <c- n>J</c-><c- p>(</c-><c- n>J</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- p>}</c->
+    <c- p>};</c->
     <c- n>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>J</c-><c- o>></c-><c- p>);</c->
-</pre></small> We <em>must</em> find a rule that makes <code class="highlight"><c- n>N</c-></code> non-trivially relocatable,
-because the declaration <code class="highlight"><c- n>N</c-> <c- nf>n2</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>n</c-><c- p>));</c-></code> invokes user-provided copy constructor <code class="highlight"><c- n>M</c-><c- p>(</c-><c- n>M</c-><c- o>&amp;</c-><c- p>)</c-></code>. 
+</pre></small> We <em>must</em> find a rule that makes neither <code class="highlight"><c- n>A</c-></code> nor <code class="highlight"><c- n>B</c-></code> trivially relocatable,
+because the move-construction <code class="highlight"><c- n>A</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>a</c-><c- p>))</c-></code> invokes user-provided copy constructor <code class="highlight"><c- n>MA</c-><c- p>(</c-><c- n>MA</c-><c- o>&amp;</c-><c- p>)</c-></code> and the move-construction <code class="highlight"><c- n>B</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>b</c-><c- p>))</c-></code> invokes user-provided copy constructor <code class="highlight"><c- n>MB</c-><c- p>(</c-><c- k>const</c-> <c- k>volatile</c-> <c- n>MB</c-><c- o>&amp;</c-><c- p>)</c-></code>. 
     <p>We would <em>like</em> to find a rule that makes <code class="highlight"><c- n>J</c-></code> trivially relocatable,
 because the <code class="highlight"><c- nl>J</c-> <c- p>:</c-> <c- n>I</c-></code> pattern is used to implement "conditionally trivial relocatability"
 for all allocator-aware containers in my libc++ reference implementation.
@@ -2747,7 +2771,7 @@ assignment operators, etc. are not moved into the base class because they are no
 expected to interfere with trivial relocatability.)
 If the <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> attribute were modified to take a boolean parameter,
 we might not care about this <code class="highlight"><c- n>J</c-></code> example.</p>
-     <a href="#issue-2cb10e0c"> ↵ </a>
+     <a href="#issue-b03b0df9"> ↵ </a>
    </div>
    <div class="issue"> "If a type <code class="highlight"><c- n>T</c-></code> is declared with the <code class="highlight"><c- n>trivially_relocatable</c-></code> attribute, and <code class="highlight"><c- n>T</c-></code> is either not move-constructible
 or not destructible, the program is ill-formed." We might want to replace this wording with

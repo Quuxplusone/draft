@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 0
-!Draft Revision: 13
+!Draft Revision: 14
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -448,6 +448,8 @@ A move-constructible, destructible object type `T` is a <dfn dfn-type="abstract-
 
     - has no virtual base classes,
 
+    - has no `mutable` or `volatile` members,
+
     - all of whose members are either of reference type or of trivially relocatable type, and
 
     - all of whose base classes are trivially relocatable.
@@ -483,15 +485,27 @@ to use them here.
 Consider the following test cases—
 <small>
 ```c++
-    struct N {
-        struct M {
-            M(M&);
-            M(const M&) = default;
+    struct A {
+        struct MA {
+            MA(MA&);
+            MA(const MA&) = default;
+            MA(MA&&) = default;
         };
-        mutable M m;
-        N(const N&) = default;
+        mutable MA ma;
+        A(const A&) = default;
     };
-    static_assert(not std::is_trivially_relocatable_v<N>);
+    static_assert(not std::is_trivially_relocatable_v<A>);
+
+    struct B {
+        struct MB {
+            MB(const volatile MB&);
+            MB(const MB&) = default;
+            MB(MB&&) = default;
+        };
+        volatile MB mb;
+        B(const B&) = default;
+    };
+    static_assert(not std::is_trivially_relocatable_v<B>);
 
     struct [[trivially_relocatable]] I {
         I(I&&);
@@ -499,13 +513,14 @@ Consider the following test cases—
     struct J : I {
         J(const J&);
         J(J&&) = default;
-    }
+    };
     static_assert(std::is_trivially_relocatable_v<J>);
 ```
 </small>
-We *must* find a rule that makes `N` non-trivially relocatable,
-because the declaration `N n2(std::move(n));`
-invokes user-provided copy constructor `M(M&)`.
+We *must* find a rule that makes neither `A` nor `B` trivially relocatable,
+because the move-construction `A(std::move(a))`
+invokes user-provided copy constructor `MA(MA&)` and the move-construction
+`B(std::move(b))` invokes user-provided copy constructor `MB(const volatile MB&)`.
 
 We would *like* to find a rule that makes `J` trivially relocatable,
 because the `J : I` pattern is used to implement "conditionally trivial relocatability"
