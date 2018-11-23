@@ -1479,7 +1479,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R1<br>Object relocation in terms of move plus destroy</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-11-21">2018-11-21</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-11-23">2018-11-23</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -1492,7 +1492,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>18
+     <dd>19
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs</a>
      <dt>Current:
@@ -1554,6 +1554,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#destructive-move"><span class="secno">5.1</span> <span class="content">Why not destructive move?</span></a>
       <li><a href="#maybe-trivially-relocatable"><span class="secno">5.2</span> <span class="content">Attribute <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code></span></a>
       <li><a href="#bool-parameter"><span class="secno">5.3</span> <span class="content">Attribute <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code></span></a>
+      <li><a href="#relocatable-list"><span class="secno">5.4</span> <span class="content"><code class="highlight"><c- n>relocate</c-></code> and MSVC <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>list</c-></code></span></a>
+      <li><a href="#nothrow-relocatable"><span class="secno">5.5</span> <span class="content">Unintuitive <code class="highlight"><c- n>is_nothrow_relocatable</c-></code></span></a>
      </ol>
     <li><a href="#acknowledgements"><span class="secno">6</span> <span class="content">Acknowledgements</span></a>
     <li>
@@ -1858,6 +1860,8 @@ that is, the current draft of the C++17 standard.</p>
 <c- k>return</c-> <c- n>result</c-><c- p>;</c->
 </pre> <p><em>Remarks:</em> If an exception is thrown, some objects in the range <code class="highlight"><c- p>[</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code> are left in a valid but unspecified state.</p> </small>
    </blockquote>
+   <p class="note" role="note"><span>Note:</span> We are guided by <a data-link-type="biblio" href="#biblio-p0884r0">[P0884R0]</a> to make <code class="highlight"><c- n>uninitialized_relocate</c-></code> unconditionally <code class="highlight"><c- k>noexcept</c-><c- p>(</c->false<c- p>)</c-></code>.
+This is consistent with <code class="highlight"><c- n>uninitialized_move</c-></code> and <code class="highlight"><c- n>destroy_at</c-></code>, both of which are unconditionally <code class="highlight"><c- k>noexcept</c-><c- p>(</c->false<c- p>)</c-></code>.</p>
    <h3 class="heading settled" data-level="4.3" id="wording-uninit-relocate-n"><span class="secno">4.3. </span><span class="content">Algorithm <code class="highlight"><c- n>uninitialized_relocate_n</c-></code></span><a class="self-link" href="#wording-uninit-relocate-n"></a></h3>
    <p><small></small></p>
    <blockquote>
@@ -2114,11 +2118,62 @@ metaprogramming to inherit the right behavior from a conditional base class.</p>
    <p>There is no technical obstacle to adding an arbitrary C++ expression as the parameter to
 an attribute. The grammar for balancing <code class="highlight"><c- p>[]</c-></code> and <code class="highlight"><c- p>()</c-></code> in attribute parameters has been
 there since C++11. There is already prior art for arbitrary expressions in attributes;
-see for example [Clang’s <code class="highlight"><c- p>[[</c-><c- n>diagnose_if</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code> attribute](https://clang.llvm.org/docs/AttributeReference.html#diagnose-if).</p>
+see for example <a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang’s <code class="highlight"><c- p>[[</c-><c- n>diagnose_if</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code> attribute</a>.</p>
    <p>I’m amenable to this idea. The major downside I see to it is that it could lead to
 an arbitrarily complicated C++ expression appearing in an awkward position. But this
 is not necessarily worse, and perhaps better, than having to do the metaprogramming
 tricks shown in <a href="#sample-conditional">Conditionally trivial relocation</a>.</p>
+   <h3 class="heading settled" data-level="5.4" id="relocatable-list"><span class="secno">5.4. </span><span class="content"><code class="highlight"><c- n>relocate</c-></code> and MSVC <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>list</c-></code></span><a class="self-link" href="#relocatable-list"></a></h3>
+   <p>(See "<a href="https://quuxplusone.github.io/blog/2018/09/28/trivially-relocatable-vs-destructive-movable/">Trivially Relocatable versus Destructive Movable</a>" (2018-09-28)
+for a detailed analysis of this material.)</p>
+   <p>Pablo Halpern’s <a data-link-type="biblio" href="#biblio-n4158">[N4158]</a> proposed a completely user-space mechanism: an ADL customization point
+named <code class="highlight"><c- n>uninitialized_destructive_move</c-></code>. In N4158, the user could overload this function for their
+own types, and thus achieve any arbitrary behavior for the N4158 "destructive move" operation.
+In contrast, P1144 provides for no middle ground between "memcpy" and "call the move-constructor
+followed by the destructor."</p>
+   <p>That middle ground would be useful for types such as MSVC’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>list</c-></code>. <code class="highlight"><c- n>list</c-></code>'s move-constructor is
+fundamentally non-<code class="highlight"><c- k>noexcept</c-></code> because it must heap-allocate a new sentinel node. <code class="highlight"><c- n>list</c-></code> is fundamentally
+non-trivially-relocatable, because it must fix up the "prev" pointer in its first node
+(see <a href="#non-trivial-sample-list">Allocated memory contains pointer to self</a>). So P1144 proposes no change to the status quo for <code class="highlight"><c- n>list</c-></code>.
+On MSVC, <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>>::</c-><c- n>reserve</c-></code> must copy (not relocate) each <code class="highlight"><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> element, which means
+calling <code class="highlight"><c- n>T</c-></code>'s copy-constructor many times.</p>
+   <p>But if there were a way for MSVC’s <code class="highlight"><c- n>list</c-></code> to express its "relocate" operation via a customization point,
+then it could make that non-trivial operation <code class="highlight"><c- k>noexcept</c-></code>. And then MSVC’s <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>>::</c-><c- n>reserve</c-></code> could be done efficiently by relocating each <code class="highlight"><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> element, without performing any operations
+on <code class="highlight"><c- n>T</c-></code> at all.</p>
+   <p>However, since the calling of <code class="highlight"><c- n>T</c-></code>'s copy-constructor is an observable side-effect, any proposal
+to optimize <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>>::</c-><c- n>reserve</c-></code> would have to change the wording for <code class="highlight"><c- n>vector</c-></code> to permit special handling of "nothrow-relocatable but not nothrow-move-constructible"
+types such as MSVC’s <code class="highlight"><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code>. This would be a silently breaking API change, and would benefit <em>only</em> MSVC’s <code class="highlight"><c- n>list</c-></code>, not libc++'s or libstdc++'s <code class="highlight"><c- n>list</c-></code> (which are already nothrow-move-constructible).
+Furthermore, anyone who uses <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c-></code> today can achieve exactly the same performance speedup
+by replacing all uses of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>list</c-></code> with something like <small></small></p>
+   <small> <pre class="language-c++ highlight">    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
+    <c- k>struct</c-> <c- nl>CustomList</c-> <c- p>:</c-> <c- n>std</c-><c- o>::</c-><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- p>{</c->
+        <c- n>using</c-> <c- n>std</c-><c- o>::</c-><c- n>list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>::</c-><c- n>list</c-><c- p>;</c->
+        <c- n>CustomList</c-><c- p>(</c-><c- n>CustomList</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- nl>noexcept</c-> <c- p>:</c-> <c- n>list</c-><c- p>(</c-><c- n>rhs</c-><c- p>)</c-> <c- p>{}</c->
+    <c- p>};</c->
+</pre></small> 
+   <p>The ADL-customization-point path seems to have a very high cost-to-benefit ratio.
+I am satisfied with P1144’s ignoring it.</p>
+   <h3 class="heading settled" data-level="5.5" id="nothrow-relocatable"><span class="secno">5.5. </span><span class="content">Unintuitive <code class="highlight"><c- n>is_nothrow_relocatable</c-></code></span><a class="self-link" href="#nothrow-relocatable"></a></h3>
+   <p>Consider a type such as</p>
+<pre class="language-c++ highlight">    <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>Widget</c-> <c- p>{</c->
+        <c- b>int</c-> <c- n>i</c-><c- p>;</c->
+        <c- n>Widget</c-><c- p>(</c-><c- n>Widget</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>:</c-> <c- n>i</c-><c- p>(</c-><c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>)</c-> <c- p>{}</c->
+    <c- p>};</c->
+    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>Widget</c-><c- o>></c-><c- p>);</c->
+    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_nothrow_relocatable_v</c-><c- o>&lt;</c-><c- n>Widget</c-><c- o>></c-><c- p>);</c->
+    <c- n>static_assert</c-><c- p>(</c-><c- n>not</c-> <c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Widget</c-><c- o>></c-><c- p>);</c->
+</pre>
+   <p>Since <code class="highlight"><c- n>Widget</c-></code> is non-nothrow move-constructible, P1144 calls it non-nothrow relocatable.
+So, looking at how <code class="highlight"><c- n>Widget</c-></code> interacts with the type-traits, we are in the awkward position
+that <code class="highlight"><c- n>Widget</c-></code> simultaneously claims "My relocation operation might throw" and "My relocation
+operation is trivial." These claims seem inconsistent.</p>
+   <p>However, I believe that it would be incorrect and unsafe for the library to claim that <code class="highlight"><c- n>Widget</c-></code> was "nothrow relocatable" in this case. "Nothrow relocatable" should imply that
+a generic algorithm could relocate it (as if by <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate</c-></code>)
+without worrying about catching exceptions. "<code class="highlight"><c- n>T</c-></code> is trivially relocatable" means that <code class="highlight"><c- n>T</c-></code> is relocat<i>able as if</i> by <code class="highlight"><c- n>memcpy</c-></code>; it does not mean that every relocation of <code class="highlight"><c- n>T</c-></code> <i>must</i> be performed <i>literally</i> by <code class="highlight"><c- n>memcpy</c-></code>.</p>
+   <p>I believe P1144’s proposed behavior is the best behavior. However, another plausible behavior
+would be to simply eliminate the <code class="highlight"><c- n>is_nothrow_relocatable</c-></code> type-trait from the standard library.
+If we don’t provide <code class="highlight"><c- n>is_nothrow_relocatable</c-></code>, then we don’t have to defend its
+somewhat unintuitive behavior.</p>
    <h2 class="heading settled" data-level="6" id="acknowledgements"><span class="secno">6. </span><span class="content">Acknowledgements</span><a class="self-link" href="#acknowledgements"></a></h2>
    <p>Thanks to Elias Kosunen, Niall Douglas, and John Bandela for their feedback on early drafts of this paper.</p>
    <p>Many thanks to Matt Godbolt for allowing me to install the prototype Clang implementation on Compiler Explorer
@@ -2321,7 +2376,7 @@ iterator from <code class="highlight"><c- n>InputIterator</c-></code> to <code c
     <c- n>using</c-> <c- n>T</c-> <c- o>=</c-> <c- kr>typename</c-> <c- n>iterator_traits</c-><c- o>&lt;</c-><c- n>ForwardIterator2</c-><c- o>>::</c-><c- n>value_type</c-><c- p>;</c->
     <c- n>using</c-> <c- n>U</c-> <c- o>=</c-> <c- n>decltype</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>first</c-><c- p>));</c->
     <c- n>constexpr</c-> <c- b>bool</c-> <c- n>memcpyable</c-> <c- o>=</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_same_v</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>remove_ref_t</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>></c-> <c- o>&amp;&amp;</c-> <c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>);</c->
-    <c- n>constexpr</c-> <c- b>bool</c-> <c- n>both_contiguous</c-> <c- o>=</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>InputIterator</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>std</c-><c- o>::</c-><c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>ForwardIterator</c-><c- o>></c-><c- p>);</c->
+    <c- n>constexpr</c-> <c- b>bool</c-> <c- n>both_contiguous</c-> <c- o>=</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>ForwardIterator1</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>std</c-><c- o>::</c-><c- n>is_pointer_v</c-><c- o>&lt;</c-><c- n>ForwardIterator2</c-><c- o>></c-><c- p>);</c->
     <c- n>constexpr</c-> <c- b>bool</c-> <c- n>nothrow_relocatable</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>is_nothrow_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>U</c-><c- o>></c-><c- p>;</c->
 
     <c- k>if</c-> <c- nf>constexpr</c-> <c- p>(</c-><c- n>memcpyable</c-> <c- o>&amp;&amp;</c-> <c- n>both_contiguous</c-><c- p>)</c-> <c- p>{</c->
@@ -2685,6 +2740,8 @@ large amount of speedup. <a data-link-type="biblio" href="#biblio-bench">[Bench]
    <dd>Pablo Halpern. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf">N4158: Destructive Move (rev 1)</a>. October 2014. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf</a>
    <dt id="biblio-p0023r0">[P0023R0]
    <dd>Denis Bider. <a href="http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0023r0.pdf">P0023R0: Relocator: Efficiently Moving Objects</a>. April 2016. URL: <a href="http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0023r0.pdf">http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0023r0.pdf</a>
+   <dt id="biblio-p0884r0">[P0884R0]
+   <dd>Nicolai Josuttis. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf">P0884R0: Extending the noexcept Policy, Rev. 0</a>. February 2018. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf</a>
    <dt id="biblio-p1029r0">[P1029R0]
    <dd>Niall Douglas. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf">P1029R0: SG14 [[move_relocates]]</a>. May 2018. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf</a>
    <dt id="biblio-p1152r0">[P1152R0]
