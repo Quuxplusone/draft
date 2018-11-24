@@ -1479,7 +1479,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R1<br>Object relocation in terms of move plus destroy</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-11-23">2018-11-23</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-11-24">2018-11-24</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -1492,7 +1492,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>19
+     <dd>20
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs</a>
      <dt>Current:
@@ -1620,9 +1620,9 @@ we can optimize any routine that performs the moral equivalent of <code class="h
     <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>R</c-><c- o>>::</c-><c- n>push_back</c->
 </pre>
    <p><a data-link-type="biblio" href="#biblio-bench">[Bench]</a> (presented at C++Now 2018) shows a 3x speedup on <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>>::</c-><c- n>resize</c-></code>. <a href="https://www.reddit.com/r/cpp/comments/9wj4vt/trivially_relocatable_in_san_diego_call_for/e9p76i4/">This Reddit thread</a> demonstrates a similar 3x speedup using the online tool Quick-Bench.</p>
-   <p>Just as with C++11 move semantics, you can write benchmarks to show whatever speedup
-you like: The more complicated your types' move-constructors and destructors,
-the more time you save by eliminating calls to them.</p>
+   <p>As observed in <a data-link-type="biblio" href="#biblio-cppchat">[CppChat]</a> (@21:55): Just as with C++11 move semantics, you can write
+benchmarks to show whatever speedup you like. The more complicated your types'
+move-constructors and destructors, the more time you save by eliminating calls to them.</p>
    <h4 class="heading settled" data-level="1.1.2" id="benefit-swap"><span class="secno">1.1.2. </span><span class="content">Swap</span><a class="self-link" href="#benefit-swap"></a></h4>
    <p>Given a reliable way of detecting trivial relocatability,
 we can optimize any routine that uses the moral equivalent of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code>, such as</p>
@@ -1989,6 +1989,7 @@ is tantamount to memcpy. No previous proposal has shown how to do this.</p>
     <li data-md>
      <p>P1144’s approach is explicitly based on existing industry practice: <a data-link-type="biblio" href="#biblio-folly">[Folly]</a>, <a data-link-type="biblio" href="#biblio-eastl">[EASTL]</a>,
 and <a data-link-type="biblio" href="#biblio-bsl">[BSL]</a> all use this exact idea in practice and it seems to work for them.
+Marc Glisse has been integrating the same idea into GNU libstdc++; see <a data-link-type="biblio" href="#biblio-deque">[Deque]</a>.
 The term "relocation" is due to <a data-link-type="biblio" href="#biblio-eastl">[EASTL]</a> (<code class="highlight"><c- n>has_trivial_relocate</c-></code>) and <a data-link-type="biblio" href="#biblio-folly">[Folly]</a> (<code class="highlight"><c- n>IsRelocatable</c-></code>).
 The same concept appears in pre-C++11 libraries under the name "movable":
 Qt (<code class="highlight"><c- n>Q_MOVABLE_TYPE</c-></code>) and <a data-link-type="biblio" href="#biblio-bsl">[BSL]</a> (<code class="highlight"><c- n>IsBitwiseMoveable</c-></code>). P1144’s sole innovation is to
@@ -2167,7 +2168,10 @@ I am satisfied with P1144’s ignoring it.</p>
 So, looking at how <code class="highlight"><c- n>Widget</c-></code> interacts with the type-traits, we are in the awkward position
 that <code class="highlight"><c- n>Widget</c-></code> simultaneously claims "My relocation operation might throw" and "My relocation
 operation is trivial." These claims seem inconsistent.</p>
-   <p>However, I believe that it would be incorrect and unsafe for the library to claim that <code class="highlight"><c- n>Widget</c-></code> was "nothrow relocatable" in this case. "Nothrow relocatable" should imply that
+   <p>This is a real-world concern because GNU libstdc++'s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>deque</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c-></code> works like <code class="highlight"><c- n>Widget</c-></code>: its move-constructor is <code class="highlight"><c- k>noexcept</c-><c- p>(</c->false<c- p>)</c-></code> (it must allocate)
+but it is trivially relocatable. As of 2018-11-22, libstdc++ marks its <code class="highlight"><c- n>deque</c-></code> as
+trivially relocatable (see <a data-link-type="biblio" href="#biblio-deque">[Deque]</a>).</p>
+   <p>However, I believe that it would be incorrect and unsafe for the library to claim that <code class="highlight"><c- n>Widget</c-></code> was "nothrow relocatable." "Nothrow relocatable" should imply that
 a generic algorithm could relocate it (as if by <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate</c-></code>)
 without worrying about catching exceptions. "<code class="highlight"><c- n>T</c-></code> is trivially relocatable" means that <code class="highlight"><c- n>T</c-></code> is relocat<i>able as if</i> by <code class="highlight"><c- n>memcpy</c-></code>; it does not mean that every relocation of <code class="highlight"><c- n>T</c-></code> <i>must</i> be performed <i>literally</i> by <code class="highlight"><c- n>memcpy</c-></code>.</p>
    <p>I believe P1144’s proposed behavior is the best behavior. However, another plausible behavior
@@ -2189,6 +2193,8 @@ of N4158 at Urbana</a> (November 2014).</p>
 Niall Douglas’s <a data-link-type="biblio" href="#biblio-p1029r0">[P1029R0]</a> (treating relocatability as an aspect of move-construction in isolation,
 rather than an aspect of the class type as a whole).</p>
    <p>Thanks to John McCall for his thought-provoking review comments on the Clang implementation <a data-link-type="biblio" href="#biblio-d50119">[D50119]</a>.</p>
+   <p>Thanks to Marc Glisse for his work integrating a "trivially relocatable" trait into GNU libstdc++
+and for answering my questions on <a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87106">GCC bug 87106</a>.</p>
    <h2 class="heading settled" id="polls"><span class="content">Appendix A: Straw polls</span><a class="self-link" href="#polls"></a></h2>
    <h3 class="heading settled" id="taken-polls-2018-11-12"><span class="content">Polls taken of the Internet between 2018-11-12 and 2018-11-21</span><a class="self-link" href="#taken-polls-2018-11-12"></a></h3>
    <table class="def">
@@ -2559,9 +2565,12 @@ from a simple <code class="highlight"><c- n>memcpy</c-></code>.</p>
     <li data-md>
      <p><a href="https://reviews.llvm.org/D50119">reviews.llvm.org/D50119</a></p>
    </ul>
-   <p>As observed in <a data-link-type="biblio" href="#biblio-cppchat">[CppChat]</a> (@21:55), since the essence of this feature is to eliminate calls
-to user-defined functions, in principle you could make a benchmark to show any arbitrarily
-large amount of speedup. <a data-link-type="biblio" href="#biblio-bench">[Bench]</a> shows a 3x speedup for <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>>::</c-><c- n>reserve</c-></code>.</p>
+   <p>Furthermore, as of November 2018, libstdc++ trunk will perform the <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>resize</c-></code> optimization
+for any type which has manually specialized <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>__is_trivially_relocatable</c-></code>.
+(See it on Compiler Explorer <a href="https://godbolt.org/z/Qs32s9">here</a>.)
+This is the same approach used by <a data-link-type="biblio" href="#biblio-folly">[Folly]</a>, <a data-link-type="biblio" href="#biblio-eastl">[EASTL]</a>, and <a data-link-type="biblio" href="#biblio-bsl">[BSL]</a>.
+As of 2018-11-22, the only library type for which <code class="highlight"><c- n>__is_trivially_relocatable</c-></code> has been specialized
+is <code class="highlight"><c- n>deque</c-></code>; see <a data-link-type="biblio" href="#biblio-deque">[Deque]</a> and <a href="#nothrow-relocatable">§5.5 Unintuitive is_nothrow_relocatable</a>.</p>
   </main>
 <script>
 (function() {
@@ -2720,6 +2729,8 @@ large amount of speedup. <a data-link-type="biblio" href="#biblio-bench">[Bench]
    <dd>Howard Hinnant; Arthur O'Dwyer. <a href="https://www.youtube.com/watch?v=8u5Qi4FgTP8">cpp.chat episode 40: It works but it's undefined behavior</a>. August 2018. URL: <a href="https://www.youtube.com/watch?v=8u5Qi4FgTP8">https://www.youtube.com/watch?v=8u5Qi4FgTP8</a>
    <dt id="biblio-d50119">[D50119]
    <dd>Arthur O'Dwyer; Nicolas Lesser; John McCall. <a href="https://reviews.llvm.org/D50119">Compiler support for P1144R0 __is_trivially_relocatable(T)</a>. July 2018. URL: <a href="https://reviews.llvm.org/D50119">https://reviews.llvm.org/D50119</a>
+   <dt id="biblio-deque">[Deque]
+   <dd>Marc Glisse. <a href="https://github.com/gcc-mirror/gcc/commit/a9b9381580de611126c9888c1a6c12a77d9b682e">Improve relocation ... (__is_trivially_relocatable): Specialize for deque</a>. November 2018. URL: <a href="https://github.com/gcc-mirror/gcc/commit/a9b9381580de611126c9888c1a6c12a77d9b682e">https://github.com/gcc-mirror/gcc/commit/a9b9381580de611126c9888c1a6c12a77d9b682e</a>
    <dt id="biblio-eastl">[EASTL]
    <dd>Paul Pedriana. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions">N2271: EASTL — Electronic Arts Standard Template Library</a>. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions</a>
    <dt id="biblio-folly">[Folly]
