@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 1
-!Draft Revision: 19
+!Draft Revision: 20
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   We provide a standard trait to detect types which are trivially relocatable, for the benefit of library writers.
   Finally, we provide a portable way for a user-defined type (e.g. <code>boost::shared_ptr</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2018-11-23
+Date: 2018-11-24
 </pre>
 
 <style>
@@ -67,9 +67,10 @@ we can optimize any routine that performs the moral equivalent of `realloc`, inc
 [This Reddit thread](https://www.reddit.com/r/cpp/comments/9wj4vt/trivially_relocatable_in_san_diego_call_for/e9p76i4/)
 demonstrates a similar 3x speedup using the online tool Quick-Bench.
 
-Just as with C++11 move semantics, you can write benchmarks to show whatever speedup
-you like: The more complicated your types' move-constructors and destructors,
-the more time you save by eliminating calls to them.
+As observed in [[CppChat]] (@21:55): Just as with C++11 move semantics, you can write
+benchmarks to show whatever speedup you like. The more complicated your types'
+move-constructors and destructors, the more time you save by eliminating calls to them.
+
 
 ### Swap ### {#benefit-swap}
 
@@ -632,6 +633,7 @@ this proposal does *not* give us a general user-provided "destructive move" faci
 
 - P1144's approach is explicitly based on existing industry practice: [[Folly]], [[EASTL]],
     and [[BSL]] all use this exact idea in practice and it seems to work for them.
+    Marc Glisse has been integrating the same idea into GNU libstdc++; see [[Deque]].
     The term "relocation" is due to [[EASTL]] (`has_trivial_relocate`) and [[Folly]] (`IsRelocatable`).
     The same concept appears in pre-C++11 libraries under the name "movable":
     Qt (`Q_MOVABLE_TYPE`) and [[BSL]] (`IsBitwiseMoveable`). P1144's sole innovation is to
@@ -863,8 +865,13 @@ So, looking at how `Widget` interacts with the type-traits, we are in the awkwar
 that `Widget` simultaneously claims "My relocation operation might throw" and "My relocation
 operation is trivial." These claims seem inconsistent.
 
+This is a real-world concern because GNU libstdc++'s `std::deque<T, std::allocator<T>>`
+works like `Widget`: its move-constructor is `noexcept(false)` (it must allocate)
+but it is trivially relocatable. As of 2018-11-22, libstdc++ marks its `deque` as
+trivially relocatable (see [[Deque]]).
+
 However, I believe that it would be incorrect and unsafe for the library to claim that
-`Widget` was "nothrow relocatable" in this case. "Nothrow relocatable" should imply that
+`Widget` was "nothrow relocatable." "Nothrow relocatable" should imply that
 a generic algorithm could relocate it (as if by `std::uninitialized_relocate`)
 without worrying about catching exceptions. "`T` is trivially relocatable" means that
 `T` is relocat<i>able as if</i> by `memcpy`; it does not mean that every relocation of
@@ -902,6 +909,9 @@ Niall Douglas's [[P1029R0]] (treating relocatability as an aspect of move-constr
 rather than an aspect of the class type as a whole).
 
 Thanks to John McCall for his thought-provoking review comments on the Clang implementation [[D50119]].
+
+Thanks to Marc Glisse for his work integrating a "trivially relocatable" trait into GNU libstdc++
+and for answering my questions on [GCC bug 87106](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87106).
 
 
 Appendix A: Straw polls {#polls}
@@ -1241,9 +1251,12 @@ A prototype Clang/libc++ implementation is at
 - <a href="https://p1144.godbolt.org/z/oWEd_X">godbolt.org</a>, under the name "x86-64 clang (experimental P1144)"
 - [reviews.llvm.org/D50119](https://reviews.llvm.org/D50119)
 
-As observed in [[CppChat]] (@21:55), since the essence of this feature is to eliminate calls
-to user-defined functions, in principle you could make a benchmark to show any arbitrarily
-large amount of speedup. [[Bench]] shows a 3x speedup for `vector<unique_ptr<int>>::reserve`.
+Furthermore, as of November 2018, libstdc++ trunk will perform the `vector::resize` optimization
+for any type which has manually specialized `std::__is_trivially_relocatable`.
+(See it on Compiler Explorer <a href="https://godbolt.org/z/Qs32s9">here</a>.)
+This is the same approach used by [[Folly]], [[EASTL]], and [[BSL]].
+As of 2018-11-22, the only library type for which `__is_trivially_relocatable` has been specialized
+is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
 
 
 <pre class=biblio>
@@ -1306,6 +1319,14 @@ large amount of speedup. [[Bench]] shows a 3x speedup for `vector<unique_ptr<int
     "title": "Compiler support for P1144R0 __is_trivially_relocatable(T)",
     "href": "https://reviews.llvm.org/D50119",
     "date": "July 2018"
+  },
+  "Deque": {
+    "authors": [
+      "Marc Glisse"
+    ],
+    "title": "Improve relocation ... (__is_trivially_relocatable): Specialize for deque",
+    "href": "https://github.com/gcc-mirror/gcc/commit/a9b9381580de611126c9888c1a6c12a77d9b682e",
+    "date": "November 2018"
   },
   "EASTL": {
     "authors": [
