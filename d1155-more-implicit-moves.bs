@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: More implicit moves
 Shortname: D1155
-Revision: 0
-!Draft Revision: 8
+Revision: 1
+!Draft Revision: 9
 Audience: EWG
 Status: D
 Group: WG21
@@ -19,7 +19,9 @@ Abstract:
   Based on our experience using Clang to diagnose unexpected copies in Chromium, Mozilla,
   and LibreOffice, we propose to change the standard so that these copies will be replaced with
   <i>implicit moves</i>.
-Date: 2018-10-04
+
+  Furthermore, we tentatively propose a new special case to permit efficient codegen for <code>return x += y</code>.
+Date: 2018-11-25
 </pre>
 
 <style>
@@ -27,6 +29,10 @@ hilite  {background-color: #FFFF00; font-weight: bold;}
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
+
+# Changelog # {#changelog}
+
+- R1: Added discussion of `return x += y`.
 
 
 # Background # {#background}
@@ -307,10 +313,144 @@ This proposal would give Mozilla that minor performance gain without the uglines
 We have never received any report that Clang's suggested move would have been incorrect.
 
 
+# Further proposal to handle assignment operators specially # {#further}
+
+Besides the cases of `return x` handled by this proposal, and the cases of `return x` handled by
+David Stone's [[P0527]], there is one more extremely frequent case where a copy is done instead
+of an implicit move or copy-elision.
+
+```c++
+std::string sixteen(std::string lhs, const std::string& rhs) {
+    return lhs += rhs;  // no copy elision, and no implicit move (the object is copied)
+}
+
+std::string seventeen(const std::string& lhs, const std::string& rhs) {
+    std::string result = lhs;
+    return result += rhs;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+For a real-world example of this kind of code, see GNU libstdc++'s [[PR85671]], where even
+a standard library implementor fell into the trap of writing
+
+```c++
+path operator/(const path& lhs, const path& rhs) {
+    path result(lhs);
+    return result /= rhs;  // no copy elision, and no implicit move (the object is copied)
+}
+```
+
+We propose that — in order to make simple code like the above produce optimal codegen —
+it would be reasonable to create a new special case permitting a (possibly parenthesized)
+assignment operation to count as "return by name." This would require major surgery on
+<a href="http://eel.is/c++draft/class.copy.elision">[class.copy.elision]</a>.
+Possibly the best approach would be to introduce a new term, such as "copy-elision candidate,"
+something like this:
+
+> When certain criteria are met, an implementation is allowed to omit the copy/move
+> construction of a class object, even if the constructor selected for the copy/move
+> operation and/or the destructor for the object have side effects. <ins>Each such case
+> involves an expression, called the <i>candidate expression</i>, and a source object,
+> called the <i>copy elision candidate</i>.</ins>
+>
+> - <ins>In a `return` statement with an <i>expression</i>, the candidate expression is the <i>expression</i>.</ins>
+>
+> - <ins>In a <i>throw-expression</i>, the candidate expression is the operand of `throw`.</ins>
+>
+> <ins>The copy elision candidate is computed from the candidate expression as follows:</ins>
+>
+> - <ins>If the candidate expression is the (possibly parenthesized) name of a non-volatile
+>     automatic object, then the copy elision candidate is that object.</ins>
+>
+> - <ins>If the candidate expression is an <i>assignment-expression</i>, and the
+>     <i>logical-or-expression</i> on the left-hand side of the <i>assignment-operator</i> is
+>     the (possibly parenthesized) name of a non-volatile automatic object,
+>     and the type of the <i>assignment-expression</i> is a non-cv-qualified lvalue reference
+>     to the type of the automatic object, then the copy elision candidate is the
+>     automatic object.<br>
+>     [<i>Note:</i> This happens regardless of the actual behavior of the assignment operator
+>     selected by overload resolution. The implementation essentially assumes that the
+>     return value of any (possibly compound) assignment operator is a reference to
+>     its left-hand operand. <i>—end note</i>]</ins>
+>
+> The elision of copy/move operations,
+> called copy elision, is permitted in the following circumstances
+> (which may be combined to eliminate multiple copies):
+>
+> - in a `return` statement in a function with a class return type, when <del>the <i>expression</i>
+>     is the name of</del> <ins>the copy elision candidate is</ins> a non-volatile automatic
+>     object (other than a function parameter or a variable introduced by the
+>     exception-declaration of a handler (13.3)) with
+>     the same type (ignoring cv-qualification) as the function return type,
+>     the copy/move operation can be omitted by constructing <del>the automatic object</del> <ins>the copy elision candidate object</ins>
+>     directly into the function call’s return object
+>
+> - in a <i>throw-expression</i>, when the <del>operand</del> <ins>copy elision candidate</ins>
+>     is the name of a non-volatile automatic object (other than a function or catch-clause parameter)
+>     whose scope does not extend beyond the end of the innermost enclosing try-block (if there is one),
+>     the copy/move operation from <del>the operand</del> <ins>the copy elision candidate object</ins>
+>     to the exception object (13.1) can be omitted by constructing the automatic object
+>     directly into the exception object
+>
+> <ins>When copy elision occurs,</ins> the implementation treats the source and target
+> of the omitted copy/move operation as simply two different ways of referring
+> to the same object. If the first parameter of the selected constructor is an
+> rvalue reference to the object’s type, the destruction of that object occurs
+> when the target would have been destroyed;
+> otherwise, the destruction occurs at the later of the times
+> when the two objects would have been destroyed without the optimization.
+
+This would be a novel special case; as the "Note" says, this would essentially permit the
+core language to assume that every overloaded `operator=` and `operator@=` which returns an
+lvalue reference at all, returns an lvalue reference to `*this`. It would be possible for
+pathological code to observe the optimization happening:
+
+```c++
+struct Observer;
+struct Observer {
+    static int k = 0;
+    static Observer global;
+    int i;
+    explicit Observer(int i) : i(i) {}
+    Observer(const Observer& rhs) : i(++k) {
+        printf("observed a copy from %d to %d", rhs.i, i);
+    }
+    Observer(Observer&& rhs) : i(++k) {
+        printf("observed a move from %d to %d", rhs.i, i);
+    }
+    Observer& operator=(const Observer& rhs) {
+        i = rhs.i + 1;
+        printf("observed a copy-assign from %d to %d", rhs.i, i);
+        return &global;  // pathological!
+    }
+};
+Observer Observer::global{10};
+Observer foo() {
+    Observer x{20};
+    Observer y{30};
+    return x = y;
+}
+int main() {
+    Observer o = foo();
+    printf("o.i is %d\n", o.i);
+}
+```
+
+In C++17, the above code has this behavior:
+
+- `observed a copy-assign from 30 to 31`, then `observed a copy from 10 to 1`, then `o.i is 1` (the behavior required by C++17, forbidden under the proposal)
+
+Under the "further proposal" sketched above, the code would instead have one of the following behaviors:
+
+- `observed a copy-assign from 30 to 31`, then `observed a move from 10 to 1`, then `o.i is 1` (implicit move, perhaps allowed under the proposal)
+
+- `observed a copy-assign from 30 to 31`, then `o.i is 31` (copy elision, at least allowed and perhaps mandated under the proposal)
+
+
 # Acknowledgments # {#acknowledgments}
 
 - Thanks to Lukas Bergdoll for his copious feedback.
-- Thanks to David Stone for [[P0527]], and for shepherding this paper at the San Diego WG21 meeting.
+- Thanks to David Stone for [[P0527]], and for offering to shepherd P1155R0 at the San Diego WG21 meeting.
 - Thanks to Barry Revzin (see [[Revzin]]) for pointing out the "By-value sinks" case.
 
 
@@ -372,6 +512,14 @@ We have never received any report that Clang's suggested move would have been in
     ],
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0527r1.html",
     "date": "November 2017"
+  },
+  "PR85671": {
+    "title": "Lack of std::move() inside operator/ for std::filesystem::path",
+    "authors": [
+      "Jonathan Wakely"
+    ],
+    "href": "https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85671",
+    "date": "May 2018"
   },
   "Revzin": {
     "title": "std-proposals thread: By-value sinks",
