@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D1155R1: More implicit moves</title>
+  <title>D1155R2: More implicit moves</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1227,7 +1227,7 @@ Possible extra rowspan handling
       text-align: center;
     }
   </style>
-  <meta content="Bikeshed version 0da7328bb90ef81993146377e4e0fed236969c4c" name="generator">
+  <meta content="Bikeshed version 6dcb46ba8cae3704b42c05bcd8578c92d239786a" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
@@ -1442,7 +1442,7 @@ pre .property::before, pre .property::after {
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D1155R1<br>More implicit moves</h1>
+   <h1 class="p-name no-ref" id="title">D1155R2<br>More implicit moves</h1>
    <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2018-11-25">2018-11-25</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
@@ -1456,7 +1456,7 @@ pre .property::before, pre .property::after {
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>9
+     <dd>10
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1155-more-implicit-moves.bs</a>
      <dt>Current:
@@ -1472,7 +1472,9 @@ pre .property::before, pre .property::after {
   an expensive copy anyway.
   Based on our experience using Clang to diagnose unexpected copies in Chromium, Mozilla,
   and LibreOffice, we propose to change the standard so that these copies will be replaced with <i>implicit moves</i>.</p>
-   <p>Furthermore, we tentatively propose a new special case to permit efficient codegen for <code class="highlight"><c- k>return</c-> <c- n>x</c-> <c- o>+=</c-> <c- n>y</c-></code>.</p>
+   <p>In a separate section, we tentatively propose a new special case to permit efficient codegen
+
+  for <code class="highlight"><c- k>return</c-> <c- n>x</c-> <c- o>+=</c-> <c- n>y</c-></code>.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -1506,6 +1508,8 @@ pre .property::before, pre .property::after {
   <main>
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
+    <li data-md>
+     <p>R2: Added discussion of <code class="highlight"><c- k>return</c-> <c- o>++</c-><c- n>x</c-></code>.</p>
     <li data-md>
      <p>R1: Added discussion of <code class="highlight"><c- k>return</c-> <c- n>x</c-> <c- o>+=</c-> <c- n>y</c-></code>.</p>
    </ul>
@@ -1820,6 +1824,12 @@ automatic object.<br> [<i>Note:</i> This happens regardless of the actual behavi
 selected by overload resolution. The implementation essentially assumes that the
 return value of any (possibly compound) assignment operator is a reference to
 its left-hand operand. <i>—end note</i>]</ins>
+     <li data-md>
+      <ins>If the candidate expression is a <i>unary-expression</i> involving the operator <code class="highlight"><c- o>++</c-></code> or <code class="highlight"><c- o>--</c-></code>, and the operand <i>cast-expression</i> is
+the (possibly parenthesized) name of a non-volatile automatic object,
+and the type of the <i>unary-expression</i> is a non-cv-qualified lvalue reference
+to the type of the automatic object, then the copy elision candidate is the
+automatic object.</ins>
     </ul>
     <p>The elision of copy/move operations,
 called copy elision, is permitted in the following circumstances
@@ -1903,9 +1913,9 @@ pathological code to observe the optimization happening:</p>
    <p>Under the "further proposal" sketched above, the code would instead have one of the following behaviors:</p>
    <ul>
     <li data-md>
-     <p><code class="highlight"><c- n>observed</c-> <c- n>a</c-> <c- n>copy</c-><c- o>-</c-><c- n>assign</c-> <c- n>from</c-> <c- mi>30</c-> <c- n>to</c-> <c- mi>31</c-></code>, then <code class="highlight"><c- n>observed</c-> <c- n>a</c-> <c- n>move</c-> <c- n>from</c-> <c- mi>10</c-> <c- n>to</c-> <c- mi>1</c-></code>, then <code class="highlight"><c- n>o</c-><c- p>.</c-><c- n>i</c-> <c- n>is</c-> <c- mi>1</c-></code> (implicit move, perhaps allowed under the proposal)</p>
+     <p><code class="highlight"><c- n>observed</c-> <c- n>a</c-> <c- n>copy</c-><c- o>-</c-><c- n>assign</c-> <c- n>from</c-> <c- mi>30</c-> <c- n>to</c-> <c- mi>31</c-></code>, then <code class="highlight"><c- n>observed</c-> <c- n>a</c-> <c- n>move</c-> <c- n>from</c-> <c- mi>10</c-> <c- n>to</c-> <c- mi>1</c-></code>, then <code class="highlight"><c- n>o</c-><c- p>.</c-><c- n>i</c-> <c- n>is</c-> <c- mi>1</c-></code> (implicit move, permitted under the proposal)</p>
     <li data-md>
-     <p><code class="highlight"><c- n>observed</c-> <c- n>a</c-> <c- n>copy</c-><c- o>-</c-><c- n>assign</c-> <c- n>from</c-> <c- mi>30</c-> <c- n>to</c-> <c- mi>31</c-></code>, then <code class="highlight"><c- n>o</c-><c- p>.</c-><c- n>i</c-> <c- n>is</c-> <c- mi>31</c-></code> (copy elision, at least allowed and perhaps mandated under the proposal)</p>
+     <p><code class="highlight"><c- n>observed</c-> <c- n>a</c-> <c- n>copy</c-><c- o>-</c-><c- n>assign</c-> <c- n>from</c-> <c- mi>30</c-> <c- n>to</c-> <c- mi>31</c-></code>, then <code class="highlight"><c- n>o</c-><c- p>.</c-><c- n>i</c-> <c- n>is</c-> <c- mi>31</c-></code> (copy elision, permitted and encouraged under the proposal)</p>
    </ul>
    <h2 class="heading settled" data-level="7" id="acknowledgments"><span class="secno">7. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <ul>
