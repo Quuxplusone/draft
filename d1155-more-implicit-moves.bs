@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: More implicit moves
 Shortname: D1155
-Revision: 1
-!Draft Revision: 9
+Revision: 2
+!Draft Revision: 10
 Audience: EWG
 Status: D
 Group: WG21
@@ -20,7 +20,8 @@ Abstract:
   and LibreOffice, we propose to change the standard so that these copies will be replaced with
   <i>implicit moves</i>.
 
-  Furthermore, we tentatively propose a new special case to permit efficient codegen for <code>return x += y</code>.
+  In a separate section, we tentatively propose a new special case to permit efficient codegen
+  for <code>return x += y</code>.
 Date: 2018-11-25
 </pre>
 
@@ -31,6 +32,8 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R2: Added discussion of `return ++x`.
 
 - R1: Added discussion of `return x += y`.
 
@@ -373,6 +376,13 @@ something like this:
 >     return value of any (possibly compound) assignment operator is a reference to
 >     its left-hand operand. <i>—end note</i>]</ins>
 >
+> - <ins>If the candidate expression is a <i>unary-expression</i> involving the operator `++`
+>     or `--`, and the operand <i>cast-expression</i> is
+>     the (possibly parenthesized) name of a non-volatile automatic object,
+>     and the type of the <i>unary-expression</i> is a non-cv-qualified lvalue reference
+>     to the type of the automatic object, then the copy elision candidate is the
+>     automatic object.</ins>
+>
 > The elision of copy/move operations,
 > called copy elision, is permitted in the following circumstances
 > (which may be combined to eliminate multiple copies):
@@ -442,9 +452,9 @@ In C++17, the above code has this behavior:
 
 Under the "further proposal" sketched above, the code would instead have one of the following behaviors:
 
-- `observed a copy-assign from 30 to 31`, then `observed a move from 10 to 1`, then `o.i is 1` (implicit move, perhaps allowed under the proposal)
+- `observed a copy-assign from 30 to 31`, then `observed a move from 10 to 1`, then `o.i is 1` (implicit move, permitted under the proposal)
 
-- `observed a copy-assign from 30 to 31`, then `o.i is 31` (copy elision, at least allowed and perhaps mandated under the proposal)
+- `observed a copy-assign from 30 to 31`, then `o.i is 31` (copy elision, permitted and encouraged under the proposal)
 
 
 # Acknowledgments # {#acknowledgments}
