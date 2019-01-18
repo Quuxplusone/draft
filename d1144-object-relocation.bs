@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
-Revision: 1
-!Draft Revision: 20
+Revision: 2
+!Draft Revision: 21
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   We provide a standard trait to detect types which are trivially relocatable, for the benefit of library writers.
   Finally, we provide a portable way for a user-defined type (e.g. <code>boost::shared_ptr</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2018-11-24
+Date: 2019-01-18
 </pre>
 
 <style>
@@ -148,7 +148,7 @@ and [[FollyIssue889]].)
 If this proposal is adopted, then Folly can start using `static_assert(std::is_trivially_relocatable_v<T>)`
 in the implementation of `fbvector`, and the programmer can stop writing explicit warrants.
 Finally, the programmer can start writing assertions of correctness, which aids maintainability and
-can even find real bugs. Example:
+can even find real bugs. [Example:](https://p1144.godbolt.org/z/dax9BR)
 
 ```c++
     class Widget {
@@ -264,11 +264,11 @@ In [[#use3|§2.3]], WG21 must actually design user-facing syntax.
 
 Therefore, I believe it would be acceptable to punt on §2.3 and come back to it later.
 We say, "Sure, that would be nice, but there's no syntax for it. Be glad that it works for
-core-language and library types. Ask again in three years."  And as long as we leave the design
-space open, I believe we wouldn't lose anything by delaying a solution to §2.3.
+core-language and library types. Ask again in three years."  As long as we leave the design
+space open, I believe we wouldn't lose much by delaying a solution to §2.3.
 
 This paper does propose a standard syntax for §2.3 — an attribute — which in turn
-provides a *simple and portable* solution to §2.1 for library vendors.
+provides a *simple and portable* way for library vendors to implement §2.1.
 
 
 # Proposed language and library features # {#proposal}
@@ -292,10 +292,10 @@ communicate trivial relocatability in each of the three use-cases above.
   - A new attribute, `[[trivially_relocatable]]`, in the core language.
     This is the *opt-in* mechanism for program-defined types.
 
-These five bullet points are severable to a certain degree. For example, if the `[[trivially_relocatable]]`
+These five bullet points are severable to some degree. For example, if the `[[trivially_relocatable]]`
 attribute (point 5) is adopted, library vendors will certainly use it in their implementations;
 but if the attribute is rejected, library vendors could still indicate the trivial relocatability
-for certain standard library types by providing library specializations of `is_trivially_relocatable`
+of certain standard library types by providing library specializations of `is_trivially_relocatable`
 (point 3).
 
 Points 1 and 2 are completely severable from points 3, 4, and 5;
@@ -305,7 +305,7 @@ other uninitialized-memory algorithms in the `<memory>` header
 and the other trios of type-traits in the `<type_traits>` header
 (e.g. `is_destructible`, `is_nothrow_destructible`,
 `is_trivially_destructible`). I do not expect these templates to be frequently useful,
-but I believe they should be provided, so as not to unpleasantly surprise the programmer
+but I believe they should be provided, so as not to surprise the programmer
 by their absence.
 
 Points 3 and 4 together motivate point 5. In order to achieve the goal of [[#use2]],
@@ -359,12 +359,12 @@ The attribute is severable; WG21 could adopt all the rest of this proposal and
 leave vendors to implement `[[clang::trivially_relocatable]]`, `[[gnu::trivially_relocatable]]`, etc.,
 as non-standard extension mechanisms.
 In that case, we would strike [[#wording-attribute|§4.5]] and one bullet point from [[#wording-inheritance|§4.4]];
-the rest of the proposal would remain the same.
+the rest of this proposal would remain exactly the same.
 
 
 # Proposed wording for C++20 # {#wording}
 
-The wording in this section is relative to [[!N4750|WG21 draft N4750]],
+The wording in this section is relative to [[!N4762|WG21 draft N4762]],
 that is, the current draft of the C++17 standard.
 
 
@@ -539,7 +539,7 @@ for all allocator-aware containers in my libc++ reference implementation.
 which is conditionally marked with `[[trivially_relocatable]]`. The copy constructor,
 assignment operators, etc. are not moved into the base class because they are not
 expected to interfere with trivial relocatability.)
-If the `[[trivially_relocatable]]` attribute were modified to take a boolean parameter,
+If we adopted the syntax proposed by [[#bool-parameter]],
 we might not care about this `J` example.
 </div>
 
@@ -552,18 +552,16 @@ Add a new section after <a href="http://eel.is/c++draft/dcl.attr.nouniqueaddr">[
 The *attribute-token* `trivially_relocatable` specifies that a class type's relocation operation has no
 visible side-effects other than a copy of the underlying bytes, as if by the library function `std::memcpy`.
 It shall appear at most once in each *attribute-list* and no *attribute-argument-clause* shall be present.
-It may be applied to the declaration of a class.
-The first declaration of a type shall specify the `trivially_relocatable` attribute if any declaration of that type
-specifies the `trivially_relocatable` attribute.
-If a type is declared with the `trivially_relocatable` attribute in one translation unit and the
-same type is declared without the `trivially_relocatable` attribute in another translation unit,
+It may be applied to the definition of a class.
+If a type is defined with the `trivially_relocatable` attribute in one translation unit and the
+same type is defined without the `trivially_relocatable` attribute in another translation unit,
 the program is ill-formed, no diagnostic required.
 
 If a type `T` is declared with the `trivially_relocatable` attribute, and `T` is either not move-constructible
 or not destructible, the program is ill-formed.
 
-If a class type is declared with the `trivially_relocatable` attribute, the implementation may replace
-relocation operations involving that type (such as those performed by the library functions
+If a class type is declared with the `trivially_relocatable` attribute, the implementation is permitted
+to replace relocation operations involving that type (such as those performed by the library functions
 `std::swap` and `std::vector::resize`) with simple copies of the underlying bytes.
 
 If a class type is declared with the `trivially_relocatable` attribute, and the program relies on
@@ -578,7 +576,7 @@ See <a href="https://p1144.godbolt.org/z/ociAVX">this example</a> where a diagno
 
 ## Type traits `is_relocatable` etc. ## {#wording-traits}
 
-Add new entries to Table 46 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
+Add new entries to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
 
 <small><blockquote>
 <table>
@@ -616,7 +614,7 @@ Add a new section after <a href="http://eel.is/c++draft/concept.moveconstructibl
 </blockquote></small>
 
 
-# Alternative directions # {#alternatives}
+# Rationale and alternatives # {#alternatives}
 
 ## Why not destructive move? ## {#destructive-move}
 
@@ -640,11 +638,34 @@ this proposal does *not* give us a general user-provided "destructive move" faci
     give a consistent set of core-language rules by which the compiler can deduce the
     trivial relocatability of some class types which follow the Rule of Zero.
 
+
+## Attribute `[[trivially_relocatable(bool)]]` ## {#bool-parameter}
+
+It has been suggested by numerous reviewers that `[[trivially_relocatable]]` should
+take a (perhaps optional) boolean parameter: `[[trivially_relocatable(true)]]`.
+This would allow us to write complicated conditions directly inline, instead of using
+metaprogramming to inherit the right behavior from a conditional base class.
+
+See [[#sample-conditional]] for an example of how this would be used.
+
+There is no technical obstacle to adding an arbitrary C++ expression as the parameter to
+an attribute. The grammar for balancing `[]` and `()` in attribute parameters has been
+there since C++11. There is already prior art for arbitrary expressions in attributes;
+see for example
+<a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang's
+`[[diagnose_if(bool)]]` attribute</a>.
+
+I'm amenable to this idea. The major downside I see to it is that it could lead to
+an arbitrarily complicated C++ expression appearing in an awkward position. But this
+is not necessarily worse, and perhaps better, than having to do the metaprogramming
+tricks shown in [[#sample-conditional]].
+
+
 ## Attribute `[[maybe_trivially_relocatable]]` ## {#maybe-trivially-relocatable}
 
-The Clang patch currently available on Godbolt Compiler Explorer supports not only
-`[[clang::trivially_relocatable]]` but also another attribute called `[[clang::maybe_trivially_relocatable]]`.
-John McCall requested on the Clang review that I explore the latter.
+The Clang patch currently available on Godbolt Compiler Explorer supports both
+`[[clang::trivially_relocatable]]` and another attribute called `[[clang::maybe_trivially_relocatable]]`,
+which John McCall requested that I explore.
 
 P1144 talks in terms of "warranting" that a class is trivially relocatable; this can be done
 manually via annotation, or as a sort of "auto-warrant" done automatically by the compiler when
@@ -665,7 +686,7 @@ levels of "overruling":
     I may have user-provided, non-defaulted, special member functions, and even though
     I may have non-trivially relocatable (or mutable or volatile) subobjects,
     I have designed them so that my relocation operation will not do anything substantially
-    different from memcpy." So I myself will be trivially relocatable _no matter what my
+    different from `memcpy`." So I myself will be trivially relocatable _no matter what my
     subobjects claim about themselves._
 
 Using `[[clang::trivially_relocatable]]`, I can write a
@@ -683,16 +704,16 @@ of type `std::list<int>` (wrapping a fundamentally non-trivial type in a wrapper
 explicitly, *incorrectly*, warrants its own triviality: see `D` below).
 
 The single "Strongly Against" vote on [[#taken-polls-2018-11-12|poll 1]] was due to concerns
-that P1144 permits a class to warrant its own trivial relocatability, overruling the compiler's
-assumptions, not only when the compiler's assumptions are based on the presence of special members
-(e.g. `A` below), but also when the compiler's assumptions are based partly or wholly
-on the non-triviality of member or base subobjects (e.g. `B`, `C`, `D` below).
+that P1144 permits a class to warrant its own trivial relocatability — overruling the compiler's
+assumptions — not only when the compiler's assumptions are based on the presence of special members
+(`A` below), but also when the compiler's assumptions are based partly or wholly
+on the non-triviality of member or base subobjects (`B`, `C`, `D` below).
 
 I see cases `B` and `C` as a "feature, not a bug"; but both Ed Catmur (in polling) and
 John McCall (in Clang review) have indicated that they would prefer to allow case `A`
 but forbid cases `B` and `C` (and of course `D`) by standardizing the equivalent of
 `[[clang::maybe_trivially_relocatable]]` in lieu of `[[clang::trivially_relocatable]]`.
-([Here is the example on Compiler Explorer.](https://p1144.godbolt.org/z/84ngkS))
+([Here is the example on Compiler Explorer.](https://p1144.godbolt.org/z/aVJOaU))
 
 <small>
 ```c++
@@ -700,8 +721,9 @@ but forbid cases `B` and `C` (and of course `D`) by standardizing the equivalent
     struct [[trivially_relocatable]] A {
         int *p;
         int i;
-        A() : p(&i), i(0) {}
-        A(A&& rhs) : p(&i), i(rhs.i) {}
+        static int g;
+        A() : p(&g), i(0) {}
+        A(A&& rhs) : p(&g), i(rhs.i) {}
         A& operator=(A&& rhs) { i = rhs.i; return *this; }
     };
 
@@ -767,39 +789,17 @@ so that its non-relocatability will not block the high-level `optional` from bec
 relocatable. But then we have a weird scenario: the non-moveable class `optional_destruct_base`
 seems to be claiming that it is "trivially relocatable," even though it is not relocatable, nor even
 moveable! Yet, if we don't annotate it, we break the high-level `optional`. This strikes me as a
-weird spooky world where actions in one part of the codebase can have effects on distant parts.
+spooky situation where actions in one part of the codebase can have effects on distant parts.
 
 Lastly, the concern over `[[trivially_relocatable]]` seems to be based on the assumption that
-working programmers will ever use this attribute in practice. In reality, I don't think they will.
+working programmers will frequently use this attribute in practice. In reality, I don't think they will.
 P1144 is designed so that the Rule of Zero will do the right thing, and all library types will
 do the right thing. Most programmers won't ever use the annotation, just as most programmers
 don't use `[[maybe_unused]]` or `[[no_unique_address]]`.
 
 The proposed attribute is a simple, sharp knife. It cuts what you point it at; point it carefully.
 `[[maybe_trivially_relocatable]]` is a slightly dull knife; it doesn't necessarily cut on the
-first try. And a dull knife is often more dangerous than a sharp one.
-
-
-## Attribute `[[trivially_relocatable(bool)]]` ## {#bool-parameter}
-
-It has been suggested by numerous reviewers that `[[trivially_relocatable]]` should
-take a (perhaps optional) boolean parameter: `[[trivially_relocatable(true)]]`.
-This would allow us to write complicated conditions directly inline, instead of using
-metaprogramming to inherit the right behavior from a conditional base class.
-
-See [[#sample-conditional]] for an example of how this would be used.
-
-There is no technical obstacle to adding an arbitrary C++ expression as the parameter to
-an attribute. The grammar for balancing `[]` and `()` in attribute parameters has been
-there since C++11. There is already prior art for arbitrary expressions in attributes;
-see for example
-<a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang's
-`[[diagnose_if(bool)]]` attribute</a>.
-
-I'm amenable to this idea. The major downside I see to it is that it could lead to
-an arbitrarily complicated C++ expression appearing in an awkward position. But this
-is not necessarily worse, and perhaps better, than having to do the metaprogramming
-tricks shown in [[#sample-conditional]].
+first try. A dull knife is often more dangerous than a sharp one.
 
 
 ## `relocate` and MSVC `std::list` ## {#relocatable-list}
@@ -813,17 +813,17 @@ own types, and thus achieve any arbitrary behavior for the N4158 "destructive mo
 In contrast, P1144 provides for no middle ground between "memcpy" and "call the move-constructor
 followed by the destructor."
 
-That middle ground would be useful for types such as MSVC's `std::list`. `list`'s move-constructor is
-fundamentally non-`noexcept` because it must heap-allocate a new sentinel node. `list` is fundamentally
+That middle ground would be useful for types such as MSVC's `std::list`. `list` is fundamentally
 non-trivially-relocatable, because it must fix up the "prev" pointer in its first node
 (see [[#non-trivial-sample-list]]). So P1144 proposes no change to the status quo for `list`.
-On MSVC, `vector<list<T>>::reserve` must copy (not relocate) each `list<T>` element, which means
-calling `T`'s copy-constructor many times.
+MSVC's `list` is fundamentally non-nothrow-move-constructible because it must heap-allocate
+a new sentinel node. Thus, on MSVC, `vector<list<T>>::reserve` must *copy* each
+`list<T>` element, which means calling `T`'s copy-constructor many times.
 
-But if there were a way for MSVC's `list` to express its "relocate" operation via a customization point,
-then it could make that non-trivial operation `noexcept`. And then MSVC's `vector<list<T>>::reserve`
-could be done efficiently by relocating each `list<T>` element, without performing any operations
-on `T` at all.
+But if there were a way for MSVC's `list` to express its non-trivial "relocate" operation via a
+customization point, then it could make that "relocate" operation `noexcept`. And then MSVC's
+`vector<list<T>>::reserve` could be done efficiently by *relocating* each `list<T>` element,
+which avoids performing any operations on `T`.
 
 However, since the calling of `T`'s copy-constructor is an observable side-effect, any proposal
 to optimize `vector<list<T>>::reserve` would have to change the wording for `vector`
@@ -842,8 +842,8 @@ by replacing all uses of `std::list` with something like
 ```
 </small>
 
-The ADL-customization-point path seems to have a very high cost-to-benefit ratio.
-I am satisfied with P1144's ignoring it.
+N4158's ADL-customization-point approach seems to have a very high cost-to-benefit ratio.
+I am satisfied with P1144's avoiding that approach.
 
 
 ## Unintuitive `is_nothrow_relocatable` ## {#nothrow-relocatable}
@@ -857,7 +857,7 @@ Consider a type such as
     };
     static_assert(not std::is_nothrow_move_constructible_v<Widget>);
     static_assert(not std::is_nothrow_relocatable_v<Widget>);
-    static_assert(not std::is_trivially_relocatable_v<Widget>);
+    static_assert(std::is_trivially_relocatable_v<Widget>);
 ```
 
 Since `Widget` is non-nothrow move-constructible, P1144 calls it non-nothrow relocatable.
@@ -867,7 +867,7 @@ operation is trivial." These claims seem inconsistent.
 
 This is a real-world concern because GNU libstdc++'s `std::deque<T, std::allocator<T>>`
 works like `Widget`: its move-constructor is `noexcept(false)` (it must allocate)
-but it is trivially relocatable. As of 2018-11-22, libstdc++ marks its `deque` as
+but it is trivially relocatable. As of 2019-01-18, libstdc++ marks its `deque` as
 trivially relocatable (see [[Deque]]).
 
 However, I believe that it would be incorrect and unsafe for the library to claim that
@@ -880,7 +880,7 @@ without worrying about catching exceptions. "`T` is trivially relocatable" means
 I believe P1144's proposed behavior is the best behavior. However, another plausible behavior
 would be to simply eliminate the `is_nothrow_relocatable` type-trait from the standard library.
 If we don't provide `is_nothrow_relocatable`, then we don't have to defend its
-somewhat unintuitive behavior.
+mildly unintuitive behavior.
 
 
 # Acknowledgements # {#acknowledgements}
@@ -1090,7 +1090,7 @@ class optional_base {
 ```
 </small>
 
-If we adopt the boolean-parameter syntax proposed by [[#bool-parameter]], then
+If we adopt the syntax proposed by [[#bool-parameter]], then
 we could eliminate the helper class `optional_relocate_base`:
 
 <small>
@@ -1107,6 +1107,33 @@ class optional_base {
 };
 ```
 </small>
+
+I have implemented the entire Standard Library using the proposed `[[trivially_relocatable]]`
+attribute; you can find the source code [on my GitHub](https://github.com/Quuxplusone/libcxx/tree/trivially-relocatable)
+and explore the resulting codegen [on Godbolt Compiler Explorer](https://p1144.godbolt.org/z/t28saC).
+
+I have also implemented case studies for `std::optional` and `std::deque`, in each of the
+alternative styles:
+
+<table class="def">
+<tr><th>Style</th><th>Size of `optional` diff (lines)</th><th>Size of `deque` diff (lines)</th></tr>
+<tr>
+<td>`[[trivially_relocatable]]`</td>
+<td>[-2, +14](https://github.com/Quuxplusone/libcxx/commit/example-optional-tr)</td>
+<td>[-18, +52](https://github.com/Quuxplusone/libcxx/commit/example-deque-tr)</td>
+</tr>
+<tr>
+<td>`[[maybe_trivially_relocatable]]`</td>
+<td>[problematic](https://github.com/Quuxplusone/libcxx/commit/example-optional-mtr)</td>
+<td>[-5, +5](https://github.com/Quuxplusone/libcxx/commit/example-deque-mtr)</td>
+<tr>
+<td>`[[trivially_relocatable(bool)]]`</td>
+<td>[-1, +1](https://github.com/Quuxplusone/libcxx/commit/example-optional-trbool)</td>
+<td>[-1, +17](https://github.com/Quuxplusone/libcxx/commit/example-deque-trbool)</td>
+</tr>
+</table>
+
+For why one entry in this table is "problematic," see [[#maybe-trivially-relocatable]].
 
 
 Appendix C: Examples of non-trivially relocatable class types {#non-trivial-samples}
@@ -1241,8 +1268,8 @@ struct Widget : registered_object {};
 </small>
 
 
-Appendix D: Implementation {#implementation}
-==========================
+Appendix D: Implementation experience {#implementation}
+=====================================
 
 A prototype Clang/libc++ implementation is at
 
@@ -1251,12 +1278,15 @@ A prototype Clang/libc++ implementation is at
 - <a href="https://p1144.godbolt.org/z/oWEd_X">godbolt.org</a>, under the name "x86-64 clang (experimental P1144)"
 - [reviews.llvm.org/D50119](https://reviews.llvm.org/D50119)
 
-Furthermore, as of November 2018, libstdc++ trunk will perform the `vector::resize` optimization
+Side-by-side case studies of `[[trivially_relocatable]]`, `[[maybe_trivially_relocatable]]`,
+and `[[trivially_relocatable(bool)]]` are given in [[#sample-conditional]].
+
+As of November 2018, libstdc++ performs the `vector::resize` optimization
 for any type which has manually specialized `std::__is_trivially_relocatable`.
 (See it on Compiler Explorer <a href="https://godbolt.org/z/Qs32s9">here</a>.)
-This is the same approach used by [[Folly]], [[EASTL]], and [[BSL]].
-As of 2018-11-22, the only library type for which `__is_trivially_relocatable` has been specialized
-is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
+Manual specialization is also the approach used by [[Folly]], [[EASTL]], and [[BSL]].
+As of 2019-01-18, the only libstdc++ library type for which `__is_trivially_relocatable` has
+been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
 
 
 <pre class=biblio>
@@ -1397,14 +1427,14 @@ is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf",
     "date": "October 2014"
   },
-  "N4750": {
+  "N4762": {
     "authors": [
       "ISO/IEC JTC1/SC22/WG21 - The C++ Standards Committee",
       "Richard Smith"
     ],
-    "title": "N4750: Working Draft, Standard for Programming Language C++",
-    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4750.pdf",
-    "date": "May 2018"
+    "title": "N4762: Working Draft, Standard for Programming Language C++",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4762.pdf",
+    "date": "July 2018"
   },
   "P0023R0": {
     "authors": [
