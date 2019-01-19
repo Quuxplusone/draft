@@ -2,7 +2,7 @@
 Title: Type traits for structural comparison
 Shortname: D1154
 Revision: 1
-!Draft Revision: 4
+!Draft Revision: 5
 Audience: LEWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   Now that [[P0732|P0732R2 "Class Types in Non-Type Template Parameters"]] has been adopted,
   we propose the new type-trait <code>has_strong_structural_equality&lt;T&gt;</code>.
   Code is more robust and maintainable when we can <code>static_assert</code> this property.
-Date: 2019-01-01
+Date: 2019-01-19
 </pre>
 
 <style>
@@ -83,7 +83,7 @@ unfriendly spew of diagnostics on the line that tries to instantiate `A`.
 
 # This feature requires support from the compiler # {#compiler-builtin}
 
-P1154R0 claimed that this type-trait could not be implemented without a compiler builtin.
+P1154R0 claimed that none of these type-traits could be implemented without a compiler builtin.
 In fact, `has_strong_structural_equality` *can* be implemented according to standard C++17:
 
 ```c++
@@ -99,10 +99,9 @@ struct HasStrongStructuralEquality<T, B<T>> : std::true_type {};
 
 static_assert(HasStrongStructuralEquality< int >::value);
 static_assert(!HasStrongStructuralEquality< std::string >::value);
-
 ```
 
-This code relies on subtle and maybe-still-changing rules governing when
+This code relies on subtle and maybe-uncertain rules governing when
 `template<auto> struct A` is a valid argument for a parameter of type
 `template<T> class`.
 
