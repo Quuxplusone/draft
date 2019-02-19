@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Type traits for structural comparison
 Shortname: D1154
-Revision: 1
-!Draft Revision: 5
+Revision: 2
+!Draft Revision: 6
 Audience: LEWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   Now that [[P0732|P0732R2 "Class Types in Non-Type Template Parameters"]] has been adopted,
   we propose the new type-trait <code>has_strong_structural_equality&lt;T&gt;</code>.
   Code is more robust and maintainable when we can <code>static_assert</code> this property.
-Date: 2019-01-19
+Date: 2019-02-19
 </pre>
 
 <style>
@@ -83,7 +83,7 @@ unfriendly spew of diagnostics on the line that tries to instantiate `A`.
 
 # This feature requires support from the compiler # {#compiler-builtin}
 
-P1154R0 claimed that none of these type-traits could be implemented without a compiler builtin.
+P1154R0 claimed that this type-trait could not be implemented without a compiler builtin.
 In fact, `has_strong_structural_equality` *can* be implemented according to standard C++17:
 
 ```c++
@@ -117,94 +117,44 @@ This code relies on subtle and maybe-uncertain rules governing when
 Right now the burden is on the application programmer to know this trivia
 and come up with workarounds for GCC and MSVC. We propose to simplify the programmer's job
 by putting this trait into the standard library, where the burden will be on the library
-to get it right (probably by using a compiler builtin).
+to get it right (probably using a compiler builtin).
 
 
 # Provide a full complement of type traits # {#batteries-included}
 
-We propose these six type-traits, with their accompanying `_v` versions.
-For exposition purposes only, we provide sample implementations in terms of
-a hypothetical compiler builtin `__has_structural_comparison(T)`.
+P1154R1 proposed six type-traits, with implementations shown in terms of a
+hypothetical compiler builtin `__has_structural_comparison(T)`. After the adoption
+of [[P1185]], the general notion of "structural comparison" is no longer meaningful; the
+new core-language feature is "structural equality" (only).
+
+Strong structural equality may be provided by a structural (defaulted) `operator<=>`
+or by a structural (defaulted) `operator==`. In the latter case, the type might not
+support `operator<=>` at all.
 
 <small>
 ```c++
-template<class T> struct has_structural_comparison :
-    bool_constant< __has_structural_comparison(T) > {};
-
-template<class T> struct has_strong_structural_ordering :
-    bool_constant<
-        __has_structural_comparison(T) &&
-        is_convertible_v<decltype(declval<T>() <=> declval<T>()), strong_ordering>
-    > {};
-
 template<class T> struct has_strong_structural_equality :
-    bool_constant<
-        __has_structural_comparison(T) &&
-        is_convertible_v<decltype(declval<T>() <=> declval<T>()), strong_equality>
-    > {};
-
-template<class T> struct has_weak_structural_ordering :
-    bool_constant<
-        __has_structural_comparison(T) &&
-        is_convertible_v<decltype(declval<T>() <=> declval<T>()), weak_ordering>
-    > {};
-
-template<class T> struct has_weak_structural_equality :
-    bool_constant<
-        __has_structural_comparison(T) &&
-        is_convertible_v<decltype(declval<T>() <=> declval<T>()), weak_equality>
-    > {};
-
-template<class T> struct has_partial_structural_ordering :
-    bool_constant<
-        __has_structural_comparison(T) &&
-        is_convertible_v<decltype(declval<T>() <=> declval<T>()), partial_ordering>
-    > {};
+    bool_constant< __has_strong_structural_equality(T) > {};
 ```
 </small>
 
 
 # Proposed wording # {#wording}
 
-Add six new entries to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
+Add one new entry to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
 
 <small><blockquote>
 <table>
 <tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr>
 <tr>
-<td>`template<class T> struct has_structural_comparison;`</td>
-<td>For a glvalue `x` of type `const T`, the expression `x <=> x` either does not invoke a three-way comparison operator or invokes a structural comparison operator (15.9.1).</td>
-<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
-</tr>
-<tr>
-<td>`template<class T> struct has_strong_structural_ordering;`</td>
-<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::strong_ordering`.</td>
-<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
-</tr>
-<tr>
 <td>`template<class T> struct has_strong_structural_equality;`</td>
-<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::strong_equality`.</td>
-<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
-</tr>
-<tr>
-<td>`template<class T> struct has_weak_structural_ordering;`</td>
-<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::weak_ordering`.</td>
-<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
-</tr>
-<tr>
-<td>`template<class T> struct has_weak_structural_equality;`</td>
-<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::weak_equality`.</td>
-<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
-</tr>
-<tr>
-<td>`template<class T> struct has_partial_structural_ordering;`</td>
-<td>`has_structural_comparison_v<T>` is `true` and the expression `x <=> x` is convertible to `std::partial_ordering`.</td>
+<td>The type `T` has strong structural equality (10.10.1).</td>
 <td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
 </tr>
 </table>
 </blockquote></small>
 
-# LEWG has jurisdiction
+# LEWG has jurisdiction # {#jurisdiction}
 
 Before the San Diego 2018 meeting, the chair of LEWG questioned whether this paper should be
 handled by SG7 (Reflection and Compile-Time Programming). In response, the chair of SG7
@@ -237,6 +187,14 @@ specifically in the "no review required" category. Quoting directly from D1354R0
     ],
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf",
     "date": "June 2018"
+  },
+  "P1185": {
+    "title": "<=> != ==",
+    "authors": [
+        "Barry Revzin"
+    ],
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1185r1.html",
+    "date": "January 2019"
   }
 }
 </pre>
