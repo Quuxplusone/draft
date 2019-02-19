@@ -1227,7 +1227,7 @@ Possible extra rowspan handling
       text-align: center;
     }
   </style>
-  <meta content="Bikeshed version afcd117d97f99b477e89cf581bf533071bd1baab" name="generator">
+  <meta content="Bikeshed version 1cff2db4ee2c3bba7a4077d3007528ec73b0485d" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 ins  {background-color: #CCFFCC; text-decoration: underline;}
@@ -1455,7 +1455,7 @@ pre .property::before, pre .property::after {
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>6
+     <dd>7
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1154-comparable-traits.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1154-comparable-traits.bs</a>
      <dt>Current:
@@ -1477,9 +1477,10 @@ pre .property::before, pre .property::after {
    <ol class="toc" role="directory">
     <li><a href="#structural-equality"><span class="secno">1</span> <span class="content">Strong structural equality should be static-assertable</span></a>
     <li><a href="#compiler-builtin"><span class="secno">2</span> <span class="content">This feature requires support from the compiler</span></a>
-    <li><a href="#batteries-included"><span class="secno">3</span> <span class="content">Provide a full complement of type traits</span></a>
+    <li><a href="#batteries-included"><span class="secno">3</span> <span class="content">Provide just the one type trait</span></a>
     <li><a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording</span></a>
     <li><a href="#jurisdiction"><span class="secno">5</span> <span class="content">LEWG has jurisdiction</span></a>
+    <li><a href="#polls"><span class="secno">6</span> <span class="content">Straw polls taken of LEWG in Kona (2019-02-18)</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -1562,13 +1563,16 @@ but that can easily be worked around on the library side.</p>
 and come up with workarounds for GCC and MSVC. We propose to simplify the programmer’s job
 by putting this trait into the standard library, where the burden will be on the library
 to get it right (probably using a compiler builtin).</p>
-   <h2 class="heading settled" data-level="3" id="batteries-included"><span class="secno">3. </span><span class="content">Provide a full complement of type traits</span><a class="self-link" href="#batteries-included"></a></h2>
+   <h2 class="heading settled" data-level="3" id="batteries-included"><span class="secno">3. </span><span class="content">Provide just the one type trait</span><a class="self-link" href="#batteries-included"></a></h2>
    <p>P1154R1 proposed six type-traits, with implementations shown in terms of a
 hypothetical compiler builtin <code class="highlight"><c- n>__has_structural_comparison</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code>. After the adoption
 of <a data-link-type="biblio" href="#biblio-p1185">[P1185]</a>, the general notion of "structural comparison" is no longer meaningful; the
-new core-language feature is "structural equality" (only).</p>
+new core-language feature is "strong structural equality" (only).</p>
    <p>Strong structural equality may be provided by a structural (defaulted) <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> or by a structural (defaulted) <code class="highlight"><c- k>operator</c-><c- o>==</c-></code>. In the latter case, the type might not
 support <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> at all.</p>
+   <p>Therefore we propose only the following type-trait, with accompanying <code class="highlight"><c- n>_v</c-></code> variable template.
+For exposition purposes only, we provide a sample implementation in terms of
+a hypothetical compiler builtin <code class="highlight"><c- n>__has_strong_structural_equality</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code>.</p>
    <p><small></small></p>
    <small> <pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c-> <c- k>struct</c-> <c- nl>has_strong_structural_equality</c-> <c- p>:</c->
     <c- n>bool_constant</c-><c- o>&lt;</c-> <c- n>__has_strong_structural_equality</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-> <c- o>></c-> <c- p>{};</c->
@@ -1592,6 +1596,31 @@ within C++ code.</p>
     <p>EXAMPLE 6
 A trait that exposes strong structural equality.</p>
    </blockquote>
+   <h2 class="heading settled" data-level="6" id="polls"><span class="secno">6. </span><span class="content">Straw polls taken of LEWG in Kona (2019-02-18)</span><a class="self-link" href="#polls"></a></h2>
+   <table class="def">
+    <tbody>
+     <tr>
+      <th style="width: 70%;">
+      <th><strong>SF</strong>
+      <th><strong>F</strong>
+      <th><strong>N</strong>
+      <th><strong>A</strong>
+      <th><strong>SA</strong>
+     <tr>
+      <th><small>We want all of the traits [from P1154R1] (rather than just strong structural equality).</small>
+      <th>0
+      <th>2
+      <th>4
+      <th>0
+      <th>3
+     <tr>
+      <th><small>Drop everything but <code class="highlight"><c- n>has_strong_structural_equality</c-><c- p>[</c-><c- n>_v</c-><c- p>]</c-></code>, make sure to coordinate with <a data-link-type="biblio" href="#biblio-p1185">[P1185]</a>, and forward to LWG for C++20.</small>
+      <th>3
+      <th>5
+      <th>1
+      <th>0
+      <th>0
+   </table>
   </main>
 <script>
 (function() {
