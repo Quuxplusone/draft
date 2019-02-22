@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
-Revision: 2
-!Draft Revision: 21
+Revision: 3
+!Draft Revision: 22
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -18,13 +18,37 @@ Abstract:
   We provide a standard trait to detect types which are trivially relocatable, for the benefit of library writers.
   Finally, we provide a portable way for a user-defined type (e.g. <code>boost::shared_ptr</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2019-01-18
+Date: 2019-02-21
 </pre>
 
 <style>
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
+
+
+# Changelog # {#changelog}
+
+- R3 (post-Kona):
+
+    - User-provided copy/move assignment operators inhibit "natural" trivial relocatability, just like
+            user-provided move constructors and destructors. This is intended to grant us
+            permission to optimize `vector::insert`.
+
+    - User-provided copy constructors inhibit "natural" trivial relocatability, just like
+            user-provided move constructors and destructors.
+
+    - Adopted `[[trivially_relocatable(bool)]]`. The attribute-argument is optional.
+
+    - Added `std::relocate_at(source, dest)`. Note that this is *not* a customization point.
+
+    - Removed the core-language blanket wording that permitted "the implementation" to eliminate
+            moves and destroys of trivially relocatable types. Instead, the existence of
+            `std::relocate_at` and handwaviness of e.g.
+            [ [vector.capacity](http://eel.is/c++draft/vector#capacity-4)] combine to strongly imply
+            (but still not to mandate) that library vendors will use `std::relocate_at` wherever
+            it helps with performance. We no longer propose to permit eliminating
+            moves and destroys in e.g. `return` statements, except as permitted under the as-if rule.
 
 
 # Introduction and motivation # {#intro}
@@ -80,7 +104,7 @@ we can optimize any routine that uses the moral equivalent of `std::swap`, such 
 ```c++
     std::swap
     std::sort
-    std::vector<R>::insert (arguably)
+    std::vector<R>::insert
 ```
 
 ### More efficient small-buffer type-erasure ### {#benefit-type-erasure}
@@ -105,6 +129,8 @@ which can be implemented naïvely as an element-by-element *move*
 (leaving the source vector's elements in their moved-from state),
 or can be implemented efficiently as an element-by-element *relocate*
 (leaving the source vector empty).
+
+For a detailed analysis of this case, see [[fixed_capacity_vector]].
 
 Note:
 `boost::container::static_vector<R,N>` currently implements the
@@ -362,6 +388,28 @@ In that case, we would strike [[#wording-attribute|§4.5]] and one bullet point 
 the rest of this proposal would remain exactly the same.
 
 
+## Why `[[trivially_relocatable(bool)]]`? ## {#bool-parameter}
+
+It was suggested by numerous reviewers that `[[trivially_relocatable]]` should
+take a (perhaps optional) boolean parameter: `[[trivially_relocatable(true)]]`.
+This would allow us to write complicated conditions directly inline, instead of using
+metaprogramming to inherit the right behavior from a conditional base class.
+
+See [[#sample-conditional]] for an example of how this can be used.
+
+There is no technical obstacle to adding an arbitrary C++ expression as the parameter to
+an attribute. The grammar for balancing `[]` and `()` in attribute parameters has been
+there since C++11. There is already prior art for arbitrary expressions in attributes;
+see for example
+<a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang's
+`[[diagnose_if(bool)]]` attribute</a>.
+
+The major downside I see to this idea is that it could lead to
+an arbitrarily complicated C++ expression appearing in an awkward position. But this
+is not necessarily worse, and perhaps better, than having to do the metaprogramming
+tricks shown in [[#sample-conditional]].
+
+
 # Proposed wording for C++20 # {#wording}
 
 The wording in this section is relative to [[!N4762|WG21 draft N4762]],
@@ -384,6 +432,42 @@ Issue: [definitions] is probably the wrong place for the core-language definitio
 
 Issue: this definition of "relocation operation" is not good
 
+
+## Algorithm `relocate_at` ## {#wording-relocate-at}
+
+Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:
+
+<small><blockquote>
+<xmp>
+  template<class T>
+  T *relocate_at(T* source, T* dest);
+  namespace ranges {
+    template<Relocatable T>
+    T *relocate_at(T* source, T* dest);
+  }
+</xmp>
+
+*Mandates:* `T` shall be a complete non-array object type.
+
+*Effects:* Equivalent to:
+<xmp>
+  result = uninitialized_move(dest, dest + 1, source);
+  destroy_at(source);
+  return std::launder(dest);
+</xmp>
+except that if the value type of the iterator is trivially relocatable, side effects
+associated with the relocation of the object's value might not happen.
+</blockquote></small>
+
+Note:
+The "as-if-by-memcpy" codepath hidden inside `relocate_at` cannot be implemented by
+literally `memcpy` (at least not without undefined behavior).
+At Kona, EWG discussion of Richard Smith's [[P0593R3]] suggests to me, and Richard
+confirmed, that a typical library vendor *could* implement this codepath
+by a call to a hypothetical `out_of_line_memcpy` function whose
+implementation is invisible to the compiler's optimizer.
+
+
 ## Algorithm `uninitialized_relocate` ## {#wording-uninit-relocate}
 
 Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:
@@ -401,6 +485,8 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
   destroy(first, last);
   return result;
 </xmp>
+except that if the value type of the iterator is trivially relocatable, side effects
+associated with the relocation of the object's value might not happen.
 
 *Remarks:* If an exception is thrown, some objects in the range `[first, last)`
 are left in a valid but unspecified state.
@@ -409,6 +495,12 @@ are left in a valid but unspecified state.
 Note: We are guided by [[P0884R0]] to make `uninitialized_relocate` unconditionally `noexcept(false)`.
 This is consistent with `uninitialized_move` and `destroy_at`, both of which are unconditionally
 `noexcept(false)`.
+
+Note: This algorithm is deliberately different from `relocate_at`-in-a-loop, so that if
+some move-construction throws an exception, some elements of `[first, last)` may be left
+in a moved-from state but will never actually be left in a *destroyed* state. If the
+vendor knows that `T` is nothrow-move-constructible, then they could use `relocate_at`-in-a-loop
+to speed up that special case.
 
 
 ## Algorithm `uninitialized_relocate_n` ## {#wording-uninit-relocate-n}
@@ -426,6 +518,8 @@ This is consistent with `uninitialized_move` and `destroy_at`, both of which are
   destroy_n(first, n);
   return pair;
 </xmp>
+except that if the value type of the iterator is trivially relocatable, side effects
+associated with the relocation of the object's value might not happen.
 
 *Remarks:* If an exception is thrown, some objects in the range `[first, std::next(first,n))`
 are left in a valid but unspecified state.
@@ -443,17 +537,18 @@ A move-constructible, destructible object type `T` is a <dfn dfn-type="abstract-
 
   - an array of trivially relocatable type, or
 
-  - a (possibly cv-qualified) class type declared with the `[[trivially_relocatable]]` attribute, or
+  - a (possibly cv-qualified) class type declared with a `[[trivially_relocatable]]` attribute
+    with value `true`, or
 
   - a (possibly cv-qualified) class type which:
 
-    - has no user-provided move constructors,
+    - has no user-provided move constructors or move assignment operators,
 
-    - either has at least one move constructor or has no user-provided copy constructors,
+    - has no user-provided copy constructors or copy assignment operators,
 
-    - has no user-provided or deleted destructors,
+    - has no user-provided destructors,
 
-    - either is final, or has a final destructor, or has no virtual destructors,
+    - either is final, or has a final destructor, or has a non-virtual destructor,
 
     - has no virtual base classes,
 
@@ -478,13 +573,8 @@ information to infer that they *are* trivially relocatable in practice. This wou
 corner case in an otherwise perfectly accurate feature. I tentatively prefer to optimize for both maximum
 performance and absence of corner cases, over spec simplicity.
 
-Note: There is no special treatment for volatile subobjects. Using `memmove` on volatile subobjects
-can cause tearing of reads and writes. This paper introduces no *new* issues in this area;
-see [[Subobjects]]. The existing issues with `volatile` are addressed narrowly by [[P1153R0]] and broadly by [[P1152R0]].
-
-Note: There is no special treatment for possibly overlapping subobjects. Using `memmove` on possibly overlapping
-subobjects can overwrite unrelated objects in the vicinity of the destination. This paper introduces
-no *new* issues in this area; see [[Subobjects]].
+Note: There is no special treatment for volatile subobjects (see [[Subobjects]] and [[P1152R0]])
+nor for possibly overlapping subobjects (see [[Subobjects]]).
 
 Issue: The relevant move constructor, copy constructor, and/or destructor must be public and unambiguous.
 We imply this via the words "A move-constructible, destructible object type". However, "move-constructible"
@@ -517,14 +607,19 @@ Consider the following test cases—
     };
     static_assert(not std::is_trivially_relocatable_v<B>);
 
+    struct H {
+        H(H&&);
+    };
     struct [[trivially_relocatable]] I {
         I(I&&);
     };
-    struct J : I {
+    template<bool Cond>
+    struct J : std::conditional_t<Cond, H, I> {
         J(const J&);
         J(J&&) = default;
     };
-    static_assert(std::is_trivially_relocatable_v<J>);
+    static_assert(std::is_trivially_relocatable_v<J<false>>);
+    static_assert(not std::is_trivially_relocatable_v<J<true>>);
 ```
 </small>
 We *must* find a rule that makes neither `A` nor `B` trivially relocatable,
@@ -532,15 +627,24 @@ because the move-construction `A(std::move(a))`
 invokes user-provided copy constructor `MA(MA&)` and the move-construction
 `B(std::move(b))` invokes user-provided copy constructor `MB(const volatile MB&)`.
 
-We would *like* to find a rule that makes `J` trivially relocatable,
-because the `J : I` pattern is used to implement "conditionally trivial relocatability"
+In P1144R2, I tried to find a rule that makes `J` trivially relocatable,
+because the `J : I` pattern was used to implement "conditionally trivial relocatability"
 for all allocator-aware containers in my libc++ reference implementation.
-(The move-constructor and destructor of `J` are moved into a base class template `I`
-which is conditionally marked with `[[trivially_relocatable]]`. The copy constructor,
-assignment operators, etc. are not moved into the base class because they are not
-expected to interfere with trivial relocatability.)
-If we adopted the syntax proposed by [[#bool-parameter]],
-we might not care about this `J` example.
+However, this paper adopts the `[[trivially_relocatable(bool)]]` syntax, which
+means that we don't need to care about `J : I` anymore. The new way to write
+`J` is simply
+<small>
+```
+    template<bool Cond>
+    struct [[trivially_relocatable(!Cond)]] J {
+        J(J&&);
+        J(const J&);
+        J(J&&) = default;
+    };
+    static_assert(std::is_trivially_relocatable_v<J<false>>);
+    static_assert(not std::is_trivially_relocatable_v<J<true>>);
+```
+</small>
 </div>
 
 
@@ -551,18 +655,22 @@ Add a new section after <a href="http://eel.is/c++draft/dcl.attr.nouniqueaddr">[
 <small><blockquote>
 The *attribute-token* `trivially_relocatable` specifies that a class type's relocation operation has no
 visible side-effects other than a copy of the underlying bytes, as if by the library function `std::memcpy`.
-It shall appear at most once in each *attribute-list* and no *attribute-argument-clause* shall be present.
-It may be applied to the definition of a class.
-If a type is defined with the `trivially_relocatable` attribute in one translation unit and the
-same type is defined without the `trivially_relocatable` attribute in another translation unit,
-the program is ill-formed, no diagnostic required.
+It may be applied to the definition of a class. It shall appear at most once in each *attribute-list*.
+An *attribute-argument-clause* may be present and, if present, shall have the form
+```
+    ( constant-expression )
+```
+The *constant-expression* shall be an integral constant expression of type `bool`.
+If no *attribute-argument-clause* is present, it has the same effect as an *attribute-argument-clause*
+of `(true)`.
+
+If any definition of a class type has a `trivially_relocatable` attribute with value *V*, then each
+definition of the same class type shall have a `trivially_relocatable` attribute with value *V*.
+No diagnostic is required if definitions in different translation units have
+mismatched `trivially_relocatable` attributes.
 
 If a type `T` is declared with the `trivially_relocatable` attribute, and `T` is either not move-constructible
 or not destructible, the program is ill-formed.
-
-If a class type is declared with the `trivially_relocatable` attribute, the implementation is permitted
-to replace relocation operations involving that type (such as those performed by the library functions
-`std::swap` and `std::vector::resize`) with simple copies of the underlying bytes.
 
 If a class type is declared with the `trivially_relocatable` attribute, and the program relies on
 observable side-effects of relocation other than a copy of the underlying bytes, the behavior is undefined.
@@ -613,6 +721,9 @@ Add a new section after <a href="http://eel.is/c++draft/concept.moveconstructibl
 *Note:* This concept is exactly equivalent to `MoveConstructible<T>`.
 </blockquote></small>
 
+Note: My understanding is that there are no standard concepts with `Trivially` in the name.
+Therefore I do not propose to add a concept named `TriviallyRelocatable`.
+
 
 # Rationale and alternatives # {#alternatives}
 
@@ -637,28 +748,6 @@ this proposal does *not* give us a general user-provided "destructive move" faci
     Qt (`Q_MOVABLE_TYPE`) and [[BSL]] (`IsBitwiseMoveable`). P1144's sole innovation is to
     give a consistent set of core-language rules by which the compiler can deduce the
     trivial relocatability of some class types which follow the Rule of Zero.
-
-
-## Attribute `[[trivially_relocatable(bool)]]` ## {#bool-parameter}
-
-It has been suggested by numerous reviewers that `[[trivially_relocatable]]` should
-take a (perhaps optional) boolean parameter: `[[trivially_relocatable(true)]]`.
-This would allow us to write complicated conditions directly inline, instead of using
-metaprogramming to inherit the right behavior from a conditional base class.
-
-See [[#sample-conditional]] for an example of how this would be used.
-
-There is no technical obstacle to adding an arbitrary C++ expression as the parameter to
-an attribute. The grammar for balancing `[]` and `()` in attribute parameters has been
-there since C++11. There is already prior art for arbitrary expressions in attributes;
-see for example
-<a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang's
-`[[diagnose_if(bool)]]` attribute</a>.
-
-I'm amenable to this idea. The major downside I see to it is that it could lead to
-an arbitrarily complicated C++ expression appearing in an awkward position. But this
-is not necessarily worse, and perhaps better, than having to do the metaprogramming
-tricks shown in [[#sample-conditional]].
 
 
 ## Attribute `[[maybe_trivially_relocatable]]` ## {#maybe-trivially-relocatable}
@@ -802,47 +891,14 @@ The proposed attribute is a simple, sharp knife. It cuts what you point it at; p
 first try. A dull knife is often more dangerous than a sharp one.
 
 
-## `relocate` and MSVC `std::list` ## {#relocatable-list}
+## Should `relocate_at` be a customization point? ## {#relocatable-list}
 
-(See "[Trivially Relocatable versus Destructive Movable](https://quuxplusone.github.io/blog/2018/09/28/trivially-relocatable-vs-destructive-movable/)" (2018-09-28)
-for a detailed analysis of this material.)
+<b>No.</b> See [P1144R2 section 5.4](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1144r2.html#relocatable-list)
+for discussion of this approach, which was taken by Pablo Halpern's [[N4158]].
+See also
+"[Trivially Relocatable versus Destructive Movable](https://quuxplusone.github.io/blog/2018/09/28/trivially-relocatable-vs-destructive-movable/)" (2018-09-28).
 
-Pablo Halpern's [[N4158]] proposed a completely user-space mechanism: an ADL customization point
-named `uninitialized_destructive_move`. In N4158, the user could overload this function for their
-own types, and thus achieve any arbitrary behavior for the N4158 "destructive move" operation.
-In contrast, P1144 provides for no middle ground between "memcpy" and "call the move-constructor
-followed by the destructor."
-
-That middle ground would be useful for types such as MSVC's `std::list`. `list` is fundamentally
-non-trivially-relocatable, because it must fix up the "prev" pointer in its first node
-(see [[#non-trivial-sample-list]]). So P1144 proposes no change to the status quo for `list`.
-MSVC's `list` is fundamentally non-nothrow-move-constructible because it must heap-allocate
-a new sentinel node. Thus, on MSVC, `vector<list<T>>::reserve` must *copy* each
-`list<T>` element, which means calling `T`'s copy-constructor many times.
-
-But if there were a way for MSVC's `list` to express its non-trivial "relocate" operation via a
-customization point, then it could make that "relocate" operation `noexcept`. And then MSVC's
-`vector<list<T>>::reserve` could be done efficiently by *relocating* each `list<T>` element,
-which avoids performing any operations on `T`.
-
-However, since the calling of `T`'s copy-constructor is an observable side-effect, any proposal
-to optimize `vector<list<T>>::reserve` would have to change the wording for `vector`
-to permit special handling of "nothrow-relocatable but not nothrow-move-constructible"
-types such as MSVC's `list<T>`. This would be a silently breaking API change, and would benefit
-*only* MSVC's `list`, not libc++'s or libstdc++'s `list` (which are already nothrow-move-constructible).
-Furthermore, anyone who uses `vector<list<T>>` today can achieve exactly the same performance speedup
-by replacing all uses of `std::list` with something like
-<small>
-```c++
-    template<class T>
-    struct CustomList : std::list<T> {
-        using std::list<T>::list;
-        CustomList(CustomList&& rhs) noexcept : list(rhs) {}
-    };
-```
-</small>
-
-N4158's ADL-customization-point approach seems to have a very high cost-to-benefit ratio.
+N4158's customization-point approach seems to have a very high cost-to-benefit ratio.
 I am satisfied with P1144's avoiding that approach.
 
 
@@ -905,13 +961,15 @@ of N4158 at Urbana</a> (November 2014).
 
 Significantly different approaches to this problem have previously appeared in Rodrigo Castro Campos's
 [[N2754]], Denis Bider's [[P0023R0]] (introducing a core-language "relocation" operator), and
-Niall Douglas's [[P1029R0]] (treating relocatability as an aspect of move-construction in isolation,
+Niall Douglas's [[P1029R1]] (treating relocatability as an aspect of move-construction in isolation,
 rather than an aspect of the class type as a whole).
 
 Thanks to John McCall for his thought-provoking review comments on the Clang implementation [[D50119]].
 
 Thanks to Marc Glisse for his work integrating a "trivially relocatable" trait into GNU libstdc++
 and for answering my questions on [GCC bug 87106](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87106).
+
+Thanks to Jens Maurer for his feedback on this paper at Kona 2019.
 
 
 Appendix A: Straw polls {#polls}
@@ -1013,10 +1071,23 @@ for something different, such as a built-in destructive-move operation.
 Appendix B: Sample code {#samples}
 =======================
 
-## Reference implementation of `std::uninitialized_relocate` ## {#sample-uninit-relocate}
+## Reference implementation of `relocate_at` and `uninitialized_relocate` ## {#sample-uninit-relocate}
 
 <small>
 ```c++
+template<class T>
+T *relocate_at(T *source, T *dest)
+{
+    if constexpr (std::is_trivially_relocatable_v<T>) {
+        std::memmove(dest, source, sizeof(T));
+        return std::launder(dest);
+    } else {
+        T *result = ::new (dest) (std::move(*source));
+        source->~T();
+        return result;
+    }
+}
+
 template<class ForwardIterator1, class ForwardIterator2>
 ForwardIterator2 uninitialized_relocate(ForwardIterator1 first, ForwardIterator1 last,
                                         ForwardIterator2 result)
@@ -1051,47 +1122,15 @@ ForwardIterator2 uninitialized_relocate(ForwardIterator1 first, ForwardIterator1
 ## Conditionally trivial relocation ## {#sample-conditional}
 
 We expect, but do not require, that `std::optional<T>` should be trivially relocatable
-if and only if `T` itself is trivially relocatable. We propose no dedicated syntax for conditional
-`[[trivially_relocatable]]`.
+if and only if `T` itself is trivially relocatable.
 
 The following abbreviated implementation shows how to achieve an `optional<T>` which
 has the same trivial-move-constructibility as `T`, the same trivial-destructibility
 as `T`, and the same trivial-relocatability as `T`.
 
 The primitives of move-construction and destruction are provided by four specializations
-of `optional_a`; then two specializations of `optional_b` extend `optional_a` and
-either do or do not apply the `[[trivially_relocatable]]` attribute; and finally
-the public `optional` extends the appropriate specialization of `optional_a`.
-
-<small>
-```c++
-template<class T>
-class optional : optional_relocate_base<T>
-{
-    using optional_relocate_base<T>::optional_relocate_base;
-};
-
-template<class T, bool R = is_trivially_relocatable_v<T>>
-class optional_relocate_base : optional_base<T>
-{
-    using optional_base<T>::optional_base;
-};
-
-template<class T>
-class [[trivially_relocatable]] optional_relocate_base<T, true> : optional_base<T>
-{
-    using optional_base<T>::optional_base;
-};
-
-template<class T, bool D = is_trivially_destructible_v<T>, bool M = is_trivially_move_constructible_v<T>>
-class optional_base {
-    // NOT SHOWN
-};
-```
-</small>
-
-If we adopt the syntax proposed by [[#bool-parameter]], then
-we could eliminate the helper class `optional_relocate_base`:
+of `optional_a`; then the public `optional` extends the appropriate specialization of `optional_a`
+and applies a conditional `[[trivially_relocatable]]` attribute.
 
 <small>
 ```c++
@@ -1365,6 +1404,13 @@ been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
     "title": "N2271: EASTL — Electronic Arts Standard Template Library",
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions"
   },
+  "fixed_capacity_vector": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "P1144 case study: Moving a `fixed_capacity_vector`",
+    "href": "https://quuxplusone.github.io/blog/2019/02/22/p1144-fixed-capacity-vector/"
+  },
   "Folly": {
     "authors": [
       "Facebook"
@@ -1444,6 +1490,14 @@ been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
     "href": "http://open-std.org/JTC1/SC22/WG21/docs/papers/2016/p0023r0.pdf",
     "date": "April 2016"
   },
+  "P0593R3": {
+    "authors": [
+      "Richard Smith"
+    ],
+    "title": "P0593R3: Implicit creation of objects for low-level object manipulation",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p0593r3.html",
+    "date": "January 2019"
+  },
   "P0884R0": {
     "authors": [
       "Nicolai Josuttis"
@@ -1452,13 +1506,13 @@ been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf",
     "date": "February 2018"
   },
-  "P1029R0": {
+  "P1029R1": {
     "authors": [
       "Niall Douglas"
     ],
-    "title": "P1029R0: SG14 [[move_relocates]]",
-    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r0.pdf",
-    "date": "May 2018"
+    "title": "P1029R1: SG14 [[move_relocates]]",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1029r1.pdf",
+    "date": "August 2018"
   },
   "P1152R0": {
     "authors": [
@@ -1466,15 +1520,6 @@ been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
     ],
     "title": "P1152R0: Deprecating volatile",
     "href": "http://wg21.link/p1152r0",
-    "date": "July 2018"
-  },
-  "P1153R0": {
-    "authors": [
-      "Arthur O'Dwyer",
-      "JF Bastien"
-    ],
-    "title": "P1153R0: Copying volatile subobjects is not trivial",
-    "href": "http://wg21.link/p1153r0",
     "date": "July 2018"
   },
   "Subobjects": {
