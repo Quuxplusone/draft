@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 3
-!Draft Revision: 22
+!Draft Revision: 23
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   We provide a standard trait to detect types which are trivially relocatable, for the benefit of library writers.
   Finally, we provide a portable way for a user-defined type (e.g. <code>boost::shared_ptr</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2019-02-21
+Date: 2019-03-09
 </pre>
 
 <style>
@@ -391,8 +391,8 @@ the rest of this proposal would remain exactly the same.
 ## Why `[[trivially_relocatable(bool)]]`? ## {#bool-parameter}
 
 It was suggested by numerous reviewers that `[[trivially_relocatable]]` should
-take a (perhaps optional) boolean parameter: `[[trivially_relocatable(true)]]`.
-This would allow us to write complicated conditions directly inline, instead of using
+take a (perhaps optional) boolean parameter, as in `[[trivially_relocatable(true)]]`.
+This allows us to write complicated conditions directly inline, instead of using
 metaprogramming to inherit the right behavior from a conditional base class.
 
 See [[#sample-conditional]] for an example of how this can be used.
@@ -400,20 +400,20 @@ See [[#sample-conditional]] for an example of how this can be used.
 There is no technical obstacle to adding an arbitrary C++ expression as the parameter to
 an attribute. The grammar for balancing `[]` and `()` in attribute parameters has been
 there since C++11. There is already prior art for arbitrary expressions in attributes;
-see for example
-<a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang's
-`[[diagnose_if(bool)]]` attribute</a>.
+see <a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang's
+`[[diagnose_if(bool)]]` attribute</a>. EWG has also previously considered an attribute
+`[[assume_aligned(expr)]]`; it was rejected in favor of [[P1007R3]]'s non-attribute
+approach, but not because of the `(expr)` part specifically.
 
-The major downside I see to this idea is that it could lead to
+The major downside I see to `[[trivially_relocatable(expr)]]` is that it could lead to
 an arbitrarily complicated C++ expression appearing in an awkward position. But this
 is not necessarily worse, and perhaps better, than having to do the metaprogramming
 tricks shown in [[#sample-conditional]].
 
 
-# Proposed wording for C++20 # {#wording}
+# Proposed wording for C++2b # {#wording}
 
-The wording in this section is relative to [[!N4762|WG21 draft N4762]],
-that is, the current draft of the C++17 standard.
+The wording in this section is relative to [[!N4800|WG21 draft N4800]].
 
 
 ## Relocation operation ## {#wording-operation}
@@ -426,7 +426,7 @@ Issue: [definitions] is probably the wrong place for the core-language definitio
 
 : <dfn dfn-type="abstract-op">relocation operation</dfn>
 
-:: the homogeneous binary operation performed on a range by `std::uninitialized_relocate`, consisting of a move-construction immediately followed by a destruction of the source object
+:: the homogeneous binary operation performed by `std::relocate_at`, consisting of a move-construction immediately followed by a destruction of the source object
 
 </blockquote></small>
 
@@ -441,6 +441,7 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
 <xmp>
   template<class T>
   T *relocate_at(T* source, T* dest);
+
   namespace ranges {
     template<Relocatable T>
     T *relocate_at(T* source, T* dest);
@@ -451,11 +452,11 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
 
 *Effects:* Equivalent to:
 <xmp>
-  result = uninitialized_move(dest, dest + 1, source);
+  uninitialized_move(dest, dest + 1, source);
   destroy_at(source);
   return std::launder(dest);
 </xmp>
-except that if the value type of the iterator is trivially relocatable, side effects
+except that if the value type of the iterator is trivially relocatable <i>[basic.types]</i>, side effects
 associated with the relocation of the object's value might not happen.
 </blockquote></small>
 
@@ -1505,6 +1506,15 @@ been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
     "title": "P0884R0: Extending the noexcept Policy, Rev. 0",
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf",
     "date": "February 2018"
+  },
+  "P1007R3": {
+    "authors": [
+      "Timur Doumler",
+      "Chandler Carruth"
+    ],
+    "title": "P1007R3: std::assume_aligned",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1007r3.pdf",
+    "date": "November 2018"
   },
   "P1029R1": {
     "authors": [
