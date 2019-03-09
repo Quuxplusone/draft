@@ -1,8 +1,8 @@
 <pre class='metadata'>
-Title: Container deduction guides should accept not just allocators but things-convertible-to-allocators
+Title: Stop overconstraining allocators in container deduction guides
 Shortname: D1518
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 4
 Audience: LEWG
 Status: D
 Group: WG21
@@ -10,12 +10,13 @@ URL:
 !Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/stack-ctad.bs">github.com/Quuxplusone/draft/blob/gh-pages/stack-ctad.bs</a>
 !Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/stack-ctad.html">rawgit.com/Quuxplusone/draft/gh-pages/stack-ctad.html</a>
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
-Editor: Mike Spertus, mike@spertus.com
+Editor: Mike Spertus, mike_spertus@symantec.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  Discussion of flatmap's deduction guides revealed that the deduction guides for
-  sequence containers and container adaptors are subtly overconstrained. We fix this.
-Date: 2019-02-22
+  Discussion of flatmap’s deduction guides revealed that the deduction guides for sequence
+  containers and container adaptors are needlessly overconstrained, making use cases such as
+  pmr containers unnecessarily difficult. We fix this.
+Date: 2019-03-09
 </pre>
 
 <style>
@@ -24,7 +25,9 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 
-# The problem # {#problem}
+# Stop overconstraining allocators that do not participate in deduction # {#overconst1}
+
+## The problem ## {#problem1}
 
 Consider this code:
 
@@ -33,153 +36,38 @@ std::pmr::monotonic_buffer_resource mr;
 std::pmr::polymorphic_allocator<int> a = &mr;
 std::pmr::vector<int> pv(a);
 
-auto v1 = std::vector<int, std::pmr::polymorphic_allocator<int>>(pv);
-auto v2 = std::vector<int, std::pmr::polymorphic_allocator<int>>(pv, a);
-auto v3 = std::vector<int, std::pmr::polymorphic_allocator<int>>(pv, &mr);
-
 auto s1 = std::stack<int, std::pmr::vector<int>>(pv);
 auto s2 = std::stack<int, std::pmr::vector<int>>(pv, a);
 auto s3 = std::stack<int, std::pmr::vector<int>>(pv, &mr);
-
-auto dv1 = std::vector(pv);
-auto dv2 = std::vector(pv, a);
-auto dv3 = std::vector(pv, &mr);
 
 auto ds1 = std::stack(pv);
 auto ds2 = std::stack(pv, a);
 auto ds3 = std::stack(pv, &mr);
 ```
 
-The initializers of `v1`, `v2`, `v3`, `s1`, `s2`, and `s3` (which do not use CTAD) are all well-formed.
+The initializers of `s1`, `s2`, and `s3` (which do not use CTAD) are all well-formed,
+as are the initializers of `ds1` and `ds2` (which do).
 
-The initializer of `dv1` is well-formed and deduces `std::pmr::vector<int>` just like `v1`.
-
-The initializer of `dv2` is well-formed and deduces `std::pmr::vector<int>` just like `v2`.
-
-The initializer of `ds1` is well-formed and deduces `std::stack<int, std::pmr::vector<int>>` just like `s1`.
-
-The initializer of `ds2` is well-formed and deduces `std::stack<int, std::pmr::vector<int>>` just like `s2`.
-
-But the initializers of `dv3` and `ds3` are ill-formed!
-
-In both cases, we know from the `pv` argument that the correct type for the vector is
-`decltype(pv)`, i.e. `std::pmr::vector<int>`. Therefore we know what is the possible range
-of types for the allocator parameter. The allocator parameter's type does not *contribute*
-to class template argument deduction in these cases; it brings no new information, and therefore
-should be treated no differently than it is in the non-CTAD case.
-
-The non-CTAD version `std::vector<...>(pv, &mr)` works; therefore it is surprising when the CTAD
-version `std::vector(pv, &mr)` fails.
-
-The problem we see with `vector` also occurs for all other sequence containers, associative containers,
-and unordered associative containers. However, there is implementation divergence in the details.
-The following table summarizes what we see in [this Godbolt](https://godbolt.org/z/1QepHG):
-
-<small>
-<table class="def">
-<tr><th>Construct</th><th>Well-formed</th><th>SFINAE-friendly<br> ill-formed</th><th>Hard error</th></tr>
-
-<tr><td>std::deque(pd, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
-<tr><td>std::forward_list(pfl, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
-<tr><td>std::list(pl, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
-<tr><td>std::map(pm, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
-<tr><td>std::multimap(pmm, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
-<tr><td>std::multiset(pms, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
-<tr><td>std::set(ps, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
-<tr><td>std::unordered_map(pum, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
-<tr><td>std::unordered_multimap(pumm, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
-<tr><td>std::unordered_multiset(pums, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
-<tr><td>std::unordered_set(pus, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
-<tr><td>std::vector(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
-<tr></tr>
-<tr><td>std::priority_queue(ppq, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
-<tr><td>std::queue(pq, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
-<tr><td>std::stack(ps, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
-<tr></tr>
-<tr><td>std::priority_queue(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
-<tr><td>std::queue(pd, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
-<tr><td>std::stack(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
-</table>
-</small>
+However, the natural and useful `ds3` is ill-formed, even though the `&mr` argument is irrelevant to determining the
+template arguments for `stack`! It seems clearly wrong that we give all the right information to unambiguously deduce
+the desired specialization of stack and then reject what would be a perfectly valid constructor invocation for that
+class. The allocator parameter’s type does not *contribute* to class template argument deduction in these cases;
+it brings no new information, and therefore should be treated no differently than it is in the non-CTAD case.
+Indeed, we believe this is an oversight and should simply be fixed.
 
 
-# The explanation # {#explanation}
-
-## How deduction fails for `vector` ## {#explanation-vector}
-
-`vector` has only one deduction guide, and it's not relevant to what happens here. Here, we end up
-looking at the implicit guide generated from the constructor
-
-```c++
-    template<class T, class Allocator>
-    class vector {
-        vector(const vector<T, Allocator>&, const Allocator&);
-    };
-```
-
-From the first parameter, we deduce `T=int` and `Allocator=std::pmr::polymorphic_allocator<int>`.
-From the second parameter, we deduce `Allocator=std::monotonic_buffer_resource*`.
-We've deduced conflicting types for `Allocator`, so deduction fails.
-
-
-## How deduction succeeds for `unordered_set` ## {#explanation-unordered-set}
-
-It should work the same as for `vector`.
-We should end up looking at the implicit guide generated from the constructor
-
-```c++
-    template<class Key, class Hash, class Pred, class Allocator>
-    class unordered_set {
-        unordered_set(const unordered_set<Key, Hash, Pred, Allocator>&, const Allocator&);
-    };
-```
-
-From the first parameter, we deduce `Key=int`, `Hash=std::hash<int>`, `Pred=std::equal_to<int>`,
-and `Allocator=std::pmr::polymorphic_allocator<int>`.
-From the second parameter, we should deduce `Allocator=std::monotonic_buffer_resource*`.
-We've deduced conflicting types for `Allocator`, so deduction fails.
-
-However, in practice, both MSVC and libstdc++ launder the `Allocator` type through a typedef
-that is opaque to deduction, so
-that the constructor seen by the compiler in practice is equivalent to
-
-```c++
-    template<class Key, class Hash, class Pred, class Allocator>
-    class unordered_set {
-        using allocator_type = typename type_identity<Allocator>::type;
-        unordered_set(const unordered_set<Key, Hash, Pred, Allocator>&, const allocator_type&);
-    };
-```
-
-From the first parameter, we deduce `Key=int`, `Hash=std::hash<int>`, `Pred=std::equal_to<int>`,
-and `Allocator=std::pmr::polymorphic_allocator<int>`.
-From the second parameter, we don't deduce anything.
-In practice, therefore, deduction succeeds.
-
-
-## How deduction fails for `stack` ## {#explanation-stack}
+## The explanation ## {#explanation1}
 
 `stack` has one relevant deduction guide.
 
 ```c++
-    template<class T, class Container>
-    class stack {
-        template<class Alloc> stack(const Container&, const Alloc&);
-    };
-
     template<class Container, class Allocator>
     stack(Container, Allocator) -> stack<typename Container::value_type, Container>;
 ```
 
-However, both the constructor and the deduction guide are constrained.
+This deduction guide satisfies the following constraints.
 
-[[stack.cons.alloc](http://eel.is/c++draft/stack.cons.alloc)] says:
-<small><blockquote>
-If `uses_allocator_v<container_type, Alloc>` is `false`
-the constructors in this subclause shall not participate in overload resolution.
-</blockquote></small>
-
-[[container.adaptors.general](http://eel.is/c++draft/container.adaptors.general)] says:
+[container.adaptors.general] says:
 <small><blockquote>
 A deduction guide for a container adaptor shall not participate in overload resolution if
 any of the following are true: ...
@@ -193,28 +81,17 @@ any of the following are true: ...
 </blockquote></small>
 
 To qualify as an allocator, a type `A` must have a nested typedef `A::value_type`
-<small>([[container.requirements.general](http://eel.is/c++draft/container.requirements.general#17)]/17)</small>.
+<small>([container.requirements.general]/17)</small>.
 Since `std::pmr::monotonic_buffer_resource*` has no such nested typedef,
 `std::pmr::monotonic_buffer_resource*` doesn't qualify as an allocator.
 However, `uses_allocator_v<std::pmr::vector<int>, std::pmr::monotonic_buffer_resource*>` is `true`.
 
 Because the type of `&mr` doesn't qualify as an allocator, the deduction guide drops out
-of overload resolution. The implicit guide generated from the constructor template, however,
-remains. From the first parameter we deduce `Container=std::pmr::vector<int>`. From the
-second parameter, we deduce `Alloc=std::pmr::monotonic_buffer_resource*`. So far so good.
-But CTAD's job is not done! We have successfully deduced the `Container` type in
-`template<class T, class Container> class stack`; but we have not deduced anything about
-the type parameter `T`. Therefore deduction fails.
+of overload resolution, failing deduction even though it has all the information
+needed to safely deduce the correct template arguments for `stack`.
 
 
-# The solution # {#solution}
-
-Note: Most of the wording being touched here was added by [[P0433R3]], on which Mike Spertus
-was the primary author. If we'd thought of these cases at the time, this is how we would have
-done these deduction guides from the beginning.
-
-
-## How to fix the container adaptors ## {#solution-stack}
+## The solution ## {#solution1}
 
 To fix all three container adaptors, modify
 [[container.adaptors.general](http://eel.is/c++draft/container.adaptors.general)] as follows:
@@ -246,11 +123,67 @@ Note: No container adaptor deduction guide has an `Allocator` template parameter
 a `Container` template parameter.
 
 
-## How to fix the containers (option 1) ## {#solution-vector-option1}
+# Stop deducing from allocators that should not participate in deduction # {#overconst2}
 
-A non-invasive, but subtle, way to fix the containers would be to carefully rewrite each
-uses-allocator constructor to use a typedef that was opaque to deduction.
-For example, modify [[deque.overview](http://eel.is/c++draft/deque.overview)] as follows:
+## The problem ## {#problem2}
+
+Consider the following code:
+```c++
+std::pmr::monotonic_buffer_resource mr;
+std::pmr::polymorphic_allocator<int> a = &mr;
+std::pmr::vector<int> pv(a);
+
+auto v1 = std::vector<int, std::pmr::polymorphic_allocator<int>>(pv);
+auto v2 = std::vector<int, std::pmr::polymorphic_allocator<int>>(pv, a);
+auto v3 = std::vector<int, std::pmr::polymorphic_allocator<int>>(pv, &mr);
+
+auto dv1 = std::vector(pv);
+auto dv2 = std::vector(pv, a);
+auto dv3 = std::vector(pv, &mr);
+
+```
+The initializers of `v1`, `v2`, and `v3` (which do not use CTAD) are all well-formed,
+as are the initializers of `dv1` and `dv2` (which do).
+
+But the initializer of `dv3` is ill-formed!
+
+Again, we know from the `pv` argument that the correct type for the vector is `decltype(pv)`, i.e. `std::pmr::vector<int>`. Therefore we
+know what is the possible range of types for the allocator parameter. The allocator parameter’s type does not *contribute*
+to class template argument deduction in these cases; it brings no new information, and therefore should be treated no differently
+than it is in the non-CTAD case.
+
+The problem we see with `vector` also occurs for all other sequence containers, associative containers, and unordered associative containers.
+
+
+## The explanation ## {#explanation2}
+
+`vector` has only one deduction guide, and it's not relevant to what happens here. Here, we end up
+looking at the implicit guide generated from the constructor
+
+```c++
+    template<class T, class Allocator>
+    class vector {
+        vector(const vector<T, Allocator>&, const Allocator&);
+    };
+```
+
+From the first parameter, we deduce `T=int` and `Allocator=std::pmr::polymorphic_allocator<int>`.
+From the second parameter, we deduce `Allocator=std::monotonic_buffer_resource*`.
+We've deduced conflicting types for `Allocator`, so deduction fails.
+
+In this case, the second argument unnecessarily participates in deduction, and again unexpectedly
+prevents natural and useful code from working as desired.
+
+
+## The solution ## {#solution2}
+
+We present two approaches for changing the wording that are equivalent in effect.
+
+### Wording option 1 ### {#option1}
+
+If we were introducing the containers from scratch today, the natural approach would be for the
+constructors to indicate which arguments should be considered deducible, as is usual for function templates.
+For example, modify [ [deque.overview](http://eel.is/c++draft/deque.overview)] as follows:
 
 <small><blockquote>
 <pre>
@@ -259,12 +192,18 @@ For example, modify [[deque.overview](http://eel.is/c++draft/deque.overview)] as
     <ins>deque(const deque&, const type_identity_t&lt;Allocator>&);</ins>
     <del>deque(deque&&, const Allocator&);</del>
     <ins>deque(deque&&, const type_identity_t&lt;Allocator>&);</ins>
-    deque(initializer_list<T>, const Allocator& = Allocator());
+    deque(initializer_list&lt;T>, const Allocator& = Allocator());
 </pre>
 </blockquote></small>
 
+(Notice that the constructor `deque(initializer_list&lt;T>, const Allocator&)` is not
+changed, because its `Allocator` parameter actually does contribute to deduction: without
+that parameter's type, we would not know what the `deque`'s allocator type should be.)
 
-## How to fix the containers (option 2) ## {#solution-vector-option2}
+If this is not deemed to cause compatibility issues, we like this approach.
+
+
+### Wording option 2 ### {#option2}
 
 First modify
 [ [sequence.reqmts](http://eel.is/c++draft/sequence.reqmts#13)]/13 as follows:
@@ -278,10 +217,10 @@ or if it has an `Alloc` template parameter and `uses_allocator_v<X, Alloc>` is `
 where `X` is the deduced type of the sequence container</ins>.
 </blockquote></small>
 
-(I think that change is not strictly necessary, but it clarifies our intent.)
+(We think that change is not strictly necessary, but it clarifies our intent.)
 
 Add one new deduction guide for each sequence container. For example, modify
-[[deque.overview](http://eel.is/c++draft/deque.overview)] as follows:
+[ [deque.overview](http://eel.is/c++draft/deque.overview)] as follows:
 
 <small><blockquote>
 <pre>
@@ -295,8 +234,7 @@ Add one new deduction guide for each sequence container. For example, modify
 </pre>
 </blockquote></small>
 
-Then, modify
-[ [associative.reqmts](http://eel.is/c++draft/associative.reqmts#15)]/15 as follows:
+Then, modify [ [associative.reqmts](http://eel.is/c++draft/associative.reqmts#15)]/15 as follows:
 
 <small><blockquote>
 A deduction guide for an associative container shall not participate in overload resolution
@@ -316,10 +254,10 @@ if any of the following are true:
 
 </blockquote></small>
 
-(I think that change is not strictly necessary, but it clarifies our intent.)
+(We think that change is not strictly necessary, but it clarifies our intent.)
 
 Add one new deduction guide for each associative container. For example, modify
-[[set.overview](http://eel.is/c++draft/set.overview)] as follows:
+[ [set.overview](http://eel.is/c++draft/set.overview)] as follows:
 
 <small><blockquote>
 <pre>
@@ -370,10 +308,10 @@ if any of the following are true:
 
 </blockquote></small>
 
-(I think that change is not strictly necessary, but it clarifies our intent.)
+(We think that change is not strictly necessary, but it clarifies our intent.)
 
 Add one new deduction guide for each unordered associative container. For example, modify
-[[unord.set.overview](http://eel.is/c++draft/unord.set.overview)] as follows:
+[ [unord.set.overview](http://eel.is/c++draft/unord.set.overview)] as follows:
 
 <small><blockquote>
 <pre>
@@ -420,7 +358,76 @@ Add one new deduction guide for each unordered associative container. For exampl
 </pre>
 </blockquote></small>
 
+## Implementation note ## {#implementation}
+While implementers may of course implement this proposal exactly as described in the wording options above,
+we wish to point out that a number of library implementations already behave in many cases as we are
+proposing here as shown in the following table and [this Godbolt](https://godbolt.org/z/1QepHG):
 
+<small>
+<table class="def">
+<tr><th>Construct</th><th>Well-formed</th><th>SFINAE-friendly<br> ill-formed</th><th>Hard error</th></tr>
+
+<tr><td>std::deque(pd, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
+<tr><td>std::forward_list(pfl, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
+<tr><td>std::list(pl, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
+<tr><td>std::vector(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
+<tr><td>std::map(pm, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
+<tr><td>std::multimap(pmm, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
+<tr><td>std::multiset(pms, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
+<tr><td>std::set(ps, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
+<tr><td>std::unordered_map(pum, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
+<tr><td>std::unordered_multimap(pumm, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
+<tr><td>std::unordered_multiset(pums, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
+<tr><td>std::unordered_set(pus, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
+<tr></tr>
+<tr><td>std::priority_queue(ppq, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
+<tr><td>std::queue(pq, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
+<tr><td>std::stack(ps, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
+<tr></tr>
+<tr><td>std::priority_queue(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
+<tr><td>std::queue(pd, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
+<tr><td>std::stack(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
+</table>
+</small>
+
+The following analysis explains why MSVC, in effect, already implements
+the approach described in [wording option 1](#option1) above.
+Consider the implicit guide generated from the constructor
+
+```c++
+    template<class Key, class Hash, class Pred, class Allocator>
+    class unordered_set {
+        unordered_set(const unordered_set<Key, Hash, Pred, Allocator>&,
+                      const Allocator&);
+    };
+```
+
+From the first parameter, we deduce `Key=int`, `Hash=std::hash<int>`, `Pred=std::equal_to<int>`,
+and `Allocator=std::pmr::polymorphic_allocator<int>`.
+From the second parameter, we should deduce `Allocator=std::monotonic_buffer_resource*`.
+We've deduced conflicting types for `Allocator`, so deduction fails.
+
+However, in practice, both MSVC and libstdc++ launder the `Allocator` type through a typedef
+that is opaque to deduction, so
+that the constructor seen by the compiler in practice is equivalent to
+
+```c++
+    template<class Key, class Hash, class Pred, class Allocator>
+    class unordered_set {
+        using allocator_type = typename type_identity<Allocator>::type;
+        unordered_set(const unordered_set<Key, Hash, Pred, Allocator>&,
+                      const allocator_type&);
+    };
+```
+
+From the first parameter, we deduce `Key=int`, `Hash=std::hash<int>`, `Pred=std::equal_to<int>`,
+and `Allocator=std::pmr::polymorphic_allocator<int>`.
+From the second parameter, we don't deduce anything.
+In practice, therefore, deduction succeeds.
+
+Implementers who have taken the above approach can use that to simplify their
+implementation of this proposal, as an alternative to directly implementing the above wording
+(which is of course also perfectly fine).
 
 <pre class=biblio>
 {
