@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 3
-!Draft Revision: 23
+!Draft Revision: 24
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   We provide a standard trait to detect types which are trivially relocatable, for the benefit of library writers.
   Finally, we provide a portable way for a user-defined type (e.g. <code>boost::shared_ptr</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2019-03-09
+Date: 2019-03-10
 </pre>
 
 <style>
@@ -130,7 +130,7 @@ which can be implemented naïvely as an element-by-element *move*
 or can be implemented efficiently as an element-by-element *relocate*
 (leaving the source vector empty).
 
-For a detailed analysis of this case, see [[fixed_capacity_vector]].
+For a detailed analysis of this case, see [[FixedCapacityVector]].
 
 Note:
 `boost::container::static_vector<R,N>` currently implements the
@@ -769,15 +769,15 @@ levels of "overruling":
 - The first level, `[[clang::maybe_trivially_relocatable]]`, means "I warrant that even though
     I may have user-provided, non-defaulted, special member functions, I have designed them
     so that my relocation operation will not do anything substantially different from memberwise
-    relocation." So if all of my member + base subobjects are trivially relocatable (and not mutable
+    relocation." So if all of my member and base subobjects are trivially relocatable (and not mutable
     and not volatile), then I myself will be trivially relocatable.
 
 - The second level, `[[clang::trivially_relocatable]]`, means "I warrant that even though
     I may have user-provided, non-defaulted, special member functions, and even though
     I may have non-trivially relocatable (or mutable or volatile) subobjects,
     I have designed them so that my relocation operation will not do anything substantially
-    different from `memcpy`." So I myself will be trivially relocatable _no matter what my
-    subobjects claim about themselves._
+    different from `memcpy`." So I myself will be trivially relocatable *no matter what my
+    subobjects claim about themselves.*
 
 Using `[[clang::trivially_relocatable]]`, I can write a
 class that "overrules" a decision made by one of its members.
@@ -1405,7 +1405,7 @@ been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
     "title": "N2271: EASTL — Electronic Arts Standard Template Library",
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions"
   },
-  "fixed_capacity_vector": {
+  "FixedCapacityVector": {
     "authors": [
       "Arthur O'Dwyer"
     ],
@@ -1473,15 +1473,6 @@ been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
     "title": "N4158: Destructive Move (rev 1)",
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4158.pdf",
     "date": "October 2014"
-  },
-  "N4762": {
-    "authors": [
-      "ISO/IEC JTC1/SC22/WG21 - The C++ Standards Committee",
-      "Richard Smith"
-    ],
-    "title": "N4762: Working Draft, Standard for Programming Language C++",
-    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/n4762.pdf",
-    "date": "July 2018"
   },
   "P0023R0": {
     "authors": [
