@@ -1479,7 +1479,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R3<br>Object relocation in terms of move plus destroy</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2019-03-09">2019-03-09</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2019-03-10">2019-03-10</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -1492,7 +1492,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>23
+     <dd>24
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs</a>
      <dt>Current:
@@ -1674,7 +1674,7 @@ code now fits in icache).</p>
 we can optimize the move-constructor of <code class="highlight"><c- n>fixed_capacity_vector</c-><c- o>&lt;</c-><c- n>R</c-><c- p>,</c-><c- n>N</c-><c- o>></c-></code>,
 which can be implemented naïvely as an element-by-element <em>move</em> (leaving the source vector’s elements in their moved-from state),
 or can be implemented efficiently as an element-by-element <em>relocate</em> (leaving the source vector empty).</p>
-   <p>For a detailed analysis of this case, see <a data-link-type="biblio" href="#biblio-fixed_capacity_vector">[fixed_capacity_vector]</a>.</p>
+   <p>For a detailed analysis of this case, see <a data-link-type="biblio" href="#biblio-fixedcapacityvector">[FixedCapacityVector]</a>.</p>
    <p class="note" role="note"><span>Note:</span> <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>container</c-><c- o>::</c-><c- n>static_vector</c-><c- o>&lt;</c-><c- n>R</c-><c- p>,</c-><c- n>N</c-><c- o>></c-></code> currently implements the
 naïve element-by-element-move strategy.</p>
    <h4 class="heading settled" data-level="2.1.5" id="benefit-assertions"><span class="secno">2.1.5. </span><span class="content">Assertions, not assumptions</span><a class="self-link" href="#benefit-assertions"></a></h4>
@@ -2095,15 +2095,15 @@ levels of "overruling":</p>
      <p>The first level, <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>, means "I warrant that even though
 I may have user-provided, non-defaulted, special member functions, I have designed them
 so that my relocation operation will not do anything substantially different from memberwise
-relocation." So if all of my member + base subobjects are trivially relocatable (and not mutable
+relocation." So if all of my member and base subobjects are trivially relocatable (and not mutable
 and not volatile), then I myself will be trivially relocatable.</p>
     <li data-md>
      <p>The second level, <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code>, means "I warrant that even though
 I may have user-provided, non-defaulted, special member functions, and even though
 I may have non-trivially relocatable (or mutable or volatile) subobjects,
 I have designed them so that my relocation operation will not do anything substantially
-different from <code class="highlight"><c- n>memcpy</c-></code>." So I myself will be trivially relocatable _no matter what my
-subobjects claim about themselves._</p>
+different from <code class="highlight"><c- n>memcpy</c-></code>." So I myself will be trivially relocatable <em>no matter what my
+subobjects claim about themselves.</em></p>
    </ul>
    <p>Using <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code>, I can write a
 class that "overrules" a decision made by one of its members.
@@ -2791,7 +2791,7 @@ been specialized is <code class="highlight"><c- n>deque</c-></code>; see <a data
    <dd>Marc Glisse. <a href="https://github.com/gcc-mirror/gcc/commit/a9b9381580de611126c9888c1a6c12a77d9b682e">Improve relocation ... (__is_trivially_relocatable): Specialize for deque</a>. November 2018. URL: <a href="https://github.com/gcc-mirror/gcc/commit/a9b9381580de611126c9888c1a6c12a77d9b682e">https://github.com/gcc-mirror/gcc/commit/a9b9381580de611126c9888c1a6c12a77d9b682e</a>
    <dt id="biblio-eastl">[EASTL]
    <dd>Paul Pedriana. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions">N2271: EASTL — Electronic Arts Standard Template Library</a>. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions</a>
-   <dt id="biblio-fixed_capacity_vector">[FIXED_CAPACITY_VECTOR]
+   <dt id="biblio-fixedcapacityvector">[FixedCapacityVector]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2019/02/22/p1144-fixed-capacity-vector/">P1144 case study: Moving a `fixed_capacity_vector`</a>. URL: <a href="https://quuxplusone.github.io/blog/2019/02/22/p1144-fixed-capacity-vector/">https://quuxplusone.github.io/blog/2019/02/22/p1144-fixed-capacity-vector/</a>
    <dt id="biblio-folly">[Folly]
    <dd>Facebook. <a href="https://github.com/facebook/folly/blob/master/folly/docs/FBVector.md#object-relocation">Folly documentation on "Object Relocation"</a>. URL: <a href="https://github.com/facebook/folly/blob/master/folly/docs/FBVector.md#object-relocation">https://github.com/facebook/folly/blob/master/folly/docs/FBVector.md#object-relocation</a>
