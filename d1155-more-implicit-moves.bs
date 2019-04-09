@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: More implicit moves
 Shortname: D1155
-Revision: 2
-!Draft Revision: 11
+Revision: 3
+!Draft Revision: 12
 Audience: EWG
 Status: D
 Group: WG21
@@ -19,12 +19,7 @@ Abstract:
   Based on our experience using Clang to diagnose unexpected copies in Chromium, Mozilla,
   and LibreOffice, we propose to change the standard so that these copies will be replaced with
   <i>implicit moves</i>.
-
-  In a separate section, we tentatively propose a new special case to permit efficient codegen
-  for <code>return x += y</code>.
-
-  This paper was presented as [[RVOHarder]] at CppCon 2018.
-Date: 2019-01-19
+Date: 2019-03-27
 </pre>
 
 <style>
@@ -34,6 +29,8 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R3: Eliminate discussion and move to CWG wording review.
 
 - R2: Added discussion of `return ++x`.
 
@@ -70,7 +67,7 @@ std::shared_ptr<Base> four() {
 }
 ```
 
-The wording for this optimization was amended by [[CWG1579]]. The current wording in
+The wording for this optimization was amended by [[CWG1579]]. N4762's wording in
 <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> says:
 
 > In the following copy-initialization contexts, a move operation might be used instead of a copy operation:
@@ -88,6 +85,10 @@ The wording for this optimization was amended by [[CWG1579]]. The current wordin
 > of the first parameter of the selected <hilite>constructor</hilite> is not an <hilite>rvalue
 > reference</hilite> to <hilite>the object's</hilite> type
 > (possibly cv-qualified), overload resolution is performed again, considering the object as an lvalue.
+
+Note: Post-Kona draft N4810 extends this wording to cover `co_return` statements too. I don't
+understand coroutines very well, but I don't know of any reason why P1155's changes should not apply to
+`co_return` just as well as to `return` and `throw`. The proposed wording below reflects my beliefs.
 
 The highlighted phrases above indicate places where the wording diverges from a naïve programmer's intuition.
 Consider the following <a href="https://godbolt.org/g/9n8cwh">examples</a>...
@@ -190,14 +191,14 @@ of Clang and MSVC. Some compilers (GCC 8.1+, ICC 18.0.0+) already do this implic
 We propose to remove all four of these unnecessary limitations.
 
 
-# Proposed wording relative to N4762 # {#wording}
+# Proposed wording relative to N4810 # {#wording}
 
 Modify
 <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:
 
 > In the following copy-initialization contexts, a move operation might be used instead of a copy operation:
 >
->   - If the *expression* in a `return` statement is a (possibly parenthesized) *id-expression* that
+>   - If the *expression* in a `return` or `co_return` statement is a (possibly parenthesized) *id-expression* that
 >     names an object with automatic storage duration declared in the body or *parameter-declaration-clause*
 >     of the innermost enclosing function or *lambda-expression*, or
 >
@@ -205,258 +206,13 @@ Modify
 >     (other than a <del>function or</del> catch-clause parameter) whose scope does not extend beyond
 >     the end of the innermost enclosing *try-block* (if there is one),
 >
-> overload resolution to select the constructor for the copy is first performed as if the object were
+> overload resolution to select the constructor for the copy or the `return_value` overload to call is first performed as if the object were
 > designated by an rvalue. If the first overload resolution fails or was not performed, <del>or if the type
-> of the first parameter of the selected constructor is not an rvalue reference to the object's type
+> of the first parameter of the selected constructor or the `return_value` overload is not an rvalue reference to the object's type
 > (possibly cv-qualified),</del> overload resolution is performed again, considering the object as an lvalue.
 > [*Note:* This two-stage overload resolution must be performed regardless of whether copy elision will occur.
-> It determines the constructor to be called if elision is not performed, and the selected constructor
-> must be accessible even if the call is elided. —*end note*]
-
-Note: I believe that the two instances of the word "constructor" in the quoted note remain correct. They
-refer to the constructor selected to initialize the result object, as the very last step of the conversion
-sequence. This proposed change merely permits the conversion sequence to be longer than a single step; for
-example, it might involve a derived-to-base conversion followed by a move-constructor, or a user-defined
-conversion operator followed by a move-constructor. In either case, as far as the quoted note is concerned,
-that ultimate move-constructor is the "constructor to be called," and indeed it must be accessible
-even if elision is performed.
-
-
-# Proposed wording relative to P0527r1 # {#wording-alt}
-
-David Stone's [[P0527]] "Implicitly move from rvalue references in return statements" proposes to
-alter the current rules "references are never implicitly moved-from" and "catch-clause parameters
-are never implicitly moved-from." It accomplishes this by significantly refactoring clause
-<a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a>.
-
-In the case that [[P0527]]'s changes are adopted into C++2a, we propose to modify the new
-<a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:
-
-> A *movable entity* is a non-volatile object or an rvalue reference to a non-volatile type,
-> in either case with automatic storage duration. <del>The underlying type of a movable entity is
-> the type of the object or the referenced type, respectively.</del> In the following
-> copy-initialization contexts, a move operation might be used instead of a copy operation:
->
->   - If the *expression* in a `return` statement is a (possibly parenthesized) *id-expression* that
->     names a movable entity declared in the body or *parameter-declaration-clause*
->     of the innermost enclosing function or *lambda-expression*, or
->
->   - if the operand of a *throw-expression* is a (possibly parenthesized) *id-expression* that
->     names a movable entity whose scope does not extend beyond
->     the end of the innermost enclosing *try-block* (if there is one),
->
-> overload resolution to select the constructor for the copy is first performed as if the entity were
-> designated by an rvalue. If the first overload resolution fails or was not performed, <del>or if the type
-> of the first parameter of the selected constructor is not an rvalue reference to the (possibly cv-qualified)
-> underlying type of the movable entity,</del> overload resolution is performed again, considering the entity as an lvalue.
-> [*Note:* This two-stage overload resolution must be performed regardless of whether copy elision will occur.
-> It determines the constructor to be called if elision is not performed, and the selected constructor
-> must be accessible even if the call is elided. —*end note*]
-
-
-# Implementation experience # {#implementation}
-
-This feature has effectively already been implemented in Clang since February 2018; see [[D43322]].
-Under the diagnostic option `-Wreturn-std-move` (which is enabled as part of `-Wmove`, `-Wmost`, and `-Wall`),
-the compiler performs overload resolution according to *both* rules — the standard rule and also
-a rule similar to the one proposed in this proposal. If the two resolutions produce different results,
-then Clang emits a warning diagnostic explaining that the return value will not be implicitly moved and
-suggesting that the programmer add an explicit `std::move`.
-
-However, Clang does not diagnose the examples from [[#sinks|§1.3 By-value sinks]].
-
-
-## Plenitude of true positives ## {#true-positives}
-
-These warning diagnostics have proven helpful on real code.
-Many instances have been reported of code that is currently accidentally pessimized,
-and which would become optimized (with no loss of correctness) if this proposal were adopted:
-
-  - [[SG14]]: a clever trick to reduce code duplication by using conversion operators,
-    rather than converting constructors, turned out to cause unnecessary copying in a common use-case.
-
-  - [[Chromium]]: a non-standard container library used `iterator::operator const_iterator() &&`
-    instead of `const_iterator::const_iterator(iterator&&)`.
-    (The actual committed diff is <a href="https://chromium-review.googlesource.com/c/chromium/src/+/1025435">here</a>.)
-
-  - [[LibreOffice]]: "An explicit std::move would be needed in the return statements, as there's a
-    conversion from `VclPtrInstance` to base class `VclPtr` involved."
-
-However, we must note that about half of the true positives from the diagnostic are on code
-like the following example, which is not affected by this proposal:
-
-```c++
-std::string fourteen(std::string&& s) {
-    s += "foo";
-    return s;  // no copy elision, and no implicit move (the object is copied)
-}
-```
-
-See [[Khronos]], [[Folly]], and three of the four diffs in [[Chromium]].
-[[AWS]] is a particularly egregious variation. (The committed diff is
-<a href="https://github.com/aws/aws-sdk-cpp/commit/ded84836cd7bf15aa2375a6c1f7143f34d985df1#diff-2ce19b694bb11d0ff1676f740d32f98dL136">here</a>.)
-
-```c++
-std::string fifteen() {
-    std::string&& s = "hello world";
-    return s;  // no copy elision, and no implicit move (the object is copied)
-}
-```
-
-Some number of programmers certainly expect a move here, and in fact [[P0527]] proposes
-to implicitly move in both of these cases. This paper does not conflict with [[P0527]],
-and we provide [an alternative wording](#wording-alt) for the case that [[P0527]] is adopted.
-
-
-## Lack of false positives ## {#false-positives}
-
-In eleven months we have received a single "false positive" report ([[Mozilla]]), which complained that the move-constructor suggested
-by Clang was *not significantly more efficient* than the actually selected copy-constructor. The programmer preferred not
-to add the suggested `std::move` because the code ugliness was not worth the minor performance gain.
-This proposal would give Mozilla that minor performance gain without the ugliness — the best of both worlds!
-
-We have never received any report that Clang's suggested move would have been incorrect.
-
-
-# Further proposal to handle assignment operators specially # {#further}
-
-Besides the cases of `return x` handled by this proposal, and the cases of `return x` handled by
-David Stone's [[P0527]], there is one more extremely frequent case where a copy is done instead
-of an implicit move or copy-elision.
-
-```c++
-std::string sixteen(std::string lhs, const std::string& rhs) {
-    return lhs += rhs;  // no copy elision, and no implicit move (the object is copied)
-}
-
-std::string seventeen(const std::string& lhs, const std::string& rhs) {
-    std::string result = lhs;
-    return result += rhs;  // no copy elision, and no implicit move (the object is copied)
-}
-```
-
-For a real-world example of this kind of code, see GNU libstdc++'s [[PR85671]], where even
-a standard library implementor fell into the trap of writing
-
-```c++
-path operator/(const path& lhs, const path& rhs) {
-    path result(lhs);
-    return result /= rhs;  // no copy elision, and no implicit move (the object is copied)
-}
-```
-
-We propose that — in order to make simple code like the above produce optimal codegen —
-it would be reasonable to create a new special case permitting a (possibly parenthesized)
-assignment operation to count as "return by name." This would require major surgery on
-<a href="http://eel.is/c++draft/class.copy.elision">[class.copy.elision]</a>.
-Possibly the best approach would be to introduce a new term, such as "copy-elision candidate,"
-something like this:
-
-> When certain criteria are met, an implementation is allowed to omit the copy/move
-> construction of a class object, even if the constructor selected for the copy/move
-> operation and/or the destructor for the object have side effects. <ins>Each such case
-> involves an expression, called the <i>candidate expression</i>, and a source object,
-> called the <i>copy elision candidate</i>.</ins>
->
-> - <ins>In a `return` statement with an <i>expression</i>, the candidate expression is the <i>expression</i>.</ins>
->
-> - <ins>In a <i>throw-expression</i>, the candidate expression is the operand of `throw`.</ins>
->
-> <ins>The copy elision candidate is computed from the candidate expression as follows:</ins>
->
-> - <ins>If the candidate expression is the (possibly parenthesized) name of a non-volatile
->     automatic object, then the copy elision candidate is that object.</ins>
->
-> - <ins>If the candidate expression is an <i>assignment-expression</i>, and the
->     <i>logical-or-expression</i> on the left-hand side of the <i>assignment-operator</i> is
->     the (possibly parenthesized) name of a non-volatile automatic object,
->     and the type of the <i>assignment-expression</i> is a non-cv-qualified lvalue reference
->     to the type of the automatic object, then the copy elision candidate is the
->     automatic object.<br>
->     [<i>Note:</i> This happens regardless of the actual behavior of the assignment operator
->     selected by overload resolution. The implementation essentially assumes that the
->     return value of any (possibly compound) assignment operator is a reference to
->     its left-hand operand. <i>—end note</i>]</ins>
->
-> - <ins>If the candidate expression is a <i>unary-expression</i> involving the operator `++`
->     or `--`, and the operand <i>cast-expression</i> is
->     the (possibly parenthesized) name of a non-volatile automatic object,
->     and the type of the <i>unary-expression</i> is a non-cv-qualified lvalue reference
->     to the type of the automatic object, then the copy elision candidate is the
->     automatic object.</ins>
->
-> The elision of copy/move operations,
-> called copy elision, is permitted in the following circumstances
-> (which may be combined to eliminate multiple copies):
->
-> - in a `return` statement in a function with a class return type, when <del>the <i>expression</i>
->     is the name of</del> <ins>the copy elision candidate is</ins> a non-volatile automatic
->     object (other than a function parameter or a variable introduced by the
->     exception-declaration of a handler (13.3)) with
->     the same type (ignoring cv-qualification) as the function return type,
->     the copy/move operation can be omitted by constructing <del>the automatic object</del> <ins>the copy elision candidate object</ins>
->     directly into the function call’s return object
->
-> - in a <i>throw-expression</i>, when the <del>operand</del> <ins>copy elision candidate</ins>
->     is the name of a non-volatile automatic object (other than a function or catch-clause parameter)
->     whose scope does not extend beyond the end of the innermost enclosing try-block (if there is one),
->     the copy/move operation from <del>the operand</del> <ins>the copy elision candidate object</ins>
->     to the exception object (13.1) can be omitted by constructing the automatic object
->     directly into the exception object
->
-> <ins>When copy elision occurs,</ins> the implementation treats the source and target
-> of the omitted copy/move operation as simply two different ways of referring
-> to the same object. If the first parameter of the selected constructor is an
-> rvalue reference to the object’s type, the destruction of that object occurs
-> when the target would have been destroyed;
-> otherwise, the destruction occurs at the later of the times
-> when the two objects would have been destroyed without the optimization.
-
-This would be a novel special case; as the "Note" says, this would essentially permit the
-core language to assume that every overloaded `operator=` and `operator@=` which returns an
-lvalue reference at all, returns an lvalue reference to `*this`. It would be possible for
-pathological code to observe the optimization happening:
-
-```c++
-struct Observer;
-struct Observer {
-    static int k = 0;
-    static Observer global;
-    int i;
-    explicit Observer(int i) : i(i) {}
-    Observer(const Observer& rhs) : i(++k) {
-        printf("observed a copy from %d to %d", rhs.i, i);
-    }
-    Observer(Observer&& rhs) : i(++k) {
-        printf("observed a move from %d to %d", rhs.i, i);
-    }
-    Observer& operator=(const Observer& rhs) {
-        i = rhs.i + 1;
-        printf("observed a copy-assign from %d to %d", rhs.i, i);
-        return &global;  // pathological!
-    }
-};
-Observer Observer::global{10};
-Observer foo() {
-    Observer x{20};
-    Observer y{30};
-    return x = y;
-}
-int main() {
-    Observer o = foo();
-    printf("o.i is %d\n", o.i);
-}
-```
-
-In C++17, the above code has this behavior:
-
-- `observed a copy-assign from 30 to 31`, then `observed a copy from 10 to 1`, then `o.i is 1` (the behavior required by C++17, forbidden under the proposal)
-
-Under the "further proposal" sketched above, the code would instead have one of the following behaviors:
-
-- `observed a copy-assign from 30 to 31`, then `observed a move from 10 to 1`, then `o.i is 1` (implicit move, permitted under the proposal)
-
-- `observed a copy-assign from 30 to 31`, then `o.i is 31` (copy elision, permitted and encouraged under the proposal)
+> It determines the constructor or the `return_value` overload to be called if elision is not performed, and the selected constructor
+> or <del>the</del> `return_value` overload must be accessible even if the call is elided. —*end note*]
 
 
 # Acknowledgments # {#acknowledgments}
