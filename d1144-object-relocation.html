@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D1144R3: Object relocation in terms of move plus destroy</title>
+  <title>D1144R4: Object relocation in terms of move plus destroy</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1227,7 +1227,7 @@ Possible extra rowspan handling
       text-align: center;
     }
   </style>
-  <meta content="Bikeshed version c03af8da7325f5ae3f9ca742161b5d270bbce12f" name="generator">
+  <meta content="Bikeshed version ee4d7efc3ed6155392d49e10a542e2351fd5792d" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 ins  {background-color: #CCFFCC; text-decoration: underline;}
@@ -1478,8 +1478,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D1144R3<br>Object relocation in terms of move plus destroy</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2019-03-10">2019-03-10</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D1144R4<br>Object relocation in terms of move plus destroy</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2019-05-12">2019-05-12</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -1492,7 +1492,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>24
+     <dd>25
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs</a>
      <dt>Current:
@@ -1906,7 +1906,7 @@ tricks shown in <a href="#sample-conditional">Conditionally trivial relocation</
 </pre> <p><em>Mandates:</em> <code class="highlight"><c- n>T</c-></code> shall be a complete non-array object type.</p> <p><em>Effects:</em> Equivalent to:</p> <pre class="highlight"><c- n>uninitialized_move</c-><c- p>(</c-><c- n>dest</c-><c- p>,</c-> <c- n>dest</c-> <c- o>+</c-> <c- mi>1</c-><c- p>,</c-> <c- n>source</c-><c- p>);</c->
 <c- n>destroy_at</c-><c- p>(</c-><c- n>source</c-><c- p>);</c->
 <c- k>return</c-> <c- n>std</c-><c- o>::</c-><c- n>launder</c-><c- p>(</c-><c- n>dest</c-><c- p>);</c->
-</pre><p>except that if the value type of the iterator is trivially relocatable <i>[basic.types]</i>, side effects
+</pre><p>except that if <code class="highlight"><c- n>T</c-></code> is trivially relocatable <i>[basic.types]</i>, side effects
 associated with the relocation of the object’s value might not happen.</p> </small>
    </blockquote>
    <p class="note" role="note"><span>Note:</span> The "as-if-by-memcpy" codepath hidden inside <code class="highlight"><c- n>relocate_at</c-></code> cannot be implemented by
@@ -1926,7 +1926,7 @@ implementation is invisible to the compiler’s optimizer.</p>
 </pre> <p><em>Effects:</em> Equivalent to:</p> <pre class="highlight"><c- n>result</c-> <c- o>=</c-> <c- n>uninitialized_move</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>,</c-> <c- n>result</c-><c- p>);</c->
 <c- n>destroy</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>);</c->
 <c- k>return</c-> <c- n>result</c-><c- p>;</c->
-</pre><p>except that if the value type of the iterator is trivially relocatable, side effects
+</pre><p>except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object’s value might not happen.</p> <p><em>Remarks:</em> If an exception is thrown, some objects in the range <code class="highlight"><c- p>[</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code> are left in a valid but unspecified state.</p> </small>
    </blockquote>
    <p class="note" role="note"><span>Note:</span> We are guided by <a data-link-type="biblio" href="#biblio-p0884r0">[P0884R0]</a> to make <code class="highlight"><c- n>uninitialized_relocate</c-></code> unconditionally <code class="highlight"><c- k>noexcept</c-><c- p>(</c->false<c- p>)</c-></code>.
@@ -1946,7 +1946,7 @@ to speed up that special case.</p>
 </pre> <p><em>Effects:</em> Equivalent to:</p> <pre class="highlight"><c- k>auto</c-> <c- n>pair</c-> <c- o>=</c-> <c- n>uninitialized_move_n</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>n</c-><c- p>,</c-> <c- n>result</c-><c- p>);</c->
 <c- n>destroy_n</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>n</c-><c- p>);</c->
 <c- k>return</c-> <c- n>pair</c-><c- p>;</c->
-</pre><p>except that if the value type of the iterator is trivially relocatable, side effects
+</pre><p>except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object’s value might not happen.</p> <p><em>Remarks:</em> If an exception is thrown, some objects in the range <code class="highlight"><c- p>[</c-><c- n>first</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>next</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-><c- n>n</c-><c- p>))</c-></code> are left in a valid but unspecified state.</p> </small>
    </blockquote>
    <h3 class="heading settled" data-level="5.5" id="wording-inheritance"><span class="secno">5.5. </span><span class="content">Trivially relocatable type</span><a class="self-link" href="#wording-inheritance"></a></h3>
