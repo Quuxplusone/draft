@@ -1,0 +1,461 @@
+<pre class='metadata'>
+Title: Remove NTTPs of class type from C++20
+Shortname: D1837
+Revision: 0
+!Draft Revision: 1
+Audience: EWG, LEWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1837-remove-class-type-nttps.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1837-remove-class-type-nttps.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d1837-remove-class-type-nttps.html">rawgit.com/Quuxplusone/draft/gh-pages/d1837-remove-class-type-nttps.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  [[P0732]] "Class types in non-type template parameters"
+  was accepted into C++20 in June 2018.
+  Newly discovered issues with its premise, and new exploration in the area,
+  suggest that we should postpone this feature until C++2b.
+Date: 2019-07-27
+</pre>
+
+<style>
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+This paper repeats some material from [[Enums]], and adds new material as well.
+
+# A summary of P0732 # {#p0732}
+
+C++ does not support non-type template parameters (NTTPs) of arbitrary types.
+For example, `template<int I>` is valid, but `template<std::string S>` is
+not valid.
+
+Jeff Snyder's [[P0732]] "Class types in non-type template parameters"
+(first revision, 2018-02-11) observed that the essential problem preventing
+C++ from supporting arbitrary-typed NTTPs is that the compiler can't tell
+when two arbitrary NTTPs are "identical." "Identity" is important because it
+is how the compiler determines (<a href="http://eel.is/c++draft/temp.type#1">[temp.type]/1</a>)
+whether two templates are the same entity. For example:
+
+<small>
+```c++
+    using SomeType = [...];
+    template<SomeType X> void foo();
+    template<> void foo<SomeType(100)>() { return; }
+    template<> void foo<SomeType(356)>() { return; }
+```
+</small>
+
+Here, if `SomeType` is `int`, then we have a valid program with two explicit
+specializations of `foo`. But if `SomeType` is `unsigned char`, then there is
+only one explicit specialization of `foo`, multiply defined; and so the program
+is ill-formed.
+
+P0732 proposed that in present-day C++, determining the "identity" of two
+NTTP values is easy because the only supported NTTP types are simple scalar
+types where it is "obvious" to the compiler when two such values are equal.
+In C++2a, `operator==` can be defaulted; this increases the number
+of types for which it is "obvious" what equality means.
+
+The rest of this paper will argue that what is "obvious" is more subtle
+than we thought.
+
+
+# P0732's killer app: template parameters of "string" type # {#killer-app}
+
+Thanks to Louis Dionne for this example using P0732 NTTPs.
+
+We create a function template `foo` that takes a
+`FixedLengthString<???>` of deduced class type as its NTTP.
+(Notice that this syntax for CTAD is homonymous with the syntaxes for plain old NTTPs
+and for concept-constrained type parameters.) When the programmer of `main`
+writes `foo<"hello">`, the compiler will perform overload resolution and class template
+argument deduction to determine that the right candidate is
+`foo<FixedLengthString<6>("hello")>`.
+
+<small>
+```c++
+    template<int N>
+    struct FixedLengthString {
+        char data_\[N] {};
+        constexpr FixedLengthString(const char *p) {
+            for (int i=0; i < N; ++i) {
+                data_[i] = p[i];
+            }
+        }
+        auto operator<=>(const FixedLengthString&) const = default;
+    };
+    template<int N> FixedLengthString(const char (&)\[N]) -> FixedLengthString<N>;
+
+    template<FixedLengthString S>
+    int foo() {
+        static int i = 0;
+        return ++i;
+    }
+
+    int main() {
+        int x = foo<"hello">();
+        int y = foo<"hello">();
+        return y;
+    }
+```
+</small>
+
+`FixedLengthString<6>` has a structural comparison operator.
+Comparison on `FixedLengthString<6>("hello")` compares exactly the six bytes `"hello"`
+which are stored in `this->data_`.
+This program has well-defined behavior and returns `2`.
+
+My understanding is that this is the "killer app" for P0732 NTTPs: we can
+use literal class types to "smuggle" contraband such as string literals
+and floating-point values which would otherwise not be allowed in template
+arguments.
+
+
+## Slight variation remains ill-formed ## {#buggy-app}
+
+On the other hand, in this next example we create a function template `bar`
+that takes a concrete `VariableLengthString` as its NTTP.
+When the programmer of `main` writes `foo<"hello">`, the compiler will
+perform overload resolution to determine that the right candidate is
+`foo<VariableLengthString("hello")>`.
+
+<small>
+```c++
+    struct VariableLengthString {
+        const char *data_ = nullptr;
+        constexpr VariableLengthString(const char *p) : data_(p) {}
+        auto operator<=>(const VariableLengthString&) const = default;
+    };
+
+    template<VariableLengthString S>
+    int bar() {
+        static int i = 0;
+        return ++i;
+    }
+
+    int main() {
+        int x = bar<"hello">(); // ERROR
+
+        auto& hello = "hello";
+        int y = bar<hello>(); // ERROR
+        return y;
+    }
+```
+</small>
+
+`VariableLengthString` has a structural comparison operator, but when
+the compiler goes to mangle the name of `bar<VariableLengthString("hello")>`,
+it finds that it cannot produce a mangling of the `data_` member's value
+because `"hello"` is not a named variable. Therefore the program above
+is ill-formed
+(by <a href="http://eel.is/c++draft/temp.arg.nontype#2">[temp.arg.nontype]/2</a>).
+
+The following `main` function would be well-formed:
+
+<small>
+```c++
+    int main() {
+        static const char hello_array[] = "hello";
+        auto& hello = hello_array;
+        int y = bar<hello>();
+        return y;
+    }
+```
+</small>
+
+because `hello` refers to `hello_array`, and `hello_array` is a named variable.
+
+
+## Subtle wording ## {#subtlety}
+
+The above-described behavior for template arguments involving pointers
+has been present since C++11 or earlier. It is quite subtle.
+It was implied by [[!N4700]]'s old wording
+(<a href="http://eel.is/c++draft/temp.type#1">[temp.type]/1</a>):
+
+> Two <i>template-id</i>s refer to the same class, function, or variable if [...]
+> their corresponding non-type <i>template-argument</i>s of pointer type
+> refer to the same object or function or are both the null pointer value [...]
+
+[[P0732]]'s changed wording, IMHO, obscures and possibly breaks the intent
+for template arguments involving pointers. [[!N4810]]'s new wording:
+
+> Two <i>template-id</i>s refer to the same class, function, or variable if [...]
+> corresponding non-type <i>template-argument</i>s have the same type and value
+> after conversion to the type of the <i>template-parameter</i>,
+> where they are considered to have the same value if they compare equal
+> with the <code>==</code> operator [...]
+
+The new wording does not clearly say what happens if the comparison with the
+`==` operator is not a constant-expression. This can happen if it attempts to
+compare beyond-the-end pointers. [[!N4700]] handled this because
+a beyond-the-end pointer does not "refer to an object."
+There is also relevant wording in <a href="http://eel.is/c++draft/temp.arg.nontype#2">[temp.arg.nontype/2]</a>, introduced
+in [[N4268]]; but it does not mention beyond-the-end pointers.
+
+Nor does the new wording say how the lookup for the `==` operator should be done.
+That's the next thing we'll look at.
+
+
+# Identity and equality are not the same thing in C++17 # {#unsame}
+
+Consider the following valid C++17 code:
+
+<small>
+```c++
+    enum E {
+        ONE, TWO
+    };
+    namespace N {
+        template<E> int foo() {
+            static int i = 0;
+            return ++i;
+        }
+        void test() {
+            foo<ONE>();
+            foo<TWO>();
+        }
+    }
+```
+</small>
+
+This code is valid and well-defined in C++17 today. It causes two
+distinct specializations of `foo` to be instantiated.
+
+We can add the following overload of `operator==` anywhere in this
+code — before or after the definition of `foo`, inside namespace `N` or the global
+namespace — and the compiler won't care.
+
+<small>
+```c++
+    constexpr bool operator==(E, E) { return true; }
+```
+</small>
+
+Thus, in C++17, it is perfectly possible that `static_assert(ONE == TWO)`
+and yet `static_assert(&foo<ONE> != &foo<TWO>)`. ([Godbolt.](https://godbolt.org/z/aav4CQ))
+
+With P0732 in the Committee Draft, two bad things happen. First, a wording issue:
+it's unclear whether, when <a href="http://eel.is/c++draft/temp.type#1.5">[temp.type]/1.5</a>
+asks if the arguments "compare equal with the `==` operator,"
+the compiler will use our overloaded `operator==(E, E)`.
+(In practice, it will not.)
+
+Second, because `E` (being an enum type) has strong structural equality
+(<a href="http://eel.is/c++draft/class.compare.default#3">[class.compare.default]/3</a>),
+under P0732's rules we can create a literal class type that can be used as an NTTP.
+
+<small>
+```c++
+    enum E {
+        ONE, TWO
+    };
+    namespace N {
+        struct A {
+            E e_;
+            bool operator==(const A&) const = default;
+        };
+        template<A> int foo() {
+            static int i = 0;
+            return ++i;
+        }
+        void test() {
+            foo<A{ONE}>();
+            foo<A{TWO}>();
+        }
+        constexpr bool operator==(E, E) { return true; }
+    }
+```
+</small>
+
+Again, we can insert the overload of `operator==` anywhere in this
+code — before or after the definition of `foo`, before or after the definition of `A`,
+inside namespace `N` or the global namespace.
+
+It is not clear how `A::operator==` should call `operator==(E, E)`, if
+`operator==(E, E)` was not yet declared when `A::operator==` was defined.
+
+No vendor has implemented P0732 NTTPs. But we can get some hint of the
+subtleties involved by looking at MSVC's incomplete implementation of
+`operator<=>`. ([Godbolt.](https://godbolt.org/z/ENOQDb))
+
+
+# There is ongoing exploration of the NTTP space # {#ongoing}
+
+[[P0732]] has done a great service by stimulating new exploration of the NTTP space.
+After P0732 was discussed and adopted, the following new work appeared:
+
+
+## `float` as NTTP ## {#float}
+
+Jorg Brown's [[P1714]] "NTTP are incomplete without float, double, and long double!"
+was discussed by EWG at Cologne, and my understanding is that the reception was
+favorable. People want something like
+
+<small>
+```c++
+    template<double Exponent>
+    double pow(double base);
+```
+</small>
+
+P0732 does not permit this, because `double` does not have strong structural equality.
+`double` has `partial_ordering`, because of NaN. So Jorg's workaround for C++2a is
+similar to the `FixedLengthString<6>` hack above: where `FixedLengthString<6>`
+smuggles a string literal through an array of char, Jorg's `AsTemplateArg<double>`
+smuggles a `double` through an array of char.
+
+Two observations:
+
+- It seems that "smuggling contraband through arrays of char" is in practice
+    the main use-case for P0732 NTTPs. I have not seen anyone excited about
+    P0732 who isn't planning to use them in this way.
+
+- P0732 is not compatible with EWG's interest in `template<double Exponent>`.
+    `double` will never have strong structural equality, and P0732-based NTTPs
+    will never support types with less-than-strong structural equality.
+
+It seems that EWG is interested in exploring avenues which P0732 cuts off.
+
+
+## A mangling or serialization operator ## {#operator-template}
+
+Richard Smith writes:
+
+> Broadly, I think that attempting to make NTTP identity be the same thing
+> as equality is an evolutionary dead end for C++. They're fundamentally
+> different operations, with different constraints and different goals.
+
+In EWG reflector thread "[isocpp-ext] Can we have float/double as template parameters now?",
+he informally explored the notion of an overloadable `operator template`
+which would allow us to pass *any* literal type `T` as an NTTP, as long as it
+provides a way to "serialize" its value into
+some serialized form that the compiler knew how to mangle (such as a POD
+aggregate), and a way to "deserialize" from that mangled representation
+back into an object of type `T`.
+
+This approach is premised on the idea that the fundamental building block
+for NTTPs should not be `==` equality, but rather some sort of *identity*
+operation. This plays well with the bare fact that `==` equality is already
+irrelevant to NTTP-identity when the type `T` is an enum type... or a reference type.
+Consider:
+
+<small>
+```c++
+    constexpr int i = 1;
+    constexpr int j = 1;
+
+    template<const int&>
+    void foo() {}
+
+    static_assert(     i  ==      j , "");
+    static_assert(&foo<i> != &foo<j>, "");
+```
+</small>
+
+Today, in C++17, it is perfectly possible that `static_assert(i == j)`
+and yet `static_assert(&foo<i> != &foo<j>)`. ([Godbolt.](https://godbolt.org/z/32k8Uw)
+
+The importance of this difference between "equality" and "identity"
+was not widely known during the original discussion of P0732.
+Had it been known, our approach to NTTPs might have taken a different form.
+
+P0732 was premised on an erroneous conflation of "`==` equality" and
+"NTTP identity." In reality these are different notions. Conflating them
+causes subtle inconsistencies in the standard which will be very hard for
+any future work in the area to fix.
+
+We should not ship class-typed NTTPs in C++20 without thoroughly exploring
+the consequences. Once P0732 has appeared in a published standard, it will
+be too late to fix it.
+
+Incidentally, in hindsight, it was probably a bad idea to allow users to overload
+`operator==` for enums. It was maybe even a bad idea to allow NTTPs of reference type.
+We cannot fix these things (even if we wanted to), because they have shipped.
+In this paper, I'm trying to apply foresight (not hindsight) to prevent
+a feature from shipping *before* we regret it.
+
+
+# Conclusion # {#conclusion}
+
+The current situation with NTTPs (in C++17) is subtle and confusing,
+but at least it's been relatively stable since C++03. P0732 really shakes
+up the scene without fixing any of the existing issues; in fact it makes some
+issues easier to run into, and causes new issues of its own. Finally, it
+permanently cuts off potentially fruitful avenues of exploration
+(such as `float` NTTPs, and user-defined mechanisms for NTTP-identity
+other than `operator==`).
+
+We propose to remove "class types in non-type template parameters"
+from C++20, with the expectation that it — or something even
+better! — may return in C++2b.
+
+
+Appendix A: Proposed straw polls {#polls}
+=========================================
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>Revert P0732, with the expectation that it or something better will return in C++2b.</th>
+<th>_</th><th>_</th><th>_</th><th>_</th><th>_</th></tr>
+
+</table>
+
+
+
+<pre class=biblio>
+{
+  "Enums": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "Enums break strong structural equality",
+    "href": "https://quuxplusone.github.io/blog/2019/07/04/strong-structural-equality-is-broken/",
+    "date": "July 2019"
+  },
+  "N4268": {
+    "authors": [
+      "Richard Smith"
+    ],
+    "title": "Allow constant evaluation for all non-type template arguments",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2014/n4268.html",
+    "date": "November 2014"
+  },
+  "N4700": {
+    "authors": [
+      "Richard Smith"
+    ],
+    "title": "Working Draft, Standard for Programming Language C++",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/n4700.pdf",
+    "date": "October 2017"
+  },
+  "N4810": {
+    "authors": [
+      "Richard Smith"
+    ],
+    "title": "Working Draft, Standard for Programming Language C++",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/n4810.pdf",
+    "date": "March 2019"
+  },
+  "P0732": {
+    "authors": [
+      "Jeff Snyder", "Louis Dionne"
+    ],
+    "title": "Class Types in Non-Type Template Parameters",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf",
+    "date": "June 2018"
+  },
+  "P1714": {
+    "authors": [
+      "Jorg Brown"
+    ],
+    "title": "NTTP are incomplete without float, double, and long double!",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1714r0.html",
+    "date": "June 2019"
+  }
+}
+</pre>

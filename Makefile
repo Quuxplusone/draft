@@ -1,6 +1,7 @@
 
 all: \
     d1808-contra-p0339.html \
+    d1837-remove-class-type-nttps.html \
     d1144-object-relocation.html \
     d1153-volatile-subobjects.html \
     d1154-comparable-traits.html \
