@@ -1500,18 +1500,18 @@ pre .property::before, pre .property::after {
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1837R0<br>Remove NTTPs of class type from C++20</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2019-07-27">2019-07-27</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2019-07-28">2019-07-28</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Author:
      <dd>
       <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
      <dt>Audience:
-     <dd>EWG, LEWG
+     <dd>EWG
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>1
+     <dd>2
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1837-remove-class-type-nttps.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1837-remove-class-type-nttps.bs</a>
      <dt>Current:
@@ -1548,6 +1548,7 @@ pre .property::before, pre .property::after {
      </ol>
     <li><a href="#conclusion"><span class="secno">5</span> <span class="content">Conclusion</span></a>
     <li><a href="#polls"><span class="secno"></span> <span class="content">Appendix A: Proposed straw polls</span></a>
+    <li><a href="#wording"><span class="secno"></span> <span class="content">Appendix B: Proposed wording</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -1580,16 +1581,19 @@ only one explicit specialization of <code class="highlight"><c- n>foo</c-></code
 is ill-formed.</p>
    <p>P0732 proposed that in present-day C++, determining the "identity" of two
 NTTP values is easy because the only supported NTTP types are simple scalar
-types where it is "obvious" to the compiler when two such values are equal.
+types where identity means equality, and where it is "obvious" to the compiler
+when two such values are equal.
 In C++2a, <code class="highlight"><c- k>operator</c-><c- o>==</c-></code> can be defaulted; this increases the number
-of types for which it is "obvious" what equality means.</p>
-   <p>The rest of this paper will argue that what is "obvious" is more subtle
+of types for which it is "obvious" what identity means.</p>
+   <p>The rest of this paper will argue that "obviousness" is more subtle
 than we thought.</p>
    <h2 class="heading settled" data-level="2" id="killer-app"><span class="secno">2. </span><span class="content">P0732’s killer app: template parameters of "string" type</span><a class="self-link" href="#killer-app"></a></h2>
    <p>Thanks to Louis Dionne for this example using P0732 NTTPs.</p>
    <p>We create a function template <code class="highlight"><c- n>foo</c-></code> that takes a <code class="highlight"><c- n>FixedLengthString</c-><c- o>&lt;???></c-></code> of deduced class type as its NTTP.
-(Notice that this syntax for CTAD is homonymous with the syntaxes for plain old NTTPs
-and for concept-constrained type parameters.) When the programmer of <code class="highlight"><c- n>main</c-></code> writes <code class="highlight"><c- n>foo</c-><c- o>&lt;</c-><c- s>"hello"</c-><c- o>></c-></code>, the compiler will perform overload resolution and class template
+(The CTAD syntax we’re using here is homonymous with the syntaxes for plain old NTTPs
+and for concept-constrained type parameters, but it is not either of those.)
+When the programmer of <code class="highlight"><c- n>main</c-></code> writes <code class="highlight"><c- n>foo</c-><c- o>&lt;</c-><c- s>"hello"</c-><c- o>></c-></code>, the compiler will perform
+overload resolution and class template
 argument deduction to determine that the right candidate is <code class="highlight"><c- n>foo</c-><c- o>&lt;</c-><c- n>FixedLengthString</c-><c- o>&lt;</c-><c- mi>6</c-><c- o>></c-><c- p>(</c-><c- s>"hello"</c-><c- p>)</c-><c- o>></c-></code>.</p>
    <p><small></small></p>
    <small> <pre class="language-c++ highlight">    <c- n>template</c-><c- o>&lt;</c-><c- b>int</c-> <c- n>N</c-><c- o>></c->
@@ -1625,8 +1629,8 @@ and floating-point values which would otherwise not be allowed in template
 arguments.</p>
    <h3 class="heading settled" data-level="2.1" id="buggy-app"><span class="secno">2.1. </span><span class="content">Slight variation remains ill-formed</span><a class="self-link" href="#buggy-app"></a></h3>
    <p>On the other hand, in this next example we create a function template <code class="highlight"><c- n>bar</c-></code> that takes a concrete <code class="highlight"><c- n>VariableLengthString</c-></code> as its NTTP.
-When the programmer of <code class="highlight"><c- n>main</c-></code> writes <code class="highlight"><c- n>foo</c-><c- o>&lt;</c-><c- s>"hello"</c-><c- o>></c-></code>, the compiler will
-perform overload resolution to determine that the right candidate is <code class="highlight"><c- n>foo</c-><c- o>&lt;</c-><c- n>VariableLengthString</c-><c- p>(</c-><c- s>"hello"</c-><c- p>)</c-><c- o>></c-></code>.</p>
+When the programmer of <code class="highlight"><c- n>main</c-></code> writes <code class="highlight"><c- n>bar</c-><c- o>&lt;</c-><c- s>"hello"</c-><c- o>></c-></code>, the compiler will
+perform overload resolution to determine that the right candidate is <code class="highlight"><c- n>bar</c-><c- o>&lt;</c-><c- n>VariableLengthString</c-><c- p>(</c-><c- s>"hello"</c-><c- p>)</c-><c- o>></c-></code>.</p>
    <p><small></small></p>
    <small> <pre class="language-c++ highlight">    <c- k>struct</c-> <c- n>VariableLengthString</c-> <c- p>{</c->
         <c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- n>data_</c-> <c- o>=</c-> <c- n>nullptr</c-><c- p>;</c->
@@ -1652,8 +1656,8 @@ perform overload resolution to determine that the right candidate is <code class
 the compiler goes to mangle the name of <code class="highlight"><c- n>bar</c-><c- o>&lt;</c-><c- n>VariableLengthString</c-><c- p>(</c-><c- s>"hello"</c-><c- p>)</c-><c- o>></c-></code>,
 it finds that it cannot produce a mangling of the <code class="highlight"><c- n>data_</c-></code> member’s value
 because <code class="highlight"><c- s>"hello"</c-></code> is not a named variable. Therefore the program above
-is ill-formed
-(by <a href="http://eel.is/c++draft/temp.arg.nontype#2">[temp.arg.nontype]/2</a>).</p>
+is ill-formed.
+(The relevant wording is <a href="http://eel.is/c++draft/temp.arg.nontype#2">[temp.arg.nontype]/2</a>).</p>
    <p>The following <code class="highlight"><c- n>main</c-></code> function would be well-formed:</p>
    <p><small></small></p>
    <small> <pre class="language-c++ highlight">    <c- b>int</c-> <c- nf>main</c-><c- p>()</c-> <c- p>{</c->
@@ -1683,7 +1687,7 @@ after conversion to the type of the <i>template-parameter</i>,
 where they are considered to have the same value if they compare equal
 with the <code class="highlight"><c- o>==</c-></code> operator [...]</p>
    </blockquote>
-   <p>The new wording does not clearly say what happens if the comparison with the <code class="highlight"><c- o>==</c-></code> operator is not a constant-expression. This can happen if it attempts to
+   <p>The new wording does not clearly say what happens if the comparison with the <code class="highlight"><c- o>==</c-></code> operator is not a constant expression. This can happen if it attempts to
 compare beyond-the-end pointers. <a data-link-type="biblio" href="#biblio-n4700">[N4700]</a> handled this because
 a beyond-the-end pointer does not "refer to an object."
 There is also relevant wording in <a href="http://eel.is/c++draft/temp.arg.nontype#2">[temp.arg.nontype/2]</a>, introduced
@@ -1720,9 +1724,9 @@ namespace — and the compiler won’t care.</p>
 it’s unclear whether, when <a href="http://eel.is/c++draft/temp.type#1.5">[temp.type]/1.5</a> asks if the arguments "compare equal with the <code class="highlight"><c- o>==</c-></code> operator,"
 the compiler will use our overloaded <code class="highlight"><c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- n>E</c-><c- p>,</c-> <c- n>E</c-><c- p>)</c-></code>.
 (In practice, it will not.)</p>
-   <p>Second, because <code class="highlight"><c- n>E</c-></code> (being an enum type) has strong structural equality
-(<a href="http://eel.is/c++draft/class.compare.default#3">[class.compare.default]/3</a>),
-under P0732’s rules we can create a literal class type that can be used as an NTTP.</p>
+   <p>Second, because <code class="highlight"><c- n>E</c-></code> is an enum type, it has strong structural equality
+(<a href="http://eel.is/c++draft/class.compare.default#3">[class.compare.default]/3</a>).
+So under P0732’s rules we can create a literal class type <code class="highlight"><c- n>A</c-></code> that can be used as an NTTP.</p>
    <p><small></small></p>
    <small> <pre class="language-c++ highlight">    <c- k>enum</c-> <c- n>E</c-> <c- p>{</c->
         <c- n>ONE</c-><c- p>,</c-> <c- n>TWO</c->
@@ -1743,19 +1747,19 @@ under P0732’s rules we can create a literal class type that can be used as an 
         <c- n>constexpr</c-> <c- b>bool</c-> <c- n>operator</c-><c- o>==</c-><c- p>(</c-><c- n>E</c-><c- p>,</c-> <c- n>E</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> true<c- p>;</c-> <c- p>}</c->
     <c- p>}</c->
 </pre></small> 
-   <p>Again, we can insert the overload of <code class="highlight"><c- k>operator</c-><c- o>==</c-></code> anywhere in this
+   <p>Again, we can insert the overload of <code class="highlight"><c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- n>E</c-><c- p>,</c-> <c- n>E</c-><c- p>)</c-></code> anywhere in this
 code — before or after the definition of <code class="highlight"><c- n>foo</c-></code>, before or after the definition of <code class="highlight"><c- n>A</c-></code>,
 inside namespace <code class="highlight"><c- n>N</c-></code> or the global namespace.</p>
    <p>It is not clear how <code class="highlight"><c- n>A</c-><c- o>::</c-><c- k>operator</c-><c- o>==</c-></code> should call <code class="highlight"><c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- n>E</c-><c- p>,</c-> <c- n>E</c-><c- p>)</c-></code>, if <code class="highlight"><c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- n>E</c-><c- p>,</c-> <c- n>E</c-><c- p>)</c-></code> was not yet declared when <code class="highlight"><c- n>A</c-><c- o>::</c-><c- k>operator</c-><c- o>==</c-></code> was defined.</p>
    <p>No vendor has implemented P0732 NTTPs. But we can get some hint of the
-subtleties involved by looking at MSVC’s incomplete implementation of <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code>. (<a href="https://godbolt.org/z/ENOQDb">Godbolt.</a>)</p>
+subtleties involved by looking at MSVC’s in-progress implementation of <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code>. (<a href="https://godbolt.org/z/ENOQDb">Godbolt.</a>)</p>
    <h2 class="heading settled" data-level="4" id="ongoing"><span class="secno">4. </span><span class="content">There is ongoing exploration of the NTTP space</span><a class="self-link" href="#ongoing"></a></h2>
    <p><a data-link-type="biblio" href="#biblio-p0732">[P0732]</a> has done a great service by stimulating new exploration of the NTTP space.
 After P0732 was discussed and adopted, the following new work appeared:</p>
    <h3 class="heading settled" data-level="4.1" id="float"><span class="secno">4.1. </span><span class="content"><code class="highlight"><c- b>float</c-></code> as NTTP</span><a class="self-link" href="#float"></a></h3>
    <p>Jorg Brown’s <a data-link-type="biblio" href="#biblio-p1714">[P1714]</a> "NTTP are incomplete without float, double, and long double!"
-was discussed by EWG at Cologne, and my understanding is that the reception was
-favorable. People want something like</p>
+was discussed by EWG (<a data-link-type="biblio" href="#biblio-p1714discussion">[P1714discussion]</a>), and the reception was
+favorable (1–14–9–3–3). Proponents want something like</p>
    <p><small></small></p>
    <small> <pre class="language-c++ highlight">    <c- n>template</c-><c- o>&lt;</c-><c- b>double</c-> <c- n>Exponent</c-><c- o>></c->
     <c- b>double</c-> <c- n>pow</c-><c- p>(</c-><c- b>double</c-> <c- n>base</c-><c- p>);</c->
@@ -1773,6 +1777,8 @@ P0732 who isn’t planning to use them in this way.</p>
 will never support types with less-than-strong structural equality.</p>
    </ul>
    <p>It seems that EWG is interested in exploring avenues which P0732 cuts off.</p>
+   <p>In <a data-link-type="biblio" href="#biblio-p1714discussion">[P1714discussion]</a>, one participant is quoted as saying,
+"My proposal is that we take it [i.e., P0732] out and try again."</p>
    <h3 class="heading settled" data-level="4.2" id="operator-template"><span class="secno">4.2. </span><span class="content">A mangling or serialization operator</span><a class="self-link" href="#operator-template"></a></h3>
    <p>Richard Smith writes:</p>
    <blockquote>
@@ -1783,8 +1789,8 @@ different operations, with different constraints and different goals.</p>
    <p>In EWG reflector thread "[isocpp-ext] Can we have float/double as template parameters now?",
 he informally explored the notion of an overloadable <code class="highlight"><c- k>operator</c-> <c- k>template</c-></code> which would allow us to pass <em>any</em> literal type <code class="highlight"><c- n>T</c-></code> as an NTTP, as long as it
 provides a way to "serialize" its value into
-some serialized form that the compiler knew how to mangle (such as a POD
-aggregate), and a way to "deserialize" from that mangled representation
+some serialized form that the compiler knows how to mangle (such as a POD
+struct), and a way to "deserialize" from that mangled representation
 back into an object of type <code class="highlight"><c- n>T</c-></code>.</p>
    <p>This approach is premised on the idea that the fundamental building block
 for NTTPs should not be <code class="highlight"><c- o>==</c-></code> equality, but rather some sort of <em>identity</em> operation. This plays well with the bare fact that <code class="highlight"><c- o>==</c-></code> equality is already
@@ -1800,32 +1806,38 @@ Consider:</p>
     <c- n>static_assert</c-><c- p>(</c->     <c- n>i</c->  <c- o>==</c->      <c- n>j</c-> <c- p>,</c-> <c- s>""</c-><c- p>);</c->
     <c- n>static_assert</c-><c- p>(</c-><c- o>&amp;</c-><c- n>foo</c-><c- o>&lt;</c-><c- n>i</c-><c- o>></c-> <c- o>!=</c-> <c- o>&amp;</c-><c- n>foo</c-><c- o>&lt;</c-><c- n>j</c-><c- o>></c-><c- p>,</c-> <c- s>""</c-><c- p>);</c->
 </pre></small> 
-   <p>Today, in C++17, it is perfectly possible that <code class="highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>i</c-> <c- o>==</c-> <c- n>j</c-><c- p>)</c-></code> and yet <code class="highlight"><c- k>static_assert</c-><c- p>(</c-><c- o>&amp;</c-><c- n>foo</c-><c- o>&lt;</c-><c- n>i</c-><c- o>></c-> <c- o>!=</c-> <c- o>&amp;</c-><c- n>foo</c-><c- o>&lt;</c-><c- n>j</c-><c- o>></c-><c- p>)</c-></code>. (<a href="https://godbolt.org/z/32k8Uw">Godbolt.</a></p>
+   <p>Today, in C++17, it is perfectly possible that <code class="highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>i</c-> <c- o>==</c-> <c- n>j</c-><c- p>)</c-></code> and yet <code class="highlight"><c- k>static_assert</c-><c- p>(</c-><c- o>&amp;</c-><c- n>foo</c-><c- o>&lt;</c-><c- n>i</c-><c- o>></c-> <c- o>!=</c-> <c- o>&amp;</c-><c- n>foo</c-><c- o>&lt;</c-><c- n>j</c-><c- o>></c-><c- p>)</c-></code>. (<a href="https://godbolt.org/z/32k8Uw">Godbolt.</a>)</p>
    <p>The importance of this difference between "equality" and "identity"
 was not widely known during the original discussion of P0732.
 Had it been known, our approach to NTTPs might have taken a different form.</p>
+   <h2 class="heading settled" data-level="5" id="conclusion"><span class="secno">5. </span><span class="content">Conclusion</span><a class="self-link" href="#conclusion"></a></h2>
    <p>P0732 was premised on an erroneous conflation of "<code class="highlight"><c- o>==</c-></code> equality" and
-"NTTP identity." In reality these are different notions. Conflating them
-causes subtle inconsistencies in the standard which will be very hard for
+"NTTP identity." These are similar — but distinguishable — notions. Conflating them
+causes subtle inconsistencies which will be very hard for
 any future work in the area to fix.</p>
    <p>We should not ship class-typed NTTPs in C++20 without thoroughly exploring
 the consequences. Once P0732 has appeared in a published standard, it will
 be too late to fix it.</p>
    <p>Incidentally, in hindsight, it was probably a bad idea to allow users to overload <code class="highlight"><c- k>operator</c-><c- o>==</c-></code> for enums. It was maybe even a bad idea to allow NTTPs of reference type.
-We cannot fix these things (even if we wanted to), because they have shipped.
+But we cannot fix these things (even if we wanted to), because they have already shipped.
 In this paper, I’m trying to apply foresight (not hindsight) to prevent
 a feature from shipping <em>before</em> we regret it.</p>
-   <h2 class="heading settled" data-level="5" id="conclusion"><span class="secno">5. </span><span class="content">Conclusion</span><a class="self-link" href="#conclusion"></a></h2>
-   <p>The current situation with NTTPs (in C++17) is subtle and confusing,
-but at least it’s been relatively stable since C++03. P0732 really shakes
-up the scene without fixing any of the existing issues; in fact it makes some
-issues easier to run into, and causes new issues of its own. Finally, it
-permanently cuts off potentially fruitful avenues of exploration
+   <p>The situation with NTTPs in C++17 is subtle and confusing,
+but at least it’s been relatively stable since C++03. P0732 makes some
+existing issues easier to run into, and causes new issues of its own.
+Finally, it permanently cuts off potentially fruitful avenues of exploration
 (such as <code class="highlight"><c- b>float</c-></code> NTTPs, and user-defined mechanisms for NTTP-identity
-other than <code class="highlight"><c- k>operator</c-><c- o>==</c-></code>).</p>
-   <p>We propose to remove "class types in non-type template parameters"
+beyond <code class="highlight"><c- o>==</c-></code>).</p>
+   <p>I propose that WG21 remove "class types in non-type template parameters"
 from C++20, with the expectation that it — or something even
 better! — may return in C++2b.</p>
+   <p class="note" role="note"><span>Note:</span> This paper (P1837) proposes to remove class-typed NTTPs but leaves <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> out of scope.
+Another paper in this mailing, ADAM David Alan Martin’s <a data-link-type="biblio" href="#biblio-p1821r0">[P1821R0]</a> "Spaceship needs to be grounded,"
+proposes to remove <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> but leaves class-typed NTTPs out of scope.
+In Arthur’s opinion, it is conceivable to remove both <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> and class-typed NTTPs
+(that is, these papers are compatible), or to remove just class-typed NTTPs, but it’s
+unlikely that we could remove just <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> without also either removing or redesigning
+class-typed NTTPs.</p>
    <h2 class="heading settled" id="polls"><span class="content">Appendix A: Proposed straw polls</span><a class="self-link" href="#polls"></a></h2>
    <table class="def">
     <tbody>
@@ -1844,6 +1856,10 @@ better! — may return in C++2b.</p>
       <th>_
       <th>_
    </table>
+   <h2 class="heading settled" id="wording"><span class="content">Appendix B: Proposed wording</span><a class="self-link" href="#wording"></a></h2>
+   <p class="note" role="note"><span>Note:</span> Arthur will draft wording for the removal of P0732, if called upon to do so.
+I don’t foresee any difficulty with the wording. As far as I know, P0732 is still
+a "leaf feature" with no library users.</p>
   </main>
 <script>
 (function() {
@@ -1992,4 +2008,8 @@ better! — may return in C++2b.</p>
    <dd>Jeff Snyder; Louis Dionne. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf">Class Types in Non-Type Template Parameters</a>. June 2018. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0732r2.pdf</a>
    <dt id="biblio-p1714">[P1714]
    <dd>Jorg Brown. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1714r0.html">NTTP are incomplete without float, double, and long double!</a>. June 2019. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1714r0.html">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1714r0.html</a>
+   <dt id="biblio-p1714discussion">[P1714discussion]
+   <dd><a href="http://wiki.edg.com/bin/view/Wg21cologne2019/P1714R0-EWG">Notes from discussion of P1714R0 (private wiki)</a>. July 2019. URL: <a href="http://wiki.edg.com/bin/view/Wg21cologne2019/P1714R0-EWG">http://wiki.edg.com/bin/view/Wg21cologne2019/P1714R0-EWG</a>
+   <dt id="biblio-p1821r0">[P1821R0]
+   <dd>ADAM David Alan Martin. <a href="https://wg21.link/p1821r0">The Spaceship Needs to be Grounded: Pull Spaceship from C++20</a>. July 2019. URL: <a href="https://wg21.link/p1821r0">https://wg21.link/p1821r0</a>
   </dl>

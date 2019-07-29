@@ -2,8 +2,8 @@
 Title: Remove NTTPs of class type from C++20
 Shortname: D1837
 Revision: 0
-!Draft Revision: 1
-Audience: EWG, LEWG
+!Draft Revision: 2
+Audience: EWG
 Status: D
 Group: WG21
 URL:
@@ -16,7 +16,7 @@ Abstract:
   was accepted into C++20 in June 2018.
   Newly discovered issues with its premise, and new exploration in the area,
   suggest that we should postpone this feature until C++2b.
-Date: 2019-07-27
+Date: 2019-07-28
 </pre>
 
 <style>
@@ -55,11 +55,12 @@ is ill-formed.
 
 P0732 proposed that in present-day C++, determining the "identity" of two
 NTTP values is easy because the only supported NTTP types are simple scalar
-types where it is "obvious" to the compiler when two such values are equal.
+types where identity means equality, and where it is "obvious" to the compiler
+when two such values are equal.
 In C++2a, `operator==` can be defaulted; this increases the number
-of types for which it is "obvious" what equality means.
+of types for which it is "obvious" what identity means.
 
-The rest of this paper will argue that what is "obvious" is more subtle
+The rest of this paper will argue that "obviousness" is more subtle
 than we thought.
 
 
@@ -69,9 +70,10 @@ Thanks to Louis Dionne for this example using P0732 NTTPs.
 
 We create a function template `foo` that takes a
 `FixedLengthString<???>` of deduced class type as its NTTP.
-(Notice that this syntax for CTAD is homonymous with the syntaxes for plain old NTTPs
-and for concept-constrained type parameters.) When the programmer of `main`
-writes `foo<"hello">`, the compiler will perform overload resolution and class template
+(The CTAD syntax we're using here is homonymous with the syntaxes for plain old NTTPs
+and for concept-constrained type parameters, but it is not either of those.)
+When the programmer of `main` writes `foo<"hello">`, the compiler will perform
+overload resolution and class template
 argument deduction to determine that the right candidate is
 `foo<FixedLengthString<6>("hello")>`.
 
@@ -118,9 +120,9 @@ arguments.
 
 On the other hand, in this next example we create a function template `bar`
 that takes a concrete `VariableLengthString` as its NTTP.
-When the programmer of `main` writes `foo<"hello">`, the compiler will
+When the programmer of `main` writes `bar<"hello">`, the compiler will
 perform overload resolution to determine that the right candidate is
-`foo<VariableLengthString("hello")>`.
+`bar<VariableLengthString("hello")>`.
 
 <small>
 ```c++
@@ -150,8 +152,8 @@ perform overload resolution to determine that the right candidate is
 the compiler goes to mangle the name of `bar<VariableLengthString("hello")>`,
 it finds that it cannot produce a mangling of the `data_` member's value
 because `"hello"` is not a named variable. Therefore the program above
-is ill-formed
-(by <a href="http://eel.is/c++draft/temp.arg.nontype#2">[temp.arg.nontype]/2</a>).
+is ill-formed.
+(The relevant wording is <a href="http://eel.is/c++draft/temp.arg.nontype#2">[temp.arg.nontype]/2</a>).
 
 The following `main` function would be well-formed:
 
@@ -190,7 +192,7 @@ for template arguments involving pointers. [[!N4810]]'s new wording:
 > with the <code>==</code> operator [...]
 
 The new wording does not clearly say what happens if the comparison with the
-`==` operator is not a constant-expression. This can happen if it attempts to
+`==` operator is not a constant expression. This can happen if it attempts to
 compare beyond-the-end pointers. [[!N4700]] handled this because
 a beyond-the-end pointer does not "refer to an object."
 There is also relevant wording in <a href="http://eel.is/c++draft/temp.arg.nontype#2">[temp.arg.nontype/2]</a>, introduced
@@ -244,9 +246,9 @@ asks if the arguments "compare equal with the `==` operator,"
 the compiler will use our overloaded `operator==(E, E)`.
 (In practice, it will not.)
 
-Second, because `E` (being an enum type) has strong structural equality
-(<a href="http://eel.is/c++draft/class.compare.default#3">[class.compare.default]/3</a>),
-under P0732's rules we can create a literal class type that can be used as an NTTP.
+Second, because `E` is an enum type, it has strong structural equality
+(<a href="http://eel.is/c++draft/class.compare.default#3">[class.compare.default]/3</a>).
+So under P0732's rules we can create a literal class type `A` that can be used as an NTTP.
 
 <small>
 ```c++
@@ -271,7 +273,7 @@ under P0732's rules we can create a literal class type that can be used as an NT
 ```
 </small>
 
-Again, we can insert the overload of `operator==` anywhere in this
+Again, we can insert the overload of `operator==(E, E)` anywhere in this
 code — before or after the definition of `foo`, before or after the definition of `A`,
 inside namespace `N` or the global namespace.
 
@@ -279,7 +281,7 @@ It is not clear how `A::operator==` should call `operator==(E, E)`, if
 `operator==(E, E)` was not yet declared when `A::operator==` was defined.
 
 No vendor has implemented P0732 NTTPs. But we can get some hint of the
-subtleties involved by looking at MSVC's incomplete implementation of
+subtleties involved by looking at MSVC's in-progress implementation of
 `operator<=>`. ([Godbolt.](https://godbolt.org/z/ENOQDb))
 
 
@@ -292,8 +294,8 @@ After P0732 was discussed and adopted, the following new work appeared:
 ## `float` as NTTP ## {#float}
 
 Jorg Brown's [[P1714]] "NTTP are incomplete without float, double, and long double!"
-was discussed by EWG at Cologne, and my understanding is that the reception was
-favorable. People want something like
+was discussed by EWG ([[P1714discussion]]), and the reception was
+favorable (1–14–9–3–3). Proponents want something like
 
 <small>
 ```c++
@@ -318,7 +320,11 @@ Two observations:
     `double` will never have strong structural equality, and P0732-based NTTPs
     will never support types with less-than-strong structural equality.
 
+
 It seems that EWG is interested in exploring avenues which P0732 cuts off.
+
+In [[P1714discussion]], one participant is quoted as saying,
+"My proposal is that we take it [i.e., P0732] out and try again."
 
 
 ## A mangling or serialization operator ## {#operator-template}
@@ -333,8 +339,8 @@ In EWG reflector thread "[isocpp-ext] Can we have float/double as template param
 he informally explored the notion of an overloadable `operator template`
 which would allow us to pass *any* literal type `T` as an NTTP, as long as it
 provides a way to "serialize" its value into
-some serialized form that the compiler knew how to mangle (such as a POD
-aggregate), and a way to "deserialize" from that mangled representation
+some serialized form that the compiler knows how to mangle (such as a POD
+struct), and a way to "deserialize" from that mangled representation
 back into an object of type `T`.
 
 This approach is premised on the idea that the fundamental building block
@@ -357,15 +363,18 @@ Consider:
 </small>
 
 Today, in C++17, it is perfectly possible that `static_assert(i == j)`
-and yet `static_assert(&foo<i> != &foo<j>)`. ([Godbolt.](https://godbolt.org/z/32k8Uw)
+and yet `static_assert(&foo<i> != &foo<j>)`. ([Godbolt.](https://godbolt.org/z/32k8Uw))
 
 The importance of this difference between "equality" and "identity"
 was not widely known during the original discussion of P0732.
 Had it been known, our approach to NTTPs might have taken a different form.
 
+
+# Conclusion # {#conclusion}
+
 P0732 was premised on an erroneous conflation of "`==` equality" and
-"NTTP identity." In reality these are different notions. Conflating them
-causes subtle inconsistencies in the standard which will be very hard for
+"NTTP identity." These are similar — but distinguishable — notions. Conflating them
+causes subtle inconsistencies which will be very hard for
 any future work in the area to fix.
 
 We should not ship class-typed NTTPs in C++20 without thoroughly exploring
@@ -374,24 +383,28 @@ be too late to fix it.
 
 Incidentally, in hindsight, it was probably a bad idea to allow users to overload
 `operator==` for enums. It was maybe even a bad idea to allow NTTPs of reference type.
-We cannot fix these things (even if we wanted to), because they have shipped.
+But we cannot fix these things (even if we wanted to), because they have already shipped.
 In this paper, I'm trying to apply foresight (not hindsight) to prevent
 a feature from shipping *before* we regret it.
 
-
-# Conclusion # {#conclusion}
-
-The current situation with NTTPs (in C++17) is subtle and confusing,
-but at least it's been relatively stable since C++03. P0732 really shakes
-up the scene without fixing any of the existing issues; in fact it makes some
-issues easier to run into, and causes new issues of its own. Finally, it
-permanently cuts off potentially fruitful avenues of exploration
+The situation with NTTPs in C++17 is subtle and confusing,
+but at least it's been relatively stable since C++03. P0732 makes some
+existing issues easier to run into, and causes new issues of its own.
+Finally, it permanently cuts off potentially fruitful avenues of exploration
 (such as `float` NTTPs, and user-defined mechanisms for NTTP-identity
-other than `operator==`).
+beyond `==`).
 
-We propose to remove "class types in non-type template parameters"
+I propose that WG21 remove "class types in non-type template parameters"
 from C++20, with the expectation that it — or something even
 better! — may return in C++2b.
+
+Note: This paper (P1837) proposes to remove class-typed NTTPs but leaves `operator<=>` out of scope.
+Another paper in this mailing, ADAM David Alan Martin's [[P1821R0]] "Spaceship needs to be grounded,"
+proposes to remove `operator<=>` but leaves class-typed NTTPs out of scope.
+In Arthur's opinion, it is conceivable to remove both `operator<=>` and class-typed NTTPs
+(that is, these papers are compatible), or to remove just class-typed NTTPs, but it's
+unlikely that we could remove just `operator<=>` without also either removing or redesigning
+class-typed NTTPs.
 
 
 Appendix A: Proposed straw polls {#polls}
@@ -405,6 +418,13 @@ Appendix A: Proposed straw polls {#polls}
 
 </table>
 
+
+Appendix B: Proposed wording {#wording}
+=======================================
+
+Note: Arthur will draft wording for the removal of P0732, if called upon to do so.
+I don't foresee any difficulty with the wording. As far as I know, P0732 is still
+a "leaf feature" with no library users.
 
 
 <pre class=biblio>
@@ -456,6 +476,19 @@ Appendix A: Proposed straw polls {#polls}
     "title": "NTTP are incomplete without float, double, and long double!",
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1714r0.html",
     "date": "June 2019"
+  },
+  "P1714discussion": {
+    "title": "Notes from discussion of P1714R0 (private wiki)",
+    "href": "http://wiki.edg.com/bin/view/Wg21cologne2019/P1714R0-EWG",
+    "date": "July 2019"
+  },
+  "P1821R0": {
+    "authors": [
+      "ADAM David Alan Martin"
+    ],
+    "title": "The Spaceship Needs to be Grounded: Pull Spaceship from C++20",
+    "href": "https://wg21.link/p1821r0",
+    "date": "July 2019"
   }
 }
 </pre>
