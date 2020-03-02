@@ -1546,7 +1546,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R5<br>Object relocation in terms of move plus destroy</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2020-02-20">2020-02-20</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2020-03-01">2020-03-01</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -1571,13 +1571,14 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   </div>
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
-   <p>We define a new verb, "relocate," which is equivalent to a move and a destroy
+   <p>We define a new verb, "relocate," which is equivalent to a move and a destroy.
 
-  (analogous to the existing verb "swap," which is equivalent to a move, two move-assignments, and a destroy).
   For many C++ types, the "relocate" operation is implementable as a single <code class="highlight"><c- n>memcpy</c-></code>.
   We provide a standard trait to detect types which are trivially relocatable, for the benefit of library writers.
+  We provide a rule that correctly propagates trivial relocatability among Rule-of-Zero types.
   Finally, we provide a portable way for a user-defined type (e.g. <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>shared_ptr</c-></code>) to warrant
-  to the implementation that it is trivially relocatable.</p>
+  that it is trivially relocatable.
+  This paper was presented at C++Now 2019 as a 90-minute talk titled <a href="https://www.youtube.com/watch?v=SGdfPextuAU">"Trivially Relocatable."</a></p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -1604,11 +1605,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#use2"><span class="secno">3.2</span> <span class="content">Program-defined types that follow the Rule of Zero</span></a>
       <li><a href="#use3"><span class="secno">3.3</span> <span class="content">Program-defined types with non-defaulted special members</span></a>
      </ol>
-    <li>
-     <a href="#proposal"><span class="secno">4</span> <span class="content">Proposed language and library features</span></a>
-     <ol class="toc">
-      <li><a href="#bool-parameter"><span class="secno">4.1</span> <span class="content">Why <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code>?</span></a>
-     </ol>
+    <li><a href="#proposal"><span class="secno">4</span> <span class="content">Proposed language and library features</span></a>
     <li>
      <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording for C++2b</span></a>
      <ol class="toc">
@@ -1625,9 +1622,12 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <a href="#alternatives"><span class="secno">6</span> <span class="content">Rationale and alternatives</span></a>
      <ol class="toc">
       <li><a href="#destructive-move"><span class="secno">6.1</span> <span class="content">Why not destructive move?</span></a>
-      <li><a href="#maybe-trivially-relocatable"><span class="secno">6.2</span> <span class="content">Attribute <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code></span></a>
-      <li><a href="#relocatable-list"><span class="secno">6.3</span> <span class="content">Should <code class="highlight"><c- n>relocate_at</c-></code> be a customization point?</span></a>
-      <li><a href="#nothrow-relocatable"><span class="secno">6.4</span> <span class="content">Unintuitive <code class="highlight"><c- n>is_nothrow_relocatable</c-></code></span></a>
+      <li><a href="#bool-parameter"><span class="secno">6.2</span> <span class="content">Why <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code>?</span></a>
+      <li><a href="#maybe-trivially-relocatable"><span class="secno">6.3</span> <span class="content">Attribute <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code></span></a>
+      <li><a href="#relocatable-list"><span class="secno">6.4</span> <span class="content">Should <code class="highlight"><c- n>relocate_at</c-></code> be a customization point?</span></a>
+      <li><a href="#nothrow-relocatable"><span class="secno">6.5</span> <span class="content">Unintuitive <code class="highlight"><c- n>is_nothrow_relocatable</c-></code></span></a>
+      <li><a href="#relocate-function"><span class="secno">6.6</span> <span class="content">Provide <code class="highlight"><c- n>T</c-> <c- n>relocate</c-><c- p>(</c-><c- n>T</c-><c- o>*</c-><c- p>)</c-></code>?</span></a>
+      <li><a href="#pmr-concerns"><span class="secno">6.7</span> <span class="content">Confusing interactions with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-></code> and <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code></span></a>
      </ol>
     <li><a href="#acknowledgements"><span class="secno">7</span> <span class="content">Acknowledgements</span></a>
     <li>
@@ -1676,18 +1676,20 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <ul>
       <li data-md>
        <p>Polymorphic types (those with any vptr at all) inhibit "natural" trivial relocatability.
-    David Stone gave the motivating example; see <a href="#non-trivial-sample-polymorphic">Polymorphic downcast effectively relies on offset-into-self</a>.</p>
+    David Stone gave the motivating example. See <a href="#non-trivial-sample-polymorphic">Polymorphic downcast effectively relies on offset-into-self</a>.</p>
       <li data-md>
-       <p>Updated <code class="highlight"><c- n>concept</c-> <c- n>relocatable</c-></code>; added semantic requirements on assignment and some discussion
+       <p>Updated <code class="highlight"><c- n>concept</c-> <c- n>relocatable</c-></code>. Added semantic requirements on assignment and some discussion
     of the issue with <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code>.</p>
+      <li data-md>
+       <p>Added many direct links to sections of <a href="https://www.youtube.com/watch?v=SGdfPextuAU">my C++Now 2019 talk</a> covering particular motivations, design decisions, and implementation details.</p>
      </ul>
     <li data-md>
      <p>R3 (post-Kona):</p>
      <ul>
       <li data-md>
        <p>User-provided copy/move assignment operators inhibit "natural" trivial relocatability, just like
-    user-provided move constructors and destructors. This is intended to grant us
-    permission to optimize <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code>.</p>
+    user-provided move constructors and destructors. This is intended to permit us
+    to optimize <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code>.</p>
       <li data-md>
        <p>User-provided copy constructors inhibit "natural" trivial relocatability, just like
     user-provided move constructors and destructors.</p>
@@ -1700,7 +1702,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     moves and destroys of trivially relocatable types. Instead, the existence of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>relocate_at</c-></code> and handwaviness of e.g. <a href="http://eel.is/c++draft/vector#capacity-4"> [vector.capacity</a>] combine to strongly imply
     (but still not to mandate) that library vendors will use <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>relocate_at</c-></code> wherever
     it helps with performance. We no longer propose to permit eliminating
-    moves and destroys in e.g. <code class="highlight"><c- k>return</c-></code> statements, except as permitted under the as-if rule.</p>
+    moves and destroys in e.g. <code class="highlight"><c- k>return</c-></code> statements, except as already permitted under the as-if rule.</p>
      </ul>
    </ul>
    <h2 class="heading settled" data-level="2" id="intro"><span class="secno">2. </span><span class="content">Introduction and motivation</span><a class="self-link" href="#intro"></a></h2>
@@ -1720,16 +1722,17 @@ just like trivial move-construction and trivial copy-construction, means
 exist but are rare; one example is <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>. See <a href="#non-trivial-samples">Appendix C: Examples of non-trivially relocatable class types</a>.</p>
    <p>P1144 provides a way for the programmer
 to warrant to the compiler that a resource-managing type is trivially relocatable,
-and provides an algorithm by which the compiler can recursively _infer_ that a Rule-of-Zero type
+and provides an algorithm by which the compiler can recursively <em>infer</em> that a Rule-of-Zero type
 is trivially relocatable.</p>
    <p>The most important thing about P1144 relocation is that it is backward compatible and does not
 break either API or ABI. My intention is simply to legalize the well-understood tricks
 that every industry codebase is already doing in practice (see <a data-link-type="biblio" href="#biblio-bsl">[BSL]</a>, <a data-link-type="biblio" href="#biblio-eastl">[EASTL]</a>, <a data-link-type="biblio" href="#biblio-folly">[Folly]</a>).
 P1144 is not intended to change the behavior of any existing source code (except to speed it up).
 P1144 is not intended to require any major work from standard library vendors.</p>
-   <p>As observed in <a data-link-type="biblio" href="#biblio-cppchat">[CppChat]</a> (@21:55): Just as with C++11 move semantics, you can write
-benchmarks to show whatever speedup you like. The more complicated your types'
-move-constructors and destructors, the more time you save by eliminating calls to them.</p>
+   <p>As observed in <a data-link-type="biblio" href="#biblio-cppchat">[CppChat]</a> (<a href="https://www.youtube.com/watch?v=8u5Qi4FgTP8&amp;t=21m57s">@21:57</a>):
+Just as with C++11 move semantics, you can write benchmarks to show whatever speedup you like.
+The more complicated your types' move-constructors and destructors, the more time you save
+by eliminating calls to them.</p>
    <h3 class="heading settled" data-level="2.1" id="applications"><span class="secno">2.1. </span><span class="content">Optimizations enabled by trivial relocatability</span><a class="self-link" href="#applications"></a></h3>
    <h4 class="heading settled" data-level="2.1.1" id="benefit-resize"><span class="secno">2.1.1. </span><span class="content">Vector resize</span><a class="self-link" href="#benefit-resize"></a></h4>
    <p>If we have a reliable way of detecting "trivial relocatability,"
@@ -1744,9 +1747,11 @@ we can optimize any routine that performs the moral equivalent of <code class="h
    <p>Given a reliable way of detecting trivial relocatability,
 we can optimize any routine that uses the moral equivalent of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code>, such as</p>
 <pre class="language-c++ highlight">    <c- n>std</c-><c- o>::</c-><c- n>swap</c->
-    <c- n>std</c-><c- o>::</c-><c- n>sort</c->
     <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>R</c-><c- o>>::</c-><c- n>insert</c->
 </pre>
+   <p>Optimizing <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code> produces massive code-size improvements for all swap-based
+algorithms, including <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>sort</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rotate</c-></code>. See <a href="https://www.youtube.com/watch?v=SGdfPextuAU&amp;t=19m56s">@19:56–21:22</a> in my C++Now 2019 talk.</p>
+   <p>However, see <a href="#pmr-concerns">§ 6.7 Confusing interactions with std::pmr and vector::insert</a> for further discussion of <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code>.</p>
    <h4 class="heading settled" data-level="2.1.3" id="benefit-type-erasure"><span class="secno">2.1.3. </span><span class="content">More efficient small-buffer type-erasure</span><a class="self-link" href="#benefit-type-erasure"></a></h4>
    <p>Given a reliable way of detecting trivial relocatability,
 we can de-duplicate the code generated by small-buffer-optimized (SBO) type-erasing wrappers
@@ -1779,7 +1784,7 @@ relocatability of any type stored in a <code class="highlight"><c- n>folly</c-><
     <c- n>folly</c-><c- o>::</c-><c- n>fbvector</c-><c- o>&lt;</c-><c- n>Widget</c-><c- o>></c-> <c- n>vec</c-><c- p>;</c->  <c- c1>// FAILS AT COMPILE TIME for lack of warrant</c->
 </pre>
    <p>But this merely encourages the programmer to add the warrant and continue. An incorrect
-warrant will be discovered only at runtime, via undefined behavior. (See <a href="#non-trivial-sample-list">Allocated memory contains pointer to self</a> and <a data-link-type="biblio" href="#biblio-follyissue889">[FollyIssue889]</a>.)</p>
+warrant will be discovered only at runtime, via undefined behavior. See <a href="#non-trivial-sample-list">Allocated memory contains pointer to self</a>, <a data-link-type="biblio" href="#biblio-follyissue889">[FollyIssue889]</a>, and (most importantly) <a href="https://www.youtube.com/watch?v=SGdfPextuAU&amp;t=27m26s">@27:26–31:47</a> in my C++Now 2019 talk.</p>
 <pre class="language-c++ highlight">    <c- n>class</c-> <c- n>Gadget</c-> <c- p>{</c->
         <c- n>std</c-><c- o>::</c-><c- n>list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>lst_</c-><c- p>;</c->
     <c- p>};</c->
@@ -1953,21 +1958,6 @@ leave vendors to implement <code class="highlight"><c- p>[[</c-><c- n>clang</c->
 as non-standard extension mechanisms.
 In that case, we would strike <a href="#wording-attribute">§5.6</a> and one bullet point from <a href="#wording-inheritance">§5.5</a>;
 the rest of this proposal would remain exactly the same.</p>
-   <h3 class="heading settled" data-level="4.1" id="bool-parameter"><span class="secno">4.1. </span><span class="content">Why <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code>?</span><a class="self-link" href="#bool-parameter"></a></h3>
-   <p>It was suggested by numerous reviewers that <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> should
-take a (perhaps optional) boolean parameter, as in <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c->true<c- p>)]]</c-></code>.
-This allows us to write complicated conditions directly inline, instead of using
-metaprogramming to inherit the right behavior from a conditional base class.</p>
-   <p>See <a href="#sample-conditional">Conditionally trivial relocation</a> for an example of how this can be used.</p>
-   <p>There is no technical obstacle to adding an arbitrary C++ expression as the parameter to
-an attribute. The grammar for balancing <code class="highlight"><c- p>[]</c-></code> and <code class="highlight"><c- p>()</c-></code> in attribute parameters has been
-there since C++11. There is already prior art for arbitrary expressions in attributes;
-see <a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang’s <code class="highlight"><c- p>[[</c-><c- n>diagnose_if</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code> attribute</a>. EWG has also previously considered an attribute <code class="highlight"><c- p>[[</c-><c- n>assume_aligned</c-><c- p>(</c-><c- n>expr</c-><c- p>)]]</c-></code>; it was rejected in favor of <a data-link-type="biblio" href="#biblio-p1007r3">[P1007R3]</a>'s non-attribute
-approach, but not because of the <code class="highlight"><c- p>(</c-><c- n>expr</c-><c- p>)</c-></code> part specifically.</p>
-   <p>The major downside I see to <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- n>expr</c-><c- p>)]]</c-></code> is that it could lead to
-an arbitrarily complicated C++ expression appearing in an awkward position. But this
-is not necessarily worse, and perhaps better, than having to do the metaprogramming
-tricks shown in <a href="#sample-conditional">Conditionally trivial relocation</a>.</p>
    <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording for C++2b</span><a class="self-link" href="#wording"></a></h2>
    <p>The wording in this section is relative to <a data-link-type="biblio" href="#biblio-n4800">WG21 draft N4800</a>.</p>
    <h3 class="heading settled" data-level="5.1" id="wording-operation"><span class="secno">5.1. </span><span class="content">Relocation operation</span><a class="self-link" href="#wording-operation"></a></h3>
@@ -2002,7 +1992,8 @@ literally <code class="highlight"><c- n>memcpy</c-></code> (at least not without
 At Kona, EWG discussion of Richard Smith’s <a data-link-type="biblio" href="#biblio-p0593r3">[P0593R3]</a> suggests to me, and Richard
 confirmed, that a typical library vendor <em>could</em> implement this codepath
 by a call to a hypothetical <code class="highlight"><c- n>out_of_line_memcpy</c-></code> function whose
-implementation is invisible to the compiler’s optimizer.</p>
+implementation is invisible to the compiler’s optimizer.
+See <a href="https://www.youtube.com/watch?v=SGdfPextuAU&amp;t=45m23s">@45:23–48:39</a> in my C++Now 2019 talk.</p>
    <h3 class="heading settled" data-level="5.3" id="wording-uninit-relocate"><span class="secno">5.3. </span><span class="content">Algorithm <code class="highlight"><c- n>uninitialized_relocate</c-></code></span><a class="self-link" href="#wording-uninit-relocate"></a></h3>
    <p>Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:</p>
    <p><small></small></p>
@@ -2017,13 +2008,12 @@ implementation is invisible to the compiler’s optimizer.</p>
 </pre><p>except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object’s value might not happen.</p> <p><em>Remarks:</em> If an exception is thrown, some objects in the range <code class="highlight"><c- p>[</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code> are left in a valid but unspecified state.</p> </small>
    </blockquote>
+   <p class="note" role="note"><span>Note:</span> The "Remark" implies that <code class="highlight"><c- n>uninitialized_relocate</c-></code> has a <code class="highlight"><c- k>catch</c-></code>-and-cleanup clause
+similar to <code class="highlight"><c- n>uninitialized_move</c-></code>: if an exception is thrown, the whole destination range
+is destroyed before the exception is propagated. If <code class="highlight"><c- n>T</c-></code> is non-trivially relocatable and <code class="highlight"><c- n>T</c-></code>'s move-constructor might throw, then the implementation must be "move-in-a-loop
+followed by destroy-in-a-loop." See the implementation in <a href="#samples">Appendix B: Sample code</a>.</p>
    <p class="note" role="note"><span>Note:</span> We are guided by <a data-link-type="biblio" href="#biblio-p0884r0">[P0884R0]</a> to make <code class="highlight"><c- n>uninitialized_relocate</c-></code> unconditionally <code class="highlight"><c- k>noexcept</c-><c- p>(</c->false<c- p>)</c-></code>.
 This is consistent with <code class="highlight"><c- n>uninitialized_move</c-></code> and <code class="highlight"><c- n>destroy_at</c-></code>, both of which are unconditionally <code class="highlight"><c- k>noexcept</c-><c- p>(</c->false<c- p>)</c-></code>.</p>
-   <p class="note" role="note"><span>Note:</span> This algorithm is deliberately different from <code class="highlight"><c- n>relocate_at</c-></code>-in-a-loop, so that if
-some move-construction throws an exception, some elements of <code class="highlight"><c- p>[</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code> may be left
-in a moved-from state but will never actually be left in a <em>destroyed</em> state. If the
-vendor knows that <code class="highlight"><c- n>T</c-></code> is nothrow-move-constructible, then they could use <code class="highlight"><c- n>relocate_at</c-></code>-in-a-loop
-to speed up that special case.</p>
    <h3 class="heading settled" data-level="5.4" id="wording-uninit-relocate-n"><span class="secno">5.4. </span><span class="content">Algorithm <code class="highlight"><c- n>uninitialized_relocate_n</c-></code></span><a class="self-link" href="#wording-uninit-relocate-n"></a></h3>
    <p><small></small></p>
    <blockquote>
@@ -2048,7 +2038,7 @@ to a simple copy of the underlying bytes. <em>—end note</em>]</p> <p>[<em>Note
    <p class="note" role="note"><span>Note:</span> A class type declared <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c->false<c- p>)]]</c-></code> may still be trivially relocatable,
 if it satisfies the criteria above. For example, it is impossible to create a trivially copyable type
 which is not also trivially relocatable.</p>
-   <p class="note" role="note"><span>Note:</span> There is no special treatment for volatile subobjects (see <a data-link-type="biblio" href="#biblio-subobjects">[Subobjects]</a> and <a data-link-type="biblio" href="#biblio-p1152r0">[P1152R0]</a>)
+   <p class="note" role="note"><span>Note:</span> There is no special treatment for volatile subobjects (see <a data-link-type="biblio" href="#biblio-subobjects">[Subobjects]</a>)
 nor for possibly overlapping subobjects (see <a data-link-type="biblio" href="#biblio-subobjects">[Subobjects]</a>).</p>
    <p class="issue" id="issue-3121e1d2"><a class="self-link" href="#issue-3121e1d2"></a> The relevant move constructor, copy constructor, and/or destructor must be public and unambiguous.
 We imply this via the words "A move-constructible, destructible object type". However, "move-constructible"
@@ -2177,128 +2167,32 @@ Qt (<code class="highlight"><c- n>Q_MOVABLE_TYPE</c-></code>) and <a data-link-t
 give a consistent set of core-language rules by which the compiler can deduce the
 trivial relocatability of some class types which follow the Rule of Zero.</p>
    </ul>
-   <h3 class="heading settled" data-level="6.2" id="maybe-trivially-relocatable"><span class="secno">6.2. </span><span class="content">Attribute <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code></span><a class="self-link" href="#maybe-trivially-relocatable"></a></h3>
+   <h3 class="heading settled" data-level="6.2" id="bool-parameter"><span class="secno">6.2. </span><span class="content">Why <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code>?</span><a class="self-link" href="#bool-parameter"></a></h3>
+   <p>It was suggested by numerous reviewers that <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> should
+take an optional boolean parameter, as in <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c->true<c- p>)]]</c-></code>.
+This allows us to write complicated conditions directly inline, instead of using
+metaprogramming to inherit the right behavior from a conditional base class.</p>
+   <p>See <a href="#sample-conditional">Conditionally trivial relocation</a> for an example of how this can be used.</p>
+   <p>There is no technical obstacle to adding an arbitrary C++ expression as the parameter to
+an attribute. The grammar for balancing <code class="highlight"><c- p>[]</c-></code> and <code class="highlight"><c- p>()</c-></code> in attribute parameters has been
+there since C++11. There is already prior art for arbitrary expressions in attributes;
+see <a href="https://clang.llvm.org/docs/AttributeReference.html#diagnose-if">Clang’s <code class="highlight"><c- p>[[</c-><c- n>diagnose_if</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code> attribute</a>. EWG has also previously considered an attribute <code class="highlight"><c- p>[[</c-><c- n>assume_aligned</c-><c- p>(</c-><c- n>expr</c-><c- p>)]]</c-></code>; it was rejected in favor of <a data-link-type="biblio" href="#biblio-p1007r3">[P1007R3]</a>'s non-attribute
+approach, but not because of the <code class="highlight"><c- p>(</c-><c- n>expr</c-><c- p>)</c-></code> part specifically.</p>
+   <p>The major downside I see to <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- n>expr</c-><c- p>)]]</c-></code> is that it could lead to
+an arbitrarily complicated C++ expression appearing in an awkward position. But this
+is better than having to do the metaprogramming tricks shown in <a href="#sample-conditional">Conditionally trivial relocation</a>.</p>
+   <h3 class="heading settled" data-level="6.3" id="maybe-trivially-relocatable"><span class="secno">6.3. </span><span class="content">Attribute <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code></span><a class="self-link" href="#maybe-trivially-relocatable"></a></h3>
    <p>The Clang patch currently available on Godbolt Compiler Explorer supports both <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> and another attribute called <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>,
 which John McCall requested that I explore.</p>
-   <p>P1144 talks in terms of "warranting" that a class is trivially relocatable; this can be done
-manually via annotation, or as a sort of "auto-warrant" done automatically by the compiler when
-we follow the Rule of Zero.</p>
-   <p>But another way of looking at it is that trivial relocatability is always inherited in a
-straightforward way, and when we use the attribute, we are "overruling" a decision made by the
-compiler — a decision it made for maybe several different reasons. So we can have two different
-levels of "overruling":</p>
-   <ul>
-    <li data-md>
-     <p>The first level, <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>, means "I warrant that even though
-I may have user-provided, non-defaulted, special member functions, I have designed them
-so that my relocation operation will not do anything substantially different from memberwise
-relocation." So if all of my member and base subobjects are trivially relocatable (and not mutable
-and not volatile), then I myself will be trivially relocatable.</p>
-    <li data-md>
-     <p>The second level, <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code>, means "I warrant that even though
-I may have user-provided, non-defaulted, special member functions, and even though
-I may have non-trivially relocatable (or mutable or volatile) subobjects,
-I have designed them so that my relocation operation will not do anything substantially
-different from <code class="highlight"><c- n>memcpy</c-></code>." So I myself will be trivially relocatable <em>no matter what my
-subobjects claim about themselves.</em></p>
-   </ul>
-   <p>Using <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code>, I can write a
-class that "overrules" a decision made by one of its members.
-I can make a trivially relocatable class that contains a data member of type <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>interprocess</c-><c- o>::</c-><c- n>offset_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code> (using fundamentally non-trivial pieces
-to build a trivially relocatable whole: see <code class="highlight"><c- n>B</c-></code> below).
-I can make a trivially relocatable class that contains a data member of type <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code> (wrapping a fundamentally trivial type in a wrapper that
-explicitly warrants that triviality in a compiler-visible way: see <code class="highlight"><c- n>C</c-></code> below).</p>
-   <p>Using <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>, I am forbidden to write either of those classes;
-but I also am forbidden to write a trivially relocatable class that contains a data member
-of type <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code> (wrapping a fundamentally non-trivial type in a wrapper that
-explicitly, <em>incorrectly</em>, warrants its own triviality: see <code class="highlight"><c- n>D</c-></code> below).</p>
-   <p>The single "Strongly Against" vote on <a href="#taken-polls-2018-11-12">poll 1</a> was due to concerns
-that P1144 permits a class to warrant its own trivial relocatability — overruling the compiler’s
-assumptions — not only when the compiler’s assumptions are based on the presence of special members
-(<code class="highlight"><c- n>A</c-></code> below), but also when the compiler’s assumptions are based partly or wholly
-on the non-triviality of member or base subobjects (<code class="highlight"><c- n>B</c-></code>, <code class="highlight"><c- n>C</c-></code>, <code class="highlight"><c- n>D</c-></code> below).</p>
-   <p>I see cases <code class="highlight"><c- n>B</c-></code> and <code class="highlight"><c- n>C</c-></code> as a "feature, not a bug"; but both Ed Catmur (in polling) and
-John McCall (in Clang review) have indicated that they would prefer to allow case <code class="highlight"><c- n>A</c-></code> but forbid cases <code class="highlight"><c- n>B</c-></code> and <code class="highlight"><c- n>C</c-></code> (and of course <code class="highlight"><c- n>D</c-></code>) by standardizing the equivalent of <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code> in lieu of <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code>.
-(<a href="https://p1144.godbolt.org/z/aVJOaU">Here is the example on Compiler Explorer.</a>)</p>
-   <p><small></small></p>
-   <small> <pre class="language-c++ highlight">    <c- c1>// Everyone agrees that we want to allow this.</c->
-    <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>A</c-> <c- p>{</c->
-        <c- b>int</c-> <c- o>*</c-><c- n>p</c-><c- p>;</c->
-        <c- b>int</c-> <c- n>i</c-><c- p>;</c->
-        <c- k>static</c-> <c- b>int</c-> <c- n>g</c-><c- p>;</c->
-        <c- n>A</c-><c- p>()</c-> <c- o>:</c-> <c- n>p</c-><c- p>(</c-><c- o>&amp;</c-><c- n>g</c-><c- p>),</c-> <c- n>i</c-><c- p>(</c-><c- mi>0</c-><c- p>)</c-> <c- p>{}</c->
-        <c- n>A</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- o>:</c-> <c- n>p</c-><c- p>(</c-><c- o>&amp;</c-><c- n>g</c-><c- p>),</c-> <c- n>i</c-><c- p>(</c-><c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>)</c-> <c- p>{}</c->
-        <c- n>A</c-><c- o>&amp;</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- p>{</c-> <c- n>i</c-> <c- o>=</c-> <c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- k>return</c-> <c- o>*</c-><c- n>this</c-><c- p>;</c-> <c- p>}</c->
-    <c- p>};</c->
-
-    <c- c1>// P1144 explicitly wants to allow this; but some want to forbid it.</c->
-    <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>B</c-> <c- p>{</c->
-        <c- n>boost</c-><c- o>::</c-><c- n>interprocess</c-><c- o>::</c-><c- n>offset_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>p</c-><c- p>;</c->
-        <c- b>int</c-> <c- n>i</c-><c- p>;</c->
-        <c- n>B</c-><c- p>()</c-> <c- o>:</c-> <c- n>p</c-><c- p>(</c-><c- o>&amp;</c-><c- n>i</c-><c- p>),</c-> <c- n>i</c-><c- p>(</c-><c- mi>0</c-><c- p>)</c-> <c- p>{}</c->
-        <c- n>B</c-><c- p>(</c-><c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- o>:</c-> <c- n>p</c-><c- p>(</c-><c- o>&amp;</c-><c- n>i</c-><c- p>),</c-> <c- n>i</c-><c- p>(</c-><c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>)</c-> <c- p>{}</c->
-        <c- n>B</c-><c- o>&amp;</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- p>{</c-> <c- n>i</c-> <c- o>=</c-> <c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- k>return</c-> <c- o>*</c-><c- n>this</c-><c- p>;</c-> <c- p>}</c->
-    <c- p>};</c->
-
-    <c- c1>// Arguably this code has poor style.</c->
-    <c- c1>// P1144 explicitly wants to allow this; but some want to forbid it.</c->
-    <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>C</c-> <c- p>{</c->
-        <c- n>boost</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>p</c-><c- p>;</c->
-        <c- n>C</c-><c- p>(</c-><c- n>C</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-        <c- n>C</c-><c- o>&amp;</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- n>C</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- p>};</c->
-
-    <c- c1>// This code is buggy.</c->
-    <c- c1>// P1144 allows you to shoot yourself in the foot like this.</c->
-    <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>D</c-> <c- p>{</c->
-        <c- n>std</c-><c- o>::</c-><c- n>list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>lst</c-><c- p>;</c->
-        <c- n>D</c-><c- p>(</c-><c- n>D</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-        <c- n>D</c-><c- o>&amp;</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- n>D</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- p>};</c->
-</pre></small> 
-   <p>I believe a major problem with <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code> is that it requires us
-to talk about class types which are "not impediments to trivial relocatability" yet are not
-themselves trivially relocatable (because they are not relocatable at all). For example,
-libc++'s <code class="highlight"><c- n>optional</c-></code> has a base class which is destructible but not move-constructible:</p>
-   <p><small></small></p>
-   <small> <pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
-<c- k>struct</c-> <c- n>optional_destruct_base</c-> <c- p>{</c->
-    <c- b>bool</c-> <c- n>engaged</c-><c- p>;</c->
-    <c- k>union</c-> <c- p>{</c->
-        <c- b>char</c-> <c- n>dummy</c-><c- p>;</c->
-        <c- n>T</c-> <c- n>t</c-><c- p>;</c->
-    <c- p>};</c->
-    <c- o>~</c-><c- n>optional_destruct_base</c-><c- p>()</c-> <c- p>{</c-> <c- k>if</c-> <c- p>(</c-><c- n>engaged</c-><c- p>)</c-> <c- n>t</c-><c- p>.</c-><c- o>~</c-><c- n>T</c-><c- p>();</c-> <c- p>}</c->
-<c- p>};</c->
-
-<c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
-<c- k>struct</c-> <c- nl>optional_move_base</c-> <c- p>:</c-> <c- n>optional_destruct_base</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- p>{</c-> <c- p>...</c-> <c- p>};</c->
-
-<c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
-<c- n>class</c-> <c- nl>optional</c-> <c- p>:</c-> <c- n>optional_move_base</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- p>{</c-> <c- p>...</c-> <c- p>};</c->
-</pre></small> 
-   <p>In a P1144 <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> world, this is no problem; the annotation happens at a
-very high level, where the class designer of <code class="highlight"><c- n>optional</c-></code> can be sure that their move-constructor
-(inherited from <code class="highlight"><c- n>optional_move_base</c-></code>) and their destructor (inherited from <code class="highlight"><c- n>optional_destruct_base</c-></code>)
-will play together in the right way.</p>
-   <p>In a <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code> world, someone needs to annotate <code class="highlight"><c- n>optional_destruct_base</c-></code> so that its non-relocatability will not block the high-level <code class="highlight"><c- n>optional</c-></code> from becoming trivially
-relocatable. But then we have a weird scenario: the non-moveable class <code class="highlight"><c- n>optional_destruct_base</c-></code> seems to be claiming that it is "trivially relocatable," even though it is not relocatable, nor even
-moveable! Yet, if we don’t annotate it, we break the high-level <code class="highlight"><c- n>optional</c-></code>. This strikes me as a
-spooky situation where actions in one part of the codebase can have effects on distant parts.</p>
-   <p>Lastly, the concern over <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> seems to be based on the assumption that
-working programmers will frequently use this attribute in practice. In reality, I don’t think they will.
-P1144 is designed so that the Rule of Zero will do the right thing, and all library types will
-do the right thing. Most programmers won’t ever use the annotation, just as most programmers
-don’t use <code class="highlight"><c- p>[[</c-><c- n>maybe_unused</c-><c- p>]]</c-></code> or <code class="highlight"><c- p>[[</c-><c- n>no_unique_address</c-><c- p>]]</c-></code>.</p>
-   <p>The proposed attribute is a simple, sharp knife. It cuts what you point it at; point it carefully. <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code> is a slightly dull knife; it doesn’t necessarily cut on the
-first try. A dull knife is often more dangerous than a sharp one.</p>
-   <h3 class="heading settled" data-level="6.3" id="relocatable-list"><span class="secno">6.3. </span><span class="content">Should <code class="highlight"><c- n>relocate_at</c-></code> be a customization point?</span><a class="self-link" href="#relocatable-list"></a></h3>
+   <p>See <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1144r4.html#maybe-trivially-relocatable">P1144R4 section 6.2</a> for discussion of the <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code> attribute, including the reasons
+I do not propose it for standardization.</p>
+   <h3 class="heading settled" data-level="6.4" id="relocatable-list"><span class="secno">6.4. </span><span class="content">Should <code class="highlight"><c- n>relocate_at</c-></code> be a customization point?</span><a class="self-link" href="#relocatable-list"></a></h3>
    <p><b>No.</b> See <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1144r2.html#relocatable-list">P1144R2 section 5.4</a> for discussion of this approach, which was taken by Pablo Halpern’s <a data-link-type="biblio" href="#biblio-n4158">[N4158]</a>.
 See also
 "<a href="https://quuxplusone.github.io/blog/2018/09/28/trivially-relocatable-vs-destructive-movable/">Trivially Relocatable versus Destructive Movable</a>" (2018-09-28).</p>
-   <p>N4158’s customization-point approach seems to have a very high cost-to-benefit ratio.
+   <p>N4158’s customization-point approach has a very high cost-to-benefit ratio.
 I am satisfied with P1144’s avoiding that approach.</p>
-   <h3 class="heading settled" data-level="6.4" id="nothrow-relocatable"><span class="secno">6.4. </span><span class="content">Unintuitive <code class="highlight"><c- n>is_nothrow_relocatable</c-></code></span><a class="self-link" href="#nothrow-relocatable"></a></h3>
+   <h3 class="heading settled" data-level="6.5" id="nothrow-relocatable"><span class="secno">6.5. </span><span class="content">Unintuitive <code class="highlight"><c- n>is_nothrow_relocatable</c-></code></span><a class="self-link" href="#nothrow-relocatable"></a></h3>
    <p>Consider a type such as</p>
 <pre class="language-c++ highlight">    <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>Widget</c-> <c- p>{</c->
         <c- b>int</c-> <c- n>i</c-><c- p>;</c->
@@ -2318,10 +2212,99 @@ trivially relocatable (see <a data-link-type="biblio" href="#biblio-deque">[Dequ
    <p>However, I believe that it would be incorrect and unsafe for the library to claim that <code class="highlight"><c- n>Widget</c-></code> was "nothrow relocatable." "Nothrow relocatable" should imply that
 a generic algorithm could relocate it (as if by <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate</c-></code>)
 without worrying about catching exceptions. "<code class="highlight"><c- n>T</c-></code> is trivially relocatable" means that <code class="highlight"><c- n>T</c-></code> is relocat<i>able as if</i> by <code class="highlight"><c- n>memcpy</c-></code>; it does not mean that every relocation of <code class="highlight"><c- n>T</c-></code> <i>must</i> be performed <i>literally</i> by <code class="highlight"><c- n>memcpy</c-></code>.</p>
-   <p>I believe P1144’s proposed behavior is the best behavior. However, another plausible behavior
-would be to simply eliminate the <code class="highlight"><c- n>is_nothrow_relocatable</c-></code> type-trait from the standard library.
+   <p>I believe P1144’s proposed behavior is the best behavior. However, another plausible option
+would be simply to eliminate the <code class="highlight"><c- n>is_nothrow_relocatable</c-></code> type-trait from the standard library.
 If we don’t provide <code class="highlight"><c- n>is_nothrow_relocatable</c-></code>, then we don’t have to defend its
 mildly unintuitive behavior.</p>
+   <h3 class="heading settled" data-level="6.6" id="relocate-function"><span class="secno">6.6. </span><span class="content">Provide <code class="highlight"><c- n>T</c-> <c- n>relocate</c-><c- p>(</c-><c- n>T</c-><c- o>*</c-><c- p>)</c-></code>?</span><a class="self-link" href="#relocate-function"></a></h3>
+   <p class="note" role="note"><span>Note:</span> This section is new in P1144R5.</p>
+   <p>The current proposal provides <code class="highlight"><c- n>T</c-> <c- o>*</c-><c- n>relocate_at</c-><c- p>(</c-><c- n>T</c-> <c- o>*</c-><c- n>source</c-><c- p>,</c-> <c- n>T</c-> <c- o>*</c-><c- n>dest</c-><c- p>)</c-></code>, which ends the lifetime of <code class="highlight"><c- n>source</c-></code> and starts the lifetime of <code class="highlight"><c- n>dest</c-></code>. Anton Zhilin suggested that a more general primitive
+would actually be <code class="highlight"><c- n>T</c-> <c- n>relocate</c-><c- p>(</c-><c- n>T</c-> <c- o>*</c-><c- n>source</c-><c- p>)</c-></code>, which ends the lifetime of <code class="highlight"><c- n>source</c-></code> and starts the
+lifetime of a prvalue <code class="highlight"><c- n>T</c-></code> wherever the caller wants.</p>
+<pre class="language-c++ highlight">    <c- c1>// Before P1144:</c->
+    <c- o>::</c-><c- n>new</c-> <c- p>(</c-><c- n>dst_ptr</c-><c- p>)</c-> <c- n>C</c-><c- p>{</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>static_cast</c-><c- o>&lt;</c-><c- n>C</c-><c- o>*></c-><c- p>(</c-><c- n>src_ptr</c-><c- p>))</c-> <c- p>};</c->
+    <c- n>static_cast</c-><c- o>&lt;</c-><c- n>C</c-><c- o>*></c-><c- p>(</c-><c- n>src_ptr</c-><c- p>)</c-><c- o>->~</c-><c- n>C</c-><c- p>();</c->
+
+    <c- c1>// After P1144R5:</c->
+    <c- n>std</c-><c- o>::</c-><c- n>relocate_at</c-><c- p>(</c-><c- n>static_cast</c-><c- o>&lt;</c-><c- n>C</c-><c- o>*></c-><c- p>(</c-><c- n>src_ptr</c-><c- p>),</c-> <c- n>static_cast</c-><c- o>&lt;</c-><c- n>C</c-><c- o>*></c-><c- p>(</c-><c- n>dst_ptr</c-><c- p>));</c->
+
+    <c- c1>// After Anton Zhilin’s suggestion:</c->
+    <c- o>::</c-><c- n>new</c-> <c- p>(</c-><c- n>dst_ptr</c-><c- p>)</c-> <c- n>C</c-><c- p>{</c-> <c- n>std</c-><c- o>::</c-><c- n>relocate</c-><c- p>(</c-><c- n>static_cast</c-><c- o>&lt;</c-><c- n>C</c-><c- o>*></c-><c- p>(</c-><c- n>src_ptr</c-><c- p>))</c-> <c- p>};</c->
+</pre>
+   <p>With the <code class="highlight"><c- n>relocate</c-></code> primitive, we could implement operations such as <code class="highlight"><c- n>pilfer_back</c-></code>:</p>
+<pre class="language-c++ highlight">    <c- c1>// Before Anton Zhilin’s suggestion:</c->
+    <c- n>T</c-> <c- nf>pilfer_back</c-><c- p>()</c-> <c- p>{</c->
+        <c- n>T</c-> <c- n>result</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>data_</c-><c- p>[</c-><c- n>size_</c-><c- o>-</c-><c- mi>1</c-><c- p>]);</c->
+        <c- n>data_</c-><c- p>[</c-><c- o>--</c-><c- n>size_</c-><c- p>].</c-><c- o>~</c-><c- n>T</c-><c- p>();</c->
+        <c- k>return</c-> <c- n>result</c-><c- p>;</c->
+    <c- p>}</c->
+
+    <c- c1>// After Anton Zhilin’s suggestion:</c->
+    <c- n>T</c-> <c- nf>pilfer_back</c-><c- p>()</c-> <c- p>{</c->
+        <c- n>T</c-> <c- n>result</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>relocate</c-><c- p>(</c-><c- n>data_</c-><c- p>[</c-><c- n>size_</c-><c- p>]);</c->
+        <c- o>--</c-><c- n>size_</c-><c- p>;</c->
+        <c- k>return</c-> <c- n>result</c-><c- p>;</c->
+    <c- p>}</c->
+</pre>
+   <p><code class="highlight"><c- n>relocate_at</c-></code> can be implemented with today’s core language. Anton’s <code class="highlight"><c- n>relocate</c-></code> cannot. There is
+no way to "memcpy into the return slot" of a function, because the return slot is unnamed —<wbr>unless you create a local variable to name it, by which point it is too late, because you cannot
+create a local variable without constructing it. The library implementation of <code class="highlight"><c- n>relocate</c-></code> would
+have to use additional implementation magic; for example, an attribute <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>unconstructed</c-><c- p>]]</c-></code>.
+That attribute (or whatever) would not need to be standardized nor exposed to users.</p>
+   <p>This also assumes a compiler with Clang-level smarts about when to do NRVO. <a data-link-type="biblio" href="#biblio-p2025r0">[P2025R0]</a>,
+currently in EWG, proposes that all compilers be required to have such smarts.</p>
+<pre class="language-c++ highlight">    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
+    <c- n>T</c-> <c- n>relocate</c-><c- p>(</c-><c- n>T</c-> <c- o>*</c-><c- n>source</c-><c- p>)</c-> <c- p>{</c->
+        <c- k>if</c-> <c- n>constexpr</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c-> <c- p>{</c->
+            <c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>unconstructed</c-><c- p>]]</c-> <c- n>T</c-> <c- n>dest</c-><c- p>;</c->   <c- c1>// do not run dest’s constructor</c->
+            <c- n>memcpy</c-><c- p>(</c-><c- o>&amp;</c-><c- n>dest</c-><c- p>,</c-> <c- n>source</c-><c- p>,</c-> <c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>));</c->  <c- c1>// do not run source’s destructor</c->
+            <c- k>return</c-> <c- n>dest</c-><c- p>;</c->                       <c- c1>// copy-elision</c->
+        <c- p>}</c-> <c- k>else</c-> <c- p>{</c->
+            <c- n>T</c-> <c- n>dest</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>source</c-><c- p>));</c->  <c- c1>// run dest’s constructor</c->
+            <c- n>source</c-><c- o>->~</c-><c- n>T</c-><c- p>();</c->                <c- c1>// run source’s destructor</c->
+            <c- k>return</c-> <c- n>dest</c-><c- p>;</c->                 <c- c1>// copy-elision</c->
+        <c- p>}</c->
+    <c- p>}</c->
+
+    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
+    <c- n>T</c-> <c- o>*</c-><c- n>relocate_at</c-><c- p>(</c-><c- n>T</c-> <c- o>*</c-><c- n>source</c-><c- p>,</c-> <c- n>T</c-> <c- o>*</c-><c- n>dest</c-><c- p>)</c-> <c- p>{</c->
+        <c- k>return</c-> <c- o>::</c-><c- n>new</c-> <c- p>(</c-><c- n>dest</c-><c- p>)</c-> <c- n>T</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>relocate</c-><c- p>(</c-><c- n>source</c-><c- p>));</c->
+    <c- p>}</c->
+</pre>
+   <p>P1144R5 does not propose <code class="highlight"><c- n>T</c-> <c- n>relocate</c-><c- p>(</c-><c- n>T</c-> <c- o>*</c-><c- n>source</c-><c- p>)</c-></code> for inclusion in the standard library, because
+it requires this additional compiler support, which has not yet been implemented anywhere.</p>
+   <h3 class="heading settled" data-level="6.7" id="pmr-concerns"><span class="secno">6.7. </span><span class="content">Confusing interactions with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-></code> and <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code></span><a class="self-link" href="#pmr-concerns"></a></h3>
+   <p class="note" role="note"><span>Note:</span> This section is new in P1144R5.</p>
+   <p>The main thing P1144 does for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-></code> is efficient reallocation of the whole buffer.
+However, a secondary goal is to permit efficient insertion and erasure. <a href="https://godbolt.org/z/YOrD1F">Example:</a></p>
+<pre class="language-c++ highlight">    <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>></c-> <c- n>vs</c-><c- p>(</c-><c- mi>1000</c-><c- p>);</c->
+    <c- n>vs</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>vs</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-><c- o>+</c-><c- mi>500</c-><c- p>);</c->
+</pre>
+   <p>This <code class="highlight"><c- n>erase</c-></code> requires us to shift down 500 <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>string</c-></code> objects, which can be done either
+by 500 calls to <code class="highlight"><c- n>string</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-></code> followed by one call to <code class="highlight"><c- o>~</c-><c- n>string</c-></code>, or by
+one call to <code class="highlight"><c- o>~</c-><c- n>string</c-></code> followed by a <code class="highlight"><c- n>memcpy</c-></code>. We want to permit the latter. That’s why
+as of P1144R3, the definition of "trivially relocatable" in <a href="#wording-inheritance">§ 5.5 Trivially relocatable type</a> places requirements on <code class="highlight"><c- n>T</c-></code>'s assignment operators as well as on <code class="highlight"><c- n>T</c-></code>'s constructors and destructors.</p>
+   <p>However, consider <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>. Its move-constructor and destructor follow the
+rules for trivial relocatability, but its assignment operator does not.</p>
+<pre class="language-c++ highlight">    <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-> <c- n>vv</c-><c- p>;</c->
+    <c- n>vv</c-><c- p>.</c-><c- n>emplace_back</c-><c- p>(</c-><c- mi>1</c-><c- p>,</c-> <c- mi>1</c-><c- p>,</c-> <c- o>&amp;</c-><c- n>mr1</c-><c- p>);</c->
+    <c- n>vv</c-><c- p>.</c-><c- n>emplace_back</c-><c- p>(</c-><c- mi>2</c-><c- p>,</c-> <c- mi>2</c-><c- p>,</c-> <c- o>&amp;</c-><c- n>mr2</c-><c- p>);</c->
+    <c- n>vv</c-><c- p>.</c-><c- n>emplace_back</c-><c- p>(</c-><c- mi>3</c-><c- p>,</c-> <c- mi>3</c-><c- p>,</c-> <c- o>&amp;</c-><c- n>mr3</c-><c- p>);</c->
+    <c- n>vv</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- mi>1000</c-><c- p>);</c->  <c- c1>// A</c->
+    <c- n>vv</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>vv</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->  <c- c1>// B</c->
+</pre>
+   <p>On line "A", we would like the implementation to use trivial relocation (<code class="highlight"><c- n>memcpy</c-></code>) because it
+is fast and correct. But on line "B", if the implementation today uses <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> and tomorrow
+uses <code class="highlight"><c- n>memcpy</c-></code>, the user will be able to detect the change by inspecting <code class="highlight"><c- n>vv</c-><c- p>[</c-><c- mi>0</c-><c- p>].</c-><c- n>get_allocator</c-><c- p>()</c-></code>.</p>
+   <p>See this example completely worked out <a href="https://www.youtube.com/watch?v=SGdfPextuAU&amp;t=76m17s">@76:17–84:20</a> in my C++Now 2019 talk.</p>
+   <p>For now, P1144R5 implies that <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code> shall not be trivially relocatable,
+which means that line "A" will not get the <code class="highlight"><c- n>memcpy</c-></code> speedup unless the vendor special-cases
+a whitelist of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-></code> containers. However, I think this area deserves more discussion.</p>
+   <p class="note" role="note"><span>Note:</span> Regardless, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>polymorphic_allocator</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code> is a trivially relocatable type.
+The problem above arises from <code class="highlight"><c- n>propagate_on_move_assignment</c-></code> etc., which affect the behavior of <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> only for <em>containers</em> such as <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>. The author of the container makes
+the choice whether to respect POCMA/POCCA/POCS, and the author of the container also makes the choice
+when to warrant trivial relocatability. These choices are correlated, and so it is natural that
+they should be made by the same person, at the same place in the source code.</p>
    <h2 class="heading settled" data-level="7" id="acknowledgements"><span class="secno">7. </span><span class="content">Acknowledgements</span><a class="self-link" href="#acknowledgements"></a></h2>
    <p>Thanks to Elias Kosunen, Niall Douglas, and John Bandela for their feedback on early drafts of this paper.</p>
    <p>Many thanks to Matt Godbolt for allowing me to install the prototype Clang implementation on Compiler Explorer
@@ -2342,6 +2325,9 @@ and for answering my questions on <a href="https://gcc.gnu.org/bugzilla/show_bug
    <p>Thanks to Jens Maurer for his feedback on this paper at Kona 2019, and to Corentin Jabot for championing
 P1144R4 at Prague 2020.</p>
    <h2 class="heading settled" id="polls"><span class="content">Appendix A: Straw polls</span><a class="self-link" href="#polls"></a></h2>
+   <p class="issue" id="issue-8c46923c"><a class="self-link" href="#issue-8c46923c"></a> The next time this paper is seen, Anton Zhilin would like us to take a straw poll
+on whether it should be possible to create a type which is "trivially relocatable, but not move-constructible."
+Currently P1144 does not permit such a thing; relocatability here is defined as a superset of move-constructibility.</p>
    <h3 class="heading settled" id="taken-polls-2020-02-13"><span class="content">Polls taken at EWGI at Prague on 2020-02-13</span><a class="self-link" href="#taken-polls-2020-02-13"></a></h3>
    <p>Corentin Jabot championed P1144R4. EWGI discussed P1144R4 and Niall Douglas’s <a data-link-type="biblio" href="#biblio-p1029r3">[P1029R3]</a> consecutively,
 then took the following straw polls.
@@ -2512,9 +2498,9 @@ as proposed in this paper (P1144R0).</small>
 own trivial relocatability, overruling the compiler’s assumptions, not only when the compiler’s assumptions
 are based on the presence of special members, but also when the compiler’s
 assumptions are based partly or wholly on the non-triviality of member or base subobjects.
-See further discussion under <a href="#maybe-trivially-relocatable">§ 6.2 Attribute [[maybe_trivially_relocatable]]</a>.</p>
+See further discussion under <a href="#maybe-trivially-relocatable">§ 6.3 Attribute [[maybe_trivially_relocatable]]</a>.</p>
    <p>The "Against" vote on poll 10, <code class="highlight"><c- n>uninitialized_relocate</c-></code>, was due to its exception guarantee, which was
-weaker in P1144R0. P1144R1 has strengthened the guarantee (and tightened the constraint on the source
+weaker in P1144R0. P1144R1 strengthened the guarantee (and tightened the constraint on the source
 iterator from <code class="highlight"><c- n>InputIterator</c-></code> to <code class="highlight"><c- n>ForwardIterator</c-></code>) to better match the other <code class="highlight"><c- n>uninitialized_foo</c-></code> algorithms.</p>
    <p>The "Strongly Against" vote on poll 11, <code class="highlight"><c- n>is_relocatable</c-></code>, was from a desire to save the name <code class="highlight"><c- n>relocatable</c-></code> for something different, such as a built-in destructive-move operation.</p>
    <h3 class="heading settled" id="taken-polls-2018-11-07"><span class="content">Poll taken of EWGI at San Diego on 2018-11-07</span><a class="self-link" href="#taken-polls-2018-11-07"></a></h3>
@@ -2653,7 +2639,7 @@ alternative styles:</p>
       <td><a href="https://github.com/Quuxplusone/libcxx/commit/example-optional-trbool">-1, +1</a>
       <td><a href="https://github.com/Quuxplusone/libcxx/commit/example-deque-trbool">-1, +17</a>
    </table>
-   <p>For why one entry in this table is "problematic," see <a href="#maybe-trivially-relocatable">§ 6.2 Attribute [[maybe_trivially_relocatable]]</a>.</p>
+   <p>For why one entry in this table is "problematic," see <a href="#maybe-trivially-relocatable">§ 6.3 Attribute [[maybe_trivially_relocatable]]</a>.</p>
    <h2 class="heading settled" id="non-trivial-samples"><span class="content">Appendix C: Examples of non-trivially relocatable class types</span><a class="self-link" href="#non-trivial-samples"></a></h2>
    <h3 class="heading settled" id="non-trivial-sample-string"><span class="content">Class contains pointer to self</span><a class="self-link" href="#non-trivial-sample-string"></a></h3>
    <p>This fictional <code class="highlight"><c- n>short_string</c-></code> illustrates a mechanism that can apply
@@ -2757,6 +2743,7 @@ from a simple <code class="highlight"><c- n>memcpy</c-></code>.</p>
 <c- k>struct</c-> <c- nl>Widget</c-> <c- p>:</c-> <c- n>registered_object</c-> <c- p>{};</c->
 </pre></small> 
    <h3 class="heading settled" id="non-trivial-sample-polymorphic"><span class="content">Polymorphic downcast effectively relies on offset-into-self</span><a class="self-link" href="#non-trivial-sample-polymorphic"></a></h3>
+   <p class="note" role="note"><span>Note:</span> This section is new in P1144R5.</p>
    <p>Thanks to David Stone for this example.
 In the following snippet, <code class="highlight"><c- k>struct</c-> <c- n>Base</c-></code> is relocatable, but not trivially relocatable,
 because its copy constructor and assignment operator do not copy the entire state of the
@@ -2806,9 +2793,7 @@ virtual methods to be "naturally" trivially relocatable.</p>
    <p>A prototype Clang/libc++ implementation is at</p>
    <ul>
     <li data-md>
-     <p><a href="https://github.com/Quuxplusone/clang/tree/trivially-relocatable">github.com/Quuxplusone/clang/tree/trivially-relocatable</a></p>
-    <li data-md>
-     <p><a href="https://github.com/Quuxplusone/libcxx/tree/trivially-relocatable">github.com/Quuxplusone/libcxx/tree/trivially-relocatable</a></p>
+     <p><a href="https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable">github.com/Quuxplusone/llvm-project/tree/trivially-relocatable</a></p>
     <li data-md>
      <p><a href="https://p1144.godbolt.org/z/oWEd_X">godbolt.org</a>, under the name "x86-64 clang (experimental P1144)"</p>
     <li data-md>
@@ -2817,11 +2802,11 @@ virtual methods to be "naturally" trivially relocatable.</p>
    <p>Side-by-side case studies of <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code>, <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>,
 and <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code> are given in <a href="#sample-conditional">Conditionally trivial relocation</a>.</p>
    <p>As of November 2018, libstdc++ performs the <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>resize</c-></code> optimization
-for any type which has manually specialized <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>__is_trivially_relocatable</c-></code>.
-(See it on Compiler Explorer <a href="https://godbolt.org/z/Qs32s9">here</a>.)
-Manual specialization is also the approach used by <a data-link-type="biblio" href="#biblio-folly">[Folly]</a>, <a data-link-type="biblio" href="#biblio-eastl">[EASTL]</a>, and <a data-link-type="biblio" href="#biblio-bsl">[BSL]</a>.
-As of 2019-01-18, the only libstdc++ library type for which <code class="highlight"><c- n>__is_trivially_relocatable</c-></code> has
-been specialized is <code class="highlight"><c- n>deque</c-></code>; see <a data-link-type="biblio" href="#biblio-deque">[Deque]</a> and <a href="#nothrow-relocatable">§ 6.4 Unintuitive is_nothrow_relocatable</a>.</p>
+for any type which has manually specialized <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>__is_bitwise_relocatable</c-></code>.
+(See it on godbolt.org <a href="https://godbolt.org/z/hvx5bg">here</a>.)
+Manual specialization is also the approach used by <a data-link-type="biblio" href="#biblio-eastl">[EASTL]</a>, <a data-link-type="biblio" href="#biblio-folly">[Folly]</a>, and <a data-link-type="biblio" href="#biblio-bsl">[BSL]</a>.
+As of 2020-03-01, the only libstdc++ library type for which <code class="highlight"><c- n>__is_bitwise_relocatable</c-></code> has
+been specialized is <code class="highlight"><c- n>deque</c-></code>; see <a data-link-type="biblio" href="#biblio-deque">[Deque]</a> and <a href="#nothrow-relocatable">§ 6.5 Unintuitive is_nothrow_relocatable</a>.</p>
   </main>
 <script>
 (function() {
@@ -3012,8 +2997,8 @@ been specialized is <code class="highlight"><c- n>deque</c-></code>; see <a data
    <dd>Timur Doumler; Chandler Carruth. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1007r3.pdf">P1007R3: std::assume_aligned</a>. November 2018. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1007r3.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1007r3.pdf</a>
    <dt id="biblio-p1029r3">[P1029R3]
    <dd>Niall Douglas. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1029r3.pdf">P1029R3: move = bitcopies</a>. January 2020. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1029r3.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1029r3.pdf</a>
-   <dt id="biblio-p1152r0">[P1152R0]
-   <dd>JF Bastien. <a href="http://wg21.link/p1152r0">P1152R0: Deprecating volatile</a>. July 2018. URL: <a href="http://wg21.link/p1152r0">http://wg21.link/p1152r0</a>
+   <dt id="biblio-p2025r0">[P2025R0]
+   <dd>Anton Zhilin. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2025r0.html">Guaranteed copy elision for named return objects</a>. January 2020. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2025r0.html">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2025r0.html</a>
    <dt id="biblio-subobjects">[Subobjects]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/">When is a trivially copyable object not trivially copyable?</a>. July 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/">https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/</a>
   </dl>
@@ -3090,6 +3075,9 @@ regardless of whether it is copy-constructible; but, if it is copy-constructible
 must have the same semantics as move-and-destroy. We intend that a type may be relocatable regardless of
 whether it is assignable; but, if it is assignable then assignment must have the same semantics as
 destroy-and-copy or destroy-and-move.<a href="#issue-2fea1ba9"> ↵ </a></div>
+   <div class="issue"> The next time this paper is seen, Anton Zhilin would like us to take a straw poll
+on whether it should be possible to create a type which is "trivially relocatable, but not move-constructible."
+Currently P1144 does not permit such a thing; relocatability here is defined as a superset of move-constructibility.<a href="#issue-8c46923c"> ↵ </a></div>
   </div>
   <aside class="dfn-panel" data-for="abstract-opdef-relocation-operation">
    <b><a href="#abstract-opdef-relocation-operation">#abstract-opdef-relocation-operation</a></b><b>Referenced in:</b>
