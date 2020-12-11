@@ -1,0 +1,460 @@
+<pre class='metadata'>
+Title: Simpler implicit move
+Shortname: D2266
+Revision: 0
+!Draft Revision: 1
+Audience: EWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2266-implicit-move-rvalue-ref.html">rawgit.com/Quuxplusone/draft/gh-pages/d2266-implicit-move-rvalue-ref.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Following P0527 and P1825, return statements are permitted to <i>implicitly move</i>
+  from local variables of rvalue reference type; but a defect in the wording means that
+  it applies only to object return types, not reference return types. We fix this.
+  Also, we now require implicitly movable entities always to be treated as rvalues,
+  simplifying the spec and eliminating some subtle implementation divergence
+  attributable to the current two-step mechanism.
+Date: 2020-12-06
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- None yet.
+
+
+# Background # {#background}
+
+Starting in C++11, *implicit move*
+(<a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>)
+permits us to return move-only types by value:
+
+```c++
+struct Widget {
+    Widget(Widget&&);
+};
+
+Widget one(Widget w) {
+    return w;  // OK since C++11
+}
+```
+
+This wording was amended by [[CWG1579]], which made it
+legal to call converting constructors accepting an rvalue reference of the
+returned expression's type.
+
+```c++
+struct RRefTaker {
+    RRefTaker(Widget&&);
+};
+RRefTaker two(Widget w) {
+    return w;  // OK since C++11 + CWG1579
+}
+```
+
+C++20 adopted [[P1825]], a wording paper created by merging [[P0527]]
+and [[P1155]]. The former introduced the category of "implicitly movable entities,"
+and extended that category to include automatic variables of
+rvalue reference type. The latter increased the scope of the "implicit move"
+optimization beyond converting constructors — now, in C++20, the rule is
+simply that the first overload resolution to initialize the returned object is done
+by treating `w` as an rvalue. (The resolution may now produce candidates such
+as conversion operators and constructors-taking-`Base&&`.) Of these two
+changes, P0527's was the more drastic:
+
+```c++
+RRefTaker three(Widget&& w) {
+    return w;  // OK since C++20 because P0527
+}
+```
+
+However, due to the placement of P1825's new wording in <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>,
+the new wording about "implicitly movable entities" is triggered *only when
+initializing a return object.* Functions that do not return objects, do not
+benefit from this wording. This leads to a surprising result:
+
+```c++
+Widget&& four(Widget&& w) {
+    return w;  // Error
+}
+```
+
+In `return w`, the implicitly movable entity `w` is treated as an rvalue
+when the return type of the function is `RRefTaker` as in example `three`,
+but it is treated as an lvalue when the return type of the function is `Widget&&`
+as in example `four`.
+
+
+## Conversion operators are treated inconsistently ## {#conversion-operator}
+
+```c++
+struct Mutt {
+    operator int*() &&;
+};
+struct Jeff {
+    operator int&() &&;
+};
+
+int* five(Mutt x) {
+    return x;  // OK since C++20 because P1155
+}
+
+int& six(Jeff x) {
+    return x;  // Error
+}
+```
+
+(`Mutt` here is isomorphic to example `nine` from [[P1155]]. P1155 did not
+explicitly consider `Jeff` because, at the time, Arthur hadn't realized that
+the difference between `Mutt` and `Jeff` was significant to the wording.)
+
+
+## "Perfect backwarding" is treated inconsistently ## {#perfect-backwarding}
+
+```c++
+template<class T>
+T&& seven(T&& x) { return x; }
+
+void test_seven(Widget w) {
+    Widget& r = seven(w);               // OK
+    Widget&& rr = seven(std::move(w));  // Error
+}
+```
+
+The line marked "Error" instantiates `seven<Widget>`, with the signature
+`Widget&& seven(Widget&& x)`. The rvalue-reference parameter `x` is an implicitly
+movable entity according to C++20; but, because the return type is not an
+object type, implicit move fails to happen — the return type `Widget&&` cannot
+bind to the lvalue *id-expression* `x`.
+
+The same surprise occurs with `decltype(auto)` return types:
+
+```
+Widget val();
+Widget& lref();
+Widget&& rref();
+
+decltype(auto) eight() {
+    decltype(auto) x = val();  // OK, x is Widget
+    return x;  // OK, return type is Widget, we get copy elision
+}
+
+decltype(auto) nine() {
+    decltype(auto) x = lref();  // OK, x is Widget&
+    return x;  // OK, return type is Widget&
+}
+
+decltype(auto) ten() {
+    decltype(auto) x = val();  // OK, x is Widget&&
+    return x;  // Error, return type is Widget&&, cannot bind to x
+}
+```
+
+We propose to make `ten` work, by permitting — in fact *requiring* —
+the implicitly movable *id-expression* `x` to be treated as an rvalue.
+
+
+### No change to `decltype` deduction ### {#decltype-auto}
+
+Notice that we do not propose to change any of the rules around
+the deduction of `decltype(auto)` itself. Ever since C++14, `ten`'s 
+return type has been deduced as `Widget&&`; we are not changing that.
+We propose merely to change the treatment of `x` in `return x` so
+that it can actually bind to the rvalue-reference type that is deduced.
+
+Consider this extremely contrived example:
+
+```c++
+decltype(auto) eleven(Widget&& x) {
+    return (x);  // OK, return type is Widget&
+}
+```
+
+In C++17, this was OK because `x` (being of reference type) did not trigger
+implicit move; `(x)` was an lvalue expression, the deduced return type was
+`Widget&`, and everything was happy.
+
+In C++20 after P0527, this is OK because although `x` *is* an implicitly movable entity,
+the return type is not an object type, and so <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>
+does not apply. `(x)` remains an lvalue expression, the deduced return type remains
+`Widget&`, and everything is happy.
+
+We propose to make `eleven` ill-formed, by making it treat `(x)` as an rvalue
+expression. The deduced return type remains `decltype((x))` i.e. `Widget&`,
+but now it refuses to bind to the rvalue `(x)`. (Hypothetically, it might still
+succeed if a second, lvalue, pass were done; but we are also proposing to eliminate the
+second pass.)
+
+
+## Two lookups are overly confusing ## {#two-lookups}
+
+Implicit move is currently expressed
+in terms of two separate overload resolutions: one treating the operand as an rvalue,
+and then (if that resolution fails) another one treating the operand as an lvalue.
+
+As far as I know, this is the only place in the language where two separate resolutions
+are done on the same operand. This mechanism has some counterintuitive ramifications —
+not *problems* per se, but surprising and subtle quirks that would be nice to simplify
+out of the language.
+
+```c++
+struct Sam {
+    Sam(Widget&);        // #1
+    Sam(const Widget&);  // #2
+};
+
+Sam twelve() {
+    Widget w;
+    return w;  // calls #2 since C++20 because P1155
+}
+```
+
+Note: In C++17 (prior to P1155), #2 would not be found by the first pass because
+its argument type is not exactly `Widget&&`. The comment in `twelve` matches the
+current Standard wording, and matches the behavior of MSVC 19.27 and GCC 7 through 10.
+(As of this writing, GCC trunk has regressed and lost the correct behavior.)
+Clang 11 still calls #1 in all modes, because it has not yet implemented P1155 (but
+Clang will correctly call #2 after [[D88220]] is landed).
+
+The first overload resolution succeeds, and selects a candidate (#2) that is
+a *worse match* than the candidate that would have been selected by the second
+overload resolution. This is a surprising quirk, which was discussed internally around
+the time P1825 was adopted (see [[CoreReflector]]); that discussion petered out with
+no conclusion except a general sense that the alternative mechanisms
+discussed (such as introducing a notion of "lvalues that preferentially bind
+to rvalue references" or "rvalues that reluctantly bind to lvalue references")
+were strictly worse than the status quo.
+
+
+```c++
+struct Frodo {
+    Frodo(Widget&);
+    Frodo(Widget&&) = delete;
+};
+
+Frodo thirteen() {
+    Widget w;
+    return w;  // Error: the first overload resolution selects a deleted function
+}
+```
+
+Here the first pass uniquely finds `Frodo(Widget&&)`,
+which is a deleted function; does this count as "the first overload resolution fails,"
+or does it count as a success and thus produce an error when we try to use that deleted
+function? Vendors currently disagree, but
+<a href="https://eel.is/c++draft/over.match.general#3">[over.match.general]/3</a> is clear:
+
+> If a best viable function exists and is unique, overload resolution succeeds
+> and produces it as the result. Otherwise overload resolution fails
+> and the invocation is ill-formed. [...] Overload resolution
+> results in a *usable candidate* if overload resolution succeeds and
+> the selected candidate is either not a function ([over.built]), or is a function
+> that is not deleted and is accessible from the context in which overload resolution
+> was performed.
+
+<b>Error from use of deleted function:</b> GCC 5,6,7; GCC trunk with <tt>-std=c++20</tt>; MSVC; ICC
+
+<b>Non-conforming fallback to `Frodo(Widget&)`:</b> GCC 8,9,10; GCC trunk with <tt>-std=c++17</tt>; Clang
+
+This implementation divergence would be less likely to exist, if the specification
+were simplified to avoid relying on the precise formal meaning of "failure."
+We propose that simplification.
+
+
+## A specific case involving `reference_wrapper` ## {#refwrap}
+
+Consider this dangerous function:
+
+```c++
+std::reference_wrapper<Widget> fourteen() {
+    Widget w;
+    return w;  // OK until CWG1579; OK after LWG2993
+}
+```
+
+Prior to [[CWG1579]] (circa 2014), implicit move was not done, and so `w` was treated
+as an lvalue and `fourteen` was well-formed — it returned a dangling reference to automatic
+variable `w`.
+
+CWG1579 made `fourteen` ill-formed (except on the non-conforming compilers listed above),
+because now the first overload resolution step would find `reference_wrapper(type&&) = delete`
+and hard-error.
+
+Then, [[LWG2993]] eliminated this deleted constructor from `reference_wrapper` and
+replaced it with a SFINAE-constrained constructor from `U&&`. Now, the first overload
+resolution step legitimately fails (it finds no viable candidates), and so the second
+overload resolution is performed and finds a usable candidate — it returns a dangling
+reference to automatic variable `w`. This is how the situation stands today in C++20.
+
+We propose to simplify <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>
+by eliminating the second "fallback" overload resolution.
+If this proposal is adopted, `fourteen` will once again become ill-formed.
+
+In the internal discussion of P1825 ([[CoreReflector]]) one participant opined that
+making `fourteen` ill-formed is a good thing, because it correctly diagnoses
+the dangling reference. The existing two-step mechanism works to defeat
+the clear intent of `reference_wrapper`'s SFINAE-constrained constructor
+and permit the returning of dangling references when in fact we don't want that.
+
+
+# Proposed wording relative to C++20 # {#wording}
+
+Modify
+<a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:
+
+> An *implicitly movable entity* is a variable of automatic storage duration that is either
+> a non-volatile object or an rvalue reference to a non-volatile object type. In the following
+> copy-initialization contexts, <del>a move operation is first considered before attempting a copy
+> operation</del><ins>an implicitly movable entity is treated as an rvalue</ins>:
+>
+> - If the <del>*expression* in</del><ins>operand of</ins>
+>     a `return` or `co_return` statement is a (possibly parenthesized) *id-expression*
+>     that names an implicitly movable entity declared in the body or
+>     *parameter-declaration-clause* of the innermost enclosing function or *lambda-expression*, or
+>
+> - if the operand of a *throw-expression* is a (possibly parenthesized) *id-expression*
+>     that names an implicitly movable entity whose scope does not extend beyond the
+>     *compound-statement* of the innermost *try-block* or *function-try-block* (if any)
+>     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*,
+>
+> <ins>the operand is treated as an rvalue for purposes of overload resolution and
+> initialization.</ins>
+> <del>overload resolution to select the constructor for the copy or the `return_value`
+> overload to call is first performed as if the expression or operand were an rvalue.
+> If the first overload resolution fails or was not performed, overload resolution
+> is performed again, considering the expression or operand as an lvalue.</del>
+>
+> [*Note 3:* This <del>two-stage overload resolution is performed</del><ins>clause applies</ins>
+> regardless of whether copy elision will occur. It determines the <del>constructor
+> or the `return_value` overload to be called</del><ins>initialization
+> or binding to be performed</ins> if elision is not performed,
+> and the selected <del>constructor or `return_value` overload</del><ins>conversion
+> sequence</ins> must be accessible even if the call is elided. — *end note*]
+
+Also change the definition of `g()` in <a href="http://eel.is/c++draft/class.copy.elision#4">[class.copy.elision]/4</a>:
+
+<small><blockquote>
+<pre>
+    struct Weird {
+      Weird();
+      Weird(Weird&);
+    };
+
+    <del>Weird g() {</del>
+      <del>Weird w;</del>
+      <del>return w;  // OK: first overload resolution fails, second overload resolution selects Weird(Weird&)</del>
+    <del>}</del>
+    <ins>Weird g(bool b) {</ins>
+      <ins>static Weird w1;</ins>
+      <ins>Weird w2;</ins>
+      <ins>if (b) {</ins>
+        <ins>return w1;  // OK: Weird(Weird&)</ins>
+      <ins>} else {</ins>
+        <ins>return w2;  // error: w2 is treated as an rvalue</ins>
+      <ins>}</ins>
+    <ins>}</ins>
+</pre>
+</blockquote></small>
+
+
+## Optional non-normative clarifications ## {#wording-nn}
+
+Add yet another example to <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/4</a>,
+showing how the new wording affects functions that return references:
+
+<small><blockquote>
+<pre>
+    <ins>int& h(bool b, int i) {</ins>
+      <ins>static int s;</ins>
+      <ins>if (b) {</ins>
+        <ins>return s;  // OK</ins>
+      <ins>} else {</ins>
+        <ins>return i;  // error: i is treated as an rvalue</ins>
+      <ins>}</ins>
+    <ins>}</ins>
+</pre>
+</blockquote></small>
+
+Add a note after <a href="http://eel.is/c++draft/dcl.init#ref-5.4.4">[dcl.init.ref]/5.4.4</a>:
+
+> if the reference is an rvalue reference, the initializer expression shall not be an lvalue.
+>
+> <ins>[*Note:* This can be affected by whether the initializer expression names
+> an implicitly movable entity ([class.copy.elision]). — *end note*]</ins>
+
+
+# Acknowledgments # {#acknowledgments}
+
+- Thanks to Ville Voutilainen for recommending Arthur write this paper.
+
+
+<pre class=biblio>
+{
+  "CWG1579": {
+    "title": "Return by converting move constructor",
+    "authors": [
+        "Jeffrey Yasskin"
+    ],
+    "href": "http://open-std.org/JTC1/SC22/WG21/docs/cwg_defects.html#1579",
+    "date": "October 2012"
+  },
+  "D88220": {
+    "title": "[C++20] P1825R0: More implicit moves",
+    "authors": [
+        "Yang Fan"
+    ],
+    "href": "https://reviews.llvm.org/D88220",
+    "date": "September 2020"
+  },
+  "LWG2993": {
+    "title": "reference_wrapper<T> conversion from T&&",
+    "authors": [
+      "Tim Song"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue2993",
+    "date": "November 2017"
+  },
+  "CoreReflector": {
+    "title": "[isocpp-core] P1825 (more implicit moves) surprise",
+    "authors": [
+      "CWG internal email discussion"
+    ],
+    "href": "https://lists.isocpp.org/core/2020/02/8455.php",
+    "date": "February 2020"
+  },
+  "P0527": {
+    "title": "Implicitly move from rvalue references in return statements",
+    "authors": [
+      "David Stone"
+    ],
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0527r1.html",
+    "date": "November 2017"
+  },
+  "P1155": {
+    "title": "More implicit moves",
+    "authors": [
+      "Arthur O'Dwyer",
+      "David Stone"
+    ],
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1155r3.html",
+    "date": "June 2019"
+  },
+  "P1825": {
+    "title": "Merged wording for P0527R1 and P1155R3",
+    "authors": [
+      "David Stone"
+    ],
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1825r0.html",
+    "date": "July 2019"
+  }
+}
+</pre>
