@@ -6,7 +6,8 @@ all: \
     d1153-volatile-subobjects.html \
     d1154-comparable-traits.html \
     d1155-more-implicit-moves.html \
-    d1518-container-deduction-guides.html
+    d1518-container-deduction-guides.html \
+    d2266-implicit-move-rvalue-ref.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
