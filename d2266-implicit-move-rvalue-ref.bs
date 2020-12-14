@@ -2,7 +2,7 @@
 Title: Simpler implicit move
 Shortname: D2266
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: EWG
 Status: D
 Group: WG21
@@ -163,36 +163,62 @@ We propose to make `ten` work, by permitting — in fact *requiring* —
 the implicitly movable *id-expression* `x` to be treated as an rvalue.
 
 
-### No change to `decltype` deduction ### {#decltype-auto}
+### Interaction with `decltype` and `decltype(auto)` ### {#decltype-auto}
 
-Notice that we do not propose to change any of the rules around
+We do not propose to change any of the rules around
 the deduction of `decltype(auto)` itself. Ever since C++14, `ten`'s 
 return type has been deduced as `Widget&&`; we are not changing that.
-We propose merely to change the treatment of `x` in `return x` so
+We propose merely to change the value category of `x` in `return x` so
 that it can actually bind to the rvalue-reference type that is deduced.
+
+However, functions with `decltype(auto)` return types have some subtlety
+to them.
 
 Consider this extremely contrived example:
 
 ```c++
 decltype(auto) eleven(Widget&& x) {
-    return (x);  // OK, return type is Widget&
+    return (x);
 }
 ```
 
-In C++17, this was OK because `x` (being of reference type) did not trigger
-implicit move; `(x)` was an lvalue expression, the deduced return type was
-`Widget&`, and everything was happy.
+Here, the return type of `eleven` is the decltype of the expression `(x)`.
+This is governed by <a href="https://eel.is/c++draft/dcl.spec.auto#dcl.type.auto.deduct-5">[dcl.type.auto.deduct]/5</a>:
 
-In C++20 after P0527, this is OK because although `x` *is* an implicitly movable entity,
-the return type is not an object type, and so <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>
-does not apply. `(x)` remains an lvalue expression, the deduced return type remains
-`Widget&`, and everything is happy.
+> If the *placeholder-type-specifier* is of the form *type-constraint<sub>opt</sub>* `decltype(auto)`,
+> `T` shall be the placeholder alone. The type deduced for `T` is determined as described in
+> <a href="https://eel.is/c++draft/dcl.type.decltype">[dcl.type.decltype]</a>,
+> as though *E* had been the operand of the decltype.
 
-We propose to make `eleven` ill-formed, by making it treat `(x)` as an rvalue
-expression. The deduced return type remains `decltype((x))` i.e. `Widget&`,
-but now it refuses to bind to the rvalue `(x)`. (Hypothetically, it might still
-succeed if a second, lvalue, pass were done; but we are also proposing to eliminate the
-second pass.)
+In C++17, the decltype of `(x)` was `int&`. No implicit move happened, because `x`
+(being a reference) was not an implicitly movable entity. The lvalue expression
+`(x)` happily binds to the function return type `int&`, and the code compiles OK.
+
+In C++20, the decltype of `(x)` is `int&`. `x` now *is* an implicitly movable entity,
+but (because the return type is not an object type) implicit move does not apply.
+The lvalue expression `(x)` happily binds to the function return type `int&`, and
+the code compiles OK.
+
+We propose to change the behavior of `eleven`!
+
+Under our proposal, the *id-expression* `x` (as the operand of `return`) is an implicitly moved entity, which means it is an xvalue.
+The function return type is deduced as `decltype(`<i>E</i>`)`, which is to say, `int&&` since *E* is an xvalue.
+The xvalue expression `(x)` happily binds to the function return type `int&&`, and the code compiles OK.
+<b>But now it returns `int&&`, not `int&`.</b>
+
+This does produce surprising inconsistencies in the handling of parentheses; for example,
+
+```c++
+auto f1(int x) -> decltype(x) { return (x); }     // int
+auto f2(int x) -> decltype((x)) { return (x); }   // int&
+auto f3(int x) -> decltype(auto) { return (x); }  // C++20: int&. Proposed: int&&
+auto g1(int x) -> decltype(x) { return x; }       // int
+auto g2(int x) -> decltype((x)) { return x; }     // int&
+auto g3(int x) -> decltype(auto) { return x; }    // int
+```
+
+However, parentheses have never played well with
+`decltype` nor `decltype(auto)`.
 
 
 ## Two lookups are overly confusing ## {#two-lookups}
@@ -290,7 +316,7 @@ Quest fourteen() {
 Here the first pass finds both `Quest(Merry&&)` and `Quest(Pippin&&)`.
 <a href="https://eel.is/c++draft/over.match.general#3">[over.match.general]/3</a> is clear
 that ambiguity *is* an overload resolution failure and the second resolution must
-be performed. However, there is again vendor divergence.
+be performed. However, EDG's front-end disagrees.
 
 <b>Fallback to `Quest(Together&)`:</b> GCC; Clang; MSVC
 
@@ -335,13 +361,36 @@ and permit the returning of dangling references when in fact we don't want that.
 
 # Proposed wording relative to C++20 # {#wording}
 
+Note that this proposal merge-conflicts with Jens Maurer's [[DraftPR3998]].
+Consensus seems to be that [class.copy.elision] is no longer the best place to explain
+"implicitly movable entity"; [[DraftPR3998]] moves that wording from [class.copy.elision] to [dcl.init],
+and introduces the term "result-initialization" for copy-initialization contexts in which
+implicit move can happen.
+
+
+Modify <a href="http://eel.is/c++draft/expr.prim.id.unqual#2">[expr.prim.id.unqual]/2</a> as follows:
+
+> The expression is <ins>an xvalue if it names an implicitly moved entity [class.copy.elision];</ins>
+> an lvalue if the entity is a function, variable, structured binding,
+> data member, or template parameter object<ins>;</ins> and a prvalue otherwise;
+> it is a bit-field if the identifier designates a bit-field.
+
+Modify <a href="https://eel.is/c++draft/dcl.spec.auto#dcl.type.auto.deduct-5">[dcl.type.auto.deduct]/5</a> as follows:
+
+> If the *placeholder-type-specifier* is of the form *type-constraint<sub>opt</sub>* `decltype(auto)`,
+> `T` shall be the placeholder alone. The type deduced for `T` is determined as described in [dcl.type.decltype],
+> as though *E* had been the operand of the `decltype`<ins>, except that *E* retains its value category</ins>.
+> <ins>[*Note:* If *E* is a parenthesized *id-expression* naming an implicitly moved entity, then the
+> type deduced for `T` may be different from `decltype(`<i>E</i>`)`. — *end note*]</ins>
+
+
 Modify
 <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:
 
 > An *implicitly movable entity* is a variable of automatic storage duration that is either
-> a non-volatile object or an rvalue reference to a non-volatile object type. In the following
-> copy-initialization contexts, <del>a move operation is first considered before attempting a copy
-> operation</del><ins>an implicitly movable entity is treated as an rvalue</ins>:
+> a non-volatile object or an rvalue reference to a non-volatile object type. In the following <del>copy-initialization</del>
+> contexts, <del>a move operation is first considered before attempting a copy
+> operation:</del><ins>an implicitly movable entity is also an *implicitly moved entity*:</ins>
 >
 > - If the <del>*expression* in</del><ins>operand of</ins>
 >     a `return` or `co_return` statement is a (possibly parenthesized) *id-expression*
@@ -353,8 +402,7 @@ Modify
 >     *compound-statement* of the innermost *try-block* or *function-try-block* (if any)
 >     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*,
 >
-> <ins>the operand is treated as an rvalue for purposes of overload resolution and
-> initialization.</ins>
+> <ins>the *id-expression* is treated as an xvalue; see [expr.prim.id.unqual].</ins>
 > <del>overload resolution to select the constructor for the copy or the `return_value`
 > overload to call is first performed as if the expression or operand were an rvalue.
 > If the first overload resolution fails or was not performed, overload resolution
@@ -393,9 +441,15 @@ Also change the definition of `g()` in <a href="http://eel.is/c++draft/class.cop
 </blockquote></small>
 
 
-## Optional non-normative clarifications ## {#wording-nn}
+## Move the wording for implicit move ## {#wording-dcl-init}
 
-Add yet another example to <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/4</a>,
+Remove <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a>, /4, and /5
+from their current position, and reinsert them after <a href="http://eel.is/c++draft/dcl.init#general-15">[dcl.init]/15</a>.
+
+
+## Non-normative clarifications ## {#wording-nn}
+
+Add yet more examples to <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/4</a>,
 showing how the new wording affects functions that return references:
 
 <small><blockquote>
@@ -405,8 +459,12 @@ showing how the new wording affects functions that return references:
       <ins>if (b) {</ins>
         <ins>return s;  // OK</ins>
       <ins>} else {</ins>
-        <ins>return i;  // error: i is treated as an rvalue</ins>
+        <ins>return i;  // error: i is an xvalue</ins>
       <ins>}</ins>
+    <ins>}</ins>
+
+    <ins>decltype(auto) h2(int i) {</ins>
+      <ins>return i;  // OK: h2's return type is int&&</ins>
     <ins>}</ins>
 </pre>
 </blockquote></small>
@@ -416,7 +474,7 @@ Add a note after <a href="http://eel.is/c++draft/dcl.init#ref-5.4.4">[dcl.init.r
 > if the reference is an rvalue reference, the initializer expression shall not be an lvalue.
 >
 > <ins>[*Note:* This can be affected by whether the initializer expression names
-> an implicitly movable entity ([class.copy.elision]). — *end note*]</ins>
+> an implicitly moved entity ([class.copy.elision]). — *end note*]</ins>
 
 
 # Acknowledgments # {#acknowledgments}
@@ -492,6 +550,14 @@ Add a note after <a href="http://eel.is/c++draft/dcl.init#ref-5.4.4">[dcl.init.r
     ],
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1825r0.html",
     "date": "July 2019"
+  },
+  "DraftPR3998": {
+    "title": "[class.copy.elision] Move specification of altered overload resolution",
+    "authors": [
+      "Jens Maurer"
+    ],
+    "href": "https://github.com/cplusplus/draft/pull/3998/",
+    "date": "May 2020"
   }
 }
 </pre>
