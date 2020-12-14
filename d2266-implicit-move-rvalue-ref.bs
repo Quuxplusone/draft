@@ -2,7 +2,7 @@
 Title: Simpler implicit move
 Shortname: D2266
 Revision: 0
-!Draft Revision: 1
+!Draft Revision: 2
 Audience: EWG
 Status: D
 Group: WG21
@@ -269,23 +269,50 @@ This implementation divergence would be less likely to exist, if the specificati
 were simplified to avoid relying on the precise formal meaning of "failure."
 We propose that simplification.
 
+Another example of vendors misinterpreting the meaning of "failure":
+
+```c++
+struct Merry {};
+struct Pippin {};
+struct Together : Merry, Pippin {};
+struct Quest {
+    Quest(Merry&&);
+    Quest(Pippin&&);
+    Quest(Together&);
+};
+
+Quest fourteen() {
+    Together t;
+    return t;  // OK: calls Quest(Together&)
+}
+```
+
+Here the first pass finds both `Quest(Merry&&)` and `Quest(Pippin&&)`.
+<a href="https://eel.is/c++draft/over.match.general#3">[over.match.general]/3</a> is clear
+that ambiguity *is* an overload resolution failure and the second resolution must
+be performed. However, there is again vendor divergence.
+
+<b>Fallback to `Quest(Together&)`:</b> GCC; Clang; MSVC
+
+<b>Non-conforming error due to ambiguity in the first pass:</b> ICC
+
 
 ## A specific case involving `reference_wrapper` ## {#refwrap}
 
 Consider this dangerous function:
 
 ```c++
-std::reference_wrapper<Widget> fourteen() {
+std::reference_wrapper<Widget> fifteen() {
     Widget w;
     return w;  // OK until CWG1579; OK after LWG2993
 }
 ```
 
 Prior to [[CWG1579]] (circa 2014), implicit move was not done, and so `w` was treated
-as an lvalue and `fourteen` was well-formed — it returned a dangling reference to automatic
+as an lvalue and `fifteen` was well-formed — it returned a dangling reference to automatic
 variable `w`.
 
-CWG1579 made `fourteen` ill-formed (except on the non-conforming compilers listed above),
+CWG1579 made `fifteen` ill-formed (except on the non-conforming compilers listed above),
 because now the first overload resolution step would find `reference_wrapper(type&&) = delete`
 and hard-error.
 
@@ -297,10 +324,10 @@ reference to automatic variable `w`. This is how the situation stands today in C
 
 We propose to simplify <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>
 by eliminating the second "fallback" overload resolution.
-If this proposal is adopted, `fourteen` will once again become ill-formed.
+If this proposal is adopted, `fifteen` will once again become ill-formed.
 
 In the internal discussion of P1825 ([[CoreReflector]]) one participant opined that
-making `fourteen` ill-formed is a good thing, because it correctly diagnoses
+making `fifteen` ill-formed is a good thing, because it correctly diagnoses
 the dangling reference. The existing two-step mechanism works to defeat
 the clear intent of `reference_wrapper`'s SFINAE-constrained constructor
 and permit the returning of dangling references when in fact we don't want that.
@@ -396,6 +423,8 @@ Add a note after <a href="http://eel.is/c++draft/dcl.init#ref-5.4.4">[dcl.init.r
 
 - Thanks to Ville Voutilainen for recommending Arthur write this paper.
 
+- Thanks to Aaron Puchert for inspiring `fourteen` via his comments on [[D68845]].
+
 
 <pre class=biblio>
 {
@@ -406,6 +435,14 @@ Add a note after <a href="http://eel.is/c++draft/dcl.init#ref-5.4.4">[dcl.init.r
     ],
     "href": "http://open-std.org/JTC1/SC22/WG21/docs/cwg_defects.html#1579",
     "date": "October 2012"
+  },
+  "D68845": {
+    "title": "Don't emit unwanted constructor calls in co_return statements",
+    "authors": [
+      "Aaron Puchert"
+    ],
+    "href": "https://reviews.llvm.org/D68845",
+    "date": "October 2019"
   },
   "D88220": {
     "title": "[C++20] P1825R0: More implicit moves",

@@ -2083,7 +2083,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>1
+     <dd>2
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs</a>
      <dt>Current:
@@ -2320,17 +2320,37 @@ was performed.</p>
    <p>This implementation divergence would be less likely to exist, if the specification
 were simplified to avoid relying on the precise formal meaning of "failure."
 We propose that simplification.</p>
+   <p>Another example of vendors misinterpreting the meaning of "failure":</p>
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- n>Merry</c-> <c- p>{};</c->
+<c- k>struct</c-> <c- n>Pippin</c-> <c- p>{};</c->
+<c- k>struct</c-> <c- nl>Together</c-> <c- p>:</c-> <c- n>Merry</c-><c- p>,</c-> <c- n>Pippin</c-> <c- p>{};</c->
+<c- k>struct</c-> <c- n>Quest</c-> <c- p>{</c->
+    <c- n>Quest</c-><c- p>(</c-><c- n>Merry</c-><c- o>&amp;&amp;</c-><c- p>);</c->
+    <c- n>Quest</c-><c- p>(</c-><c- n>Pippin</c-><c- o>&amp;&amp;</c-><c- p>);</c->
+    <c- n>Quest</c-><c- p>(</c-><c- n>Together</c-><c- o>&amp;</c-><c- p>);</c->
+<c- p>};</c->
+
+<c- n>Quest</c-> <c- nf>fourteen</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>Together</c-> <c- n>t</c-><c- p>;</c->
+    <c- k>return</c-> <c- n>t</c-><c- p>;</c->  <c- c1>// OK: calls Quest(Together&amp;)</c->
+<c- p>}</c->
+</pre>
+   <p>Here the first pass finds both <code class="highlight"><c- n>Quest</c-><c- p>(</c-><c- n>Merry</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code> and <code class="highlight"><c- n>Quest</c-><c- p>(</c-><c- n>Pippin</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code>. <a href="https://eel.is/c++draft/over.match.general#3">[over.match.general]/3</a> is clear
+that ambiguity <em>is</em> an overload resolution failure and the second resolution must
+be performed. However, there is again vendor divergence.</p>
+   <p><b>Fallback to <code class="highlight"><c- n>Quest</c-><c- p>(</c-><c- n>Together</c-><c- o>&amp;</c-><c- p>)</c-></code>:</b> GCC; Clang; MSVC</p>
+   <p><b>Non-conforming error due to ambiguity in the first pass:</b> ICC</p>
    <h3 class="heading settled" data-level="2.4" id="refwrap"><span class="secno">2.4. </span><span class="content">A specific case involving <code class="highlight"><c- n>reference_wrapper</c-></code></span><a class="self-link" href="#refwrap"></a></h3>
    <p>Consider this dangerous function:</p>
-<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>reference_wrapper</c-><c- o>&lt;</c-><c- n>Widget</c-><c- o>></c-> <c- n>fourteen</c-><c- p>()</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>reference_wrapper</c-><c- o>&lt;</c-><c- n>Widget</c-><c- o>></c-> <c- n>fifteen</c-><c- p>()</c-> <c- p>{</c->
     <c- n>Widget</c-> <c- n>w</c-><c- p>;</c->
     <c- k>return</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// OK until CWG1579; OK after LWG2993</c->
 <c- p>}</c->
 </pre>
    <p>Prior to <a data-link-type="biblio" href="#biblio-cwg1579">[CWG1579]</a> (circa 2014), implicit move was not done, and so <code class="highlight"><c- n>w</c-></code> was treated
-as an lvalue and <code class="highlight"><c- n>fourteen</c-></code> was well-formed — it returned a dangling reference to automatic
+as an lvalue and <code class="highlight"><c- n>fifteen</c-></code> was well-formed — it returned a dangling reference to automatic
 variable <code class="highlight"><c- n>w</c-></code>.</p>
-   <p>CWG1579 made <code class="highlight"><c- n>fourteen</c-></code> ill-formed (except on the non-conforming compilers listed above),
+   <p>CWG1579 made <code class="highlight"><c- n>fifteen</c-></code> ill-formed (except on the non-conforming compilers listed above),
 because now the first overload resolution step would find <code class="highlight"><c- n>reference_wrapper</c-><c- p>(</c-><c- n>type</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>delete</c-></code> and hard-error.</p>
    <p>Then, <a data-link-type="biblio" href="#biblio-lwg2993">[LWG2993]</a> eliminated this deleted constructor from <code class="highlight"><c- n>reference_wrapper</c-></code> and
 replaced it with a SFINAE-constrained constructor from <code class="highlight"><c- n>U</c-><c- o>&amp;&amp;</c-></code>. Now, the first overload
@@ -2338,9 +2358,9 @@ resolution step legitimately fails (it finds no viable candidates), and so the s
 overload resolution is performed and finds a usable candidate — it returns a dangling
 reference to automatic variable <code class="highlight"><c- n>w</c-></code>. This is how the situation stands today in C++20.</p>
    <p>We propose to simplify <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a> by eliminating the second "fallback" overload resolution.
-If this proposal is adopted, <code class="highlight"><c- n>fourteen</c-></code> will once again become ill-formed.</p>
+If this proposal is adopted, <code class="highlight"><c- n>fifteen</c-></code> will once again become ill-formed.</p>
    <p>In the internal discussion of P1825 (<a data-link-type="biblio" href="#biblio-corereflector">[CoreReflector]</a>) one participant opined that
-making <code class="highlight"><c- n>fourteen</c-></code> ill-formed is a good thing, because it correctly diagnoses
+making <code class="highlight"><c- n>fifteen</c-></code> ill-formed is a good thing, because it correctly diagnoses
 the dangling reference. The existing two-step mechanism works to defeat
 the clear intent of <code class="highlight"><c- n>reference_wrapper</c-></code>'s SFINAE-constrained constructor
 and permit the returning of dangling references when in fact we don’t want that.</p>
@@ -2440,6 +2460,8 @@ an implicitly movable entity ([class.copy.elision]). — <em>end note</em>]</ins
    <ul>
     <li data-md>
      <p>Thanks to Ville Voutilainen for recommending Arthur write this paper.</p>
+    <li data-md>
+     <p>Thanks to Aaron Puchert for inspiring <code class="highlight"><c- n>fourteen</c-></code> via his comments on <a data-link-type="biblio" href="#biblio-d68845">[D68845]</a>.</p>
    </ul>
   </main>
 <script>
@@ -2578,6 +2600,8 @@ an implicitly movable entity ([class.copy.elision]). — <em>end note</em>]</ins
    <dd>CWG internal email discussion. <a href="https://lists.isocpp.org/core/2020/02/8455.php">[isocpp-core] P1825 (more implicit moves) surprise</a>. February 2020. URL: <a href="https://lists.isocpp.org/core/2020/02/8455.php">https://lists.isocpp.org/core/2020/02/8455.php</a>
    <dt id="biblio-cwg1579">[CWG1579]
    <dd>Jeffrey Yasskin. <a href="http://open-std.org/JTC1/SC22/WG21/docs/cwg_defects.html#1579">Return by converting move constructor</a>. October 2012. URL: <a href="http://open-std.org/JTC1/SC22/WG21/docs/cwg_defects.html#1579">http://open-std.org/JTC1/SC22/WG21/docs/cwg_defects.html#1579</a>
+   <dt id="biblio-d68845">[D68845]
+   <dd>Aaron Puchert. <a href="https://reviews.llvm.org/D68845">Don't emit unwanted constructor calls in co_return statements</a>. October 2019. URL: <a href="https://reviews.llvm.org/D68845">https://reviews.llvm.org/D68845</a>
    <dt id="biblio-d88220">[D88220]
    <dd>Yang Fan. <a href="https://reviews.llvm.org/D88220">[C++20] P1825R0: More implicit moves</a>. September 2020. URL: <a href="https://reviews.llvm.org/D88220">https://reviews.llvm.org/D88220</a>
    <dt id="biblio-lwg2993">[LWG2993]
