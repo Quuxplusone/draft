@@ -2,7 +2,7 @@
 Title: Simpler implicit move
 Shortname: D2266
 Revision: 0
-!Draft Revision: 6
+!Draft Revision: 7
 Audience: EWG
 Status: D
 Group: WG21
@@ -12,13 +12,14 @@ URL:
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  Following P0527 and P1825, return statements are permitted to <i>implicitly move</i>
+  In C++20, return statements can <i>implicitly move</i>
   from local variables of rvalue reference type; but a defect in the wording means that
-  it applies only to object return types, not reference return types. We fix this.
-  Also, we now require implicitly movable entities always to be treated as rvalues,
-  simplifying the spec and eliminating some subtle implementation divergence
-  attributable to the current two-step mechanism.
-Date: 2020-12-15
+  <i>implicit move</i> fails to apply to functions that return references.
+  C++20's implicit move is specified via a complicated process involving two overload resolutions,
+  which is hard to implement, causing implementation divergence.
+  We fix the defect and simplify the spec by saying that a returned move-eligible
+  id-expression is <i>always</i> an xvalue.
+Date: 2021-01-06
 </pre>
 
 <style>
@@ -94,6 +95,8 @@ but it is treated as an lvalue when the return type of the function is `Widget&&
 as in example `four`.
 
 
+# Problems remaining in C++20 # {#problems}
+
 ## Conversion operators are treated inconsistently ## {#conversion-operator}
 
 ```c++
@@ -160,17 +163,13 @@ decltype(auto) ten() {
 ```
 
 We propose to make `ten` work, by permitting — in fact *requiring* —
-the implicitly movable *id-expression* `x` to be treated as an rvalue.
+the move-eligible *id-expression* `x` to be treated as an rvalue.
 
 
 ### Interaction with `decltype` and `decltype(auto)` ### {#decltype-auto}
 
 We do not propose to change any of the rules around
-the deduction of `decltype(auto)` itself. Ever since C++14, `ten`'s 
-return type has been deduced as `Widget&&`; we are not changing that.
-We propose merely to change the value category of `x` in `return x` so
-that it can actually bind to the rvalue-reference type that is deduced.
-
+the deduction of `decltype(auto)` itself.
 However, functions with `decltype(auto)` return types have some subtlety
 to them.
 
@@ -293,7 +292,7 @@ function? Vendors currently disagree, but
 
 <b>Error from use of deleted function:</b> GCC 5,6,7; GCC trunk with <tt>-std=c++20</tt>; MSVC; ICC
 
-<b>Non-conforming fallback to `Frodo(Widget&)`:</b> GCC 8,9,10; GCC trunk with <tt>-std=c++17</tt>; Clang
+<b>Non-conforming fallback to `Frodo(Widget&)`:</b> GCC 8,9,10; GCC trunk with <tt>-std=c++17</tt>; Clang before [[D92936]]
 
 This implementation divergence would be less likely to exist, if the specification
 were simplified to avoid relying on the precise formal meaning of "failure."
@@ -313,7 +312,7 @@ struct Quest {
 
 Quest fourteen() {
     Together t;
-    return t;  // OK: calls Quest(Together&)
+    return t;  // C++20: calls Quest(Together&). Proposed: ill-formed
 }
 ```
 
@@ -334,7 +333,7 @@ Consider this dangerous function:
 ```c++
 std::reference_wrapper<Widget> fifteen() {
     Widget w;
-    return w;  // OK until CWG1579; OK after LWG2993
+    return w;  // OK until CWG1579; OK after LWG2993. Proposed: ill-formed
 }
 ```
 
@@ -532,6 +531,14 @@ Add a note after <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init#ref
     ],
     "href": "https://reviews.llvm.org/D88220",
     "date": "September 2020"
+  },
+  "D92936": {
+    "title": "[Sema] Fix deleted function problem in implicitly movable test",
+    "authors": [
+        "Yang Fan"
+    ],
+    "href": "https://reviews.llvm.org/D92936",
+    "date": "December 2020"
   },
   "LWG2993": {
     "title": "reference_wrapper<T> conversion from T&&",
