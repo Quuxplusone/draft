@@ -2,7 +2,7 @@
 Title: Simpler implicit move
 Shortname: D2266
 Revision: 0
-!Draft Revision: 3
+!Draft Revision: 4
 Audience: EWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   Also, we now require implicitly movable entities always to be treated as rvalues,
   simplifying the spec and eliminating some subtle implementation divergence
   attributable to the current two-step mechanism.
-Date: 2020-12-06
+Date: 2020-12-15
 </pre>
 
 <style>
@@ -154,7 +154,7 @@ decltype(auto) nine() {
 }
 
 decltype(auto) ten() {
-    decltype(auto) x = val();  // OK, x is Widget&&
+    decltype(auto) x = rref();  // OK, x is Widget&&
     return x;  // Error, return type is Widget&&, cannot bind to x
 }
 ```
@@ -201,7 +201,7 @@ the code compiles OK.
 
 We propose to change the behavior of `eleven`!
 
-Under our proposal, the *id-expression* `x` (as the operand of `return`) is an implicitly moved entity, which means it is an xvalue.
+Under our proposal, the *id-expression* `x` (as the operand of `return`) is *move-eligible*, which means it is an xvalue.
 The function return type is deduced as `decltype(`<i>E</i>`)`, which is to say, `int&&` since *E* is an xvalue.
 The xvalue expression `(x)` happily binds to the function return type `int&&`, and the code compiles OK.
 <b>But now it returns `int&&`, not `int&`.</b>
@@ -221,7 +221,7 @@ However, parentheses have never played well with
 `decltype` nor `decltype(auto)`.
 
 
-## Two lookups are overly confusing ## {#two-lookups}
+## Two overload resolutions are overly confusing ## {#two-resolutions}
 
 Implicit move is currently expressed
 in terms of two separate overload resolutions: one treating the operand as an rvalue,
@@ -363,59 +363,72 @@ and permit the returning of dangling references when in fact we don't want that.
 
 Note that this proposal merge-conflicts with Jens Maurer's [[DraftPR3998]].
 Consensus seems to be that [class.copy.elision] is no longer the best place to explain
-"implicitly movable entity"; [[DraftPR3998]] moves that wording from [class.copy.elision] to [dcl.init],
-and introduces the term "result-initialization" for copy-initialization contexts in which
-implicit move can happen.
+"implicit move." [[DraftPR3998]] moves the "implicitly movable entity" wording from
+[class.copy.elision] to [dcl.init], and introduces the term "result-initialization"
+for copy-initialization contexts in which implicit move can happen. Vice versa, we
+propose to move the wording from [class.copy.elision] to [expr.prim.id.unqual],
+and introduce the term "move-eligible *id-expression*" for xvalue id-expressions.
 
+Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/expr.prim.id.unqual#2">[expr.prim.id.unqual]/2</a> as follows:
 
-Modify <a href="http://eel.is/c++draft/expr.prim.id.unqual#2">[expr.prim.id.unqual]/2</a> as follows:
-
-> The expression is <ins>an xvalue if it names an implicitly moved entity [class.copy.elision];</ins>
+> The expression is <ins>an xvalue if it is move-eligible (see below);</ins>
 > an lvalue if the entity is a function, variable, structured binding,
 > data member, or template parameter object<ins>;</ins> and a prvalue otherwise;
 > it is a bit-field if the identifier designates a bit-field.
+>
+> <ins>An *implicitly movable entity* is a variable of automatic storage duration that is either
+> a non-volatile object or an rvalue reference to a non-volatile object type. In the following
+> contexts, an *id-expression* is *move-eligible*:</ins>
+>
+> - <ins>If the *id-expression* is the (possibly parenthesized) operand of
+>     a `return` or `co_return` statement, and
+>     names an implicitly movable entity declared in the body or
+>     *parameter-declaration-clause* of the innermost enclosing function or *lambda-expression*, or</ins>
+>
+> - <ins>if the *id-expression* is the (possibly parenthesized) operand of
+>     a *throw-expression*, and
+>     names an implicitly movable entity whose scope does not extend beyond the
+>     *compound-statement* of the innermost *try-block* or *function-try-block* (if any)
+>     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*.</ins>
 
-Modify <a href="https://eel.is/c++draft/dcl.spec.auto#dcl.type.auto.deduct-5">[dcl.type.auto.deduct]/5</a> as follows:
+Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.type.auto.deduct#5">[dcl.type.auto.deduct]/5</a> as follows:
 
 > If the *placeholder-type-specifier* is of the form *type-constraint<sub>opt</sub>* `decltype(auto)`,
 > `T` shall be the placeholder alone. The type deduced for `T` is determined as described in [dcl.type.decltype],
 > as though *E* had been the operand of the `decltype`<ins>, except that *E* retains its value category</ins>.
-> <ins>[*Note:* If *E* is a parenthesized *id-expression* naming an implicitly moved entity, then the
-> type deduced for `T` may be different from `decltype(`<i>E</i>`)`. — *end note*]</ins>
+> <ins>[*Note:* If *E* is a parenthesized move-eligible *id-expression*, the
+> type deduced for `T` can be different from `decltype(`<i>E</i>`)`. — *end note*]</ins>
 
+Eliminate
+<a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>:
 
-Modify
-<a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:
-
-> An *implicitly movable entity* is a variable of automatic storage duration that is either
-> a non-volatile object or an rvalue reference to a non-volatile object type. In the following <del>copy-initialization</del>
-> contexts, <del>a move operation is first considered before attempting a copy
-> operation:</del><ins>an implicitly movable entity is also an *implicitly moved entity*:</ins>
+> <del>An *implicitly movable entity* is a variable of automatic storage duration that is either
+> a non-volatile object or an rvalue reference to a non-volatile object type. In the following copy-initialization
+> contexts, a move operation is first considered before attempting a copy
+> operation:</del>
 >
-> - If the <del>*expression* in</del><ins>operand of</ins>
+> - <del>If the *expression* in
 >     a `return` or `co_return` statement is a (possibly parenthesized) *id-expression*
 >     that names an implicitly movable entity declared in the body or
->     *parameter-declaration-clause* of the innermost enclosing function or *lambda-expression*, or
+>     *parameter-declaration-clause* of the innermost enclosing function or *lambda-expression*, or</del>
 >
-> - if the operand of a *throw-expression* is a (possibly parenthesized) *id-expression*
+> - <del>if the operand of a *throw-expression* is a (possibly parenthesized) *id-expression*
 >     that names an implicitly movable entity whose scope does not extend beyond the
 >     *compound-statement* of the innermost *try-block* or *function-try-block* (if any)
->     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*,
+>     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*,</del>
 >
-> <ins>the *id-expression* is treated as an xvalue; see [expr.prim.id.unqual].</ins>
 > <del>overload resolution to select the constructor for the copy or the `return_value`
 > overload to call is first performed as if the expression or operand were an rvalue.
 > If the first overload resolution fails or was not performed, overload resolution
 > is performed again, considering the expression or operand as an lvalue.</del>
 >
-> [*Note 3:* This <del>two-stage overload resolution is performed</del><ins>clause applies</ins>
-> regardless of whether copy elision will occur. It determines the <del>constructor
-> or the `return_value` overload to be called</del><ins>initialization
-> or binding to be performed</ins> if elision is not performed,
-> and the selected <del>constructor or `return_value` overload</del><ins>conversion
-> sequence</ins> must be accessible even if the call is elided. — *end note*]
+> <del>[*Note 3:* This two-stage overload resolution is performed
+> regardless of whether copy elision will occur. It determines the constructor
+> or the `return_value` overload to be called if elision is not performed,
+> and the selected constructor or `return_value` overload
+> must be accessible even if the call is elided. — *end note*]</del>
 
-Also change the definition of `g()` in <a href="http://eel.is/c++draft/class.copy.elision#4">[class.copy.elision]/4</a>:
+Also change the definition of `g()` in <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#4">[class.copy.elision]/4</a>:
 
 <small><blockquote>
 <pre>
@@ -434,22 +447,16 @@ Also change the definition of `g()` in <a href="http://eel.is/c++draft/class.cop
       <ins>if (b) {</ins>
         <ins>return w1;  // OK: Weird(Weird&)</ins>
       <ins>} else {</ins>
-        <ins>return w2;  // error: w2 is treated as an rvalue</ins>
+        <ins>return w2;  // error: w2 in this context is an xvalue</ins>
       <ins>}</ins>
     <ins>}</ins>
 </pre>
 </blockquote></small>
 
 
-## Move the wording for implicit move ## {#wording-dcl-init}
-
-Remove <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a>, /4, and /5
-from their current position, and reinsert them after <a href="http://eel.is/c++draft/dcl.init#general-15">[dcl.init]/15</a>.
-
-
 ## Non-normative clarifications ## {#wording-nn}
 
-Add yet more examples to <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/4</a>,
+Add yet more examples to <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#4">[class.copy.elision]/4</a>,
 showing how the new wording affects functions that return references:
 
 <small><blockquote>
@@ -463,18 +470,22 @@ showing how the new wording affects functions that return references:
       <ins>}</ins>
     <ins>}</ins>
 
-    <ins>decltype(auto) h2(int i) {</ins>
-      <ins>return i;  // OK: h2's return type is int&&</ins>
+    <ins>decltype(auto) h2(Thing t) {</ins>
+      <ins>return t;  // OK: t is an xvalue and h2's return type is Thing</ins>
+    <ins>}</ins>
+
+    <ins>decltype(auto) h3(Thing t) {</ins>
+      <ins>return (t);  // OK: (t) is an xvalue and h3's return type is Thing&&</ins>
     <ins>}</ins>
 </pre>
 </blockquote></small>
 
-Add a note after <a href="http://eel.is/c++draft/dcl.init#ref-5.4.4">[dcl.init.ref]/5.4.4</a>:
+Add a note after <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init#ref-5.4.4">[dcl.init.ref]/5.4.4</a>:
 
 > if the reference is an rvalue reference, the initializer expression shall not be an lvalue.
 >
-> <ins>[*Note:* This can be affected by whether the initializer expression names
-> an implicitly moved entity ([class.copy.elision]). — *end note*]</ins>
+> <ins>[*Note:* This can be affected by whether the initializer expression
+> is move-eligible ([expr.prim.id.unqual]). — *end note*]</ins>
 
 
 # Acknowledgments # {#acknowledgments}
@@ -482,6 +493,8 @@ Add a note after <a href="http://eel.is/c++draft/dcl.init#ref-5.4.4">[dcl.init.r
 - Thanks to Ville Voutilainen for recommending Arthur write this paper.
 
 - Thanks to Aaron Puchert for inspiring `fourteen` via his comments on [[D68845]].
+
+- Thanks to Richard Smith and Jens Maurer for their feedback, and to Jens for proposing the term "move-eligible."
 
 
 <pre class=biblio>
