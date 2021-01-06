@@ -2083,7 +2083,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>5
+     <dd>6
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs</a>
      <dt>Current:
@@ -2249,7 +2249,7 @@ to them.</p>
    <p>Here, the return type of <code class="highlight"><c- n>eleven</c-></code> is the decltype of the expression <code class="highlight"><c- p>(</c-><c- n>x</c-><c- p>)</c-></code>.
 This is governed by <a href="https://eel.is/c++draft/dcl.spec.auto#dcl.type.auto.deduct-5">[dcl.type.auto.deduct]/5</a>:</p>
    <blockquote>
-    <p>If the <em>placeholder-type-specifier</em> is of the form *type-constraint<sub>opt</sub>* <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code>, <code class="highlight"><c- n>T</c-></code> shall be the placeholder alone. The type deduced for <code class="highlight"><c- n>T</c-></code> is determined as described in <a href="https://eel.is/c++draft/dcl.type.decltype">[dcl.type.decltype]</a>,
+    <p>If the <em>placeholder-type-specifier</em> is of the form <i>type-constraint<sub>opt</sub></i> <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code>, <code class="highlight"><c- n>T</c-></code> shall be the placeholder alone. The type deduced for <code class="highlight"><c- n>T</c-></code> is determined as described in <a href="https://eel.is/c++draft/dcl.type.decltype">[dcl.type.decltype]</a>,
 as though <em>E</em> had been the operand of the decltype.</p>
    </blockquote>
    <p>In C++17, the decltype of <code class="highlight"><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> was <code class="highlight"><c- b>int</c-><c- o>&amp;</c-></code>. No implicit move happened, because <code class="highlight"><c- n>x</c-></code> (being a reference) was not an implicitly movable entity. The lvalue expression <code class="highlight"><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> happily binds to the function return type <code class="highlight"><c- b>int</c-><c- o>&amp;</c-></code>, and the code compiles OK.</p>
@@ -2408,26 +2408,15 @@ a non-volatile object or an rvalue reference to a non-volatile object type. In t
 contexts, an <em>id-expression</em> is <em>move-eligible</em>:</ins>
     <ul>
      <li data-md>
-      <ins>If the <em>id-expression</em> is the (possibly parenthesized) operand of
+      <ins>If the <em>id-expression</em> (possibly parenthesized) is the operand of
 a <code class="highlight"><c- k>return</c-></code> or <code class="highlight"><c- k>co_return</c-></code> statement, and
 names an implicitly movable entity declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</ins>
      <li data-md>
-      <ins>if the <em>id-expression</em> is the (possibly parenthesized) operand of
+      <ins>if the <em>id-expression</em> (possibly parenthesized) is the operand of
 a <em>throw-expression</em>, and
 names an implicitly movable entity whose scope does not extend beyond the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
 whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>.</ins>
     </ul>
-   </blockquote>
-   <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.type.auto.deduct#5">[dcl.type.auto.deduct]/5</a> as follows:</p>
-   <blockquote>
-    <p>
-     If the <em>placeholder-type-specifier</em> is of the form *type-constraint<sub>opt</sub>* <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code>, <code class="highlight"><c- n>T</c-></code> shall be the placeholder alone. The type deduced for <code class="highlight"><c- n>T</c-></code> is determined as described in [dcl.type.decltype],
-as though <em>E</em> had been the operand of the <code class="highlight"><c- k>decltype</c-></code>
-     <ins>, except that <em>E</em> retains its value category</ins>
-     .
-    </p>
-    <ins>[<em>Note:</em> If <em>E</em> is a parenthesized move-eligible <em>id-expression</em>, the
-type deduced for <code class="highlight"><c- n>T</c-></code> can be different from <code class="highlight"><c- k>decltype</c-><c- p>(</c-></code><i>E</i><code class="highlight"><c- p>)</c-></code>. — <em>end note</em>]</ins>
    </blockquote>
    <p>Eliminate <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>:</p>
    <blockquote>
@@ -2477,6 +2466,16 @@ must be accessible even if the call is elided. — <em>end note</em>]</del>
 </pre></small>
    </blockquote>
    <h3 class="heading settled" data-level="3.1" id="wording-nn"><span class="secno">3.1. </span><span class="content">Non-normative clarifications</span><a class="self-link" href="#wording-nn"></a></h3>
+   <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.type.auto.deduct#5">[dcl.type.auto.deduct]/5</a> as follows:</p>
+   <blockquote>
+     If the <em>placeholder-type-specifier</em> is of the form <i>type-constraint<sub>opt</sub></i> <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code>, <code class="highlight"><c- n>T</c-></code> shall be the placeholder alone. The type deduced for <code class="highlight"><c- n>T</c-></code> is determined as described in [dcl.type.decltype],
+as though <em>E</em> had been the operand of the <code class="highlight"><c- k>decltype</c-></code>. 
+    <ins>[<em>Example:</em></ins>
+     <small><pre class="highlight">    <ins><c- k>auto</c-> <c- nf>f</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>((</c-><c- n>x</c-><c- p>))</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->   <c- c1>// return type is "int&amp;"</c-></ins>
+    <ins><c- k>auto</c-> <c- nf>g</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->  <c- c1>// return type is "int&amp;&amp;"</c-></ins>
+</pre></small> 
+    <ins>— <em>end example</em>]</ins>
+   </blockquote>
    <p>Add yet more examples to <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#4">[class.copy.elision]/4</a>,
 showing how the new wording affects functions that return references:</p>
    <p><small></small></p>
