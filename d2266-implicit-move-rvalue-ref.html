@@ -2073,7 +2073,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2266R0<br>Simpler implicit move</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2020-12-06">2020-12-06</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2020-12-15">2020-12-15</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2083,7 +2083,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>3
+     <dd>4
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs</a>
      <dt>Current:
@@ -2114,14 +2114,13 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
        <ol class="toc">
         <li><a href="#decltype-auto"><span class="secno">2.2.1</span> <span class="content">Interaction with <code class="highlight"><c- k>decltype</c-></code> and <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code></span></a>
        </ol>
-      <li><a href="#two-lookups"><span class="secno">2.3</span> <span class="content">Two lookups are overly confusing</span></a>
+      <li><a href="#two-resolutions"><span class="secno">2.3</span> <span class="content">Two overload resolutions are overly confusing</span></a>
       <li><a href="#refwrap"><span class="secno">2.4</span> <span class="content">A specific case involving <code class="highlight"><c- n>reference_wrapper</c-></code></span></a>
      </ol>
     <li>
      <a href="#wording"><span class="secno">3</span> <span class="content">Proposed wording relative to C++20</span></a>
      <ol class="toc">
-      <li><a href="#wording-dcl-init"><span class="secno">3.1</span> <span class="content">Move the wording for implicit move</span></a>
-      <li><a href="#wording-nn"><span class="secno">3.2</span> <span class="content">Non-normative clarifications</span></a>
+      <li><a href="#wording-nn"><span class="secno">3.1</span> <span class="content">Non-normative clarifications</span></a>
      </ol>
     <li><a href="#acknowledgments"><span class="secno">4</span> <span class="content">Acknowledgments</span></a>
     <li>
@@ -2229,7 +2228,7 @@ bind to the lvalue <em>id-expression</em> <code class="highlight"><c- n>x</c-></
 <c- p>}</c->
 
 <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>ten</c-><c- p>()</c-> <c- p>{</c->
-    <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>x</c-> <c- o>=</c-> <c- n>val</c-><c- p>();</c->  <c- c1>// OK, x is Widget&amp;&amp;</c->
+    <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>x</c-> <c- o>=</c-> <c- n>rref</c-><c- p>();</c->  <c- c1>// OK, x is Widget&amp;&amp;</c->
     <c- k>return</c-> <c- n>x</c-><c- p>;</c->  <c- c1>// Error, return type is Widget&amp;&amp;, cannot bind to x</c->
 <c- p>}</c->
 </pre>
@@ -2259,7 +2258,7 @@ but (because the return type is not an object type) implicit move does not apply
 The lvalue expression <code class="highlight"><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> happily binds to the function return type <code class="highlight"><c- b>int</c-><c- o>&amp;</c-></code>, and
 the code compiles OK.</p>
    <p>We propose to change the behavior of <code class="highlight"><c- n>eleven</c-></code>!</p>
-   <p>Under our proposal, the <em>id-expression</em> <code class="highlight"><c- n>x</c-></code> (as the operand of <code class="highlight"><c- k>return</c-></code>) is an implicitly moved entity, which means it is an xvalue.
+   <p>Under our proposal, the <em>id-expression</em> <code class="highlight"><c- n>x</c-></code> (as the operand of <code class="highlight"><c- k>return</c-></code>) is <em>move-eligible</em>, which means it is an xvalue.
 The function return type is deduced as <code class="highlight"><c- k>decltype</c-><c- p>(</c-></code><i>E</i><code class="highlight"><c- p>)</c-></code>, which is to say, <code class="highlight"><c- b>int</c-><c- o>&amp;&amp;</c-></code> since <em>E</em> is an xvalue.
 The xvalue expression <code class="highlight"><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> happily binds to the function return type <code class="highlight"><c- b>int</c-><c- o>&amp;&amp;</c-></code>, and the code compiles OK. <b>But now it returns <code class="highlight"><c- b>int</c-><c- o>&amp;&amp;</c-></code>, not <code class="highlight"><c- b>int</c-><c- o>&amp;</c-></code>.</b></p>
    <p>This does produce surprising inconsistencies in the handling of parentheses; for example,</p>
@@ -2271,7 +2270,7 @@ The xvalue expression <code class="highlight"><c- p>(</c-><c- n>x</c-><c- p>)</c
 <c- k>auto</c-> <c- nf>g3</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- p>;</c-> <c- p>}</c->    <c- c1>// int</c->
 </pre>
    <p>However, parentheses have never played well with <code class="highlight"><c- k>decltype</c-></code> nor <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code>.</p>
-   <h3 class="heading settled" data-level="2.3" id="two-lookups"><span class="secno">2.3. </span><span class="content">Two lookups are overly confusing</span><a class="self-link" href="#two-lookups"></a></h3>
+   <h3 class="heading settled" data-level="2.3" id="two-resolutions"><span class="secno">2.3. </span><span class="content">Two overload resolutions are overly confusing</span><a class="self-link" href="#two-resolutions"></a></h3>
    <p>Implicit move is currently expressed
 in terms of two separate overload resolutions: one treating the operand as an rvalue,
 and then (if that resolution fails) another one treating the operand as an lvalue.</p>
@@ -2385,22 +2384,38 @@ and permit the returning of dangling references when in fact we don’t want tha
    <h2 class="heading settled" data-level="3" id="wording"><span class="secno">3. </span><span class="content">Proposed wording relative to C++20</span><a class="self-link" href="#wording"></a></h2>
    <p>Note that this proposal merge-conflicts with Jens Maurer’s <a data-link-type="biblio" href="#biblio-draftpr3998">[DraftPR3998]</a>.
 Consensus seems to be that [class.copy.elision] is no longer the best place to explain
-"implicitly movable entity"; <a data-link-type="biblio" href="#biblio-draftpr3998">[DraftPR3998]</a> moves that wording from [class.copy.elision] to [dcl.init],
-and introduces the term "result-initialization" for copy-initialization contexts in which
-implicit move can happen.</p>
-   <p>Modify <a href="http://eel.is/c++draft/expr.prim.id.unqual#2">[expr.prim.id.unqual]/2</a> as follows:</p>
+"implicit move." <a data-link-type="biblio" href="#biblio-draftpr3998">[DraftPR3998]</a> moves the "implicitly movable entity" wording from
+[class.copy.elision] to [dcl.init], and introduces the term "result-initialization"
+for copy-initialization contexts in which implicit move can happen. Vice versa, we
+propose to move the wording from [class.copy.elision] to [expr.prim.id.unqual],
+and introduce the term "move-eligible <em>id-expression</em>" for xvalue id-expressions.</p>
+   <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/expr.prim.id.unqual#2">[expr.prim.id.unqual]/2</a> as follows:</p>
    <blockquote>
     <p>
      The expression is 
-     <ins>an xvalue if it names an implicitly moved entity [class.copy.elision];</ins>
+     <ins>an xvalue if it is move-eligible (see below);</ins>
       an lvalue if the entity is a function, variable, structured binding,
 data member, or template parameter object
      <ins>;</ins>
       and a prvalue otherwise;
 it is a bit-field if the identifier designates a bit-field.
     </p>
+    <ins>An <em>implicitly movable entity</em> is a variable of automatic storage duration that is either
+a non-volatile object or an rvalue reference to a non-volatile object type. In the following
+contexts, an <em>id-expression</em> is <em>move-eligible</em>:</ins>
+    <ul>
+     <li data-md>
+      <ins>If the <em>id-expression</em> is the (possibly parenthesized) operand of
+a <code class="highlight"><c- k>return</c-></code> or <code class="highlight"><c- k>co_return</c-></code> statement, and
+names an implicitly movable entity declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</ins>
+     <li data-md>
+      <ins>if the <em>id-expression</em> is the (possibly parenthesized) operand of
+a <em>throw-expression</em>, and
+names an implicitly movable entity whose scope does not extend beyond the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
+whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>.</ins>
+    </ul>
    </blockquote>
-   <p>Modify <a href="https://eel.is/c++draft/dcl.spec.auto#dcl.type.auto.deduct-5">[dcl.type.auto.deduct]/5</a> as follows:</p>
+   <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.type.auto.deduct#5">[dcl.type.auto.deduct]/5</a> as follows:</p>
    <blockquote>
     <p>
      If the <em>placeholder-type-specifier</em> is of the form *type-constraint<sub>opt</sub>* <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code>, <code class="highlight"><c- n>T</c-></code> shall be the placeholder alone. The type deduced for <code class="highlight"><c- n>T</c-></code> is determined as described in [dcl.type.decltype],
@@ -2408,54 +2423,33 @@ as though <em>E</em> had been the operand of the <code class="highlight"><c- k>d
      <ins>, except that <em>E</em> retains its value category</ins>
      .
     </p>
-    <ins>[<em>Note:</em> If <em>E</em> is a parenthesized <em>id-expression</em> naming an implicitly moved entity, then the
-type deduced for <code class="highlight"><c- n>T</c-></code> may be different from <code class="highlight"><c- k>decltype</c-><c- p>(</c-></code><i>E</i><code class="highlight"><c- p>)</c-></code>. — <em>end note</em>]</ins>
+    <ins>[<em>Note:</em> If <em>E</em> is a parenthesized move-eligible <em>id-expression</em>, the
+type deduced for <code class="highlight"><c- n>T</c-></code> can be different from <code class="highlight"><c- k>decltype</c-><c- p>(</c-></code><i>E</i><code class="highlight"><c- p>)</c-></code>. — <em>end note</em>]</ins>
    </blockquote>
-   <p>Modify <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a> as follows:</p>
+   <p>Eliminate <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>:</p>
    <blockquote>
-    <p>
-     An <em>implicitly movable entity</em> is a variable of automatic storage duration that is either
-a non-volatile object or an rvalue reference to a non-volatile object type. In the following 
-     <del>copy-initialization</del>
-      contexts, 
-     <del>a move operation is first considered before attempting a copy
+    <del>An <em>implicitly movable entity</em> is a variable of automatic storage duration that is either
+a non-volatile object or an rvalue reference to a non-volatile object type. In the following copy-initialization
+contexts, a move operation is first considered before attempting a copy
 operation:</del>
-     <ins>an implicitly movable entity is also an <em>implicitly moved entity</em>:</ins>
-    </p>
     <ul>
      <li data-md>
-      <p>
-       If the 
-       <del><em>expression</em> in</del>
-       <ins>operand of</ins>
-        a <code class="highlight"><c- k>return</c-></code> or <code class="highlight"><c- k>co_return</c-></code> statement is a (possibly parenthesized) <em>id-expression</em> that names an implicitly movable entity declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or
-      </p>
+      <del>If the <em>expression</em> in
+a <code class="highlight"><c- k>return</c-></code> or <code class="highlight"><c- k>co_return</c-></code> statement is a (possibly parenthesized) <em>id-expression</em> that names an implicitly movable entity declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</del>
      <li data-md>
-      <p>if the operand of a <em>throw-expression</em> is a (possibly parenthesized) <em>id-expression</em> that names an implicitly movable entity whose scope does not extend beyond the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
-whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>,</p>
+      <del>if the operand of a <em>throw-expression</em> is a (possibly parenthesized) <em>id-expression</em> that names an implicitly movable entity whose scope does not extend beyond the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
+whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>,</del>
     </ul>
-    <ins>the <em>id-expression</em> is treated as an xvalue; see [expr.prim.id.unqual].</ins>
     <del>overload resolution to select the constructor for the copy or the <code class="highlight"><c- n>return_value</c-></code> overload to call is first performed as if the expression or operand were an rvalue.
 If the first overload resolution fails or was not performed, overload resolution
 is performed again, considering the expression or operand as an lvalue.</del>
-    <p>
-     [<em>Note 3:</em> This 
-     <del>two-stage overload resolution is performed</del>
-     <ins>clause applies</ins>
-      regardless of whether copy elision will occur. It determines the 
-     <del>constructor
-or the <code class="highlight"><c- n>return_value</c-></code> overload to be called</del>
-     <ins>initialization
-or binding to be performed</ins>
-      if elision is not performed,
-and the selected 
-     <del>constructor or <code class="highlight"><c- n>return_value</c-></code> overload</del>
-     <ins>conversion
-sequence</ins>
-      must be accessible even if the call is elided. — <em>end note</em>]
-    </p>
+    <del>[<em>Note 3:</em> This two-stage overload resolution is performed
+regardless of whether copy elision will occur. It determines the constructor
+or the <code class="highlight"><c- n>return_value</c-></code> overload to be called if elision is not performed,
+and the selected constructor or <code class="highlight"><c- n>return_value</c-></code> overload
+must be accessible even if the call is elided. — <em>end note</em>]</del>
    </blockquote>
-   <p>Also change the definition of <code class="highlight"><c- n>g</c-><c- p>()</c-></code> in <a href="http://eel.is/c++draft/class.copy.elision#4">[class.copy.elision]/4</a>:</p>
+   <p>Also change the definition of <code class="highlight"><c- n>g</c-><c- p>()</c-></code> in <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#4">[class.copy.elision]/4</a>:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
@@ -2474,16 +2468,13 @@ sequence</ins>
   <ins><c- k>if</c-> <c- p>(</c-><c- n>b</c-><c- p>)</c-> <c- p>{</c-></ins>
     <ins><c- k>return</c-> <c- n>w1</c-><c- p>;</c->  <c- c1>// OK: Weird(Weird&amp;)</c-></ins>
   <ins><c- p>}</c-> <c- k>else</c-> <c- p>{</c-></ins>
-    <ins><c- k>return</c-> <c- n>w2</c-><c- p>;</c->  <c- c1>// error: w2 is treated as an rvalue</c-></ins>
+    <ins><c- k>return</c-> <c- n>w2</c-><c- p>;</c->  <c- c1>// error: w2 in this context is an xvalue</c-></ins>
   <ins><c- p>}</c-></ins>
 <ins><c- p>}</c-></ins>
 </pre></small>
    </blockquote>
-   <h3 class="heading settled" data-level="3.1" id="wording-dcl-init"><span class="secno">3.1. </span><span class="content">Move the wording for implicit move</span><a class="self-link" href="#wording-dcl-init"></a></h3>
-   <p>Remove <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/3</a>, /4, and /5
-from their current position, and reinsert them after <a href="http://eel.is/c++draft/dcl.init#general-15">[dcl.init]/15</a>.</p>
-   <h3 class="heading settled" data-level="3.2" id="wording-nn"><span class="secno">3.2. </span><span class="content">Non-normative clarifications</span><a class="self-link" href="#wording-nn"></a></h3>
-   <p>Add yet more examples to <a href="http://eel.is/c++draft/class.copy.elision#3">[class.copy.elision]/4</a>,
+   <h3 class="heading settled" data-level="3.1" id="wording-nn"><span class="secno">3.1. </span><span class="content">Non-normative clarifications</span><a class="self-link" href="#wording-nn"></a></h3>
+   <p>Add yet more examples to <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#4">[class.copy.elision]/4</a>,
 showing how the new wording affects functions that return references:</p>
    <p><small></small></p>
    <blockquote>
@@ -2497,16 +2488,20 @@ showing how the new wording affects functions that return references:</p>
   <ins><c- p>}</c-></ins>
 <ins><c- p>}</c-></ins>
 
-<ins><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>h2</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- p>{</c-></ins>
-  <ins><c- k>return</c-> <c- n>i</c-><c- p>;</c->  <c- c1>// OK: h2’s return type is int&amp;&amp;</c-></ins>
+<ins><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>h2</c-><c- p>(</c-><c- n>Thing</c-> <c- n>t</c-><c- p>)</c-> <c- p>{</c-></ins>
+  <ins><c- k>return</c-> <c- n>t</c-><c- p>;</c->  <c- c1>// OK: t is an xvalue and h2’s return type is Thing</c-></ins>
+<ins><c- p>}</c-></ins>
+
+<ins><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>h3</c-><c- p>(</c-><c- n>Thing</c-> <c- n>t</c-><c- p>)</c-> <c- p>{</c-></ins>
+  <ins><c- k>return</c-> <c- p>(</c-><c- n>t</c-><c- p>);</c->  <c- c1>// OK: (t) is an xvalue and h3’s return type is Thing&amp;&amp;</c-></ins>
 <ins><c- p>}</c-></ins>
 </pre></small>
    </blockquote>
-   <p>Add a note after <a href="http://eel.is/c++draft/dcl.init#ref-5.4.4">[dcl.init.ref]/5.4.4</a>:</p>
+   <p>Add a note after <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init#ref-5.4.4">[dcl.init.ref]/5.4.4</a>:</p>
    <blockquote>
     <p>if the reference is an rvalue reference, the initializer expression shall not be an lvalue.</p>
-    <ins>[<em>Note:</em> This can be affected by whether the initializer expression names
-an implicitly moved entity ([class.copy.elision]). — <em>end note</em>]</ins>
+    <ins>[<em>Note:</em> This can be affected by whether the initializer expression
+is move-eligible ([expr.prim.id.unqual]). — <em>end note</em>]</ins>
    </blockquote>
    <h2 class="heading settled" data-level="4" id="acknowledgments"><span class="secno">4. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <ul>
@@ -2514,6 +2509,8 @@ an implicitly moved entity ([class.copy.elision]). — <em>end note</em>]</ins>
      <p>Thanks to Ville Voutilainen for recommending Arthur write this paper.</p>
     <li data-md>
      <p>Thanks to Aaron Puchert for inspiring <code class="highlight"><c- n>fourteen</c-></code> via his comments on <a data-link-type="biblio" href="#biblio-d68845">[D68845]</a>.</p>
+    <li data-md>
+     <p>Thanks to Richard Smith and Jens Maurer for their feedback, and to Jens for proposing the term "move-eligible."</p>
    </ul>
   </main>
 <script>
