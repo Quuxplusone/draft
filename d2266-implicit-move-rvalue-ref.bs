@@ -2,7 +2,7 @@
 Title: Simpler implicit move
 Shortname: D2266
 Revision: 0
-!Draft Revision: 5
+!Draft Revision: 6
 Audience: EWG
 Status: D
 Group: WG21
@@ -185,7 +185,7 @@ decltype(auto) eleven(Widget&& x) {
 Here, the return type of `eleven` is the decltype of the expression `(x)`.
 This is governed by <a href="https://eel.is/c++draft/dcl.spec.auto#dcl.type.auto.deduct-5">[dcl.type.auto.deduct]/5</a>:
 
-> If the *placeholder-type-specifier* is of the form *type-constraint<sub>opt</sub>* `decltype(auto)`,
+> If the *placeholder-type-specifier* is of the form <i>type-constraint<sub>opt</sub></i> `decltype(auto)`,
 > `T` shall be the placeholder alone. The type deduced for `T` is determined as described in
 > <a href="https://eel.is/c++draft/dcl.type.decltype">[dcl.type.decltype]</a>,
 > as though *E* had been the operand of the decltype.
@@ -384,24 +384,16 @@ Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/expr.prim.id.unqual#2"
 > a non-volatile object or an rvalue reference to a non-volatile object type. In the following
 > contexts, an *id-expression* is *move-eligible*:</ins>
 >
-> - <ins>If the *id-expression* is the (possibly parenthesized) operand of
+> - <ins>If the *id-expression* (possibly parenthesized) is the operand of
 >     a `return` or `co_return` statement, and
 >     names an implicitly movable entity declared in the body or
 >     *parameter-declaration-clause* of the innermost enclosing function or *lambda-expression*, or</ins>
 >
-> - <ins>if the *id-expression* is the (possibly parenthesized) operand of
+> - <ins>if the *id-expression* (possibly parenthesized) is the operand of
 >     a *throw-expression*, and
 >     names an implicitly movable entity whose scope does not extend beyond the
 >     *compound-statement* of the innermost *try-block* or *function-try-block* (if any)
 >     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*.</ins>
-
-Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.type.auto.deduct#5">[dcl.type.auto.deduct]/5</a> as follows:
-
-> If the *placeholder-type-specifier* is of the form *type-constraint<sub>opt</sub>* `decltype(auto)`,
-> `T` shall be the placeholder alone. The type deduced for `T` is determined as described in [dcl.type.decltype],
-> as though *E* had been the operand of the `decltype`<ins>, except that *E* retains its value category</ins>.
-> <ins>[*Note:* If *E* is a parenthesized move-eligible *id-expression*, the
-> type deduced for `T` can be different from `decltype(`<i>E</i>`)`. — *end note*]</ins>
 
 Eliminate
 <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>:
@@ -459,6 +451,20 @@ Also change the definition of `g()` in <a href="https://timsong-cpp.github.io/cp
 
 
 ## Non-normative clarifications ## {#wording-nn}
+
+Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.type.auto.deduct#5">[dcl.type.auto.deduct]/5</a> as follows:
+
+<blockquote>
+If the *placeholder-type-specifier* is of the form <i>type-constraint<sub>opt</sub></i> `decltype(auto)`,
+`T` shall be the placeholder alone. The type deduced for `T` is determined as described in [dcl.type.decltype],
+as though *E* had been the operand of the `decltype`.
+<ins>[*Example:*</ins>
+<small><pre>
+    <ins>auto f(int x) -> decltype((x)) { return (x); }   // return type is "int&"</ins>
+    <ins>auto g(int x) -> decltype(auto) { return (x); }  // return type is "int&&"</ins>
+</pre></small>
+<ins>— *end example*]</ins>
+</blockquote>
 
 Add yet more examples to <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#4">[class.copy.elision]/4</a>,
 showing how the new wording affects functions that return references:
