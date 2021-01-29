@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Simpler implicit move
 Shortname: D2266
-Revision: 0
-!Draft Revision: 7
+Revision: 1
+!Draft Revision: 8
 Audience: EWG
 Status: D
 Group: WG21
@@ -19,7 +19,7 @@ Abstract:
   which is hard to implement, causing implementation divergence.
   We fix the defect and simplify the spec by saying that a returned move-eligible
   id-expression is <i>always</i> an xvalue.
-Date: 2021-01-06
+Date: 2021-01-07
 </pre>
 
 <style>
@@ -362,7 +362,7 @@ the clear intent of `reference_wrapper`'s SFINAE-constrained constructor
 and permit the returning of dangling references when in fact we don't want that.
 
 
-# Proposed wording relative to C++20 # {#wording}
+# Proposed wording relative to N4878 # {#wording}
 
 Note that this proposal merge-conflicts with Jens Maurer's [[DraftPR3998]].
 Consensus seems to be that [class.copy.elision] is no longer the best place to explain
@@ -390,7 +390,7 @@ Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/expr.prim.id.unqual#2"
 >
 > - <ins>if the *id-expression* (possibly parenthesized) is the operand of
 >     a *throw-expression*, and
->     names an implicitly movable entity whose scope does not extend beyond the
+>     names an implicitly movable entity that belongs to a scope that does not contain the
 >     *compound-statement* of the innermost *try-block* or *function-try-block* (if any)
 >     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*.</ins>
 
@@ -408,7 +408,7 @@ Eliminate
 >     *parameter-declaration-clause* of the innermost enclosing function or *lambda-expression*, or</del>
 >
 > - <del>if the operand of a *throw-expression* is a (possibly parenthesized) *id-expression*
->     that names an implicitly movable entity whose scope does not extend beyond the
+>     that names an implicitly movable entity that belongs to a scope that does not contain the
 >     *compound-statement* of the innermost *try-block* or *function-try-block* (if any)
 >     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*,</del>
 >
@@ -495,6 +495,39 @@ Add a note after <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init#ref
 >
 > <ins>[*Note:* This can be affected by whether the initializer expression
 > is move-eligible ([expr.prim.id.unqual]). — *end note*]</ins>
+
+
+## Drive-by bugfix for throws inside lambdas ## {#wording-lambdas}
+
+Davis Herring points out a bug in the existing wording.
+
+```c++
+    std::string x = "original value should not be moved-from";
+    auto lam = [&]() { throw x; };  // HERE
+    try {
+        lam();
+    } catch (...) {}
+    assert(x == "original value should not be moved-from");
+```
+
+The existing wording implies that the compiler should generate a move, not a copy,
+for that `throw x`, because its operand is an entity (`x`) defined in the outer scope,
+inside the nearest lexically enclosing try-block. However, this is a bug in the
+wording. I think we could patch this bug simply by inserting in the new [expr.prim.id.unqual]:
+
+> In the following contexts, an *id-expression* is *move-eligible*:
+>
+> - If the *id-expression* (possibly parenthesized) is the operand of
+>     a `return` or `co_return` statement, and
+>     names an implicitly movable entity declared in the body or
+>     *parameter-declaration-clause* of the innermost enclosing function or *lambda-expression*, or
+>
+> - if the *id-expression* (possibly parenthesized) is the operand of
+>     a *throw-expression*, and
+>     names an implicitly movable entity that belongs to a scope that does not contain the
+>     *compound-statement* of the innermost <ins>*lambda-expression*,</ins>
+>     *try-block*<ins>,</ins> or *function-try-block* (if any)
+>     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*.
 
 
 # Acknowledgments # {#acknowledgments}
