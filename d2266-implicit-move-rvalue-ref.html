@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2266R0: Simpler implicit move</title>
+  <title>D2266R1: Simpler implicit move</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -2072,8 +2072,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2266R0<br>Simpler implicit move</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2021-01-06">2021-01-06</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D2266R1<br>Simpler implicit move</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2021-01-07">2021-01-07</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2083,7 +2083,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>7
+     <dd>8
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs</a>
      <dt>Current:
@@ -2119,9 +2119,10 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#refwrap"><span class="secno">3.4</span> <span class="content">A specific case involving <code class="highlight"><c- n>reference_wrapper</c-></code></span></a>
      </ol>
     <li>
-     <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording relative to C++20</span></a>
+     <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording relative to N4878</span></a>
      <ol class="toc">
       <li><a href="#wording-nn"><span class="secno">4.1</span> <span class="content">Non-normative clarifications</span></a>
+      <li><a href="#wording-lambdas"><span class="secno">4.2</span> <span class="content">Drive-by bugfix for throws inside lambdas</span></a>
      </ol>
     <li><a href="#acknowledgments"><span class="secno">5</span> <span class="content">Acknowledgments</span></a>
     <li>
@@ -2140,7 +2141,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <h2 class="heading settled" data-level="2" id="background"><span class="secno">2. </span><span class="content">Background</span><a class="self-link" href="#background"></a></h2>
    <p>Starting in C++11, <em>implicit move</em> (<a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>)
 permits us to return move-only types by value:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- n>Widget</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Widget</c-> <c- p>{</c->
     <c- n>Widget</c-><c- p>(</c-><c- n>Widget</c-><c- o>&amp;&amp;</c-><c- p>);</c->
 <c- p>};</c->
 
@@ -2151,7 +2152,7 @@ permits us to return move-only types by value:</p>
    <p>This wording was amended by <a data-link-type="biblio" href="#biblio-cwg1579">[CWG1579]</a>, which made it
 legal to call converting constructors accepting an rvalue reference of the
 returned expression’s type.</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- n>RRefTaker</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>RRefTaker</c-> <c- p>{</c->
     <c- n>RRefTaker</c-><c- p>(</c-><c- n>Widget</c-><c- o>&amp;&amp;</c-><c- p>);</c->
 <c- p>};</c->
 <c- n>RRefTaker</c-> <c- nf>two</c-><c- p>(</c-><c- n>Widget</c-> <c- n>w</c-><c- p>)</c-> <c- p>{</c->
@@ -2174,7 +2175,7 @@ changes, P0527’s was the more drastic:</p>
 the new wording about "implicitly movable entities" is triggered <em>only when
 initializing a return object.</em> Functions that do not return objects, do not
 benefit from this wording. This leads to a surprising result:</p>
-<pre class="language-c++ highlight"><c- n>Widget</c-><c- o>&amp;&amp;</c-> <c- n>four</c-><c- p>(</c-><c- n>Widget</c-><c- o>&amp;&amp;</c-> <c- n>w</c-><c- p>)</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- n>Widget</c-><c- o>&amp;&amp;</c-> <c- nf>four</c-><c- p>(</c-><c- n>Widget</c-><c- o>&amp;&amp;</c-> <c- n>w</c-><c- p>)</c-> <c- p>{</c->
     <c- k>return</c-> <c- n>w</c-><c- p>;</c->  <c- c1>// Error</c->
 <c- p>}</c->
 </pre>
@@ -2183,10 +2184,10 @@ when the return type of the function is <code class="highlight"><c- n>RRefTaker<
 but it is treated as an lvalue when the return type of the function is <code class="highlight"><c- n>Widget</c-><c- o>&amp;&amp;</c-></code> as in example <code class="highlight"><c- n>four</c-></code>.</p>
    <h2 class="heading settled" data-level="3" id="problems"><span class="secno">3. </span><span class="content">Problems remaining in C++20</span><a class="self-link" href="#problems"></a></h2>
    <h3 class="heading settled" data-level="3.1" id="conversion-operator"><span class="secno">3.1. </span><span class="content">Conversion operators are treated inconsistently</span><a class="self-link" href="#conversion-operator"></a></h3>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- n>Mutt</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Mutt</c-> <c- p>{</c->
     <c- n>operator</c-> <c- b>int</c-><c- o>*</c-><c- p>()</c-> <c- o>&amp;&amp;</c-><c- p>;</c->
 <c- p>};</c->
-<c- k>struct</c-> <c- n>Jeff</c-> <c- p>{</c->
+<c- k>struct</c-> <c- nc>Jeff</c-> <c- p>{</c->
     <c- n>operator</c-> <c- b>int</c-><c- o>&amp;</c-><c- p>()</c-> <c- o>&amp;&amp;</c-><c- p>;</c->
 <c- p>};</c->
 
@@ -2194,7 +2195,7 @@ but it is treated as an lvalue when the return type of the function is <code cla
     <c- k>return</c-> <c- n>x</c-><c- p>;</c->  <c- c1>// OK since C++20 because P1155</c->
 <c- p>}</c->
 
-<c- b>int</c-><c- o>&amp;</c-> <c- n>six</c-><c- p>(</c-><c- n>Jeff</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c->
+<c- b>int</c-><c- o>&amp;</c-> <c- nf>six</c-><c- p>(</c-><c- n>Jeff</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c->
     <c- k>return</c-> <c- n>x</c-><c- p>;</c->  <c- c1>// Error</c->
 <c- p>}</c->
 </pre>
@@ -2216,8 +2217,8 @@ object type, implicit move fails to happen — the return type <code class="high
 bind to the lvalue <em>id-expression</em> <code class="highlight"><c- n>x</c-></code>.</p>
    <p>The same surprise occurs with <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code> return types:</p>
 <pre class="highlight"><c- n>Widget</c-> <c- nf>val</c-><c- p>();</c->
-<c- n>Widget</c-><c- o>&amp;</c-> <c- n>lref</c-><c- p>();</c->
-<c- n>Widget</c-><c- o>&amp;&amp;</c-> <c- n>rref</c-><c- p>();</c->
+<c- n>Widget</c-><c- o>&amp;</c-> <c- nf>lref</c-><c- p>();</c->
+<c- n>Widget</c-><c- o>&amp;&amp;</c-> <c- nf>rref</c-><c- p>();</c->
 
 <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>eight</c-><c- p>()</c-> <c- p>{</c->
     <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>x</c-> <c- o>=</c-> <c- n>val</c-><c- p>();</c->  <c- c1>// OK, x is Widget</c->
@@ -2279,7 +2280,7 @@ and then (if that resolution fails) another one treating the operand as an lvalu
    <p>As far as I know, this is the only place in the language where two separate resolutions
 are done on the same operand. This mechanism has some counterintuitive ramifications —<wbr>not <em>problems</em> per se, but surprising and subtle quirks that would be nice to simplify
 out of the language.</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- n>Sam</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Sam</c-> <c- p>{</c->
     <c- n>Sam</c-><c- p>(</c-><c- n>Widget</c-><c- o>&amp;</c-><c- p>);</c->        <c- c1>// #1</c->
     <c- n>Sam</c-><c- p>(</c-><c- k>const</c-> <c- n>Widget</c-><c- o>&amp;</c-><c- p>);</c->  <c- c1>// #2</c->
 <c- p>};</c->
@@ -2303,7 +2304,7 @@ no conclusion except a general sense that the alternative mechanisms
 discussed (such as introducing a notion of "lvalues that preferentially bind
 to rvalue references" or "rvalues that reluctantly bind to lvalue references")
 were strictly worse than the status quo.</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- n>Frodo</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Frodo</c-> <c- p>{</c->
     <c- n>Frodo</c-><c- p>(</c-><c- n>Widget</c-><c- o>&amp;</c-><c- p>);</c->
     <c- n>Frodo</c-><c- p>(</c-><c- n>Widget</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- n>delete</c-><c- p>;</c->
 <c- p>};</c->
@@ -2340,10 +2341,10 @@ was performed.</p>
 were simplified to avoid relying on the precise formal meaning of "failure."
 We propose that simplification.</p>
    <p>Another example of vendors misinterpreting the meaning of "failure":</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- n>Merry</c-> <c- p>{};</c->
-<c- k>struct</c-> <c- n>Pippin</c-> <c- p>{};</c->
-<c- k>struct</c-> <c- nl>Together</c-> <c- p>:</c-> <c- n>Merry</c-><c- p>,</c-> <c- n>Pippin</c-> <c- p>{};</c->
-<c- k>struct</c-> <c- n>Quest</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Merry</c-> <c- p>{};</c->
+<c- k>struct</c-> <c- nc>Pippin</c-> <c- p>{};</c->
+<c- k>struct</c-> <c- nc>Together</c-> <c- o>:</c-> <c- n>Merry</c-><c- p>,</c-> <c- n>Pippin</c-> <c- p>{};</c->
+<c- k>struct</c-> <c- nc>Quest</c-> <c- p>{</c->
     <c- n>Quest</c-><c- p>(</c-><c- n>Merry</c-><c- o>&amp;&amp;</c-><c- p>);</c->
     <c- n>Quest</c-><c- p>(</c-><c- n>Pippin</c-><c- o>&amp;&amp;</c-><c- p>);</c->
     <c- n>Quest</c-><c- p>(</c-><c- n>Together</c-><c- o>&amp;</c-><c- p>);</c->
@@ -2383,7 +2384,7 @@ making <code class="highlight"><c- n>fifteen</c-></code> ill-formed is a good th
 the dangling reference. The existing two-step mechanism works to defeat
 the clear intent of <code class="highlight"><c- n>reference_wrapper</c-></code>'s SFINAE-constrained constructor
 and permit the returning of dangling references when in fact we don’t want that.</p>
-   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording relative to C++20</span><a class="self-link" href="#wording"></a></h2>
+   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording relative to N4878</span><a class="self-link" href="#wording"></a></h2>
    <p>Note that this proposal merge-conflicts with Jens Maurer’s <a data-link-type="biblio" href="#biblio-draftpr3998">[DraftPR3998]</a>.
 Consensus seems to be that [class.copy.elision] is no longer the best place to explain
 "implicit move." <a data-link-type="biblio" href="#biblio-draftpr3998">[DraftPR3998]</a> moves the "implicitly movable entity" wording from
@@ -2413,7 +2414,7 @@ names an implicitly movable entity declared in the body or <em>parameter-declara
      <li data-md>
       <ins>if the <em>id-expression</em> (possibly parenthesized) is the operand of
 a <em>throw-expression</em>, and
-names an implicitly movable entity whose scope does not extend beyond the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
+names an implicitly movable entity that belongs to a scope that does not contain the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
 whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>.</ins>
     </ul>
    </blockquote>
@@ -2428,7 +2429,7 @@ operation:</del>
       <del>If the <em>expression</em> in
 a <code class="highlight"><c- k>return</c-></code> or <code class="highlight"><c- k>co_return</c-></code> statement is a (possibly parenthesized) <em>id-expression</em> that names an implicitly movable entity declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</del>
      <li data-md>
-      <del>if the operand of a <em>throw-expression</em> is a (possibly parenthesized) <em>id-expression</em> that names an implicitly movable entity whose scope does not extend beyond the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
+      <del>if the operand of a <em>throw-expression</em> is a (possibly parenthesized) <em>id-expression</em> that names an implicitly movable entity that belongs to a scope that does not contain the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
 whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>,</del>
     </ul>
     <del>overload resolution to select the constructor for the copy or the <code class="highlight"><c- n>return_value</c-></code> overload to call is first performed as if the expression or operand were an rvalue.
@@ -2444,7 +2445,7 @@ must be accessible even if the call is elided. — <em>end note</em>]</del>
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <pre class="highlight"><c- k>struct</c-> <c- n>Weird</c-> <c- p>{</c->
+    <small> <pre class="highlight"><c- k>struct</c-> <c- nc>Weird</c-> <c- p>{</c->
   <c- n>Weird</c-><c- p>();</c->
   <c- n>Weird</c-><c- p>(</c-><c- n>Weird</c-><c- o>&amp;</c-><c- p>);</c->
 <c- p>};</c->
@@ -2480,7 +2481,7 @@ showing how the new wording affects functions that return references:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <pre class="highlight"><ins><c- b>int</c-><c- o>&amp;</c-> <c- n>h</c-><c- p>(</c-><c- b>bool</c-> <c- n>b</c-><c- p>,</c-> <c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- p>{</c-></ins>
+    <small> <pre class="highlight"><ins><c- b>int</c-><c- o>&amp;</c-> <c- nf>h</c-><c- p>(</c-><c- b>bool</c-> <c- n>b</c-><c- p>,</c-> <c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- p>{</c-></ins>
   <ins><c- k>static</c-> <c- b>int</c-> <c- n>s</c-><c- p>;</c-></ins>
   <ins><c- k>if</c-> <c- p>(</c-><c- n>b</c-><c- p>)</c-> <c- p>{</c-></ins>
     <ins><c- k>return</c-> <c- n>s</c-><c- p>;</c->  <c- c1>// OK</c-></ins>
@@ -2503,6 +2504,39 @@ showing how the new wording affects functions that return references:</p>
     <p>if the reference is an rvalue reference, the initializer expression shall not be an lvalue.</p>
     <ins>[<em>Note:</em> This can be affected by whether the initializer expression
 is move-eligible ([expr.prim.id.unqual]). — <em>end note</em>]</ins>
+   </blockquote>
+   <h3 class="heading settled" data-level="4.2" id="wording-lambdas"><span class="secno">4.2. </span><span class="content">Drive-by bugfix for throws inside lambdas</span><a class="self-link" href="#wording-lambdas"></a></h3>
+   <p>Davis Herring points out a bug in the existing wording.</p>
+<pre class="language-c++ highlight">    <c- n>std</c-><c- o>::</c-><c- n>string</c-> <c- n>x</c-> <c- o>=</c-> <c- s>"original value should not be moved-from"</c-><c- p>;</c->
+    <c- k>auto</c-> <c- n>lam</c-> <c- o>=</c-> <c- p>[</c-><c- o>&amp;</c-><c- p>]()</c-> <c- p>{</c-> <c- n>throw</c-> <c- n>x</c-><c- p>;</c-> <c- p>};</c->  <c- c1>// HERE</c->
+    <c- n>try</c-> <c- p>{</c->
+        <c- n>lam</c-><c- p>();</c->
+    <c- p>}</c-> <c- n>catch</c-> <c- p>(...)</c-> <c- p>{}</c->
+    <c- n>assert</c-><c- p>(</c-><c- n>x</c-> <c- o>==</c-> <c- s>"original value should not be moved-from"</c-><c- p>);</c->
+</pre>
+   <p>The existing wording implies that the compiler should generate a move, not a copy,
+for that <code class="highlight"><c- k>throw</c-> <c- n>x</c-></code>, because its operand is an entity (<code class="highlight"><c- n>x</c-></code>) defined in the outer scope,
+inside the nearest lexically enclosing try-block. However, this is a bug in the
+wording. I think we could patch this bug simply by inserting in the new [expr.prim.id.unqual]:</p>
+   <blockquote>
+    <p>In the following contexts, an <em>id-expression</em> is <em>move-eligible</em>:</p>
+    <ul>
+     <li data-md>
+      <p>If the <em>id-expression</em> (possibly parenthesized) is the operand of
+a <code class="highlight"><c- k>return</c-></code> or <code class="highlight"><c- k>co_return</c-></code> statement, and
+names an implicitly movable entity declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</p>
+     <li data-md>
+      <p>
+       if the <em>id-expression</em> (possibly parenthesized) is the operand of
+a <em>throw-expression</em>, and
+names an implicitly movable entity that belongs to a scope that does not contain the <em>compound-statement</em> of the innermost 
+       <ins><em>lambda-expression</em>,</ins>
+        <em>try-block</em>
+       <ins>,</ins>
+        or <em>function-try-block</em> (if any)
+whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>.
+      </p>
+    </ul>
    </blockquote>
    <h2 class="heading settled" data-level="5" id="acknowledgments"><span class="secno">5. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <ul>
