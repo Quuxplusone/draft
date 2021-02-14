@@ -172,10 +172,19 @@ looking at the implicit guide generated from the constructor
 
 From the first parameter, we deduce `T=int` and `Allocator=std::pmr::polymorphic_allocator<int>`.
 From the second parameter, we deduce `Allocator=std::monotonic_buffer_resource*`.
-We've deduced conflicting types for `Allocator`, so deduction fails.
+We've deduced conflicting types for `Allocator`, so deduction fails. 
 
 In this case, the second argument unnecessarily participates in deduction, and again unexpectedly
 prevents natural and useful code from working as desired.
+
+To see  that 
+the allocator argument is irrelevant to deduction, note that a vector can only be 
+constructed from a vector of the same type. E.g.,
+```c++
+std::vector<int, std::pmr::polymorphic_allocator<int>> pv2(pv, &mr); // OK. Same types
+std::vector<int> v(pv, std::allocator<int>());  // Ill-formed. No such constructor
+```
+
 
 
 ## The solution ## {#solution2}
@@ -480,4 +489,5 @@ implementation of this proposal, as an alternative to directly implementing the 
     "date": "June 2017"
   }
 }
+
 </pre>

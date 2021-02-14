@@ -2215,6 +2215,12 @@ From the second parameter, we deduce <code class="highlight"><c- n="">Allocator<
 We’ve deduced conflicting types for <code class="highlight"><c- n="">Allocator</c-></code>, so deduction fails.</p>
    <p>In this case, the second argument unnecessarily participates in deduction, and again unexpectedly
 prevents natural and useful code from working as desired.</p>
+   <p>To see  that
+the allocator argument is irrelevant to deduction, note that a vector can only be 
+constructed from a vector of the same type. E.g.,</p>
+<pre class="language-c++ highlight"><c- n="">std</c-><c- o="">::</c-><c- n="">vector</c-><c- o="">&lt;</c-><c- b="">int</c-><c- p="">,</c-> <c- n="">std</c-><c- o="">::</c-><c- n="">pmr</c-><c- o="">::</c-><c- n="">polymorphic_allocator</c-><c- o="">&lt;</c-><c- b="">int</c-><c- o="">&gt;&gt;</c-> <c- n="">pv2</c-><c- p="">(</c-><c- n="">pv</c-><c- p="">,</c-> <c- o="">&amp;</c-><c- n="">mr</c-><c- p="">);</c-> <c- c1="">// OK. Same types</c->
+<c- n="">std</c-><c- o="">::</c-><c- n="">vector</c-><c- o="">&lt;</c-><c- b="">int</c-><c- o="">&gt;</c-> <c- n="">v</c-><c- p="">(</c-><c- n="">pv</c-><c- p="">,</c-> <c- n="">std</c-><c- o="">::</c-><c- n="">allocator</c-><c- o="">&lt;</c-><c- b="">int</c-><c- o="">&gt;</c-><c- p="">());</c->  <c- c1="">// Ill-formed. No such constructor</c->
+</pre>
    <h3 class="heading settled" data-level="3.3" id="solution2"><span class="secno">3.3. </span><span class="content">The solution</span><a class="self-link" href="#solution2"></a></h3>
    <p>If we were introducing the containers from scratch today, the natural approach would be for the
 constructors to indicate which arguments should be considered deducible, as is usual for function templates.</p>
