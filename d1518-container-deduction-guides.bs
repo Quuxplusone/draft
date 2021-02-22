@@ -1,28 +1,32 @@
 <pre class='metadata'>
 Title: Stop overconstraining allocators in container deduction guides
 Shortname: D1518
-Revision: 0
-!Draft Revision: 4
-Audience: LEWG
+Revision: 1
+!Draft Revision: 5
+Audience: LWG
 Status: D
 Group: WG21
 URL:
-!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/stack-ctad.bs">github.com/Quuxplusone/draft/blob/gh-pages/stack-ctad.bs</a>
-!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/stack-ctad.html">rawgit.com/Quuxplusone/draft/gh-pages/stack-ctad.html</a>
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1518-container-deduction-guides.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1518-container-deduction-guides.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d1518-container-deduction-guides.html">rawgit.com/Quuxplusone/draft/gh-pages/d1518-container-deduction-guides.html</a>
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
-Editor: Mike Spertus, mike_spertus@symantec.com
+Editor: Mike Spertus, msspertu@amazon.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Discussion of flatmap’s deduction guides revealed that the deduction guides for sequence
   containers and container adaptors are needlessly overconstrained, making use cases such as
   pmr containers unnecessarily difficult. We fix this.
-Date: 2019-03-09
+Date: 2021-02-21
 </pre>
 
 <style>
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
+
+# Changelog # {#changelog}
+
+- R1: Incorporate LWG wording feedback. Mention [[LWG3506]] and [[P1425R2]].
 
 
 # Stop overconstraining allocators that do not participate in deduction # {#overconst1}
@@ -108,8 +112,8 @@ A deduction guide for a container adaptor shall not participate in overload reso
 - It has a `Container` template parameter and a type that qualifies as an allocator is deduced
      for that parameter.
 
-- <del>It has an `Allocator` template parameter and a type that does not qualify as an allocator
-     is deduced for that parameter.</del>
+- It has <ins>no `Container` template parameter, and it has</ins> an `Allocator` template parameter<ins>,</ins>
+     and a type that does not qualify as an allocator is deduced for that parameter.
 
 - It has both `Container` and `Allocator` template parameters, and
      `uses_allocator_v<Container, Allocator>` is `false`.
@@ -119,8 +123,12 @@ A deduction guide for a container adaptor shall not participate in overload reso
 Note: The rationale is that if the `Container` advertises that it can "use" the supplied allocator,
 we shouldn't interrogate it any more closely. Trust the `Container`'s specialization of `uses_allocator`.
 
-Note: No container adaptor deduction guide has an `Allocator` template parameter without also having
-a `Container` template parameter.
+Note: As of C++20, no container-adaptor deduction guide has an `Allocator` template parameter without
+also having a `Container` template parameter. But, as the resolution of [[LWG3506]] will add such deduction guides,
+LWG asked that we future-proof this wording.
+
+Note: [[P1425R2]] also proposes some new container-adaptor deduction guides,
+but they have no special interaction with this wording.
 
 
 # Stop deducing from allocators that should not participate in deduction # {#overconst2}
@@ -174,16 +182,21 @@ We've deduced conflicting types for `Allocator`, so deduction fails.
 In this case, the second argument unnecessarily participates in deduction, and again unexpectedly
 prevents natural and useful code from working as desired.
 
+Observe that even in the absence of CTAD, the signature above
+permits construction only from the same specialization of `vector`,
+not from any arbitrary specialization of `vector`. For example:
+```c++
+    std::vector<T, A1> v1;
+    std::vector<T, A2> v2(v1, A2());  // ill-formed
+```
 
 ## The solution ## {#solution2}
 
-We present two approaches for changing the wording that are equivalent in effect.
-
-### Wording option 1 ### {#option1}
-
 If we were introducing the containers from scratch today, the natural approach would be for the
-constructors to indicate which arguments should be considered deducible, as is usual for function templates.
-For example, modify [ [deque.overview](http://eel.is/c++draft/deque.overview)] as follows:
+constructors to indicate which arguments should be considered deducible.
+LWG has indicated their satisfaction with this approach, so that's what we propose here.
+
+Modify [ [deque.overview](http://eel.is/c++draft/deque.overview)] as follows:
 
 <small><blockquote>
 <pre>
@@ -196,167 +209,184 @@ For example, modify [ [deque.overview](http://eel.is/c++draft/deque.overview)] a
 </pre>
 </blockquote></small>
 
-(Notice that the constructor `deque(initializer_list&lt;T>, const Allocator&)` is not
-changed, because its `Allocator` parameter actually does contribute to deduction: without
-that parameter's type, we would not know what the `deque`'s allocator type should be.)
-
-If this is not deemed to cause compatibility issues, we like this approach.
-
-
-### Wording option 2 ### {#option2}
-
-First modify
-[ [sequence.reqmts](http://eel.is/c++draft/sequence.reqmts#13)]/13 as follows:
-
-<small><blockquote>
-A deduction guide for a sequence container shall not participate in overload resolution
-if it has an `InputIterator` template parameter and a type that does not qualify as an
-input iterator is deduced for that parameter, or if it has an `Allocator` template parameter
-and a type that does not qualify as an allocator is deduced for that parameter<ins>,
-or if it has an `Alloc` template parameter and `uses_allocator_v<X, Alloc>` is `false`
-where `X` is the deduced type of the sequence container</ins>.
-</blockquote></small>
-
-(We think that change is not strictly necessary, but it clarifies our intent.)
-
-Add one new deduction guide for each sequence container. For example, modify
-[ [deque.overview](http://eel.is/c++draft/deque.overview)] as follows:
+Modify [ [forwardlist.overview](http://eel.is/c++draft/forwardlist.overview)] as follows:
 
 <small><blockquote>
 <pre>
-    template&lt;class InputIterator, class Allocator = allocator&lt;<i>iter-value-type</i>&lt;InputIterator>>>
-        deque(InputIterator, InputIterator, Allocator = Allocator())
-          -> deque&lt;<i>iter-value-type</i>&lt;InputIterator>, Allocator>;
-
-    <ins>template&lt;class T, class Allocator, class Alloc>
-        deque(deque&lt;T, Allocator>, Alloc)
-          -> deque&lt;T, Allocator>;</ins>
+    forward_list(forward_list&&);
+    <del>forward_list(const forward_list&, const Allocator&);</del>
+    <ins>forward_list(const forward_list&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>forward_list(forward_list&&, const Allocator&);</del>
+    <ins>forward_list(forward_list&&, const type_identity_t&lt;Allocator>&);</ins>
+    forward_list(initializer_list&lt;T>, const Allocator& = Allocator());
 </pre>
 </blockquote></small>
 
-Then, modify [ [associative.reqmts](http://eel.is/c++draft/associative.reqmts#15)]/15 as follows:
-
-<small><blockquote>
-A deduction guide for an associative container shall not participate in overload resolution
-if any of the following are true:
-
-- It has an `InputIterator` template parameter and a type that does not qualify as an input iterator
-        is deduced for that parameter.
-
-- It has an `Allocator` template parameter and a type that does not qualify as an allocator
-        is deduced for that parameter.
-
-- It has a `Compare` template parameter and a type that qualifies as an allocator is
-        deduced for that parameter.
-
-- <ins>It has an `Alloc` template parameter and `uses_allocator_v<X, Alloc>` is `false`
-        where `X` is the deduced type of the associative container</ins>.
-
-</blockquote></small>
-
-(We think that change is not strictly necessary, but it clarifies our intent.)
-
-Add one new deduction guide for each associative container. For example, modify
-[ [set.overview](http://eel.is/c++draft/set.overview)] as follows:
+Modify [ [list.overview](http://eel.is/c++draft/list.overview)] as follows:
 
 <small><blockquote>
 <pre>
-    template&lt;class InputIterator,
-             class Compare = less&lt;<i>iter-value-type</i>&lt;InputIterator>>,
-             class Allocator = allocator&lt;<i>iter-value-type</i>&lt;InputIterator>>>
-      set(InputIterator, InputIterator,
-          Compare = Compare(), Allocator = Allocator())
-        -> set&lt;<i>iter-value-type</i>&lt;InputIterator>, Compare, Allocator>;
-
-    template&lt;class Key, class Compare = less&lt;Key>, class Allocator = allocator&lt;Key>>
-      set(initializer_list&lt;Key>, Compare = Compare(), Allocator = Allocator())
-        -> set&lt;Key, Compare, Allocator>;
-
-    template&lt;class InputIterator, class Allocator>
-      set(InputIterator, InputIterator, Allocator)
-        -> set&lt;<i>iter-value-type</i>&lt;InputIterator>,
-               less&lt;<i>iter-value-type</i>&lt;InputIterator>>, Allocator>;
-
-    template&lt;class Key, class Allocator>
-      set(initializer_list&lt;Key>, Allocator) -> set&lt;Key, less&lt;Key>, Allocator>;
-
-    <ins>template&lt;class Key, class Compare, class Allocator, class Alloc>
-      set(set&lt;Key, Compare, Allocator>, Alloc) -> set&lt;Key, Compare, Allocator>;</ins>
+    list(list&&);
+    <del>list(const list&, const Allocator&);</del>
+    <ins>list(const list&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>list(list&&, const Allocator&);</del>
+    <ins>list(list&&, const type_identity_t&lt;Allocator>&);</ins>
+    list(initializer_list&lt;T>, const Allocator& = Allocator());
 </pre>
 </blockquote></small>
 
-Then, modify [ [unord.req](http://eel.is/c++draft/unord.req#18)]/18 as follows:
-
-<small><blockquote>
-A deduction guide for an unordered associative container shall not participate in overload resolution
-if any of the following are true:
-
-- It has an `InputIterator` template parameter and a type that does not qualify as an input iterator
-        is deduced for that parameter.
-
-- It has an `Allocator` template parameter and a type that does not qualify as an allocator
-        is deduced for that parameter.
-
-- It has a `Hash` template parameter and an integral type or a type that qualifies as an allocator
-        is deduced for that parameter.
-
-- It has a `Pred` template parameter and a type that qualifies as an allocator is
-        deduced for that parameter.
-
-- <ins>It has an `Alloc` template parameter and `uses_allocator_v<X, Alloc>` is `false`
-        where `X` is the deduced type of the associative container</ins>.
-
-</blockquote></small>
-
-(We think that change is not strictly necessary, but it clarifies our intent.)
-
-Add one new deduction guide for each unordered associative container. For example, modify
-[ [unord.set.overview](http://eel.is/c++draft/unord.set.overview)] as follows:
+Modify [ [vector.overview](http://eel.is/c++draft/vector.overview)] as follows:
 
 <small><blockquote>
 <pre>
-    template&lt;class InputIterator,
-             class Hash = hash&lt;<i>iter-value-type</i>&lt;InputIterator>>,
-             class Pred = equal_to&lt;<i>iter-value-type</i>&lt;InputIterator>>,
-             class Allocator = allocator&lt;<i>iter-value-type</i>&lt;InputIterator>>>
-      unordered_set(InputIterator, InputIterator, typename <i>see below</i>::size_type = <i>see below</i>,
-                    Hash = Hash(), Pred = Pred(), Allocator = Allocator())
-        -> unordered_set&lt;<i>iter-value-type</i>&lt;InputIterator>,
-                         Hash, Pred, Allocator>;
-
-    template&lt;class T, class Hash = hash&lt;T>,
-             class Pred = equal_to&lt;T>, class Allocator = allocator&lt;T>>
-      unordered_set(initializer_list&lt;T>, typename <i>see below</i>::size_type = <i>see below</i>,
-                    Hash = Hash(), Pred = Pred(), Allocator = Allocator())
-        -> unordered_set&lt;T, Hash, Pred, Allocator>;
-
-    template&lt;class InputIterator, class Allocator>
-      unordered_set(InputIterator, InputIterator, typename <i>see below</i>::size_type, Allocator)
-        -> unordered_set&lt;<i>iter-value-type</i>&lt;InputIterator>,
-                         hash&lt;<i>iter-value-type</i>&lt;InputIterator>>,
-                         equal_to&lt;<i>iter-value-type</i>&lt;InputIterator>>,
-                         Allocator>;
-
-    template&lt;class InputIterator, class Hash, class Allocator>
-      unordered_set(InputIterator, InputIterator, typename <i>see below</i>::size_type,
-                    Hash, Allocator)
-        -> unordered_set&lt;<i>iter-value-type</i>&lt;InputIterator>, Hash,
-                         equal_to&lt;<i>iter-value-type</i>&lt;InputIterator>>,
-                         Allocator>;
-
-    template&lt;class T, class Allocator>
-      unordered_set(initializer_list&lt;T>, typename <i>see below</i>::size_type, Allocator)
-        -> unordered_set&lt;T, hash&lt;T>, equal_to&lt;T>, Allocator>;
-
-    template&lt;class T, class Hash, class Allocator>
-      unordered_set(initializer_list&lt;T>, typename <i>see below</i>::size_type, Hash, Allocator)
-        -> unordered_set&lt;T, Hash, equal_to&lt;T>, Allocator>;
-
-    <ins>template&lt;class T, class Hash, class Pred, class Allocator, class Alloc>
-      unordered_set(set&lt;T, Hash, Pred, Allocator>, Alloc)
-        -> unordered_set&lt;T, Hash, Pred, Allocator>;</ins>
+    constexpr vector(vector&&) noexcept;
+    <del>constexpr vector(const vector&, const Allocator&);</del>
+    <ins>constexpr vector(const vector&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>constexpr vector(vector&&, const Allocator&);</del>
+    <ins>constexpr vector(vector&&, const type_identity_t&lt;Allocator>&);</ins>
+    constexpr vector(initializer_list&lt;T>, const Allocator& = Allocator());
 </pre>
 </blockquote></small>
+
+Modify [ [vector.bool](http://eel.is/c++draft/vector.bool)] as follows:
+
+<small><blockquote>
+<pre>
+    constexpr vector(vector&& x);
+    <del>constexpr vector(const vector&, const Allocator&);</del>
+    <ins>constexpr vector(const vector&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>constexpr vector(vector&&, const Allocator&);</del>
+    <ins>constexpr vector(vector&&, const type_identity_t&lt;Allocator>&);</ins>
+    constexpr vector(initializer_list&lt;bool>, const Allocator& = Allocator());
+</pre>
+</blockquote></small>
+
+Modify [ [map.overview](http://eel.is/c++draft/map.overview)] as follows:
+
+<small><blockquote>
+<pre>
+    explicit map(const Allocator&);
+    <del>map(const map&, const Allocator&);</del>
+    <ins>map(const map&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>map(map&&, const Allocator&);</del>
+    <ins>map(map&&, const type_identity_t&lt;Allocator>&);</ins>
+    map(initializer_list&lt;value_type>,
+      const Compare& = Compare,
+      const Allocator& = Allocator());
+</pre>
+</blockquote></small>
+
+Modify [ [multimap.overview](http://eel.is/c++draft/multimap.overview)] as follows:
+
+<small><blockquote>
+<pre>
+    explicit multimap(const Allocator&);
+    <del>multimap(const multimap&, const Allocator&);</del>
+    <ins>multimap(const multimap&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>multimap(multimap&&, const Allocator&);</del>
+    <ins>multimap(multimap&&, const type_identity_t&lt;Allocator>&);</ins>
+    multimap(initializer_list&lt;value_type>,
+      const Compare& = Compare,
+      const Allocator& = Allocator());
+</pre>
+</blockquote></small>
+
+Modify [ [set.overview](http://eel.is/c++draft/set.overview)] as follows:
+
+<small><blockquote>
+<pre>
+    explicit set(const Allocator&);
+    <del>set(const set&, const Allocator&);</del>
+    <ins>set(const set&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>set(set&&, const Allocator&);</del>
+    <ins>set(set&&, const type_identity_t&lt;Allocator>&);</ins>
+    set(initializer_list&lt;value_type>, const Compare& = Compare(),
+        const Allocator& = Allocator());
+</pre>
+</blockquote></small>
+
+Modify [ [multiset.overview](http://eel.is/c++draft/multiset.overview)] as follows:
+
+<small><blockquote>
+<pre>
+    explicit multiset(const Allocator&);
+    <del>multiset(const multiset&, const Allocator&);</del>
+    <ins>multiset(const multiset&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>multiset(multiset&&, const Allocator&);</del>
+    <ins>multiset(multiset&&, const type_identity_t&lt;Allocator>&);</ins>
+    multiset(initializer_list&lt;value_type>, const Compare& = Compare(),
+        const Allocator& = Allocator());
+</pre>
+</blockquote></small>
+
+Modify [ [unord.map.overview](http://eel.is/c++draft/unord.map.overview)] as follows:
+
+<small><blockquote>
+<pre>
+    explicit unordered_map(const Allocator&);
+    <del>unordered_map(const unordered_map&, const Allocator&);</del>
+    <ins>unordered_map(const unordered_map&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>unordered_map(unordered_map&&, const Allocator&);</del>
+    <ins>unordered_map(unordered_map&&, const type_identity_t&lt;Allocator>&);</ins>
+    unordered_map(initializer_list&lt;value_type> il,
+                  size_type n = <i>see below</i>,
+                  const hasher& hf = hasher(),
+                  const key_equal& eql = key_equal(),
+                  const allocator_type& a = allocator_type());
+</pre>
+</blockquote></small>
+
+Modify [ [unord.multimap.overview](http://eel.is/c++draft/unord.multimap.overview)] as follows:
+
+<small><blockquote>
+<pre>
+    explicit unordered_multimap(const Allocator&);
+    <del>unordered_multimap(const unordered_multimap&, const Allocator&);</del>
+    <ins>unordered_multimap(const unordered_multimap&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>unordered_multimap(unordered_multimap&&, const Allocator&);</del>
+    <ins>unordered_multimap(unordered_multimap&&, const type_identity_t&lt;Allocator>&);</ins>
+    unordered_multimap(initializer_list&lt;value_type> il,
+                  size_type n = <i>see below</i>,
+                  const hasher& hf = hasher(),
+                  const key_equal& eql = key_equal(),
+                  const allocator_type& a = allocator_type());
+</pre>
+</blockquote></small>
+
+Modify [ [unord.set.overview](http://eel.is/c++draft/unord.set.overview)] as follows:
+
+<small><blockquote>
+<pre>
+    explicit unordered_set(const Allocator&);
+    <del>unordered_set(const unordered_set&, const Allocator&);</del>
+    <ins>unordered_set(const unordered_set&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>unordered_set(unordered_set&&, const Allocator&);</del>
+    <ins>unordered_set(unordered_set&&, const type_identity_t&lt;Allocator>&);</ins>
+    unordered_set(initializer_list&lt;value_type> il,
+                  size_type n = <i>see below</i>,
+                  const hasher& hf = hasher(),
+                  const key_equal& eql = key_equal(),
+                  const allocator_type& a = allocator_type());
+</pre>
+</blockquote></small>
+
+Modify [ [unord.multiset.overview](http://eel.is/c++draft/unord.multiset.overview)] as follows:
+
+<small><blockquote>
+<pre>
+    explicit unordered_multiset(const Allocator&);
+    <del>unordered_multiset(const unordered_multiset&, const Allocator&);</del>
+    <ins>unordered_multiset(const unordered_multiset&, const type_identity_t&lt;Allocator>&);</ins>
+    <del>unordered_multiset(unordered_multiset&&, const Allocator&);</del>
+    <ins>unordered_multiset(unordered_multiset&&, const type_identity_t&lt;Allocator>&);</ins>
+    unordered_multiset(initializer_list&lt;value_type> il,
+                  size_type n = <i>see below</i>,
+                  const hasher& hf = hasher(),
+                  const key_equal& eql = key_equal(),
+                  const allocator_type& a = allocator_type());
+</pre>
+</blockquote></small>
+
 
 ## Implementation note ## {#implementation}
 While implementers may of course implement this proposal exactly as described in the wording options above,
@@ -391,7 +421,7 @@ proposing here as shown in the following table and [this Godbolt](https://godbol
 </small>
 
 The following analysis explains why MSVC, in effect, already implements
-the approach described in [wording option 1](#option1) above.
+the approach described in [[#solution2]] above.
 Consider the implicit guide generated from the constructor
 
 ```c++
@@ -414,7 +444,7 @@ that the constructor seen by the compiler in practice is equivalent to
 ```c++
     template<class Key, class Hash, class Pred, class Allocator>
     class unordered_set {
-        using allocator_type = typename type_identity<Allocator>::type;
+        using allocator_type = type_identity_t<Allocator>;
         unordered_set(const unordered_set<Key, Hash, Pred, Allocator>&,
                       const allocator_type&);
     };
@@ -438,6 +468,22 @@ implementation of this proposal, as an alternative to directly implementing the 
     "title": "Toward a resolution of US7 and US14: Integrating template deduction for class templates into the standard library",
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0433r3.html",
     "date": "June 2017"
+  },
+  "LWG3506": {
+    "authors": [
+      "Tim Song"
+    ],
+    "title": "LWG 3506: Missing allocator-extended constructors for priority_queue",
+    "href": "https://cplusplus.github.io/LWG/issue3506",
+    "date": "November 2020"
+  },
+  "P1425R2": {
+    "authors": [
+      "Corentin Jabot"
+    ],
+    "title": "P1425R2: Iterator-pair constructors for stack and queue",
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r2.pdf",
+    "date": "January 2021"
   }
 }
 </pre>
