@@ -2,7 +2,7 @@
 Title: Stop overconstraining allocators in container deduction guides
 Shortname: D1518
 Revision: 1
-!Draft Revision: 5
+!Draft Revision: 6
 Audience: LWG
 Status: D
 Group: WG21
@@ -120,15 +120,17 @@ A deduction guide for a container adaptor shall not participate in overload reso
 
 </blockquote></small>
 
-Note: The rationale is that if the `Container` advertises that it can "use" the supplied allocator,
-we shouldn't interrogate it any more closely. Trust the `Container`'s specialization of `uses_allocator`.
+Note: The rationale is that if it does have a `Container` parameter, and the `Container` advertises
+that it can "use" the supplied allocator, we shouldn't interrogate the allocator parameter any more
+closely. Trust the `Container`'s specialization of `uses_allocator`.
 
 Note: As of C++20, no container-adaptor deduction guide has an `Allocator` template parameter without
 also having a `Container` template parameter. But, as the resolution of [[LWG3506]] will add such deduction guides,
 LWG asked that we future-proof this wording.
 
-Note: [[P1425R2]] also proposes some new container-adaptor deduction guides,
-but they have no special interaction with this wording.
+Note: [[P1425R3]] also proposes new container-adaptor deduction guides which have an `Allocator` parameter
+without a `Container` parameter. (These guides were proposed in P1425R1, dropped in P1425R2, and restored
+in P1425R3.)
 
 
 # Stop deducing from allocators that should not participate in deduction # {#overconst2}
@@ -389,9 +391,9 @@ Modify [ [unord.multiset.overview](http://eel.is/c++draft/unord.multiset.overvie
 
 
 ## Implementation note ## {#implementation}
-While implementers may of course implement this proposal exactly as described in the wording options above,
-we wish to point out that a number of library implementations already behave in many cases as we are
-proposing here as shown in the following table and [this Godbolt](https://godbolt.org/z/1QepHG):
+Some of the changes proposed in this paper have already been implemented "accidentally" by
+one or more library implementations,
+as shown in the following table and [this Godbolt](https://godbolt.org/z/5oKKGd):
 
 <small>
 <table class="def">
@@ -401,63 +403,24 @@ proposing here as shown in the following table and [this Godbolt](https://godbol
 <tr><td>std::forward_list(pfl, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
 <tr><td>std::list(pl, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
 <tr><td>std::vector(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
-<tr><td>std::map(pm, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
-<tr><td>std::multimap(pmm, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
-<tr><td>std::multiset(pms, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
-<tr><td>std::set(ps, &mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td>
-<tr><td>std::unordered_map(pum, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
-<tr><td>std::unordered_multimap(pumm, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
-<tr><td>std::unordered_multiset(pums, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
-<tr><td>std::unordered_set(pus, &mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td>
+<tr><td>std::map(pm, &mr)</td> <td>MSVC, libc++</td> <td>libstdc++</td> <td></td>
+<tr><td>std::multimap(pmm, &mr)</td> <td>MSVC, libc++</td> <td>libstdc++</td> <td></td>
+<tr><td>std::multiset(pms, &mr)</td> <td>MSVC, libc++</td> <td>libstdc++</td> <td></td>
+<tr><td>std::set(ps, &mr)</td> <td>MSVC, libc++</td> <td>libstdc++</td> <td></td>
+<tr><td>std::unordered_map(pum, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
+<tr><td>std::unordered_multimap(pumm, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
+<tr><td>std::unordered_multiset(pums, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
+<tr><td>std::unordered_set(pus, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
 <tr></tr>
 <tr><td>std::priority_queue(ppq, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
 <tr><td>std::queue(pq, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
 <tr><td>std::stack(ps, &mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td>
 <tr></tr>
-<tr><td>std::priority_queue(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
+<tr><td>std::priority_queue(comp, pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
 <tr><td>std::queue(pd, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
 <tr><td>std::stack(pv, &mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td>
 </table>
 </small>
-
-The following analysis explains why MSVC, in effect, already implements
-the approach described in [[#solution2]] above.
-Consider the implicit guide generated from the constructor
-
-```c++
-    template<class Key, class Hash, class Pred, class Allocator>
-    class unordered_set {
-        unordered_set(const unordered_set<Key, Hash, Pred, Allocator>&,
-                      const Allocator&);
-    };
-```
-
-From the first parameter, we deduce `Key=int`, `Hash=std::hash<int>`, `Pred=std::equal_to<int>`,
-and `Allocator=std::pmr::polymorphic_allocator<int>`.
-From the second parameter, we should deduce `Allocator=std::monotonic_buffer_resource*`.
-We've deduced conflicting types for `Allocator`, so deduction fails.
-
-However, in practice, both MSVC and libstdc++ launder the `Allocator` type through a typedef
-that is opaque to deduction, so
-that the constructor seen by the compiler in practice is equivalent to
-
-```c++
-    template<class Key, class Hash, class Pred, class Allocator>
-    class unordered_set {
-        using allocator_type = type_identity_t<Allocator>;
-        unordered_set(const unordered_set<Key, Hash, Pred, Allocator>&,
-                      const allocator_type&);
-    };
-```
-
-From the first parameter, we deduce `Key=int`, `Hash=std::hash<int>`, `Pred=std::equal_to<int>`,
-and `Allocator=std::pmr::polymorphic_allocator<int>`.
-From the second parameter, we don't deduce anything.
-In practice, therefore, deduction succeeds.
-
-Implementers who have taken the above approach can use that to simplify their
-implementation of this proposal, as an alternative to directly implementing the above wording
-(which is of course also perfectly fine).
 
 <pre class=biblio>
 {
