@@ -2083,7 +2083,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>5
+     <dd>6
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1518-container-deduction-guides.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1518-container-deduction-guides.bs</a>
      <dt>Current:
@@ -2178,13 +2178,15 @@ needed to safely deduce the correct template arguments for <code class="highligh
  input iterator is deduced for that parameter.</p> </li><li data-md><p>It has a <code class="highlight"><c- n>Compare</c-></code> template parameter and a type that qualifies as an allocator is deduced
  for that parameter.</p> </li><li data-md><p>It has a <code class="highlight"><c- n>Container</c-></code> template parameter and a type that qualifies as an allocator is deduced
  for that parameter.</p> </li><li data-md><p>It has <ins>no <code class="highlight"><c- n>Container</c-></code> template parameter, and it has</ins> an <code class="highlight"><c- n>Allocator</c-></code> template parameter<ins>,</ins> and a type that does not qualify as an allocator is deduced for that parameter.</p> </li><li data-md><p>It has both <code class="highlight"><c- n>Container</c-></code> and <code class="highlight"><c- n>Allocator</c-></code> template parameters, and <code class="highlight"><c- n>uses_allocator_v</c-><c- o>&lt;</c-><c- n>Container</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>></c-></code> is <code class="highlight">false</code>.</p> </li></ul> </small></blockquote>
-   <p class="note" role="note"><span>Note:</span> The rationale is that if the <code class="highlight"><c- n>Container</c-></code> advertises that it can "use" the supplied allocator,
-we shouldn’t interrogate it any more closely. Trust the <code class="highlight"><c- n>Container</c-></code>'s specialization of <code class="highlight"><c- n>uses_allocator</c-></code>.</p>
+   <p class="note" role="note"><span>Note:</span> The rationale is that if it does have a <code class="highlight"><c- n>Container</c-></code> parameter, and the <code class="highlight"><c- n>Container</c-></code> advertises
+that it can "use" the supplied allocator, we shouldn’t interrogate the allocator parameter any more
+closely. Trust the <code class="highlight"><c- n>Container</c-></code>'s specialization of <code class="highlight"><c- n>uses_allocator</c-></code>.</p>
    <p class="note" role="note"><span>Note:</span> As of C++20, no container-adaptor deduction guide has an <code class="highlight"><c- n>Allocator</c-></code> template parameter without
 also having a <code class="highlight"><c- n>Container</c-></code> template parameter. But, as the resolution of <a data-link-type="biblio" href="#biblio-lwg3506">[LWG3506]</a> will add such deduction guides,
 LWG asked that we future-proof this wording.</p>
-   <p class="note" role="note"><span>Note:</span> <a data-link-type="biblio" href="#biblio-p1425r2">[P1425R2]</a> also proposes some new container-adaptor deduction guides,
-but they have no special interaction with this wording.</p>
+   <p class="note" role="note"><span>Note:</span> <a data-link-type="biblio" href="#biblio-p1425r3">[P1425R3]</a> also proposes new container-adaptor deduction guides which have an <code class="highlight"><c- n>Allocator</c-></code> parameter
+without a <code class="highlight"><c- n>Container</c-></code> parameter. (These guides were proposed in P1425R1, dropped in P1425R2, and restored
+in P1425R3.)</p>
    <h2 class="heading settled" data-level="3" id="overconst2"><span class="secno">3. </span><span class="content">Stop deducing from allocators that should not participate in deduction</span><a class="self-link" href="#overconst2"></a></h2>
    <h3 class="heading settled" data-level="3.1" id="problem2"><span class="secno">3.1. </span><span class="content">The problem</span><a class="self-link" href="#problem2"></a></h3>
    <p>Consider the following code:</p>
@@ -2409,41 +2411,11 @@ LWG has indicated their satisfaction with this approach, so that’s what we pro
 </pre></small>
    </blockquote>
    <h3 class="heading settled" data-level="3.4" id="implementation"><span class="secno">3.4. </span><span class="content">Implementation note</span><a class="self-link" href="#implementation"></a></h3>
-    While implementers may of course implement this proposal exactly as described in the wording options above,
-we wish to point out that a number of library implementations already behave in many cases as we are
-proposing here as shown in the following table and <a href="https://godbolt.org/z/1QepHG">this Godbolt</a>: 
+    Some of the changes proposed in this paper have already been implemented "accidentally" by
+one or more library implementations,
+as shown in the following table and <a href="https://godbolt.org/z/5oKKGd">this Godbolt</a>: 
    <p><small></small></p>
-   <small> <table class="def"> <tbody><tr><th>Construct</th><th>Well-formed</th><th>SFINAE-friendly<br> ill-formed</th><th>Hard error</th></tr> <tr><td>std::deque(pd, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::forward_list(pfl, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::list(pl, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::vector(pv, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::map(pm, &amp;mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td> </tr><tr><td>std::multimap(pmm, &amp;mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td> </tr><tr><td>std::multiset(pms, &amp;mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td> </tr><tr><td>std::set(ps, &amp;mr)</td> <td>MSVC</td> <td>libstdc++, libc++</td> <td></td> </tr><tr><td>std::unordered_map(pum, &amp;mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td> </tr><tr><td>std::unordered_multimap(pumm, &amp;mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td> </tr><tr><td>std::unordered_multiset(pums, &amp;mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td> </tr><tr><td>std::unordered_set(pus, &amp;mr)</td> <td>MSVC, libstdc++</td> <td>libc++</td> <td></td> </tr><tr></tr> <tr><td>std::priority_queue(ppq, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr><td>std::queue(pq, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr><td>std::stack(ps, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr></tr> <tr><td>std::priority_queue(pv, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::queue(pd, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::stack(pv, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr></tbody></table> </small> 
-   <p>The following analysis explains why MSVC, in effect, already implements
-the approach described in <a href="#solution2">§ 3.3 The solution</a> above.
-Consider the implicit guide generated from the constructor</p>
-<pre class="language-c++ highlight">    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>Key</c-><c- p>,</c-> <c- n>class</c-> <c- n>Hash</c-><c- p>,</c-> <c- n>class</c-> <c- n>Pred</c-><c- p>,</c-> <c- n>class</c-> <c- n>Allocator</c-><c- o>></c->
-    <c- n>class</c-> <c- n>unordered_set</c-> <c- p>{</c->
-        <c- n>unordered_set</c-><c- p>(</c-><c- k>const</c-> <c- n>unordered_set</c-><c- o>&lt;</c-><c- n>Key</c-><c- p>,</c-> <c- n>Hash</c-><c- p>,</c-> <c- n>Pred</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>>&amp;</c-><c- p>,</c->
-                      <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c->
-    <c- p>};</c->
-</pre>
-   <p>From the first parameter, we deduce <code class="highlight"><c- n>Key</c-><c- o>=</c-><c- b>int</c-></code>, <code class="highlight"><c- n>Hash</c-><c- o>=</c-><c- n>std</c-><c- o>::</c-><c- n>hash</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>, <code class="highlight"><c- n>Pred</c-><c- o>=</c-><c- n>std</c-><c- o>::</c-><c- n>equal_to</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>,
-and <code class="highlight"><c- n>Allocator</c-><c- o>=</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>polymorphic_allocator</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>.
-From the second parameter, we should deduce <code class="highlight"><c- n>Allocator</c-><c- o>=</c-><c- n>std</c-><c- o>::</c-><c- n>monotonic_buffer_resource</c-><c- o>*</c-></code>.
-We’ve deduced conflicting types for <code class="highlight"><c- n>Allocator</c-></code>, so deduction fails.</p>
-   <p>However, in practice, both MSVC and libstdc++ launder the <code class="highlight"><c- n>Allocator</c-></code> type through a typedef
-that is opaque to deduction, so
-that the constructor seen by the compiler in practice is equivalent to</p>
-<pre class="language-c++ highlight">    <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>Key</c-><c- p>,</c-> <c- n>class</c-> <c- n>Hash</c-><c- p>,</c-> <c- n>class</c-> <c- n>Pred</c-><c- p>,</c-> <c- n>class</c-> <c- n>Allocator</c-><c- o>></c->
-    <c- n>class</c-> <c- n>unordered_set</c-> <c- p>{</c->
-        <c- n>using</c-> <c- n>allocator_type</c-> <c- o>=</c-> <c- n>type_identity_t</c-><c- o>&lt;</c-><c- n>Allocator</c-><c- o>></c-><c- p>;</c->
-        <c- n>unordered_set</c-><c- p>(</c-><c- k>const</c-> <c- n>unordered_set</c-><c- o>&lt;</c-><c- n>Key</c-><c- p>,</c-> <c- n>Hash</c-><c- p>,</c-> <c- n>Pred</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>>&amp;</c-><c- p>,</c->
-                      <c- k>const</c-> <c- n>allocator_type</c-><c- o>&amp;</c-><c- p>);</c->
-    <c- p>};</c->
-</pre>
-   <p>From the first parameter, we deduce <code class="highlight"><c- n>Key</c-><c- o>=</c-><c- b>int</c-></code>, <code class="highlight"><c- n>Hash</c-><c- o>=</c-><c- n>std</c-><c- o>::</c-><c- n>hash</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>, <code class="highlight"><c- n>Pred</c-><c- o>=</c-><c- n>std</c-><c- o>::</c-><c- n>equal_to</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>,
-and <code class="highlight"><c- n>Allocator</c-><c- o>=</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>polymorphic_allocator</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>.
-From the second parameter, we don’t deduce anything.
-In practice, therefore, deduction succeeds.</p>
-   <p>Implementers who have taken the above approach can use that to simplify their
-implementation of this proposal, as an alternative to directly implementing the above wording
-(which is of course also perfectly fine).</p>
+   <small> <table class="def"> <tbody><tr><th>Construct</th><th>Well-formed</th><th>SFINAE-friendly<br> ill-formed</th><th>Hard error</th></tr> <tr><td>std::deque(pd, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::forward_list(pfl, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::list(pl, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::vector(pv, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::map(pm, &amp;mr)</td> <td>MSVC, libc++</td> <td>libstdc++</td> <td></td> </tr><tr><td>std::multimap(pmm, &amp;mr)</td> <td>MSVC, libc++</td> <td>libstdc++</td> <td></td> </tr><tr><td>std::multiset(pms, &amp;mr)</td> <td>MSVC, libc++</td> <td>libstdc++</td> <td></td> </tr><tr><td>std::set(ps, &amp;mr)</td> <td>MSVC, libc++</td> <td>libstdc++</td> <td></td> </tr><tr><td>std::unordered_map(pum, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr><td>std::unordered_multimap(pumm, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr><td>std::unordered_multiset(pums, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr><td>std::unordered_set(pus, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr></tr> <tr><td>std::priority_queue(ppq, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr><td>std::queue(pq, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr><td>std::stack(ps, &amp;mr)</td> <td>MSVC, libstdc++, libc++</td> <td></td> <td></td> </tr><tr></tr> <tr><td>std::priority_queue(comp, pv, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::queue(pd, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr><tr><td>std::stack(pv, &amp;mr)</td> <td></td> <td>MSVC, libstdc++, libc++</td> <td></td> </tr></tbody></table> </small> 
   </main>
 <script>
 (function() {
@@ -2581,4 +2553,6 @@ implementation of this proposal, as an alternative to directly implementing the 
    <dd>Tim Song. <a href="https://cplusplus.github.io/LWG/issue3506">LWG 3506: Missing allocator-extended constructors for priority_queue</a>. November 2020. URL: <a href="https://cplusplus.github.io/LWG/issue3506">https://cplusplus.github.io/LWG/issue3506</a>
    <dt id="biblio-p1425r2">[P1425R2]
    <dd>Corentin Jabot. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r2.pdf">P1425R2: Iterator-pair constructors for stack and queue</a>. January 2021. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r2.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r2.pdf</a>
+   <dt id="biblio-p1425r3">[P1425R3]
+   <dd>Corentin Jabot. <a href="https://wg21.link/p1425r3">Iterators pair constructors for stack and queue</a>. 18 February 2021. URL: <a href="https://wg21.link/p1425r3">https://wg21.link/p1425r3</a>
   </dl>
