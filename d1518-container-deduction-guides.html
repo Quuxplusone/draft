@@ -2072,7 +2072,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1518R1<br>Stop overconstraining allocators in container deduction guides</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2021-02-21">2021-02-21</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2021-02-24">2021-02-24</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2083,7 +2083,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>6
+     <dd>7
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1518-container-deduction-guides.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1518-container-deduction-guides.bs</a>
      <dt>Current:
@@ -2109,14 +2109,14 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <ol class="toc">
       <li><a href="#problem1"><span class="secno">2.1</span> <span class="content">The problem</span></a>
       <li><a href="#explanation1"><span class="secno">2.2</span> <span class="content">The explanation</span></a>
-      <li><a href="#solution1"><span class="secno">2.3</span> <span class="content">The solution</span></a>
+      <li><a href="#solution1"><span class="secno">2.3</span> <span class="content">Proposed wording</span></a>
      </ol>
     <li>
      <a href="#overconst2"><span class="secno">3</span> <span class="content">Stop deducing from allocators that should not participate in deduction</span></a>
      <ol class="toc">
       <li><a href="#problem2"><span class="secno">3.1</span> <span class="content">The problem</span></a>
       <li><a href="#explanation2"><span class="secno">3.2</span> <span class="content">The explanation</span></a>
-      <li><a href="#solution2"><span class="secno">3.3</span> <span class="content">The solution</span></a>
+      <li><a href="#solution2"><span class="secno">3.3</span> <span class="content">Proposed wording</span></a>
       <li><a href="#implementation"><span class="secno">3.4</span> <span class="content">Implementation note</span></a>
      </ol>
     <li>
@@ -2130,7 +2130,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
     <li data-md>
-     <p>R1: Incorporate LWG wording feedback. Mention <a data-link-type="biblio" href="#biblio-lwg3506">[LWG3506]</a> and <a data-link-type="biblio" href="#biblio-p1425r2">[P1425R2]</a>.</p>
+     <p>R1: Incorporate LWG wording feedback. Mention <a data-link-type="biblio" href="#biblio-lwg3506">[LWG3506]</a> and <a data-link-type="biblio" href="#biblio-p1425r3">[P1425R3]</a>.</p>
    </ul>
    <h2 class="heading settled" data-level="2" id="overconst1"><span class="secno">2. </span><span class="content">Stop overconstraining allocators that do not participate in deduction</span><a class="self-link" href="#overconst1"></a></h2>
    <h3 class="heading settled" data-level="2.1" id="problem1"><span class="secno">2.1. </span><span class="content">The problem</span><a class="self-link" href="#problem1"></a></h3>
@@ -2171,7 +2171,7 @@ However, <code class="highlight"><c- n>uses_allocator_v</c-><c- o>&lt;</c-><c- n
    <p>Because the type of <code class="highlight"><c- o>&amp;</c-><c- n>mr</c-></code> doesn’t qualify as an allocator, the deduction guide drops out
 of overload resolution, failing deduction even though it has all the information
 needed to safely deduce the correct template arguments for <code class="highlight"><c- n>stack</c-></code>.</p>
-   <h3 class="heading settled" data-level="2.3" id="solution1"><span class="secno">2.3. </span><span class="content">The solution</span><a class="self-link" href="#solution1"></a></h3>
+   <h3 class="heading settled" data-level="2.3" id="solution1"><span class="secno">2.3. </span><span class="content">Proposed wording</span><a class="self-link" href="#solution1"></a></h3>
    <p>To fix all three container adaptors, modify <a href="http://eel.is/c++draft/container.adaptors.general">[container.adaptors.general</a>] as follows:</p>
    <p><small></small></p>
    <blockquote><small> A deduction guide for a container adaptor shall not participate in overload resolution if any of the following are true:<p></p> <ul><li data-md><p>It has an <code class="highlight"><c- n>InputIterator</c-></code> template parameter and a type that does not qualify as an
@@ -2228,7 +2228,7 @@ not from any arbitrary specialization of <code class="highlight"><c- n>vector</c
 <pre class="language-c++ highlight">    <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>A1</c-><c- o>></c-> <c- n>v1</c-><c- p>;</c->
     <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>A2</c-><c- o>></c-> <c- n>v2</c-><c- p>(</c-><c- n>v1</c-><c- p>,</c-> <c- n>A2</c-><c- p>());</c->  <c- c1>// ill-formed</c->
 </pre>
-   <h3 class="heading settled" data-level="3.3" id="solution2"><span class="secno">3.3. </span><span class="content">The solution</span><a class="self-link" href="#solution2"></a></h3>
+   <h3 class="heading settled" data-level="3.3" id="solution2"><span class="secno">3.3. </span><span class="content">Proposed wording</span><a class="self-link" href="#solution2"></a></h3>
    <p>If we were introducing the containers from scratch today, the natural approach would be for the
 constructors to indicate which arguments should be considered deducible.
 LWG has indicated their satisfaction with this approach, so that’s what we propose here.</p>
@@ -2551,8 +2551,6 @@ as shown in the following table and <a href="https://godbolt.org/z/5oKKGd">this 
   <dl>
    <dt id="biblio-lwg3506">[LWG3506]
    <dd>Tim Song. <a href="https://cplusplus.github.io/LWG/issue3506">LWG 3506: Missing allocator-extended constructors for priority_queue</a>. November 2020. URL: <a href="https://cplusplus.github.io/LWG/issue3506">https://cplusplus.github.io/LWG/issue3506</a>
-   <dt id="biblio-p1425r2">[P1425R2]
-   <dd>Corentin Jabot. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r2.pdf">P1425R2: Iterator-pair constructors for stack and queue</a>. January 2021. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r2.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r2.pdf</a>
    <dt id="biblio-p1425r3">[P1425R3]
-   <dd>Corentin Jabot. <a href="https://wg21.link/p1425r3">Iterators pair constructors for stack and queue</a>. 18 February 2021. URL: <a href="https://wg21.link/p1425r3">https://wg21.link/p1425r3</a>
+   <dd>Corentin Jabot. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r3.pdf">P1425R3: Iterator-pair constructors for stack and queue</a>. February 2021. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r3.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r3.pdf</a>
   </dl>
