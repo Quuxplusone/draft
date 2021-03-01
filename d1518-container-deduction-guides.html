@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D1518R1: Stop overconstraining allocators in container deduction guides</title>
+  <title>D1518R2: Stop overconstraining allocators in container deduction guides</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -2071,7 +2071,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D1518R1<br>Stop overconstraining allocators in container deduction guides</h1>
+   <h1 class="p-name no-ref" id="title">D1518R2<br>Stop overconstraining allocators in container deduction guides</h1>
    <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2021-02-24">2021-02-24</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
@@ -2083,7 +2083,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>7
+     <dd>8
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1518-container-deduction-guides.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1518-container-deduction-guides.bs</a>
      <dt>Current:
@@ -2109,16 +2109,15 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <ol class="toc">
       <li><a href="#problem1"><span class="secno">2.1</span> <span class="content">The problem</span></a>
       <li><a href="#explanation1"><span class="secno">2.2</span> <span class="content">The explanation</span></a>
-      <li><a href="#solution1"><span class="secno">2.3</span> <span class="content">Proposed wording</span></a>
      </ol>
     <li>
      <a href="#overconst2"><span class="secno">3</span> <span class="content">Stop deducing from allocators that should not participate in deduction</span></a>
      <ol class="toc">
       <li><a href="#problem2"><span class="secno">3.1</span> <span class="content">The problem</span></a>
       <li><a href="#explanation2"><span class="secno">3.2</span> <span class="content">The explanation</span></a>
-      <li><a href="#solution2"><span class="secno">3.3</span> <span class="content">Proposed wording</span></a>
-      <li><a href="#implementation"><span class="secno">3.4</span> <span class="content">Implementation note</span></a>
      </ol>
+    <li><a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording</span></a>
+    <li><a href="#implementation"><span class="secno">5</span> <span class="content">Implementation note</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -2129,6 +2128,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <main>
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
+    <li data-md>
+     <p>R2: Move proposed wording into a single section, and remove Bikeshed "notes" that
+were never intended to propose new "Note" elements in the wording.</p>
     <li data-md>
      <p>R1: Incorporate LWG wording feedback. Mention <a data-link-type="biblio" href="#biblio-lwg3506">[LWG3506]</a> and <a data-link-type="biblio" href="#biblio-p1425r3">[P1425R3]</a>.</p>
    </ul>
@@ -2171,22 +2173,6 @@ However, <code class="highlight"><c- n>uses_allocator_v</c-><c- o>&lt;</c-><c- n
    <p>Because the type of <code class="highlight"><c- o>&amp;</c-><c- n>mr</c-></code> doesn’t qualify as an allocator, the deduction guide drops out
 of overload resolution, failing deduction even though it has all the information
 needed to safely deduce the correct template arguments for <code class="highlight"><c- n>stack</c-></code>.</p>
-   <h3 class="heading settled" data-level="2.3" id="solution1"><span class="secno">2.3. </span><span class="content">Proposed wording</span><a class="self-link" href="#solution1"></a></h3>
-   <p>To fix all three container adaptors, modify <a href="http://eel.is/c++draft/container.adaptors.general">[container.adaptors.general</a>] as follows:</p>
-   <p><small></small></p>
-   <blockquote><small> A deduction guide for a container adaptor shall not participate in overload resolution if any of the following are true:<p></p> <ul><li data-md><p>It has an <code class="highlight"><c- n>InputIterator</c-></code> template parameter and a type that does not qualify as an
- input iterator is deduced for that parameter.</p> </li><li data-md><p>It has a <code class="highlight"><c- n>Compare</c-></code> template parameter and a type that qualifies as an allocator is deduced
- for that parameter.</p> </li><li data-md><p>It has a <code class="highlight"><c- n>Container</c-></code> template parameter and a type that qualifies as an allocator is deduced
- for that parameter.</p> </li><li data-md><p>It has <ins>no <code class="highlight"><c- n>Container</c-></code> template parameter, and it has</ins> an <code class="highlight"><c- n>Allocator</c-></code> template parameter<ins>,</ins> and a type that does not qualify as an allocator is deduced for that parameter.</p> </li><li data-md><p>It has both <code class="highlight"><c- n>Container</c-></code> and <code class="highlight"><c- n>Allocator</c-></code> template parameters, and <code class="highlight"><c- n>uses_allocator_v</c-><c- o>&lt;</c-><c- n>Container</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>></c-></code> is <code class="highlight">false</code>.</p> </li></ul> </small></blockquote>
-   <p class="note" role="note"><span>Note:</span> The rationale is that if it does have a <code class="highlight"><c- n>Container</c-></code> parameter, and the <code class="highlight"><c- n>Container</c-></code> advertises
-that it can "use" the supplied allocator, we shouldn’t interrogate the allocator parameter any more
-closely. Trust the <code class="highlight"><c- n>Container</c-></code>'s specialization of <code class="highlight"><c- n>uses_allocator</c-></code>.</p>
-   <p class="note" role="note"><span>Note:</span> As of C++20, no container-adaptor deduction guide has an <code class="highlight"><c- n>Allocator</c-></code> template parameter without
-also having a <code class="highlight"><c- n>Container</c-></code> template parameter. But, as the resolution of <a data-link-type="biblio" href="#biblio-lwg3506">[LWG3506]</a> will add such deduction guides,
-LWG asked that we future-proof this wording.</p>
-   <p class="note" role="note"><span>Note:</span> <a data-link-type="biblio" href="#biblio-p1425r3">[P1425R3]</a> also proposes new container-adaptor deduction guides which have an <code class="highlight"><c- n>Allocator</c-></code> parameter
-without a <code class="highlight"><c- n>Container</c-></code> parameter. (These guides were proposed in P1425R1, dropped in P1425R2, and restored
-in P1425R3.)</p>
    <h2 class="heading settled" data-level="3" id="overconst2"><span class="secno">3. </span><span class="content">Stop deducing from allocators that should not participate in deduction</span><a class="self-link" href="#overconst2"></a></h2>
    <h3 class="heading settled" data-level="3.1" id="problem2"><span class="secno">3.1. </span><span class="content">The problem</span><a class="self-link" href="#problem2"></a></h3>
    <p>Consider the following code:</p>
@@ -2228,10 +2214,13 @@ not from any arbitrary specialization of <code class="highlight"><c- n>vector</c
 <pre class="language-c++ highlight">    <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>A1</c-><c- o>></c-> <c- n>v1</c-><c- p>;</c->
     <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>A2</c-><c- o>></c-> <c- n>v2</c-><c- p>(</c-><c- n>v1</c-><c- p>,</c-> <c- n>A2</c-><c- p>());</c->  <c- c1>// ill-formed</c->
 </pre>
-   <h3 class="heading settled" data-level="3.3" id="solution2"><span class="secno">3.3. </span><span class="content">Proposed wording</span><a class="self-link" href="#solution2"></a></h3>
-   <p>If we were introducing the containers from scratch today, the natural approach would be for the
-constructors to indicate which arguments should be considered deducible.
-LWG has indicated their satisfaction with this approach, so that’s what we propose here.</p>
+   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
+   <p>Modify <a href="http://eel.is/c++draft/container.adaptors.general"> [container.adaptors.general</a>] as follows:</p>
+   <p><small></small></p>
+   <blockquote><small> A deduction guide for a container adaptor shall not participate in overload resolution if any of the following are true:<p></p> <ul><li data-md><p>It has an <code class="highlight"><c- n>InputIterator</c-></code> template parameter and a type that does not qualify as an
+ input iterator is deduced for that parameter.</p> </li><li data-md><p>It has a <code class="highlight"><c- n>Compare</c-></code> template parameter and a type that qualifies as an allocator is deduced
+ for that parameter.</p> </li><li data-md><p>It has a <code class="highlight"><c- n>Container</c-></code> template parameter and a type that qualifies as an allocator is deduced
+ for that parameter.</p> </li><li data-md><p>It has <ins>no <code class="highlight"><c- n>Container</c-></code> template parameter, and it has</ins> an <code class="highlight"><c- n>Allocator</c-></code> template parameter<ins>,</ins> and a type that does not qualify as an allocator is deduced for that parameter.</p> </li><li data-md><p>It has both <code class="highlight"><c- n>Container</c-></code> and <code class="highlight"><c- n>Allocator</c-></code> template parameters, and <code class="highlight"><c- n>uses_allocator_v</c-><c- o>&lt;</c-><c- n>Container</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>></c-></code> is <code class="highlight">false</code>.</p> </li></ul> </small></blockquote>
    <p>Modify <a href="http://eel.is/c++draft/deque.overview"> [deque.overview</a>] as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2410,7 +2399,7 @@ LWG has indicated their satisfaction with this approach, so that’s what we pro
               <c- k>const</c-> <c- n>allocator_type</c-><c- o>&amp;</c-> <c- n>a</c-> <c- o>=</c-> <c- n>allocator_type</c-><c- p>());</c->
 </pre></small>
    </blockquote>
-   <h3 class="heading settled" data-level="3.4" id="implementation"><span class="secno">3.4. </span><span class="content">Implementation note</span><a class="self-link" href="#implementation"></a></h3>
+   <h2 class="heading settled" data-level="5" id="implementation"><span class="secno">5. </span><span class="content">Implementation note</span><a class="self-link" href="#implementation"></a></h2>
     Some of the changes proposed in this paper have already been implemented "accidentally" by
 one or more library implementations,
 as shown in the following table and <a href="https://godbolt.org/z/5oKKGd">this Godbolt</a>: 
