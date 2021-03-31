@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
-Revision: 5
-!Draft Revision: 27
+Revision: 6
+!Draft Revision: 28
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -30,6 +30,17 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 
 # Changelog # {#changelog}
+
+- R6:
+
+    - Fixed some typos.
+
+    - Added `T std::relocate(T *source)`.
+
+    - Changed the exception guarantee of `uninitialized_relocate` and `uninitialized_relocate_n`
+            in accord with feedback from David Stone.
+
+    - Removed `std::ranges::relocate_at` (but kept `std::relocate_at`).
 
 - R5 (post-Prague):
 
@@ -232,9 +243,9 @@ Every C++ type already *is* or *is not* trivially relocatable. This proposal doe
 library vendor to make any library type trivially relocatable. (We assume that quality implementations
 will do so on their own.)
 
-The optimizations discussed above are purely in the domain of library writers. If you're writing
+The optimizations above are in the domain of library writers. If you're writing
 a vector, and you detect that your element type `T` is trivially relocatable, then
-whether you do any special optimization in that case is up to you.
+whether you optimize in that case is up to you.
 This proposal does not require any library vendor to guarantee that any particular optimization
 happens. (But we assume that quality implementations will do so on their own.)
 
@@ -245,7 +256,7 @@ emerge without any further special effort by WG21.
 
 There are three kinds of object types that we want to make sure are correctly detected as
 trivially relocatable. These three cases are important for improving the performance of
-the standard library, and for improving the correctness of programs using libraries such as
+the standard library, and for improving the correctness of libraries such as
 [[Folly]]'s `fbvector`.
 
 
@@ -425,7 +436,7 @@ the rest of this proposal would remain exactly the same.
 
 # Proposed wording for C++2b # {#wording}
 
-The wording in this section is relative to [[!N4800|WG21 draft N4800]].
+The wording in this section is relative to [[!N4885|WG21 draft N4885]].
 
 
 ## Relocation operation ## {#wording-operation}
@@ -445,6 +456,36 @@ Issue: [definitions] is probably the wrong place for the core-language definitio
 Issue: this definition of "relocation operation" is not good
 
 
+## Algorithm `relocate` ## {#wording-relocate}
+
+Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:
+
+<small><blockquote>
+<xmp>
+  template<class T>
+  T relocate(T* source);
+</xmp>
+
+*Mandates:* `T` shall be a complete non-array object type.
+
+*Effects:* Equivalent to:
+<xmp>
+  T t = move(source);
+  destroy_at(source);
+  return t;
+</xmp>
+except that if `T` is trivially relocatable <i>[basic.types]</i>, side effects
+associated with the relocation of the object's value might not happen.
+</blockquote></small>
+
+Note:
+This function can easily be implemented as shown here; but this won't do the
+Right Thing for trivially relocatable types. There is no way to implement the
+Right Thing in standard C++; you'd have to somehow get access to the return slot
+so that you could as-if-by-memcpy into it. I'm still skeptical about standardizing
+this function, but I have added it in P1144R6 so that we can discuss it.
+
+
 ## Algorithm `relocate_at` ## {#wording-relocate-at}
 
 Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:
@@ -453,23 +494,17 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
 <xmp>
   template<class T>
   T *relocate_at(T* source, T* dest);
-
-  namespace ranges {
-    template<relocatable T>
-    T *relocate_at(T* source, T* dest);
-  }
 </xmp>
 
 *Mandates:* `T` shall be a complete non-array object type.
 
 *Effects:* Equivalent to:
 <xmp>
-  uninitialized_move(dest, dest + 1, source);
-  destroy_at(source);
-  return std::launder(dest);
+  struct guard { T *t; ~guard() { destroy_at(t); } } g(source);
+  return ::new (<i>voidify</i>(dest)) T(std::move(*source));
 </xmp>
 except that if `T` is trivially relocatable <i>[basic.types]</i>, side effects
-associated with the relocation of the object's value might not happen.
+associated with the relocation of the value of `*source` might not happen.
 </blockquote></small>
 
 Note:
@@ -488,56 +523,70 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
 
 <small><blockquote>
 <xmp>
-  template<class ForwardIterator1, class ForwardIterator2>
-  ForwardIterator2 uninitialized_relocate(ForwardIterator1 first, ForwardIterator1 last,
-                                          ForwardIterator2 result);
+  template<class InputIterator, class NoThrowForwardIterator>
+  NoThrowForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,
+                                                NoThrowForwardIterator result);
 </xmp>
 
 *Effects:* Equivalent to:
 <xmp>
-  result = uninitialized_move(first, last, result);
-  destroy(first, last);
-  return result;
+  try {
+    for (; first != last; ++result, (void) ++first) {
+      ::new (voidify(*result))
+        typename iterator_traits<NoThrowForwardIterator>::value_type(*first);
+      destroy_at(addressof(*first));
+    }
+    return result;
+  } catch (...) {
+    destroy(++first, last);
+    throw;
+  }
 </xmp>
 except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.
 
-*Remarks:* If an exception is thrown, some objects in the range `[first, last)`
-are left in a valid but unspecified state.
+*Remarks:* If an exception is thrown, all objects in both the source and destination
+ranges are destroyed.
 </blockquote></small>
 
-Note: The "Remark" implies that `uninitialized_relocate` has a `catch`-and-cleanup clause
-similar to `uninitialized_move`: if an exception is thrown, the whole destination range
-is destroyed before the exception is propagated. If `T` is non-trivially relocatable and
-`T`'s move-constructor might throw, then the implementation must be "move-in-a-loop
-followed by destroy-in-a-loop." See the implementation in [[#samples]].
+Note: See <a href="http://eel.is/c++draft/specialized.algorithms#general-2">[specialized.algorithms.general]/2</a>
+for the blanket wording that explains why objects in the destination range are destroyed,
+even though the "Equivalent to" wording doesn't show them being destroyed.
+See the implementation in [[#samples]].
 
 Note: We are guided by [[P0884R0]] to make `uninitialized_relocate` unconditionally `noexcept(false)`.
 This is consistent with `uninitialized_move` and `destroy_at`, both of which are unconditionally
 `noexcept(false)`.
 
 
-
 ## Algorithm `uninitialized_relocate_n` ## {#wording-uninit-relocate-n}
 
 <small><blockquote>
 <xmp>
-  template<class ForwardIterator1, class Size, class ForwardIterator2>
-    pair<ForwardIterator1, ForwardIterator2>
-      uninitialized_relocate_n(ForwardIterator1 first, Size n, ForwardIterator2 result);
+  template<class InputIterator, class Size, class NoThrowForwardIterator>
+    pair<InputIterator, NoThrowForwardIterator>
+      uninitialized_relocate_n(InputIterator first, Size n, NoThrowForwardIterator result);
 </xmp>
 
 *Effects:* Equivalent to:
 <xmp>
-  auto pair = uninitialized_move_n(first, n, result);
-  destroy_n(first, n);
-  return pair;
+  try {
+    for (; n > 0; ++result, (void) ++first, --n) {
+      ::new (voidify(*result))
+        typename iterator_traits<NoThrowForwardIterator>::value_type(*first);
+      destroy_at(addressof(*first));
+    }
+    return {first, result};
+  } catch (...) {
+    destroy_n(++first, --n);
+    throw;
+  }
 </xmp>
 except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.
 
-*Remarks:* If an exception is thrown, some objects in the range `[first, std::next(first,n))`
-are left in a valid but unspecified state.
+*Remarks:* If an exception is thrown, all objects in both the source and destination
+ranges are destroyed.
 </blockquote></small>
 
 
@@ -579,7 +628,7 @@ to a simple copy of the underlying bytes. *—end note*]
 
 </blockquote></small>
 
-Note: As of P1144R5, polymorphic types are not "naturally" trivially relocatable. See
+Note: Since P1144R5, polymorphic types are not "naturally" trivially relocatable. See
 [[#non-trivial-sample-polymorphic|Appendix C, example 5]].
 
 Note: A class type declared `[[trivially_relocatable(false)]]` may still be trivially relocatable,
@@ -640,7 +689,7 @@ because the move-construction `A(std::move(a))`
 invokes user-provided copy constructor `MA(MA&)` and the move-construction
 `B(std::move(b))` invokes user-provided copy constructor `MB(const volatile MB&)`.
 Prior to P1144R3, the rule was that `mutable` and `volatile` data members
-inhibited "natural" trivial relocatability. As of P1144R3, the rule is that
+inhibited "natural" trivial relocatability. Since P1144R3, the rule is that
 any user-provided copy constructor inhibits trivial relocatability (even in the
 presence of a defaulted move constructor).
 
@@ -724,7 +773,7 @@ Add new entries to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">
 </blockquote></small>
 
 
-## `Relocatable` concept ## {#wording-concept}
+## `relocatable` concept ## {#wording-concept}
 
 Add a new section after <a href="http://eel.is/c++draft/concept.moveconstructible">[concept.moveconstructible]</a>:
 
@@ -876,7 +925,7 @@ mildly unintuitive behavior.
 
 ## Provide `T relocate(T*)`? ## {#relocate-function}
 
-Note: This section is new in P1144R5.
+Note: This section was added in P1144R5.
 
 The current proposal provides `T *relocate_at(T *source, T *dest)`, which ends the lifetime of
 `source` and starts the lifetime of `dest`. Anton Zhilin suggested that a more general primitive
@@ -949,7 +998,7 @@ it requires this additional compiler support, which has not yet been implemented
 
 ## Confusing interactions with `std::pmr` and `vector::insert` ## {#pmr-concerns}
 
-Note: This section is new in P1144R5.
+Note: This section was added in P1144R5.
 
 The main thing P1144 does for `std::vector` is efficient reallocation of the whole buffer.
 However, a secondary goal is to permit efficient insertion and erasure.
@@ -963,7 +1012,7 @@ However, a secondary goal is to permit efficient insertion and erasure.
 This `erase` requires us to shift down 500 `std::string` objects, which can be done either
 by 500 calls to `string::operator=` followed by one call to `~string`, or by
 one call to `~string` followed by a `memcpy`. We want to permit the latter. That's why
-as of P1144R3, the definition of "trivially relocatable" in [[#wording-inheritance]]
+since P1144R3, the definition of "trivially relocatable" in [[#wording-inheritance]]
 places requirements on `T`'s assignment operators as well as on `T`'s constructors and destructors.
 
 However, consider `std::pmr::vector<int>`. Its move-constructor and destructor follow the
@@ -1160,47 +1209,82 @@ for something different, such as a built-in destructive-move operation.
 Appendix B: Sample code {#samples}
 =======================
 
-## Reference implementation of `relocate_at` and `uninitialized_relocate` ## {#sample-uninit-relocate}
+## Reference implementations of `relocate`, `relocate_at`, and `uninitialized_relocate` ## {#sample-uninit-relocate}
+
+See this C++20 code on Godbolt Compiler Explorer [here](https://godbolt.org/z/5bshMM6x5).
 
 <small>
 ```c++
 template<class T>
-T *relocate_at(T *source, T *dest)
+constexpr T relocate(T *source)
+    noexcept(std::is_trivially_relocatable_v<T> || std::is_nothrow_move_constructible_v<T>)
 {
     if constexpr (std::is_trivially_relocatable_v<T>) {
-        std::memmove(dest, source, sizeof(T));
-        return std::launder(dest);
-    } else {
-        T *result = ::new (dest) (std::move(*source));
-        source->~T();
-        return result;
+        // We need compiler magic to handle this situation properly.
+        static_assert(std::is_nothrow_move_constructible_v<T>);
     }
+    struct Guard { T *t; ~Guard() { t->~T(); } };
+    Guard guard {source};
+    return std::move(*source);
 }
 
-template<class ForwardIterator1, class ForwardIterator2>
-ForwardIterator2 uninitialized_relocate(ForwardIterator1 first, ForwardIterator1 last,
-                                        ForwardIterator2 result)
+template<class T, class U>
+    requires (std::is_same_v<const T, const U> && std::is_trivially_relocatable_v<U>)
+constexpr T *relocate_at2(T *source, U *dest) noexcept
 {
-    using T = typename iterator_traits<ForwardIterator2>::value_type;
+    std::memmove(dest, source, sizeof(T));
+    return std::launder(dest);
+}
+
+template<class T, class U>
+constexpr T *relocate_at2(T *source, U *dest)
+    noexcept(std::is_nothrow_constructible_v<U, T&&>)
+{
+    struct Guard { T *t; ~Guard() { t->~T(); } };
+    Guard guard {source};
+    return ::new (dest) U(std::move(*source));
+}
+
+template<class T>
+constexpr T *relocate_at(T *source, T *dest)
+    noexcept(noexcept(relocate_at2(source, dest)))
+{
+    return relocate_at2(source, dest);
+}
+
+template<class InputIterator, class ForwardIterator>
+ForwardIterator uninitialized_relocate(
+    InputIterator first, InputIterator last, ForwardIterator result)
+{
+    using T = typename std::iterator_traits<ForwardIterator>::value_type;
     using U = decltype(std::move(*first));
-    constexpr bool memcpyable = (std::is_same_v<T, std::remove_ref_t<U>> && std::is_trivially_relocatable_v<T>);
-    constexpr bool both_contiguous = (std::is_pointer_v<ForwardIterator1> && std::is_pointer_v<ForwardIterator2>);
+    constexpr bool memcpyable = (std::is_same_v<T, std::remove_reference_t<U>> && std::is_trivially_relocatable_v<T>);
+    constexpr bool both_contiguous = (std::contiguous_iterator<InputIterator> && std::contiguous_iterator<ForwardIterator>);
     constexpr bool nothrow_relocatable = std::is_nothrow_constructible_v<T, U>;
 
     if constexpr (memcpyable && both_contiguous) {
-        std::size_t nbytes = (char *)last - (char *)first;
+        char *firstbyte = (char *)std::to_address(first);
+        std::size_t nbytes = (char *)std::to_address(last) - firstbyte;
         if (nbytes != 0) {
-            std::memmove(std::addressof(*result), std::addressof(*first), nbytes);
+            std::memmove(std::to_address(result), firstbyte, nbytes);
             result += (last - first);
         }
     } else if constexpr (nothrow_relocatable) {
         for (; first != last; (void)++result, ++first) {
-            ::new (static_cast<void*>(std::addressof(*result))) T(std::move(*first));
-            std::destroy_at(std::addressof(*first));
+            relocate_at2(std::addressof(*first), std::addressof(*result));
         }
     } else {
-        result = std::uninitialized_move(first, last, result);
-        std::destroy(first, last);
+        ForwardIterator orig_result = result;
+        for (; first != last; (void)++result, ++first) {
+            try {
+                relocate_at2(std::addressof(*first), std::addressof(*result));
+            } catch (...) {
+                ++first;
+                std::destroy(first, last);
+                std::destroy(orig_result, result);
+                throw;
+            }
+        }
     }
     return result;
 }
@@ -1398,7 +1482,7 @@ struct Widget : registered_object {};
 
 ## Polymorphic downcast effectively relies on offset-into-self ## {#non-trivial-sample-polymorphic}
 
-Note: This section is new in P1144R5.
+Note: This section was added in P1144R5.
 
 Thanks to David Stone for this example.
 In the following snippet, `struct Base` is relocatable, but not trivially relocatable,
@@ -1449,7 +1533,7 @@ int main() {
 }
 ```
 
-This is why (as of P1144R5) the compiler will not consider types with
+This is why (since P1144R5) the compiler will not consider types with
 virtual methods to be "naturally" trivially relocatable.
 
 
@@ -1460,7 +1544,10 @@ A prototype Clang/libc++ implementation is at
 
 - [github.com/Quuxplusone/llvm-project/tree/trivially-relocatable](https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable)
 - <a href="https://p1144.godbolt.org/z/oWEd_X">godbolt.org</a>, under the name "x86-64 clang (experimental P1144)"
-- [reviews.llvm.org/D50119](https://reviews.llvm.org/D50119)
+- [reviews.llvm.org/D50119](https://reviews.llvm.org/D50119) (Clang core-language part)
+- [reviews.llvm.org/D61761](https://reviews.llvm.org/D61761) (libc++ P1144 reference implementation)
+- [reviews.llvm.org/D63620](https://reviews.llvm.org/D63620) (libc++ QoI features: warrants for standard types)
+- [reviews.llvm.org/D67524](https://reviews.llvm.org/D67524) (libc++ QoI features: optimizations for standard algorithms and containers)
 
 Side-by-side case studies of `[[trivially_relocatable]]`, `[[maybe_trivially_relocatable]]`,
 and `[[trivially_relocatable(bool)]]` are given in [[#sample-conditional]].
