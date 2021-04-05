@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Simpler implicit move
 Shortname: D2266
-Revision: 1
-!Draft Revision: 8
+Revision: 2
+!Draft Revision: 9
 Audience: EWG
 Status: D
 Group: WG21
@@ -19,7 +19,7 @@ Abstract:
   which is hard to implement, causing implementation divergence.
   We fix the defect and simplify the spec by saying that a returned move-eligible
   id-expression is <i>always</i> an xvalue.
-Date: 2021-01-07
+Date: 2021-04-04
 </pre>
 
 <style>
@@ -30,7 +30,20 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- None yet.
+- R2:
+
+    - Merged the drive-by bugfix into the main "proposed wording" section.
+
+    - Added new wording for the note in [basic.lval]/4.
+
+    - Added feature-test macro `__cpp_implicit_move`.
+
+    - Added straw poll results and mention of [[D99005]].
+
+- R1:
+
+    - Added the drive-by bugfix about lambda-expressions.
+
 
 
 # Background # {#background}
@@ -362,15 +375,35 @@ the clear intent of `reference_wrapper`'s SFINAE-constrained constructor
 and permit the returning of dangling references when in fact we don't want that.
 
 
-# Proposed wording relative to N4878 # {#wording}
+# Straw polls # {#polls}
 
-Note that this proposal merge-conflicts with Jens Maurer's [[DraftPR3998]].
-Consensus seems to be that [class.copy.elision] is no longer the best place to explain
-"implicit move." [[DraftPR3998]] moves the "implicitly movable entity" wording from
-[class.copy.elision] to [dcl.init], and introduces the term "result-initialization"
-for copy-initialization contexts in which implicit move can happen. Vice versa, we
-propose to move the wording from [class.copy.elision] to [expr.prim.id.unqual],
-and introduce the term "move-eligible *id-expression*" for xvalue id-expressions.
+## Polls taken in EWG telecon on 2021-03-17 ## {#taken-polls-2021-03-17}
+
+Arthur O'Dwyer presented P2266R1. The following straw polls were taken.
+The second poll was interpreted as consensus, but with the strong "Against" vote indicating
+that implementation experience (and an updated paper) was needed before sending P2266 to electronic polling.
+(Two days later, the first draft of Clang patch [[D99005]] became available.)
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>We are interested in addressing the issue raised in P2266 (as proposed, or in another manner).</th>
+<th> 13 </th><th> 9 </th><th> 1 </th><th> 0 </th><th> 0 </th></tr>
+
+<tr><th><small>Send P2266 (with minor wording fixes) to electronic polling, then CWG, targeting C++23.</th>
+<th> 5 </th><th> 6 </th><th> 7 </th><th> 2 </th><th> 1 </th></tr>
+
+<tr><th><small>Treat P2266 as a “Defect Report” against prior versions of C++ (i.e. not just C++23).</th>
+<th> 1 </th><th> 2 </th><th> 5 </th><th> 7 </th><th> 5 </th></tr>
+</table>
+
+
+# Proposed wording relative to N4861 # {#wording}
+
+Consensus is that [class.copy.elision] is no longer the best place to explain
+"implicit move."
+We propose to move the wording from [class.copy.elision] to [expr.prim.id.unqual],
+and introduce the term "move-eligible *id-expression*" for id-expressions that are xvalues.
 
 Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/expr.prim.id.unqual#2">[expr.prim.id.unqual]/2</a> as follows:
 
@@ -391,7 +424,8 @@ Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/expr.prim.id.unqual#2"
 > - <ins>if the *id-expression* (possibly parenthesized) is the operand of
 >     a *throw-expression*, and
 >     names an implicitly movable entity that belongs to a scope that does not contain the
->     *compound-statement* of the innermost *try-block* or *function-try-block* (if any)
+>     *compound-statement* of the innermost <ins>*lambda-expression*,</ins> *try-block* <ins>,</ins>
+>     or *function-try-block* (if any)
 >     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*.</ins>
 
 Eliminate
@@ -448,8 +482,29 @@ Also change the definition of `g()` in <a href="https://timsong-cpp.github.io/cp
 </pre>
 </blockquote></small>
 
+Add a feature-test macro in
+<a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:
+
+> <pre><ins>__cpp_implicit_move     <i>DATE-OF-ADOPTION</i></ins></pre>
+
 
 ## Non-normative clarifications ## {#wording-nn}
+
+Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/basic.lval#4">[basic.lval]/4</a> as follows:
+
+<blockquote>
+[*Note:* An expression is an xvalue if it is:
+
+* <ins>a move-eligible <i>id-expression</i> ([expr.prim.id.unqual]),</ins>
+* the result of calling a function, whether implicitly or explicitly, whose return type is an rvalue reference to object type,
+* a cast to an rvalue reference to object type,
+* a subscripting operation with an xvalue array operand,
+* a class member access expression designating a non-static data member of non-reference type in which the object expression is an xvalue, or
+* a `.*` pointer-to-member expression in which the first operand is an xvalue and the second operand is a pointer to data member.
+
+In general, the effect of this rule is that named rvalue references are treated as lvalues and unnamed rvalue references to objects
+are treated as xvalues; rvalue references to functions are treated as lvalues whether named or not. — *end note*]
+</blockquote>
 
 Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.type.auto.deduct#5">[dcl.type.auto.deduct]/5</a> as follows:
 
@@ -497,39 +552,6 @@ Add a note after <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init#ref
 > is move-eligible ([expr.prim.id.unqual]). — *end note*]</ins>
 
 
-## Drive-by bugfix for throws inside lambdas ## {#wording-lambdas}
-
-Davis Herring points out a bug in the existing wording.
-
-```c++
-    std::string x = "original value should not be moved-from";
-    auto lam = [&]() { throw x; };  // HERE
-    try {
-        lam();
-    } catch (...) {}
-    assert(x == "original value should not be moved-from");
-```
-
-The existing wording implies that the compiler should generate a move, not a copy,
-for that `throw x`, because its operand is an entity (`x`) defined in the outer scope,
-inside the nearest lexically enclosing try-block. However, this is a bug in the
-wording. I think we could patch this bug simply by inserting in the new [expr.prim.id.unqual]:
-
-> In the following contexts, an *id-expression* is *move-eligible*:
->
-> - If the *id-expression* (possibly parenthesized) is the operand of
->     a `return` or `co_return` statement, and
->     names an implicitly movable entity declared in the body or
->     *parameter-declaration-clause* of the innermost enclosing function or *lambda-expression*, or
->
-> - if the *id-expression* (possibly parenthesized) is the operand of
->     a *throw-expression*, and
->     names an implicitly movable entity that belongs to a scope that does not contain the
->     *compound-statement* of the innermost <ins>*lambda-expression*,</ins>
->     *try-block*<ins>,</ins> or *function-try-block* (if any)
->     whose *compound-statement* or *ctor-initializer* encloses the *throw-expression*.
-
-
 # Acknowledgments # {#acknowledgments}
 
 - Thanks to Ville Voutilainen for recommending Arthur write this paper.
@@ -573,6 +595,14 @@ wording. I think we could patch this bug simply by inserting in the new [expr.pr
     "href": "https://reviews.llvm.org/D92936",
     "date": "December 2020"
   },
+  "D99005": {
+    "title": "[clang] Implement P2266 Simpler implicit move",
+    "authors": [
+        "Matheus Izvekov"
+    ],
+    "href": "https://reviews.llvm.org/D99005",
+    "date": "March 2021"
+  },
   "LWG2993": {
     "title": "reference_wrapper<T> conversion from T&&",
     "authors": [
@@ -613,14 +643,6 @@ wording. I think we could patch this bug simply by inserting in the new [expr.pr
     ],
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1825r0.html",
     "date": "July 2019"
-  },
-  "DraftPR3998": {
-    "title": "[class.copy.elision] Move specification of altered overload resolution",
-    "authors": [
-      "Jens Maurer"
-    ],
-    "href": "https://github.com/cplusplus/draft/pull/3998/",
-    "date": "May 2020"
   }
 }
 </pre>

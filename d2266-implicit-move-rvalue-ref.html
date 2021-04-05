@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2266R1: Simpler implicit move</title>
+  <title>D2266R2: Simpler implicit move</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1557,7 +1557,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version 4e8dd937, updated Fri Nov 13 16:49:31 2020 -0800" name="generator">
+  <meta content="Bikeshed version b94c7e755, updated Fri Feb 19 16:28:59 2021 -0800" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
@@ -2072,8 +2072,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2266R1<br>Simpler implicit move</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2021-01-07">2021-01-07</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D2266R2<br>Simpler implicit move</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="subtitle"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2021-04-04">2021-04-04</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2083,7 +2083,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>8
+     <dd>9
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs</a>
      <dt>Current:
@@ -2119,12 +2119,16 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#refwrap"><span class="secno">3.4</span> <span class="content">A specific case involving <code class="highlight"><c- n>reference_wrapper</c-></code></span></a>
      </ol>
     <li>
-     <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording relative to N4878</span></a>
+     <a href="#polls"><span class="secno">4</span> <span class="content">Straw polls</span></a>
      <ol class="toc">
-      <li><a href="#wording-nn"><span class="secno">4.1</span> <span class="content">Non-normative clarifications</span></a>
-      <li><a href="#wording-lambdas"><span class="secno">4.2</span> <span class="content">Drive-by bugfix for throws inside lambdas</span></a>
+      <li><a href="#taken-polls-2021-03-17"><span class="secno">4.1</span> <span class="content">Polls taken in EWG telecon on 2021-03-17</span></a>
      </ol>
-    <li><a href="#acknowledgments"><span class="secno">5</span> <span class="content">Acknowledgments</span></a>
+    <li>
+     <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording relative to N4861</span></a>
+     <ol class="toc">
+      <li><a href="#wording-nn"><span class="secno">5.1</span> <span class="content">Non-normative clarifications</span></a>
+     </ol>
+    <li><a href="#acknowledgments"><span class="secno">6</span> <span class="content">Acknowledgments</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -2136,7 +2140,23 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
     <li data-md>
-     <p>None yet.</p>
+     <p>R2:</p>
+     <ul>
+      <li data-md>
+       <p>Merged the drive-by bugfix into the main "proposed wording" section.</p>
+      <li data-md>
+       <p>Added new wording for the note in [basic.lval]/4.</p>
+      <li data-md>
+       <p>Added feature-test macro <code class="highlight"><c- n>__cpp_implicit_move</c-></code>.</p>
+      <li data-md>
+       <p>Added straw poll results and mention of <a data-link-type="biblio" href="#biblio-d99005">[D99005]</a>.</p>
+     </ul>
+    <li data-md>
+     <p>R1:</p>
+     <ul>
+      <li data-md>
+       <p>Added the drive-by bugfix about lambda-expressions.</p>
+     </ul>
    </ul>
    <h2 class="heading settled" data-level="2" id="background"><span class="secno">2. </span><span class="content">Background</span><a class="self-link" href="#background"></a></h2>
    <p>Starting in C++11, <em>implicit move</em> (<a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>)
@@ -2384,14 +2404,48 @@ making <code class="highlight"><c- n>fifteen</c-></code> ill-formed is a good th
 the dangling reference. The existing two-step mechanism works to defeat
 the clear intent of <code class="highlight"><c- n>reference_wrapper</c-></code>'s SFINAE-constrained constructor
 and permit the returning of dangling references when in fact we don’t want that.</p>
-   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording relative to N4878</span><a class="self-link" href="#wording"></a></h2>
-   <p>Note that this proposal merge-conflicts with Jens Maurer’s <a data-link-type="biblio" href="#biblio-draftpr3998">[DraftPR3998]</a>.
-Consensus seems to be that [class.copy.elision] is no longer the best place to explain
-"implicit move." <a data-link-type="biblio" href="#biblio-draftpr3998">[DraftPR3998]</a> moves the "implicitly movable entity" wording from
-[class.copy.elision] to [dcl.init], and introduces the term "result-initialization"
-for copy-initialization contexts in which implicit move can happen. Vice versa, we
-propose to move the wording from [class.copy.elision] to [expr.prim.id.unqual],
-and introduce the term "move-eligible <em>id-expression</em>" for xvalue id-expressions.</p>
+   <h2 class="heading settled" data-level="4" id="polls"><span class="secno">4. </span><span class="content">Straw polls</span><a class="self-link" href="#polls"></a></h2>
+   <h3 class="heading settled" data-level="4.1" id="taken-polls-2021-03-17"><span class="secno">4.1. </span><span class="content">Polls taken in EWG telecon on 2021-03-17</span><a class="self-link" href="#taken-polls-2021-03-17"></a></h3>
+   <p>Arthur O’Dwyer presented P2266R1. The following straw polls were taken.
+The second poll was interpreted as consensus, but with the strong "Against" vote indicating
+that implementation experience (and an updated paper) was needed before sending P2266 to electronic polling.
+(Two days later, the first draft of Clang patch <a data-link-type="biblio" href="#biblio-d99005">[D99005]</a> became available.)</p>
+   <table class="def">
+    <tbody>
+     <tr>
+      <th style="width: 70%;">
+      <th><strong>SF</strong>
+      <th><strong>F</strong>
+      <th><strong>N</strong>
+      <th><strong>A</strong>
+      <th><strong>SA</strong>
+     <tr>
+      <th><small>We are interested in addressing the issue raised in P2266 (as proposed, or in another manner).</small>
+      <th> 13 
+      <th> 9 
+      <th> 1 
+      <th> 0 
+      <th> 0 
+     <tr>
+      <th><small>Send P2266 (with minor wording fixes) to electronic polling, then CWG, targeting C++23.</small>
+      <th> 5 
+      <th> 6 
+      <th> 7 
+      <th> 2 
+      <th> 1 
+     <tr>
+      <th><small>Treat P2266 as a “Defect Report” against prior versions of C++ (i.e. not just C++23).</small>
+      <th> 1 
+      <th> 2 
+      <th> 5 
+      <th> 7 
+      <th> 5 
+   </table>
+   <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording relative to N4861</span><a class="self-link" href="#wording"></a></h2>
+   <p>Consensus is that [class.copy.elision] is no longer the best place to explain
+"implicit move."
+We propose to move the wording from [class.copy.elision] to [expr.prim.id.unqual],
+and introduce the term "move-eligible <em>id-expression</em>" for id-expressions that are xvalues.</p>
    <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/expr.prim.id.unqual#2">[expr.prim.id.unqual]/2</a> as follows:</p>
    <blockquote>
     <p>
@@ -2412,10 +2466,16 @@ contexts, an <em>id-expression</em> is <em>move-eligible</em>:</ins>
 a <code class="highlight"><c- k>return</c-></code> or <code class="highlight"><c- k>co_return</c-></code> statement, and
 names an implicitly movable entity declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</ins>
      <li data-md>
-      <ins>if the <em>id-expression</em> (possibly parenthesized) is the operand of
+      <ins>
+       if the <em>id-expression</em> (possibly parenthesized) is the operand of
 a <em>throw-expression</em>, and
-names an implicitly movable entity that belongs to a scope that does not contain the <em>compound-statement</em> of the innermost <em>try-block</em> or <em>function-try-block</em> (if any)
-whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>.</ins>
+names an implicitly movable entity that belongs to a scope that does not contain the <em>compound-statement</em> of the innermost 
+       <ins><em>lambda-expression</em>,</ins>
+        <em>try-block</em> 
+       <ins>,</ins>
+        or <em>function-try-block</em> (if any)
+whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>.
+      </ins>
     </ul>
    </blockquote>
    <p>Eliminate <a href="https://timsong-cpp.github.io/cppwp/n4861/class.copy.elision#3">[class.copy.elision]/3</a>:</p>
@@ -2465,7 +2525,31 @@ must be accessible even if the call is elided. — <em>end note</em>]</del>
 <ins><c- p>}</c-></ins>
 </pre></small>
    </blockquote>
-   <h3 class="heading settled" data-level="4.1" id="wording-nn"><span class="secno">4.1. </span><span class="content">Non-normative clarifications</span><a class="self-link" href="#wording-nn"></a></h3>
+   <p>Add a feature-test macro in <a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:</p>
+   <blockquote>
+<pre class="highlight"><ins><c- n>__cpp_implicit_move</c->     <i><c- n>DATE</c-><c- o>-</c-><c- n>OF</c-><c- o>-</c-><c- n>ADOPTION</c-></i></ins></pre>
+   </blockquote>
+   <h3 class="heading settled" data-level="5.1" id="wording-nn"><span class="secno">5.1. </span><span class="content">Non-normative clarifications</span><a class="self-link" href="#wording-nn"></a></h3>
+   <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/basic.lval#4">[basic.lval]/4</a> as follows:</p>
+   <blockquote>
+     [<em>Note:</em> An expression is an xvalue if it is: 
+    <ul>
+     <li data-md>
+      <ins>a move-eligible <i>id-expression</i> ([expr.prim.id.unqual]),</ins>
+     <li data-md>
+      <p>the result of calling a function, whether implicitly or explicitly, whose return type is an rvalue reference to object type,</p>
+     <li data-md>
+      <p>a cast to an rvalue reference to object type,</p>
+     <li data-md>
+      <p>a subscripting operation with an xvalue array operand,</p>
+     <li data-md>
+      <p>a class member access expression designating a non-static data member of non-reference type in which the object expression is an xvalue, or</p>
+     <li data-md>
+      <p>a <code class="highlight"><c- p>.</c-><c- o>*</c-></code> pointer-to-member expression in which the first operand is an xvalue and the second operand is a pointer to data member.</p>
+    </ul>
+    <p>In general, the effect of this rule is that named rvalue references are treated as lvalues and unnamed rvalue references to objects
+are treated as xvalues; rvalue references to functions are treated as lvalues whether named or not. — <em>end note</em>]</p>
+   </blockquote>
    <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.type.auto.deduct#5">[dcl.type.auto.deduct]/5</a> as follows:</p>
    <blockquote>
      If the <em>placeholder-type-specifier</em> is of the form <i>type-constraint<sub>opt</sub></i> <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code>, <code class="highlight"><c- n>T</c-></code> shall be the placeholder alone. The type deduced for <code class="highlight"><c- n>T</c-></code> is determined as described in [dcl.type.decltype],
@@ -2505,40 +2589,7 @@ showing how the new wording affects functions that return references:</p>
     <ins>[<em>Note:</em> This can be affected by whether the initializer expression
 is move-eligible ([expr.prim.id.unqual]). — <em>end note</em>]</ins>
    </blockquote>
-   <h3 class="heading settled" data-level="4.2" id="wording-lambdas"><span class="secno">4.2. </span><span class="content">Drive-by bugfix for throws inside lambdas</span><a class="self-link" href="#wording-lambdas"></a></h3>
-   <p>Davis Herring points out a bug in the existing wording.</p>
-<pre class="language-c++ highlight">    <c- n>std</c-><c- o>::</c-><c- n>string</c-> <c- n>x</c-> <c- o>=</c-> <c- s>"original value should not be moved-from"</c-><c- p>;</c->
-    <c- k>auto</c-> <c- n>lam</c-> <c- o>=</c-> <c- p>[</c-><c- o>&amp;</c-><c- p>]()</c-> <c- p>{</c-> <c- n>throw</c-> <c- n>x</c-><c- p>;</c-> <c- p>};</c->  <c- c1>// HERE</c->
-    <c- n>try</c-> <c- p>{</c->
-        <c- n>lam</c-><c- p>();</c->
-    <c- p>}</c-> <c- n>catch</c-> <c- p>(...)</c-> <c- p>{}</c->
-    <c- n>assert</c-><c- p>(</c-><c- n>x</c-> <c- o>==</c-> <c- s>"original value should not be moved-from"</c-><c- p>);</c->
-</pre>
-   <p>The existing wording implies that the compiler should generate a move, not a copy,
-for that <code class="highlight"><c- k>throw</c-> <c- n>x</c-></code>, because its operand is an entity (<code class="highlight"><c- n>x</c-></code>) defined in the outer scope,
-inside the nearest lexically enclosing try-block. However, this is a bug in the
-wording. I think we could patch this bug simply by inserting in the new [expr.prim.id.unqual]:</p>
-   <blockquote>
-    <p>In the following contexts, an <em>id-expression</em> is <em>move-eligible</em>:</p>
-    <ul>
-     <li data-md>
-      <p>If the <em>id-expression</em> (possibly parenthesized) is the operand of
-a <code class="highlight"><c- k>return</c-></code> or <code class="highlight"><c- k>co_return</c-></code> statement, and
-names an implicitly movable entity declared in the body or <em>parameter-declaration-clause</em> of the innermost enclosing function or <em>lambda-expression</em>, or</p>
-     <li data-md>
-      <p>
-       if the <em>id-expression</em> (possibly parenthesized) is the operand of
-a <em>throw-expression</em>, and
-names an implicitly movable entity that belongs to a scope that does not contain the <em>compound-statement</em> of the innermost 
-       <ins><em>lambda-expression</em>,</ins>
-        <em>try-block</em>
-       <ins>,</ins>
-        or <em>function-try-block</em> (if any)
-whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>throw-expression</em>.
-      </p>
-    </ul>
-   </blockquote>
-   <h2 class="heading settled" data-level="5" id="acknowledgments"><span class="secno">5. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
+   <h2 class="heading settled" data-level="6" id="acknowledgments"><span class="secno">6. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <ul>
     <li data-md>
      <p>Thanks to Ville Voutilainen for recommending Arthur write this paper.</p>
@@ -2690,8 +2741,8 @@ whose <em>compound-statement</em> or <em>ctor-initializer</em> encloses the <em>
    <dd>Yang Fan. <a href="https://reviews.llvm.org/D88220">[C++20] P1825R0: More implicit moves</a>. September 2020. URL: <a href="https://reviews.llvm.org/D88220">https://reviews.llvm.org/D88220</a>
    <dt id="biblio-d92936">[D92936]
    <dd>Yang Fan. <a href="https://reviews.llvm.org/D92936">[Sema] Fix deleted function problem in implicitly movable test</a>. December 2020. URL: <a href="https://reviews.llvm.org/D92936">https://reviews.llvm.org/D92936</a>
-   <dt id="biblio-draftpr3998">[DraftPR3998]
-   <dd>Jens Maurer. <a href="https://github.com/cplusplus/draft/pull/3998/">[class.copy.elision] Move specification of altered overload resolution</a>. May 2020. URL: <a href="https://github.com/cplusplus/draft/pull/3998/">https://github.com/cplusplus/draft/pull/3998/</a>
+   <dt id="biblio-d99005">[D99005]
+   <dd>Matheus Izvekov. <a href="https://reviews.llvm.org/D99005">[clang] Implement P2266 Simpler implicit move</a>. March 2021. URL: <a href="https://reviews.llvm.org/D99005">https://reviews.llvm.org/D99005</a>
    <dt id="biblio-lwg2993">[LWG2993]
    <dd>Tim Song. <a href="https://cplusplus.github.io/LWG/issue2993">reference_wrapper&lt;T> conversion from T&amp;&amp;</a>. November 2017. URL: <a href="https://cplusplus.github.io/LWG/issue2993">https://cplusplus.github.io/LWG/issue2993</a>
    <dt id="biblio-p0527">[P0527]
