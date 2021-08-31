@@ -2,7 +2,7 @@
 Title: Simpler implicit move
 Shortname: D2266
 Revision: 2
-!Draft Revision: 9
+!Draft Revision: 10
 Audience: EWG
 Status: D
 Group: WG21
@@ -19,7 +19,7 @@ Abstract:
   which is hard to implement, causing implementation divergence.
   We fix the defect and simplify the spec by saying that a returned move-eligible
   id-expression is <i>always</i> an xvalue.
-Date: 2021-04-04
+Date: 2021-08-31
 </pre>
 
 <style>
@@ -38,7 +38,9 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
     - Added feature-test macro `__cpp_implicit_move`.
 
-    - Added straw poll results and mention of [[D99005]].
+    - Added straw poll results.
+
+    - Added a section on "Implementation Experience", mentioning [[D99005]].
 
 - R1:
 
@@ -262,10 +264,8 @@ Sam twelve() {
 
 Note: In C++17 (prior to P1155), #2 would not be found by the first pass because
 its argument type is not exactly `Widget&&`. The comment in `twelve` matches the
-current Standard wording, and matches the behavior of MSVC 19.27 and GCC 7 through 10.
-(As of this writing, GCC trunk has regressed and lost the correct behavior.)
-Clang 11 still calls #1 in all modes, because it has not yet implemented P1155 (but
-Clang will correctly call #2 after [[D88220]] is landed).
+current Standard wording, and matches the behavior of MSVC, Clang 13+, and GCC 7 through 10.
+(As of this writing, GCC 11+ have regressed and lost the correct behavior.)
 
 The first overload resolution succeeds, and selects a candidate (#2) that is
 a *worse match* than the candidate that would have been selected by the second
@@ -303,9 +303,9 @@ function? Vendors currently disagree, but
 > that is not deleted and is accessible from the context in which overload resolution
 > was performed.
 
-<b>Error from use of deleted function:</b> GCC 5,6,7; GCC trunk with <tt>-std=c++20</tt>; MSVC; ICC
+<b>Error from use of deleted function:</b> GCC 5,6,7; GCC 11+ with <tt>-std=c++20</tt>; MSVC; ICC
 
-<b>Non-conforming fallback to `Frodo(Widget&)`:</b> GCC 8,9,10; GCC trunk with <tt>-std=c++17</tt>; Clang before [[D92936]]
+<b>Non-conforming fallback to `Frodo(Widget&)`:</b> GCC 8,9,10; GCC 11+ with <tt>-std=c++17</tt>; Clang before [[D92936]]
 
 This implementation divergence would be less likely to exist, if the specification
 were simplified to avoid relying on the precise formal meaning of "failure."
@@ -396,6 +396,75 @@ that implementation experience (and an updated paper) was needed before sending 
 <tr><th><small>Treat P2266 as a “Defect Report” against prior versions of C++ (i.e. not just C++23).</th>
 <th> 1 </th><th> 2 </th><th> 5 </th><th> 7 </th><th> 5 </th></tr>
 </table>
+
+
+# Implementation experience # {#experience}
+
+In June 2021, P2266R1 was implemented as the default behavior in Clang's <tt>-std=c++2b</tt> mode. This was
+shipped in the Clang 13 release (July 2021). We are aware of three pieces of industry code that broke
+as a result of this change. All three have been treated as "dubious code, worth patching" and have been
+patched already. These are the *only* three breakages we have seen from deployment of
+Clang 13's <tt>-std=c++2b</tt> mode. See [[FieldTesting]] for full details.
+The executive summary of the three breakages is:
+
+## Microsoft's rvalue `std::getline` ## {#exp-getline}
+
+```c++
+std::istream& getline(std::istream&& in, ~~~) {
+    ~~~
+    return in;
+}
+```
+
+[was changed](https://github.com/microsoft/STL/pull/2025) to
+
+```c++
+std::istream& getline(std::istream&& in, ~~~) {
+    ~~~
+    return static_cast<std::istream&>(in);
+}
+```
+
+## LibreOffice `OString` constructor ## {#exp-ostring}
+
+This is a subtle one, but it boils down to the fact that
+
+```c++
+struct X {
+    X(auto&);
+};
+
+X f() {
+    char a[10];
+    return a;
+}
+```
+
+compiles in C++20 (deducing `X(char (&)[10])`) but not after P2266
+(because the returned expression now has type `char (&&)[10]`, which
+cannot bind to `auto&`). The solution [was to change it](https://git.libreoffice.org/core/+/433ab39b2175bdadb4916373cd2dc8e1aabc08a5%5E%21)
+by making the return convert explicitly rather than implicitly:
+
+```
+X f() {
+    char a[10];
+    return X(a);
+}
+```
+
+## LibreOffice `o3tl::temporary` ## {#exp-o3tl}
+
+```c++
+template<class T>
+T& temporary(T&& x) { return x; }
+```
+
+[was changed](https://git.libreoffice.org/core/+/21da7d80aa1ee0f9661dcde37bc4629d5eb9d50e%5E%21) to
+
+```c++
+template<class T>
+T& temporary(T&& x) { return static_cast<T&>(x); }
+```
 
 
 # Proposed wording relative to N4861 # {#wording}
@@ -579,14 +648,6 @@ Add a note after <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init#ref
     "href": "https://reviews.llvm.org/D68845",
     "date": "October 2019"
   },
-  "D88220": {
-    "title": "[C++20] P1825R0: More implicit moves",
-    "authors": [
-        "Yang Fan"
-    ],
-    "href": "https://reviews.llvm.org/D88220",
-    "date": "September 2020"
-  },
   "D92936": {
     "title": "[Sema] Fix deleted function problem in implicitly movable test",
     "authors": [
@@ -618,6 +679,14 @@ Add a note after <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init#ref
     ],
     "href": "https://lists.isocpp.org/core/2020/02/8455.php",
     "date": "February 2020"
+  },
+  "FieldTesting": {
+    "title": "Field-testing P2266 'Simpler Implicit Move'",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://quuxplusone.github.io/blog/2021/08/07/p2266-field-test-results/",
+    "date": "August 2021"
   },
   "P0527": {
     "title": "Implicitly move from rvalue references in return statements",
