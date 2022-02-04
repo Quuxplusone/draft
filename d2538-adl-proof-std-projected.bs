@@ -2,7 +2,7 @@
 Title: ADL-proof std::projected
 Shortname: D2538
 Revision: 0
-!Draft Revision: 1
+!Draft Revision: 2
 Audience: LEWG, LWG
 Status: D
 Group: WG21
@@ -16,8 +16,8 @@ Abstract:
   does not attempt to complete the associated type <tt>Danger</tt>. But when <tt>proj</tt> is an iterator
   of type <tt>projected&lt;Danger*, identity&gt;</tt>, evaluating <tt>*proj</tt> does perform ADL and will
   attempt to complete <tt>Danger</tt>. As a result, most Ranges algorithms are fundamentally
-  "less ADL-proof" than their STL Classic counterparts, and some concepts such as
-  <tt>indirectly_comparable</tt> can result in unexpected hard errors.
+  "less ADL-proof" than their STL Classic counterparts, and some concepts such as <tt>indirectly_comparable</tt>
+  can result in unexpected hard errors.
   We fix this by respecifying <tt>projected&lt;I, Proj&gt;</tt> in a backward-compatible way so that its
   associated entities do not include its template arguments.
 Date: 2022-02-04
@@ -158,6 +158,8 @@ ADL will associate the base classes of derived classes, but it does not
 associate the containing classes of nested classes. In short, the `::` in
 `__projected_impl<NonAssociated>::type` acts as a firewall against unwanted ADL.
 
+For more information, see [[Disable]].
+
 [[P2300R4]] actually provides blanket wording and
 a phrase of power that denotes this technique, in their proposed new library section
 [lib.tmpl-heads]. Quote:
@@ -171,21 +173,20 @@ a phrase of power that denotes this technique, in their proposed new library sec
 
 This is exactly the sort of thing I'm talking about, and if that wording is shipped,
 then we might consider rewording `std::projected` to use the phrase of power. However,
-I'm proposing a particular implementation technique below, because it also removes some
-unnecessary complexity (a partial specialization of `incrementable_traits` that after
-this patch is neither needed, nor physically possible to implement).
+I'm proposing a particular implementation technique below, so that the wording here
+(which I hope vendors will DR back to C++20) is not unnecessarily tied to the fate of P2300.
+The proposed wording here also removes some unnecessary complexity (a partial specialization
+of `incrementable_traits` that, after this patch, will not be physically possible to implement).
 
-For more information, see [[Disable]].
-
-If we respecify `std::projected` along these lines, then the programmer
+If we adopt this proposal and respecify `std::projected` along these lines, then the programmer
 will gain the ability to write:
 
 ```c++
 using T = Holder<Incomplete>*;
 
 static_assert(std::equality_comparable<T>); // OK
-bool x = std::indirectly_comparable<T*, T*, std::equal_to<>>; // will be OK
-bool y = std::sortable<T*>; // will be OK
+static_assert(std::indirectly_comparable<T*, T*, std::equal_to<>>); // will be OK
+static_assert(std::sortable<T*>); // will be OK
 
 int main() {
   Holder<Incomplete> *a[10] = {}; // ten null pointers
@@ -200,6 +201,14 @@ This has been prototyped in a branch of libc++, and is just waiting for
 the paper to be adopted so that we can merge it. See [[D119029]].
 
 # Proposed wording relative to N4868 # {#wording}
+
+Note: The phrase of power "present only if..." was recently introduced into the working draft
+by [[P2259R1]]; see for example <a href="https://eel.is/c++draft/counted.iterator">[counted.iterator]</a>
+and <a href="https://eel.is/c++draft/range.iota.iterator">[range.iota.iterator]</a>.
+
+Note: I believe this doesn't need a feature-test macro, because it merely enables code that
+was ill-formed before, and I can't think of a scenario where you'd want to do one thing
+if the feature was available and a different thing if it wasn't.
 
 Modify <a href="https://timsong-cpp.github.io/cppwp/n4868/projected">[projected]</a> as follows:
 
@@ -228,15 +237,7 @@ namespace std {
   struct <i>projected-impl</i> { <i>// exposition only</i>
     struct <i>type</i> { <i>// exposition only</i>
       using value_type = remove_cvref_t&lt;indirect_result_t&lt;Proj&amp;, I>>;
-      indirect_result_t&lt;Proj&amp;, I> operator*() const; <i>// not defined</i>
-    };
-  };
-
-  template&lt;weakly_incrementable I, class Proj>
-  struct <i>projected-impl</i>&lt;I, Proj> {
-    struct <i>type</i> { <i>// exposition only</i>
-      using value_type = remove_cvref_t&lt;indirect_result_t&lt;Proj&amp;, I>>;
-      using difference_type = iter_difference_t&lt;I>;
+      using difference_type = iter_difference_t&lt;I>; <i>// present only if I models weakly_incrementable</i>
       indirect_result_t&lt;Proj&amp;, I> operator*() const; <i>// not defined</i>
     };
   };
@@ -247,13 +248,12 @@ namespace std {
 </ins></pre>
 </blockquote>
 
-I believe this doesn't need a feature-test macro, because it merely enables code that
-was ill-formed before, and I can't think of a scenario where you'd want to do one thing
-if the feature was available and a different thing if it wasn't.
-
 # Acknowledgments # {#acknowledgments}
 
 - Thanks to Jonathan Wakely and Ville Voutilainen for recommending Arthur write this paper.
+
+- Thanks to Barry Revzin for suggesting the "present only if..." wording, and
+    to Hui Xie for pointing out the relevance of [[P2300R4]].
 
 # Appendix A: Compiler error messages for the `ranges::count` example # {#appendix-a}
 
@@ -361,6 +361,14 @@ algorithm(466): note: see reference to variable template 'bool indirect_binary_p
     ],
     "href": "https://quuxplusone.github.io/blog/2019/04/09/adl-insanity-round-2/",
     "date": "April 2019"
+  },
+  "P2259R1": {
+    "title": "Repairing input range adaptors and counted_iterator",
+    "authors": [
+        "Tim Song"
+    ],
+    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2259r1.html",
+    "date": "January 2021"
   },
   "P2300R4": {
     "title": "std::execution",
