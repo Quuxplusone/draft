@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2266R2: Simpler implicit move</title>
+  <title>D2266R3: Simpler implicit move</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1269,7 +1269,7 @@ Possible extra rowspan handling
 	ul.index ul,
 	ul.index dl { font-size: smaller; }
 	@media not print {
-		ul.index li span:not(.dfn-paneled) {
+		ul.index li a + span {
 			white-space: nowrap;
 			color: transparent; }
 		ul.index li a:hover + span,
@@ -1487,7 +1487,7 @@ Possible extra rowspan handling
 		}
 	}
 </style>
-<style type="text/css">
+<style>
     table, th, td {
       border: 1px solid black;
       border-collapse: collapse;
@@ -1560,7 +1560,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version 4f053d00e, updated Tue Aug 10 14:13:32 2021 -0700" name="generator">
+  <meta content="Bikeshed version fb1e763a4, updated Tue Mar 1 13:13:50 2022 -0800" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
@@ -1767,6 +1767,16 @@ figcaption {
 figcaption:not(.no-marker)::before {
     content: "Figure " counter(figure) " ";
 }</style>
+<style>/* style-issues */
+
+a[href].issue-return {
+    float: right;
+    float: inline-end;
+    color: var(--issueheading-text);
+    font-weight: bold;
+    text-decoration: none;
+}
+</style>
 <style>/* style-md-lists */
 
 /* This is a weird hack for me not yet following the commonmark spec
@@ -2075,8 +2085,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2266R2<br>Simpler implicit move</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2021-08-31">2021-08-31</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D2266R3<br>Simpler implicit move</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2022-03-11">2022-03-11</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2086,7 +2096,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>10
+     <dd>11
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2266-implicit-move-rvalue-ref.bs</a>
      <dt>Current:
@@ -2137,6 +2147,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <a href="#wording"><span class="secno">6</span> <span class="content">Proposed wording relative to N4861</span></a>
      <ol class="toc">
       <li><a href="#wording-nn"><span class="secno">6.1</span> <span class="content">Non-normative clarifications</span></a>
+      <li><a href="#wording-annexc"><span class="secno">6.2</span> <span class="content">Addition to Annex C</span></a>
      </ol>
     <li><a href="#acknowledgments"><span class="secno">7</span> <span class="content">Acknowledgments</span></a>
     <li>
@@ -2149,6 +2160,12 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <main>
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
+    <li data-md>
+     <p>R3:</p>
+     <ul>
+      <li data-md>
+       <p>Added the Annex C entry.</p>
+     </ul>
     <li data-md>
      <p>R2:</p>
      <ul>
@@ -2294,12 +2311,12 @@ the code compiles OK.</p>
 The function return type is deduced as <code class="highlight"><c- k>decltype</c-><c- p>(</c-></code><i>E</i><code class="highlight"><c- p>)</c-></code>, which is to say, <code class="highlight"><c- b>int</c-><c- o>&amp;&amp;</c-></code> since <em>E</em> is an xvalue.
 The xvalue expression <code class="highlight"><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> happily binds to the function return type <code class="highlight"><c- b>int</c-><c- o>&amp;&amp;</c-></code>, and the code compiles OK. <b>But now it returns <code class="highlight"><c- b>int</c-><c- o>&amp;&amp;</c-></code>, not <code class="highlight"><c- b>int</c-><c- o>&amp;</c-></code>.</b></p>
    <p>This does produce surprising inconsistencies in the handling of parentheses; for example,</p>
-<pre class="language-c++ highlight"><c- k>auto</c-> <c- nf>f1</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->     <c- c1>// int</c->
-<c- k>auto</c-> <c- nf>f2</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>((</c-><c- n>x</c-><c- p>))</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->   <c- c1>// int&amp;</c->
-<c- k>auto</c-> <c- nf>f3</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->  <c- c1>// C++20: int&amp;. Proposed: int&amp;&amp;</c->
-<c- k>auto</c-> <c- nf>g1</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- p>;</c-> <c- p>}</c->       <c- c1>// int</c->
-<c- k>auto</c-> <c- nf>g2</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>((</c-><c- n>x</c-><c- p>))</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- p>;</c-> <c- p>}</c->     <c- c1>// int&amp;</c->
-<c- k>auto</c-> <c- nf>g3</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- p>;</c-> <c- p>}</c->    <c- c1>// int</c->
+<pre class="language-c++ highlight"><c- k>auto</c-> <c- n>f1</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->     <c- c1>// int</c->
+<c- k>auto</c-> <c- n>f2</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>((</c-><c- n>x</c-><c- p>))</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->   <c- c1>// int&amp;</c->
+<c- k>auto</c-> <c- n>f3</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->  <c- c1>// C++20: int&amp;. Proposed: int&amp;&amp;</c->
+<c- k>auto</c-> <c- n>g1</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- p>;</c-> <c- p>}</c->       <c- c1>// int</c->
+<c- k>auto</c-> <c- n>g2</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>((</c-><c- n>x</c-><c- p>))</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- p>;</c-> <c- p>}</c->     <c- c1>// int&amp;</c->
+<c- k>auto</c-> <c- n>g3</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- n>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- p>;</c-> <c- p>}</c->    <c- c1>// int</c->
 </pre>
    <p>Note that <code class="highlight"><c- n>f2</c-></code> and <code class="highlight"><c- n>g2</c-></code> are well-formed in C++20, but we propose to make <code class="highlight"><c- n>f2</c-></code> and <code class="highlight"><c- n>g2</c-></code> ill-formed,
 because they attempt to bind an lvalue reference to a <em>move-eligible</em> xvalue expression.</p>
@@ -2465,13 +2482,13 @@ Clang 13’s
 The executive summary of the three breakages is:
    </p>
    <h3 class="heading settled" data-level="5.1" id="exp-getline"><span class="secno">5.1. </span><span class="content">Microsoft’s rvalue <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>getline</c-></code></span><a class="self-link" href="#exp-getline"></a></h3>
-<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;</c-> <c- n>getline</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;&amp;</c-> <c- n>in</c-><c- p>,</c-> <c- o>~~~</c-><c- p>)</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;</c-> <c- nf>getline</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;&amp;</c-> <c- n>in</c-><c- p>,</c-> <c- o>~~~</c-><c- p>)</c-> <c- p>{</c->
     <c- o>~~~</c->
     <c- k>return</c-> <c- n>in</c-><c- p>;</c->
 <c- p>}</c->
 </pre>
    <p><a href="https://github.com/microsoft/STL/pull/2025">was changed</a> to</p>
-<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;</c-> <c- n>getline</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;&amp;</c-> <c- n>in</c-><c- p>,</c-> <c- o>~~~</c-><c- p>)</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;</c-> <c- nf>getline</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;&amp;</c-> <c- n>in</c-><c- p>,</c-> <c- o>~~~</c-><c- p>)</c-> <c- p>{</c->
     <c- o>~~~</c->
     <c- k>return</c-> <c- n>static_cast</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>istream</c-><c- o>&amp;></c-><c- p>(</c-><c- n>in</c-><c- p>);</c->
 <c- p>}</c->
@@ -2617,8 +2634,8 @@ are treated as xvalues; rvalue references to functions are treated as lvalues wh
      If the <em>placeholder-type-specifier</em> is of the form <i>type-constraint<sub>opt</sub></i> <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code>, <code class="highlight"><c- n>T</c-></code> shall be the placeholder alone. The type deduced for <code class="highlight"><c- n>T</c-></code> is determined as described in [dcl.type.decltype],
 as though <em>E</em> had been the operand of the <code class="highlight"><c- k>decltype</c-></code>. 
     <ins>[<em>Example:</em></ins>
-     <small><pre class="highlight">    <ins><c- k>auto</c-> <c- nf>f</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>((</c-><c- n>x</c-><c- p>))</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->   <c- c1>// return type is "int&amp;"</c-></ins>
-    <ins><c- k>auto</c-> <c- nf>g</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->  <c- c1>// return type is "int&amp;&amp;"</c-></ins>
+     <small><pre class="highlight">    <ins><c- k>auto</c-> <c- n>f</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>((</c-><c- n>x</c-><c- p>))</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->   <c- c1>// return type is "int&amp;"</c-></ins>
+    <ins><c- k>auto</c-> <c- n>g</c-><c- p>(</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->  <c- c1>// return type is "int&amp;&amp;"</c-></ins>
 </pre></small> 
     <ins>— <em>end example</em>]</ins>
    </blockquote>
@@ -2650,6 +2667,15 @@ showing how the new wording affects functions that return references:</p>
     <p>if the reference is an rvalue reference, the initializer expression shall not be an lvalue.</p>
     <ins>[<em>Note:</em> This can be affected by whether the initializer expression
 is move-eligible ([expr.prim.id.unqual]). — <em>end note</em>]</ins>
+   </blockquote>
+   <h3 class="heading settled" data-level="6.2" id="wording-annexc"><span class="secno">6.2. </span><span class="content">Addition to Annex C</span><a class="self-link" href="#wording-annexc"></a></h3>
+   <p>Add to Annex C <a href="https://eel.is/c++draft/diff.cpp20.expr">[diff.cpp20.expr]</a>:</p>
+   <blockquote>
+    <ins><b>Affected subclause:</b> [expr.prim.unqual]<br> <b>Change:</b> Change move-eligible id-expressions from lvalues to xvalues.<br> <b>Rationale:</b> Simplify the rules for implicit move.<br> <b>Effect on original feature:</b> Valid C++ 2020 code that uses <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-></code> or binds a reference to a returned id-expression may change behavior or fail to compile.
+For example:</ins>
+     <small><pre class="highlight">    <ins><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- n>f</c-><c- p>(</c-><c- b>int</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c->  <c- c1>// return type was "int&amp;", now is "int&amp;&amp;"</c-></ins>
+    <ins><c- b>int</c-><c- o>&amp;</c-> <c- n>g</c-><c- p>(</c-><c- b>int</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- p>;</c-> <c- p>}</c->  <c- c1>// was well-formed, now is ill-formed</c-></ins>
+</pre></small> 
    </blockquote>
    <h2 class="heading settled" data-level="7" id="acknowledgments"><span class="secno">7. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <ul>
