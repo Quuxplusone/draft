@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: ADL-proof std::projected
 Shortname: D2538
-Revision: 0
-!Draft Revision: 2
+Revision: 1
+!Draft Revision: 3
 Audience: LEWG, LWG
 Status: D
 Group: WG21
@@ -10,6 +10,7 @@ URL:
 !Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2538-adl-proof-std-projected.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2538-adl-proof-std-projected.bs</a>
 !Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2538-adl-proof-std-projected.html">rawgit.com/Quuxplusone/draft/gh-pages/d2538-adl-proof-std-projected.html</a>
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Editor: Casey Carter, casey@carter.net
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   When <tt>it</tt> is a pointer of type <tt>Danger*</tt>, evaluating <tt>*it</tt> does not perform ADL and
@@ -20,7 +21,7 @@ Abstract:
   can result in unexpected hard errors.
   We fix this by respecifying <tt>projected&lt;I, Proj&gt;</tt> in a backward-compatible way so that its
   associated entities do not include its template arguments.
-Date: 2022-02-04
+Date: 2022-03-31
 </pre>
 
 <style>
@@ -30,6 +31,12 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R1:
+
+    - Added Casey Carter as coauthor.
+
+    - Added libc++ to Appendix A.
 
 - R0:
 
@@ -257,7 +264,7 @@ namespace std {
 
 # Appendix A: Compiler error messages for the `ranges::count` example # {#appendix-a}
 
-Here's the sample program again ([Godbolt](https://godbolt.org/z/6KnebPrMq)):
+Here's the sample program again ([Godbolt](https://godbolt.org/z/9KEoETMfr)):
 
 ```c++
 #include <algorithm>
@@ -267,8 +274,8 @@ struct Incomplete;
 
 int main() {
     Holder<Incomplete> *a[10] = {}; // ten null pointers
-    (void)std::count(a, a+10, nullptr); // OK
-    (void)std::ranges::count(a, a+10, nullptr); // error
+    // (void)std::count(a, a+10, nullptr); // OK on libstdc++ and libc++, hard error on Microsoft STL
+    (void)std::ranges::count(a, a+10, nullptr); // hard error
 }
 ```
 
@@ -292,45 +299,50 @@ note: forward declaration of 'struct Incomplete'
       |        ^~~~~~~~~~
 ```
 
-Clang (also with libstdc++, as libc++ does not yet implement `std::ranges::count`) says:
+Clang (with libc++, after applying [[D121523]]'s implementation of `ranges::count`) says:
 
 ```
 error: field has incomplete type 'Incomplete'
 template<class T> struct Holder { T t; };
                                     ^
-bits/iterator_concepts.h:292:6: note: in instantiation of template class 'Holder<Incomplete>' requested here
-          { *__it } -> __can_reference;
-            ^
-bits/iterator_concepts.h:292:6: note: in instantiation of requirement here
-          { *__it } -> __can_reference;
-            ^~~~~
-bits/iterator_concepts.h:290:34: note: while substituting template arguments into constraint expression here
-      concept __cpp17_iterator = requires(_Iter __it)
-                                 ^~~~~~~~~~~~~~~~~~~~
-bits/iterator_concepts.h:298:40: note: while checking the satisfaction of concept '__cpp17_iterator<std::projected<Holder<Incomplete> **, std::identity>>' requested here
-      concept __cpp17_input_iterator = __cpp17_iterator<_Iter>
-                                       ^~~~~~~~~~~~~~~~~~~~~~~
-bits/iterator_concepts.h:298:40: note: while substituting template arguments into constraint expression here
-      concept __cpp17_input_iterator = __cpp17_iterator<_Iter>
-                                       ^~~~~~~~~~~~~~~~~~~~~~~
-bits/iterator_concepts.h:388:11: note: (skipping 20 contexts in backtrace; use -ftemplate-backtrace-limit=0 to see all)
-              && __detail::__cpp17_input_iterator<_Iterator>
-                 ^
-bits/iterator_concepts.h:717:9: note: while substituting template arguments into constraint expression here
-      = indirectly_readable<_I1> && indirectly_readable<_I2>
-        ^~~~~~~~~~~~~~~~~~~~~~~~
-bits/ranges_algo.h:282:16: note: while checking the satisfaction of concept 'indirect_binary_predicate<std::ranges::equal_to, std::projected<Holder<Incomplete> **, std::identity>, const std::nullptr_t *>' requested here
-      requires indirect_binary_predicate<ranges::equal_to,
-               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-bits/ranges_algo.h:282:16: note: while substituting template arguments into constraint expression here
-      requires indirect_binary_predicate<ranges::equal_to,
-               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+__iterator/iterator_traits.h:151:9: note: in instantiation of template class 'Holder<Incomplete>' requested here
+    {   *__i } -> __can_reference;
+        ^
+__iterator/iterator_traits.h:151:9: note: in instantiation of requirement here
+    {   *__i } -> __can_reference;
+        ^~~~
+__iterator/iterator_traits.h:150:3: note: while substituting template arguments into constraint expression here
+  requires(_Ip __i) {
+  ^~~~~~~~~~~~~~~~~~~
+__iterator/iterator_traits.h:237:3: note: while checking the satisfaction of concept '__cpp17_iterator<std::projected<Holder<Incomplete> **, std::identity>>' requested here
+  __iterator_traits_detail::__cpp17_iterator<_Tp>;
+  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+__iterator/iterator_traits.h:237:29: note: while substituting template arguments into constraint expression here
+  __iterator_traits_detail::__cpp17_iterator<_Tp>;
+                            ^~~~~~~~~~~~~~~~~~~~~
+__iterator/iterator_traits.h:241:3: note: (skipping 19 contexts in backtrace; use -ftemplate-backtrace-limit=0 to see all)
+  __cpp17_iterator_missing_members<_Tp> &&
+  ^
+__iterator/concepts.h:212:3: note: while substituting template arguments into constraint expression here
+  indirectly_readable<_It1> && indirectly_readable<_It2> &&
+  ^~~~~~~~~~~~~~~~~~~~~~~~~
+__algorithm/ranges_count.h:35:14: note: while checking the satisfaction of concept 'indirect_binary_predicate<std::ranges::equal_to, std::projected<Holder<Incomplete> **, std::identity>, const std::nullptr_t *>' requested here
+    requires indirect_binary_predicate<ranges::equal_to, projected<_Iter, _Proj>, const _Type*>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+__algorithm/ranges_count.h:35:14: note: while substituting template arguments into constraint expression here
+    requires indirect_binary_predicate<ranges::equal_to, projected<_Iter, _Proj>, const _Type*>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 note: while checking constraint satisfaction for template 'operator()<Holder<Incomplete> **, Holder<Incomplete> **, std::nullptr_t, std::identity>' required here
-(void)std::ranges::count(a, a+10, nullptr); // hard error
-                        ^
+    (void)std::ranges::count(a, a+10, nullptr); // hard error
+                            ^
+note: in instantiation of function template specialization 'std::ranges::__count::__fn::operator()<Holder<Incomplete> **, Holder<Incomplete> **, std::nullptr_t, std::identity>' requested here
+note: forward declaration of 'Incomplete'
+struct Incomplete;
+       ^
+1 error generated.
 ```
 
-MSVC (with Microsoft STL, which generally does not pursue ADL-proofing anyway) says:
+MSVC (with Microsoft STL, which already does not ADL-proof `std::count`) says:
 
 ```
 error C2079: 'Holder<Incomplete>::t' uses undefined struct 'Incomplete'
@@ -353,6 +365,14 @@ algorithm(466): note: see reference to variable template 'bool indirect_binary_p
     ],
     "href": "https://reviews.llvm.org/D119029",
     "date": "February 2022"
+  },
+  "D121523": {
+    "title": "[libc++][ranges] Implement ranges::count{, _if}",
+    "authors": [
+        "Nikolas Klauser"
+    ],
+    "href": "https://reviews.llvm.org/D121523",
+    "date": "March 2022"
   },
   "Disable": {
     "title": "How hana::type<T> disables ADL",
