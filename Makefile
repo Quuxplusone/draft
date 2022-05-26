@@ -8,7 +8,8 @@ all: \
     d1155-more-implicit-moves.html \
     d1518-container-deduction-guides.html \
     d2266-implicit-move-rvalue-ref.html \
-    d2538-adl-proof-std-projected.html
+    d2538-adl-proof-std-projected.html \
+    d2596-improve-hive-reshape.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
