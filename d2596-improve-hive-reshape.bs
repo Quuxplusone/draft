@@ -1,0 +1,821 @@
+<pre class='metadata'>
+Title: Improve std::hive::reshape
+Shortname: D2596
+Revision: 0
+!Draft Revision: 1
+Audience: LEWG, LWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2596-improve-hive-reshape.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2596-improve-hive-reshape.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2596-improve-hive-reshape.html">rawgit.com/Quuxplusone/draft/gh-pages/d2596-improve-hive-reshape.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  P0447R20 <code>std::hive</code> proposes a complicated capacity model involving
+  the library identifiers <code>hive_limits</code>, <code>block_capacity_limits</code>,
+  <code>block_capacity_hard_limits</code>, <code>reshape</code>, in addition to
+  <code>capacity</code>, <code>reserve</code>, <code>shrink_to_fit</code>, and
+  <code>trim_capacity</code>. P0447R20's model permits the user to specify a
+  max block size; this causes "secret quadratic behavior" on some common operations.
+  P0447R20's model requires the container to track its min and max block sizes as
+  part of its (non-salient) state.
+
+  We propose a simpler model that involves the library identifiers
+  <code>max_block_size</code> and <code>reshape</code>, in addition to
+  <code>capacity</code>, <code>reserve</code>, <code>shrink_to_fit</code>, and
+  <code>trim_capacity</code>. This model does not permit the user to specify
+  a max block size, so "secret quadratic behavior" is less common. This model
+  does not require the container to track anything; the new `reshape` is
+  a simple mutating operation analogous to `reserve` or `sort`.
+Date: 2022-05-26
+</pre>
+
+<style>
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial release.
+
+
+# Introduction: P0447R20's model # {#intro}
+
+P0447R20 `hive` is a bidirectional container, basically a "rope with holes." Compare it to the
+existing STL sequence containers:
+
+- `vector` is a single block with spare capacity only on the end. Only one block ever exists at a time.
+
+- `list` is a linked list of equal-sized blocks, each with capacity 1; unused blocks are immediately deallocated.
+
+- `deque` is a vector of equal-sized blocks, each with capacity N;
+    spare capacity exists at the end of the last block *and* at the beginning of the first block, but nowhere
+    else.
+
+- `hive` is a linked list of variably-sized blocks;
+    spare capacity ("holes") can appear anywhere in any block, and the container keeps track of
+    where the "holes" are.
+
+The blocks of a `hive` are variably sized. The intent is that as you insert into a hive, it will allocate
+new blocks of progressively larger sizes — just like `vector`'s geometric resizing, but without relocating
+any existing elements. This improves cache locality when iterating.
+
+We can represent a vector, list, or hive diagrammatically, using `[square brackets]` to bracket the elements
+belonging to a single block, and `_` to represent spare capacity ("holes"). There's a lot of bookkeeping detail
+not captured by this representation; that's okay for our purposes.
+
+<xmp>
+    std::vector<int> v = {1,2,3,4,5,6}; // [1 2 3 4 5 6 _ _]
+    std::list<int>   l = {1,2,3,4,5,6}; // [1] [2] [3] [4] [5] [6]
+    std::hive<int>   h = {1,2,3,4,5,6}; // [1 2 3 4 5 6]
+</xmp>
+
+Erasing from a vector shifts the later elements down. Erasing from a list or hive never needs to shift elements.
+
+<xmp>
+    v.erase(std::next(v.begin()));  // [1 3 4 5 6 _ _ _]
+    l.erase(std::next(l.begin()));  // [1] [3] [4] [5] [6]
+    h.erase(std::next(h.begin()));  // [1 _ 3 4 5 6]
+</xmp>
+
+Reserving in a vector may invalidate iterators, because there's no way to strictly "add" capacity.
+Reserving in a hive never invalidates iterators (except for `end()`), because we can just add new
+blocks right onto the back of the container. (In fact the container tracks unused blocks via a
+separate list, so iteration doesn't have to traverse them; this diagrammatic representation
+doesn't capture that detail.)
+
+<xmp>
+    v.reserve(10);  // [1 3 4 5 6 _ _ _ _ _]
+    h.reserve(10);  // [1 _ 3 4 5 6] [_ _ _ _]
+</xmp>
+
+P0447R20 allows the programmer to specify `min` and `max` block capacities,
+via the `std::hive_limits` mechanism. No block in the hive is ever permitted to be
+smaller than `min` elements in capacity, nor greater than `max` elements in capacity.
+For example, we can construct a hive in which no block's capacity will ever be smaller than 4
+or greater than 5.
+
+<xmp>
+    std::hive<int> h({1,2,3,4,5,6}, std::hive_limits(4, 5));
+                   // [1 2 3 4 5] [6 _ _ _]
+    h.reserve(10); // [1 2 3 4 5] [6 _ _ _] [_ _ _ _]
+</xmp>
+
+A hive can also be "reshaped" on the fly, after construction.
+In the following example, after creating a hive with one size-5 block,
+we `reshape` the hive to include only blocks of sizes between 3 and 4
+inclusive. This means that the size-5 block is now "illegal"; its
+elements are redistributed to other blocks, and then it is deallocated,
+because this hive is no longer allowed to hold blocks of that size.
+
+<xmp>
+    std::hive<int> h({1,2,3,4,5,6}, std::hive_limits(4, 5));
+                   // [1 2 3 4 5] [6 _ _ _]
+    h.reserve(10); // [1 2 3 4 5] [6 _ _ _] [_ _ _ _]
+    h.reshape(std::hive_limits(3, 4));
+                   // [6 1 2 3] [4 5 _ _]
+</xmp>
+
+Notice that `reshape` invalidates iterators (to element `1`,
+for example), and can also undo the effects of `reserve` by reducing
+the overall capacity of the hive. (Before the reshape operation,
+`h.capacity()` was 13; afterward it is only 8.)
+Programmers are advised to "`reshape` first, `reserve` second."
+
+
+# Criticisms of P0447R20's model # {#motivation}
+
+## Max block size is not useful in practice ## {#motivation-useless}
+
+One of the primary motivations for `hive` is to be usable in embedded/low-latency situations, where the programmer
+might want fine control over the memory allocation scheme. So at first glance it makes sense that the programmer
+should be able to specify min and max block capacities via `hive_limits`. However:
+
+- A programmer is likely to care about *min* block capacity (for cache locality),
+    but not so much *max* capacity. The more contiguity the better! Why would I want to put a cap on it?
+
+- If the embedded programmer cares about max capacity, it's likely because they're using a slab allocator
+    that hands out blocks of some fixed size (say, 1024 bytes). But that doesn't correspond to `hive_limits(0, 1024)`.
+    The min and max values in `hive_limits` are *counts of elements*, not the size of the actual allocation.
+    So you might try dividing by `sizeof(T)`; but that still won't help, for two reasons:
+
+    - Just like with `std::set`, the size of the allocation is not the same as `sizeof(T)`. In the reference
+        implementation, a block with capacity `n` typically asks the allocator for `n*sizeof(T) + n + 1` bytes
+        of storage, to account for the skipfield structure. In my own implementation, I do a `make_shared`-like
+        optimization that asks the allocator for `sizeof(GroupHeader) + n*sizeof(T) + n + 1` bytes.
+
+    - The reference implementation doesn't store `T` objects contiguously, when `T` is small.
+        When `plf::hive<char>` allocates a block of capacity `n`, it actually asks for `n*2 + n + 1` bytes
+        instead of `n*sizeof(char) + n + 1` bytes.
+
+It's kind of fun that you're allowed to set a very small maximum block size,
+and thus a hive can be used to simulate a traditional "rope" of fixed-capacity blocks:
+
+<xmp>
+    std::hive<int> h(std::hive_limits(3, 3));
+    h.assign({1,2,3,4,5,6,7,8});  // [1 2 3] [4 5 6] [7 8 _]
+</xmp>
+
+It's kind of fun; but I claim that it is not *useful enough* to justify its cost, in brain cells nor in CPU time.
+
+Imagine if `std::vector` provided this max-block-capacity API! 
+
+<xmp>
+    // If vector provided hive's API...
+    std::vector<int> v = {1,2};  // [1 2]
+    v.reshape({5, 8});           // [1 2 _ _ _]
+    v.assign({1,2,3,4,5});       // [1 2 3 4 5]
+    v.push_back(6);              // [1 2 3 4 5 6 _ _]
+    v.push_back(7);              // [1 2 3 4 5 6 7 _]
+    v.push_back(8);              // [1 2 3 4 5 6 7 8]
+    v.push_back(9);              // throws length_error, since allocating a larger block isn't allowed
+</xmp>
+
+No, the real-world `vector` sensibly says that it should just keep geometrically resizing until the underlying allocator
+conks out. In my opinion, `hive` should behave the same way. Let the *allocator* decide how many bytes
+is too much to allocate at once. Don't make it the container's problem.
+
+
+## Max block size causes O(n) behavior ## {#motivation-complexity}
+
+Many of `hive`'s operations are linear in the number of active blocks.
+Consider this program:
+
+<xmp>
+    std::hive<int> h(std::hive_limits(3, 3));
+    h.assign(N, 1); // [1 1 1] [1 1 1] [1 1 1] [...
+    while (!h.empty()) {
+        h.erase(h.begin());
+    }
+</xmp>
+
+This loop takes O(`N`<sup>2</sup>) time to run! The reason is that `hive`'s
+active blocks are stored in a linked list, but also *numbered* in sequential
+order starting from 1; those "serial numbers" are required by `hive::iterator`'s
+`operator<`. (Aside: I don't think `operator<` should exist either, but
+my understanding is that it's already been litigated.)
+
+Every time you `erase` the last element from a block (in other words,
+every time you change `[_ _ 1]` into `[_ _ _]`), you need to move the
+newly unused block from the active block list to the unused block list.
+And then you need to renumber all the subsequent blocks. Quoting P0447R20's
+specification of `erase`:
+
+<blockquote>
+<i>Complexity:</i> Constant if the active block within which `position` is located
+does not become empty as a result of this function call. If it does become empty,
+at worst linear in the number of subsequent blocks in the iterative sequence.
+</blockquote>
+
+Since this program sets the max block capacity to 3, it will hit the linear-time
+case once for every three erasures. Result: quadratic running time.
+
+Such "secret quadratic behavior" is caused *primarily* by how `hive` permits
+the programmer to set a max block size. If we get rid of the max block size,
+then the implementation is free to allocate larger blocks, and so we'll hit
+the linear-time cases geometrically less often — we'll get amortized O(`N`)
+instead of O(`N`<sup>2</sup>).
+
+<div class="note">
+It's still possible to simulate a rope of fixed-size blocks using my
+proposed `hive`, but the programmer has to go pretty far out of their way.
+There's no footgun analogous to `std::hive<int>({1,2,3}, {3,3})`.
+
+<xmp>
+    auto make_block = []() {
+        std::hive<int> h;
+        h.reserve(3);
+        return h;
+    };
+    std::hive<int> h;
+    h.splice(make_block()); // [_ _ _]
+    h.splice(make_block()); // [_ _ _] [_ _ _]
+    h.splice(make_block()); // [_ _ _] [_ _ _] [_ _ _]
+    // ...
+</xmp>
+</div>
+
+
+## Move semantics are arguably unintuitive ## {#motivation-pmr-analogy}
+
+Suppose we've constructed a hive with min and max block capacities, and then
+we assign into it from another sequence in various ways.
+
+<xmp>
+    std::hive<int> h(std::hive_limits(3, 3));  // empty
+
+    h.assign({1,2,3,4,5});                // [1 2 3] [4 5 _]
+    h = {1,2,3,4,5};                      // [1 2 3] [4 5 _]
+    h.assign_range(std::hive{1,2,3,4,5}); // [1 2 3] [4 5 _]
+
+    // BUT:
+
+    h = std::hive{1,2,3,4,5}; // [1 2 3 4 5]
+    // OR
+    std::hive<int> h2 = {1,2,3,4,5};
+    h = h2;                   // [1 2 3 4 5]
+    // OR
+    std::hive<int> h2 = {1,2,3,4,5};
+    std::swap(h, h2);         // [1 2 3 4 5]
+
+    // BUT AGAIN:
+
+    h = std::hive<int>(std::hive_limits(3, 3));
+    h.splice({1,2,3,4,5});  // throws length_error
+</xmp>
+
+The capacity limits of a hive are not part of its "value," yet they still
+affect its behavior in critical ways. Worse, the capacity limits are
+"sticky" in a way that reminds me of `std::pmr` allocators: *most* modifying
+operations don't affect a hive's limits (resp. a `pmr` container's allocator),
+but *some* operations do.
+
+The distinction between these two overloads of `operator=` is particularly awkward:
+
+<xmp>
+    h = {1,2,3,4,5};           // does NOT affect h's limits
+    h = std::hive{1,2,3,4,5};  // DOES affect h's limits
+</xmp>
+
+
+## `splice` is O(n), and can throw ## {#motivation-splice}
+
+In P0447R20, `h.splice(h2)` is a "sticky" operation: it does not change `h`'s limits.
+This means that if `h2` contains any active blocks larger than `h.block_capacity_limits().max`,
+then `h.splice(h2)` will fail and throw `length_error`! This is a problem on three levels:
+
+- It's a specification speedbump: Should we say something about the state of `h2`
+    after the throw? for example, should we guarantee that any too-large blocks not
+    transferred out of `h2` will remain in `h2`, kind of like what happens in
+    `std::set::merge`? Or should we leave it unspecified?
+
+- It's a correctness pitfall: `splice` "should" just twiddle a few pointers. The idea
+    that it might actually *fail* is not likely to occur to the working programmer.
+
+- It's a performance pessimization: Again, `splice` "should" just twiddle a few pointers.
+    But P0447R20's specification requires us to traverse `h2` looking for too-large
+    active blocks. This adds an O(n) step that doesn't "need" to be there.
+
+Now, we've already mentioned [[#motivation-complexity|above]] that in fact `splice`
+must still traverse `h2` to update its active blocks' serial numbers; so removing
+this one linear-time operation won't improve the big-O of the operation. But
+the embedded programmer's mantra still applies: "No-work is faster than some-work."
+Eliminating the comparison, conditional branch, and throwing machinery from `splice`
+is still a major win.
+
+If my proposal is adopted, `hive::splice` will be "Throws: Nothing," just
+like `list::splice`.
+
+Note: I would expect that both `hive::splice` and `list::splice` *ought* to throw `length_error`
+if the resulting container would exceed `max_size()` in size; but I guess that's
+intended to be impossible in practice.
+
+
+## `hive_limits` causes constructor overload set bloat ## {#motivation-bloat}
+
+Every STL container's constructor overload set is "twice as big as necessary"
+because of the duplication between `container(Args...)` and `container(Args..., Alloc)`.
+Hive's constructor overload set is "four times as big as necessary" because
+of the duplication between `container(Args...)` and `container(Args..., hive_limits)`.
+
+P0447R20 `hive` has 18 constructor overloads. My proposal removes 7 of them.
+(Of course, we could always eliminate these same 7 constructor overloads
+without doing anything else to P0447R20. If this were the *only* complaint,
+my proposal would be undermotivated.)
+
+Analogously: Today there is no constructor overload for `vector` that sets the capacity in one step;
+it's a multi-step process. Even for P0447R20 `hive`, there's no constructor overload
+that sets the overall capacity in one step — even though overall capacity is certainly
+more important to the average programmer than min and max block capacities!
+
+<xmp>
+    // Today's multi-step process for vector
+    std::vector<int> v;
+    v.reserve(12);
+    v.assign({1,2,3,4,5,6});  // [1 2 3 4 5 6 _ _ _ _ _ _]
+
+    // Today's multi-step process for hive
+    std::hive<int> h;
+    h.reshape(std::hive_limits(3, 5));
+    h.reserve(12);            // [_ _ _ _ _] [_ _ _ _ _] [_ _ _]
+    h.assign({1,2,3,4,5,6});  // [1 2 3 4 5] [6 _ _ _ _] [_ _ _]
+
+    // Today's (insufficient) single-step process for hive
+    // fails to provide a setting for overall capacity
+    std::hive<int> h({1,2,3,4,5,6}, {3,5});
+                              // [1 2 3 4 5] [6 _ _]
+</xmp>
+
+If my proposal is adopted, the analogous multi-step process will be:
+
+<xmp>
+    std::hive<int> h;
+    h.reshape(12, 12);      // [_ _ _ _ _ _ _ _ _ _ _ _]
+    h.assign({1,2,3,4,5,6}; // [1 2 3 4 5 6 _ _ _ _ _ _]
+</xmp>
+
+
+# Proposed wording relative to P0447R20 # {#wording}
+
+The wording in this section is relative to [[plflib|D0447R20 as it stands today]].
+
+<div class="note">
+In addition to these core changes, I claim that every reference in P0447 to
+"reserved blocks" should be changed to "unused blocks" for clarity. And then the
+vast majority of those references can simply be deleted, because my proposal largely
+eliminates the normative distinction between "active" and "unused" blocks.
+For example, P0447R20's specification for `erase` currently says
+
+<blockquote>
+If the active block which position is located within becomes empty of non-erased elements as a result of the function call,
+that active block is either deallocated or transformed into a reserved block.
+</blockquote>
+
+After my proposal, that sentence can be removed, because it doesn't carry any normative weight
+anymore: sure, the container will still behave exactly that way, but we no longer need to
+normatively *specify* that the empty block is non-active, because we no longer need to
+normatively prevent it from interfering with a `splice`. (After this patch, `splice` can
+never fail to transfer a block for any reason, so it doesn't need to go out of its way to
+avoid transferring unused blocks, so we don't need to normatively describe the tracking of
+unused blocks anymore. The separate unused-block list remains the intended implementation
+technique, for performance reasons; but it will no longer be directly observable by the programmer.)
+</div>
+
+## [hive.overview] ## {#wording-hive-overview}
+
+1. A hive is a sequence container that allows constant-time insert and erase operations.
+    Insertion position is not specified, but will in most implementations typically be the back
+    of the container when no erasures have occurred, or when erasures have occurred it will reuse
+    existing erased element memory locations. Storage management is handled automatically and is
+    specifically organized in multiple blocks of sequential elements.
+
+2. Erasures use unspecified techniques to mark erased elements as skippable, as opposed to
+    relocating subsequent elements during erasure as is expected in a vector or deque. These
+    elements are subsequently skipped during iteration. If a memory block becomes empty of
+    unskipped elements as the result of an erasure, that memory block is removed from the
+    iterative sequence. The same, or different unspecified techniques may be used to record
+    the locations of erased elements, such that those locations may be reused later during
+    insertions.
+
+3. Operations pertaining to the updating of any data associated with the erased-element
+    skipping mechanism or erased-element location-recording mechanism are not factored into
+    individual function time complexity. The time complexity of these unspecified techniques
+    is implementation-defined and may be constant, linear or otherwise defined.
+
+4. Memory block element capacities have an unspecified growth factor greater than 1,
+    for example a new block's capacity could be equal to the summed capacities of the existing blocks.
+
+5. <del>Limits can be placed on the minimum and maximum element capacities of memory blocks,
+    both by a user and by an implementation. In neither case shall minimum capacity be greater
+    than maximum capacity. When limits are not specified by a user, the implementation's default
+    limits are used. The default limits of an implementation are not guaranteed to be the same
+    as the minimum and maximum possible values for an implementation's limits. The latter are
+    defined as hard limits. If user-specified limits are supplied to a function which are not
+    within an implementation's hard limits, or if the user-specified minimum is larger than
+    the user-specified maximum capacity, behaviour is undefined.</del>
+
+6. Memory blocks can be removed from the iterative sequence [Example: by `erase` or `clear` —end example]
+    without being deallocated. Other memory blocks can be allocated without becoming part of the iterative
+    sequence [Example: by `reserve` —end example]. These are both referred to as <i>reserved blocks.</i>
+    Blocks which form part of the iterative sequence of the container are referred to as <i>active blocks.</i>
+
+7. A hive conforms to the requirements for Containers, with the exception of operators `==`, `!=`, and `<=>`.
+    A hive also meets the requirements of a reversible container, of an allocator-aware container,
+    and some of the requirements of a sequence container, including several of the optional sequence
+    container requirements. Descriptions are provided here only for operations on `hive` that are
+    not described in that table or for operations where there is additional semantic information.
+
+8. Hive iterators meet the Cpp17BidirectionalIterator requirements but also provide relational
+    operators `<`, `<=`, `>`, `>=`, and `<=>`, which compare the relative ordering of two iterators
+    in the sequence of a hive instance.
+
+<pre>
+namespace std {
+
+<del>struct hive_limits {</del>
+  <del>size_t min;</del>
+  <del>size_t max;</del>
+  <del>constexpr hive_limits(size_t minimum, size_t maximum) noexcept : min(minimum), max(maximum) {}</del>
+<del>};</del>
+
+template&lt;class T, class Allocator = allocator&lt;T>>
+class hive {
+<del>private:</del>
+  <del>hive_limits current-limits = implementation-defined; // exposition only</del>
+public:
+  // types
+  using value_type = T;
+  using allocator_type = Allocator;
+  using pointer = typename allocator_traits&lt;Allocator>::pointer;
+  using const_pointer = typename allocator_traits&lt;Allocator>::const_pointer;
+  using reference = value_type&amp;;
+  using const_reference = const value_type&amp;;
+  using size_type = <i>implementation-defined</i>; // see [container.requirements]
+  using difference_type = <i>implementation-defined</i>; // see [container.requirements]
+  using iterator = <i>implementation-defined</i>; // see [container.requirements]
+  using const_iterator = <i>implementation-defined</i>; // see [container.requirements]
+  using reverse_iterator = std::reverse_iterator&lt;iterator>; // see [container.requirements]
+  using const_reverse_iterator = std::reverse_iterator&lt;const_iterator>; // see [container.requirements]
+
+  constexpr hive() noexcept(noexcept(Allocator())) : hive(Allocator()) { }
+  explicit hive(const Allocator&) noexcept;
+  <del>explicit hive(hive_limits block_limits) noexcept(noexcept(Allocator())) : hive(block_limits, Allocator()) { }</del>
+  <del>hive(hive_limits block_limits, const Allocator&) noexcept;</del>
+  explicit hive(size_type n, const Allocator&amp; = Allocator());
+  <del>explicit hive(size_type n, hive_limits block_limits, const Allocator&amp; = Allocator());</del>
+  hive(size_type n, const T&amp; value, const Allocator&amp; = Allocator());
+  <del>hive(size_type n, const T&amp; value, hive_limits block_limits, const Allocator&amp; = Allocator());</del>
+  template&lt;class InputIterator>
+    hive(InputIterator first, InputIterator last, const Allocator&amp; = Allocator());
+  <del>template&lt;class InputIterator></del>
+    <del>hive(InputIterator first, InputIterator last, hive_limits block_limits, const Allocator&amp; = Allocator());</del>
+  template&lt;<i>container-compatible-range</i>&lt;T> R>
+    hive(from_range_t, R&& rg, const Allocator& = Allocator());
+  <del>template&lt;<i>container-compatible-range</i>&lt;T> R></del>
+    <del>hive(from_range_t, R&amp;&amp; rg, hive_limits block_limits, const Allocator&amp; = Allocator());</del>
+  hive(const hive&);
+  hive(hive&&) noexcept;
+  hive(const hive&, const type_identity_t&lt;Allocator>&);
+  hive(hive&&, const type_identity_t&lt;Allocator>&);
+  hive(initializer_list&lt;T>, const Allocator&amp; = Allocator());
+  <del>hive(initializer_list&lt;T>, hive_limits block_limits, const Allocator&amp; = Allocator());</del>
+  ~hive();
+  hive& operator=(const hive& x);
+  hive& operator=(hive&& x) noexcept(allocator_traits&lt;Allocator>::propagate_on_container_move_assignment::value || allocator_traits&lt;Allocator>::is_always_equal::value);
+  hive& operator=(initializer_list&lt;T>);
+  template&lt;class InputIterator>
+    void assign(InputIterator first, InputIterator last);
+  template&lt;<i>container-compatible-range</i>&lt;T> R>
+    void assign_range(R&& rg);
+
+  void assign(size_type n, const T&amp; t);
+  void assign(initializer_list&lt;T>);
+  allocator_type get_allocator() const noexcept;
+
+  // iterators
+  iterator               begin() noexcept;
+  const_iterator         begin() const noexcept;
+  iterator               end() noexcept;
+  const_iterator         end() const noexcept;
+  reverse_iterator       rbegin() noexcept;
+  const_reverse_iterator rbegin() const noexcept;
+  reverse_iterator       rend() noexcept;
+  const_reverse_iterator rend() const noexcept;
+
+  const_iterator         cbegin() const noexcept;
+  const_iterator         cend() const noexcept;
+  const_reverse_iterator crbegin() const noexcept;
+  const_reverse_iterator crend() const noexcept;
+
+  // capacity
+  [[nodiscard]] bool empty() const noexcept;
+  size_type size() const noexcept;
+  size_type max_size() const noexcept;
+  <ins>size_type max_block_size() const noexcept;</ins>
+  size_type capacity() const noexcept;
+  void reserve(size_type n);
+  <ins>bool reshape(size_t min, size_t n = 0);</ins>
+  void shrink_to_fit();
+  <del>void trim_capacity() noexcept;</del>
+  <del>void trim_capacity(size_type n) noexcept;</del>
+  <ins>void trim_capacity(size_type n = 0) noexcept;</ins>
+
+  // modifiers
+  template&lt;class... Args> iterator emplace(Args&&... args);
+  iterator insert(const T& x);
+  iterator insert(T&& x);
+  void insert(size_type n, const T& x);
+  template&lt;class InputIterator>
+    void insert(InputIterator first, InputIterator last);
+  template&lt;<i>container-compatible-range</i>&lt;T> R>
+    void insert_range(R&& rg);
+  void insert(initializer_list&lt;T>);
+  iterator erase(const_iterator position);
+  iterator erase(const_iterator first, const_iterator last);
+  void swap(hive&) noexcept(allocator_traits&lt;Allocator>::propagate_on_container_swap::value || allocator_traits&lt;Allocator>::is_always_equal::value);
+  void clear() noexcept;
+
+  // hive operations
+  void splice(hive& x);
+  void splice(hive&& x);
+  size_type unique();
+  template&lt;class BinaryPredicate>
+    size_type unique(BinaryPredicate binary_pred);
+
+  <del>hive_limits block_capacity_limits() const noexcept;</del>
+  <del>static constexpr hive_limits block_capacity_hard_limits() noexcept;</del>
+  <del>void reshape(hive_limits block_limits);</del>
+
+  iterator get_iterator(const_pointer p) noexcept;
+  const_iterator get_iterator(const_pointer p) const noexcept;
+  bool is_active(const_iterator it) const noexcept;
+
+  void sort();
+  template&lt;class Compare> void sort(Compare comp);
+}
+
+template&lt;class InputIterator, class Allocator = allocator&lt;<i>iter-value-type</i>&lt;InputIterator>>
+  hive(InputIterator, InputIterator, Allocator = Allocator())
+    -> hive&lt;<i>iter-value-type</i>&lt;InputIterator>, Allocator>;
+
+<del>template&lt;class InputIterator, class Allocator = allocator&lt;<i>iter-value-type</i>&lt;InputIterator>></del>
+  <del>hive(InputIterator, InputIterator, hive_limits block_limits, Allocator = Allocator())</del>
+    <del>-> hive&lt;<i>iter-value-type</i>&lt;InputIterator>, block_limits, Allocator>;</del>
+
+template&lt;ranges::input_range R, class Allocator = allocator&lt;ranges::range_value_t&lt;R>>>
+  hive(from_range_t, R&&, Allocator = Allocator())
+    -> hive&lt;ranges::range_value_t&lt;R>, Allocator>;
+
+<del>template&lt;ranges::input_range R, class Allocator = allocator&lt;ranges::range_value_t&lt;R>>></del>
+  <del>hive(from_range_t, R&&, hive_limits block_limits, Allocator = Allocator())</del>
+    <del>-> hive&lt;ranges::range_value_t&lt;R>, block_limits, Allocator>;</del>
+}
+</pre>
+
+An incomplete type `T` may be used when instantiating `hive` if the allocator meets the allocator completeness requirements
+([allocator.requirements.completeness]). `T` shall be complete before any member of the resulting specialization of `hive` is referenced.
+
+## [hive.cons] ## {#wording-hive-cons}
+
+<pre>
+  explicit hive(const Allocator&) noexcept;
+</pre>
+
+<i>Effects:</i> Constructs an empty hive, using the specified allocator.
+
+<i>Complexity:</i> Constant.
+
+<pre>
+  <del>hive(hive_limits block_limits, const Allocator&) noexcept;</del>
+</pre>
+<del><i>Effects:</i> Constructs an empty hive, with the specified Allocator. Initializes <i>`current-limits`</i> with `block_limits`.</del>
+
+<p><del><i>Complexity:</i> Constant.</del>
+
+<pre>
+  explicit hive(size_type n, const Allocator& = Allocator());
+  <del>hive(size_type n, hive_limits block_limits, const Allocator& = Allocator());</del>
+</pre>
+
+<i>Preconditions:</i> `T` is *Cpp17DefaultInsertable* into `hive`.
+
+<i>Effects:</i> Constructs a hive with `n` default-inserted elements, using the specified allocator. <del>If the second overload is called,
+also initializes <i>`current-limits`</i> with `block_limits`.</del>
+
+<i>Complexity:</i> Linear in `n`. <del>Creates at most `(n / current-limits.max) + 1` element block allocations.</del>
+
+<pre>
+  hive(size_type n, const T& value, const Allocator& = Allocator());
+  <del>hive(size_type n, const T& value, hive_limits block_limits, const Allocator& = Allocator());</del>
+</pre>
+
+<i>Preconditions:</i> `T` is *Cpp17CopyInsertable* into `hive`.
+
+<i>Effects:</i> Constructs a hive with `n` copies of value, using the specified allocator. <del>If the second overload is called,
+also initializes <i>`current-limits`</i> with `block_limits`.</del>
+
+<i>Complexity:</i> Linear in `n`. <del>Creates at most `(n / current-limits.max) + 1` element block allocations.</del>
+
+<pre>
+template&lt;<i>container-compatible-range</i>&lt;T> R>
+  hive(from_range_t, R&& rg, const Allocator& = Allocator());
+<del>template&lt;<i>container-compatible-range</i>&lt;T> R></del>
+  <del>hive(from_range_t, R&& rg, hive_limits block_limits, const Allocator& = Allocator());</del>
+</pre>
+
+<i>Preconditions:</i> `T` is *Cpp17EmplaceConstructible* into `hive` from `*ranges::begin(rg)`.
+
+<i>Effects:</i> Constructs a hive object with the elements of the range `rg`. <del>If the second overload is called,
+also initializes <i>`current-limits`</i> with `block_limits`.</del>
+
+<i>Complexity:</i> Linear in `ranges::distance(rg)`. <del>Creates at most `(ranges::distance(rg) / current-limits.max) + 1` element block allocations.</del>
+
+<pre>
+hive(initializer_list&lt;T> il, const Allocator& = Allocator());
+<del>hive(initializer_list&lt;T> il, hive_limits block_limits, const Allocator& = Allocator());</del>
+</pre>
+
+<i>Preconditions:</i> `T` is *Cpp17CopyInsertable* into `hive`.
+
+<i>Effects:</i> Constructs a hive object with the elements of `il`. <del>If the second overload is called,
+also initializes <i>`current-limits`</i> with `block_limits`.</del>
+
+<i>Complexity</i>: Linear in `il.size()`. <del>Creates at most `(il.size() / current-limits.max) + 1` element block allocations.</del>
+
+## [hive.capacity] ## {#wording-hive-capacity}
+
+### max_block_size ### {#max_block_size}
+
+<pre>
+<ins>size_type max_block_size() const noexcept;</ins>
+</pre>
+
+<ins><i>Returns:</i> The largest possible capacity of a single memory block.</ins>
+
+<p><ins><i>Complexity:</i> Constant.</ins>
+
+### capacity ### {#capacity}
+
+<pre>
+size_type capacity() const noexcept;
+</pre>
+
+<i>Returns:</i> The total number of elements that the hive can hold without requiring allocation of more <del>element memory</del> blocks.
+
+<i>Complexity:</i> Constant time.
+
+### reserve ### {#reserve}
+
+<pre>
+void reserve(size_type n);
+</pre>
+
+<i>Effects:</i> A directive that informs a hive of a planned change in size, so that it can manage the storage allocation accordingly. <del>Does
+not cause reallocation of elements. Iterators</del> <ins>Invalidates the past-the-end iterator. Iterators and
+references</ins> to elements in `*this` remain valid. If `n <= capacity()` there are no effects.
+
+<p><del><i>Complexity:</i> It does not change the size of the sequence and creates at most `(n / block_capacity_limits().max) + 1` element block allocations.</del>
+
+<i>Throws:</i> `length_error` if `n > max_size()`. <ins>Any exception thrown from `allocate`.</ins>
+
+<i>Postconditions:</i> `capacity() >= n` is `true`.
+
+### shrink_to_fit ### {#shrink_to_fit}
+
+<pre>
+void shrink_to_fit();
+</pre>
+
+<i>Preconditions:</i> `T` is *Cpp17MoveInsertable* into `hive`.
+
+<i>Effects:</i> `shrink_to_fit` is a non-binding request to reduce `capacity()` to be closer to `size()`.
+[<i>Note:</i> The request is non-binding to allow latitude for implementation-specific optimizations. <i>—end note</i>]
+It does not increase `capacity()`, but may reduce `capacity()`. <del>It may reallocate elements.</del> <ins>Invalidates
+all references, pointers, and iterators referring to the elements in the sequence, as well as the past-the-end
+iterator. [<i>Note:</i> This operation may change the iterative order of the elements in `*this`. <i>—end note</i>]</ins>
+
+<i>Complexity:</i> <del>If reallocation happens, linear in the size of the sequence.</del> <ins>Linear in `size()`.</ins>
+
+<del><i>Remarks:</i> Reallocation invalidates all the references, pointers, and iterators referring to the elements in the sequence,
+as well as the past-the-end iterator.
+[<i>Note:</i> If no reallocation happens, they remain valid. <i>—end note</i>]
+[<i>Note:</i> This operation may change the iterative order of the elements in *this. <i>—end note</i>]</del>
+
+### trim_capacity ### {#trim_capacity}
+
+<pre>
+<del>void trim_capacity() noexcept;</del>
+<del>void trim_capacity(size_type n) noexcept;</del>
+<ins>void trim_capacity(size_type n = 0) noexcept;</ins>
+</pre>
+
+<i>Effects:</i> <del>Removes and deallocates reserved blocks created by prior calls to `reserve`, `clear`, or `erase`.
+If such blocks are present, for the first overload `capacity()` is reduced. For the second overload `capacity()`
+will be reduced to no less than `n`.</del> <ins>`trim_capacity` is a non-binding request to reduce `capacity()` to be
+closer to `n`. It does not increase `capacity()`; it may reduce `capacity()`, but not below `n`.</ins>
+
+<i>Complexity:</i> Linear in the number of reserved blocks <del>deallocated</del>.
+
+<p><ins><i>Postconditions:</i> `capacity() >= n` is `true`.</ins>
+
+<i>Remarks:</i> <del>Does not reallocate elements and no</del> <ins>No</ins> iterators or references to elements in `*this` are invalidated.
+
+## [hive.operations] ## {#wording-hive-operations}
+
+In this subclause, arguments for a template parameter named `Predicate` or `BinaryPredicate` shall meet the
+corresponding requirements in [algorithms.requirements]. The semantics of `i + n` and `i - n`, where `i`
+is an iterator into the list and `n` is an integer, are the same as those of `next(i, n)` and `prev(i, n)`,
+respectively. For `sort`, the definitions and requirements in [alg.sorting] apply.
+
+<del>`hive` provides a splice operation that destructively moves all elements from one hive to another.
+The behavior of splice operations is undefined if `get_allocator() != x.get_allocator()`.</del>
+
+### splice ### {#splice}
+
+<pre>
+void splice(hive& x);
+void splice(hive&& x);
+</pre>
+
+<i>Preconditions:</i> `addressof(x) != this` is `true`.
+
+<i>Effects:</i> Inserts the contents of `x` into `*this` and `x` becomes empty. Pointers and references to the moved elements of `x`
+now refer to those same elements but as members of `*this`. Iterators referring to the moved elements <del>shall</del> continue
+to refer to their elements, but they now behave as iterators into `*this`, not into `x`.
+
+<i>Complexity:</i> <del>At worst, linear in the number of active blocks in `x` + the number of active blocks in `*this`.</del> <ins>Linear in the number of active blocks in the resulting hive.</ins>
+
+<i>Throws:</i> <del>`length_error` if any of `x`'s element memory block capacities are outside of the current minimum and maximum element memory block capacity limits of `*this`.</del> <ins>Nothing.</ins>
+
+<i>Remarks:</i> The behavior <del>of splice operations</del> is undefined if `get_allocator() != x.get_allocator()`. <del>Reserved blocks in `x` are not transferred into `*this`.</del>
+
+### block_capacity_limits ### {#block_capacity_limits}
+
+<pre>
+<del>hive_limits block_capacity_limits() const noexcept;</del>
+</pre>
+
+<del><i>Effects:</i> Returns <i>`current-limits`</i>.</del>
+
+<p><del><i>Complexity:</i> Constant.</del>
+
+### block_capacity_hard_limits ### {#block_capacity_hard_limits}
+
+<pre>
+<del>static constexpr hive_limits block_capacity_hard_limits();</del>
+</pre>
+
+<del><i>Returns:</i> A `hive_limits` struct with the `min` and `max` members set to the implementation's hard limits.</del>
+
+<p><del><i>Complexity:</i> Constant.</del>
+
+### reshape ### {#reshape}
+
+<pre>
+<del>void reshape(hive_limits block_limits);</del>
+<ins>bool reshape(size_t min, size_t n = 0);</ins>
+</pre>
+
+<i>Preconditions:</i> `T` shall be *Cpp17MoveInsertable* into `hive`.
+
+<i>Effects:</i> <del>Sets minimum and maximum element memory block capacities to the `min` and `max` members of the supplied `hive_limits` struct.
+If the hive is not empty, adjusts existing memory block capacities to conform to the new minimum and maximum block capacities, where necessary.
+If existing memory block capacities are within the supplied minimum/maximum range, no reallocation of elements takes place.
+If they are not within the supplied range, elements are reallocated to new or existing memory blocks which fit within the supplied range,
+and the old memory blocks are deallocated. If elements are reallocated, all iterators and references to reallocated elements are invalidated.</del> <ins>Reallocates
+storage by allocating new blocks and/or transferring elements among existing blocks so that the capacity of each memory block
+that remains allocated is greater than or equal to `min`, and `capacity()` is greater than or equal to `n`.
+If reallocation takes place, all iterators, pointers, and references to elements of the container, including the past-the-end iterator, are invalidated.
+Reallocation may change the iteration order of the elements of `*this`.</ins>
+
+<ins><i>Returns:</i> `true` if reallocation took place; otherwise `false`.</ins>
+
+<i>Complexity:</i> <del>At worst linear in the number of active and reserved blocks in `*this`. If reallocation occurs, also linear in
+the number of elements reallocated.</del> <ins>Linear in `size()`.</ins>
+
+<i>Throws:</i> <ins>`length_error` if `min > max_block_size() || n > max_size()`. Any exception thrown from `allocate` or from the initialization
+of `T`.</ins> <del>If reallocation occurs, uses `Allocator::allocate()` which may throw an appropriate exception. [<i>Note:</i> This operation
+may change the iterative order of the elements in `*this`. <i>—end note</i>]</del>
+
+
+# Acknowledgements # {#acknowledgements}
+
+Thanks to Matthew Bentley for proposing `std::hive`.
+
+<pre class=biblio>
+{
+  "plflib": {
+    "authors": [
+      "Matthew Bentley"
+    ],
+    "title": "Introduction of std::hive to the standard library",
+    "href": "https://plflib.org/D0447R20_-_Introduction_of_hive_to_the_Standard_Library.html",
+    "date": "May 2022"
+  }
+}
+</pre>
