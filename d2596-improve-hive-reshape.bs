@@ -2,7 +2,7 @@
 Title: Improve std::hive::reshape
 Shortname: D2596
 Revision: 0
-!Draft Revision: 1
+!Draft Revision: 2
 Audience: LEWG, LWG
 Status: D
 Group: WG21
@@ -28,7 +28,7 @@ Abstract:
   a max block size, so "secret quadratic behavior" is less common. This model
   does not require the container to track anything; the new `reshape` is
   a simple mutating operation analogous to `reserve` or `sort`.
-Date: 2022-05-26
+Date: 2022-05-28
 </pre>
 
 <style>
@@ -85,8 +85,8 @@ Erasing from a vector shifts the later elements down. Erasing from a list or hiv
 
 Reserving in a vector may invalidate iterators, because there's no way to strictly "add" capacity.
 Reserving in a hive never invalidates iterators (except for `end()`), because we can just add new
-blocks right onto the back of the container. (In fact the container tracks unused blocks via a
-separate list, so iteration doesn't have to traverse them; this diagrammatic representation
+blocks right onto the back of the container. (In practice, `hive` tracks unused blocks in a
+separate list so that iteration doesn't have to traverse them; this diagrammatic representation
 doesn't capture that detail.)
 
 <xmp>
@@ -183,8 +183,7 @@ is too much to allocate at once. Don't make it the container's problem.
 
 ## Max block size causes O(n) behavior ## {#motivation-complexity}
 
-Many of `hive`'s operations are linear in the number of active blocks.
-Consider this program:
+Consider this program parameterized on `N`:
 
 <xmp>
     std::hive<int> h(std::hive_limits(3, 3));
@@ -198,7 +197,7 @@ This loop takes O(`N`<sup>2</sup>) time to run! The reason is that `hive`'s
 active blocks are stored in a linked list, but also *numbered* in sequential
 order starting from 1; those "serial numbers" are required by `hive::iterator`'s
 `operator<`. (Aside: I don't think `operator<` should exist either, but
-my understanding is that it's already been litigated.)
+my understanding is that that's already been litigated.)
 
 Every time you `erase` the last element from a block (in other words,
 every time you change `[_ _ 1]` into `[_ _ _]`), you need to move the
@@ -360,9 +359,87 @@ If my proposal is adopted, the analogous multi-step process will be:
 </xmp>
 
 
+## `hive_limits` introduces unnecessary UB ## {#motivation-ub}
+
+[[D0447R20]] currently says ([hive.overview]/5):
+
+<blockquote>
+If user-specified limits are supplied to a function which are not within an implementation's <i>hard limits</i>,
+or if the user-specified minimum is larger than the user-specified maximum capacity, the behaviour is undefined.
+</blockquote>
+
+This means that the following program's behavior is undefined:
+
+<xmp>
+    std::hive<int> h;
+    h.reshape({0, SIZE_MAX}); // UB! Throws.
+</xmp>
+
+In Matt Bentley's reference implementation, this program will throw `std::length_error`.
+The correct way to express "I don't care about the limits anymore" is:
+
+<xmp>
+    std::hive<int> h;
+    h.reshape(h.block_capacity_hard_limits());  // OK
+</xmp>
+
+Worse, the following program's behavior is undefined on the reference implementation ([Godbolt](https://godbolt.org/z/naT7GqEMo)).
+Its definedness hinges on whether the user-provided maximum `1000` is greater than the implementation's hard limit
+`hive<char>::block_capacity_hard_limits().max`. On the reference implementation, `hive<char>::block_capacity_hard_limits().max`
+is `255`, so the following program has undefined behavior.
+
+<xmp>
+    std::hive<char> h;
+    h.reshape({10, 1000}); // UB! Throws.
+</xmp>
+
+There are two problems here. The first is trivial to solve: P0447R20 adds to the set of unnecessary library UB.
+We could fix that by simply saying that the implementation must *clamp the provided limits* to the hard limits; this will
+make `h.reshape({0, SIZE_MAX})` well-defined, and make `h.reshape({10, 1000})` UB only in the unlikely case that
+the implementation doesn't support _any_ block sizes in the range [10, 1000].
+
+The second problem is bigger: The presence of `hive_limits` vastly increases the "specification surface area" of `hive`'s API.
+Many hive operations need to think about `hive_limits`:
+
+- Every constructor needs to specify (or UB) what happens when the supplied `hive_limits` are invalid.
+
+- `reshape` needs to specify (or UB) what happens when the supplied `hive_limits` are invalid.
+
+- `reshape` needs to think about how to restore the hive's invariants if an exception is thrown. (See below.)
+
+- `splice` needs to specify what happens when the two hives' <i>`current-limits`</i> are incompatible.
+
+- The special members — `hive(const hive&)`, `hive(hive&&)`, `operator=(const hive&)`, `operator=(hive&&)`, `swap` — need to specify
+    their effect on each operand's <i>`current-limits`</i>. For example, is `operator=(const hive&)` permitted to preserve its
+    left-hand side's <i>`current-limits`</i>, in the same way that `vector::operator=(const vector&)` is permitted to preserve
+    the left-hand side's capacity? The Standard needs to specify this.
+
+All this extra specification effort is costly, for LWG and for vendors. Notice that my proposal's "Proposed Wording"
+is mostly deletions.
+
+When I say "`reshape` needs to think about how to restore the hive's invariants," I'm talking about this example:
+
+<xmp>
+    std::hive<W> h({1,2,3,4,5}, {4,4}); // [1 2 3 4] [5 _ _ _]
+    h.reshape({5,5});  // suppose W(W&&) can throw
+</xmp>
+
+Suppose `W`'s move constructor is throwing (and for the sake of simplicity, assume `W` is move-only, although
+the same problem exists for copyable types too). The hive needs to get from `[1 2 3 4] [5 _ _ _]` to `[1 2 3 4 5]`.
+We can start by allocating a block `[_ _ _ _ _]` and then moving the first element over: `[1 2 3 4] [5 _ _ _ _]`.
+Then we move over the next element, intending to get to `[1 2 3 _] [5 4 _ _ _]`; but that move construction might
+throw. If it does, then we have no good options. If we do as `vector` does, and simply deallocate the new buffer,
+then we'll lose data (namely element `5`). If we keep the new buffer, then we must update the hive's <i>`current-limits`</i>
+because a hive with limits `{4,4}` cannot hold a block of capacity 5. But a hive with the new user-provided limits `{5,5}`
+cannot hold a block of capacity 4! So we must either lose data, or replace `h`'s <i>`current-limits`</i> with
+something "consistent but novel" such as `{4,5}` or `h.block_capacity_hard_limits()`. In short: May a failed operation leave
+the hive with an "out-of-thin-air" <i>`current-limits`</i>? Implementors must grapple with this kind of question
+in many places.
+
+
 # Proposed wording relative to P0447R20 # {#wording}
 
-The wording in this section is relative to [[plflib|D0447R20 as it stands today]].
+The wording in this section is relative to [[D0447R20]] as it stands today.
 
 <div class="note">
 In addition to these core changes, I claim that every reference in P0447 to
@@ -372,7 +449,7 @@ eliminates the normative distinction between "active" and "unused" blocks.
 For example, P0447R20's specification for `erase` currently says
 
 <blockquote>
-If the active block which position is located within becomes empty of non-erased elements as a result of the function call,
+If the active block which `position` is located within becomes empty [...] as a result of the function call,
 that active block is either deallocated or transformed into a reserved block.
 </blockquote>
 
@@ -809,7 +886,7 @@ Thanks to Matthew Bentley for proposing `std::hive`.
 
 <pre class=biblio>
 {
-  "plflib": {
+  "D0447R20": {
     "authors": [
       "Matthew Bentley"
     ],
