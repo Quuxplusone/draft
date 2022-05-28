@@ -2,7 +2,7 @@
 Title: Improve std::hive::reshape
 Shortname: D2596
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: LEWG, LWG
 Status: D
 Group: WG21
@@ -181,7 +181,15 @@ conks out. In my opinion, `hive` should behave the same way. Let the *allocator*
 is too much to allocate at once. Don't make it the container's problem.
 
 
-## Max block size causes O(n) behavior ## {#motivation-complexity}
+## Max block size causes O(n) behavior ## {#motivation-bigo}
+
+### Example 1 ### {#motivation-bigo-1}
+
+Note:
+The quadratic behavior shown below was <i>previously</i> present in Matt Bentley's reference implementation
+(as late as [git commit 9486262](https://github.com/mattreecebentley/plf_hive/blob/94862621b2466735989c88dec5b7b23a6e04e757/plf_hive.h)),
+but was fixed in [git commit 7ac1f03](https://github.com/mattreecebentley/plf_hive/commit/7ac1f03abd9aebfae242ba7fe3c22ab1115550e9)
+by renumbering the blocks less often.
 
 Consider this program parameterized on `N`:
 
@@ -214,6 +222,36 @@ at worst linear in the number of subsequent blocks in the iterative sequence.
 Since this program sets the max block capacity to 3, it will hit the linear-time
 case once for every three erasures. Result: quadratic running time.
 
+### Example 2 ### {#motivation-bigo-2}
+
+Note:
+The quadratic behavior shown below is <i>currently</i> present in Matt Bentley's reference implementation,
+as of [git commit ef9bad9](https://github.com/mattreecebentley/plf_hive/blob/ef9bad9c83919c9728a7ce99b98992ce60af0438/plf_hive.h).
+
+Consider this program parameterized on `N`:
+
+<xmp>
+    plf::hive<int> h;
+    h.reshape({4, 4});
+    for (int i=0; i < N; ++i) {
+        h.insert(1);
+        h.insert(2);
+    }
+    erase(h, 1); // [_ 2 _ 2] [_ 2 _ 2] [_ 2 _ 2] [...
+    while (!h.empty()) {
+        h.erase(h.begin());
+    }
+</xmp>
+
+The final loop takes O(`N`<sup>2</sup>) time to run! The reason is that in the
+reference implementation, `hive`'s list of blocks-with-erasures is singly linked.
+Every time you `erase` the last element from a block (in other words,
+every time you change `[_ _ _ 2]` into `[_ _ _ _]`), you need to unlink the
+newly empty block from the list of blocks with erasures; and thanks to how we
+set up this snippet, the current block will always happen to be at the end of
+that list! So each `erase` takes O(`h.size()`) time, and the overall program
+takes O(`N`<sup>2</sup>) time.
+
 Such "secret quadratic behavior" is caused *primarily* by how `hive` permits
 the programmer to set a max block size. If we get rid of the max block size,
 then the implementation is free to allocate larger blocks, and so we'll hit
@@ -221,9 +259,9 @@ the linear-time cases geometrically less often — we'll get amortized O(`N`)
 instead of O(`N`<sup>2</sup>).
 
 <div class="note">
-It's still possible to simulate a rope of fixed-size blocks using my
-proposed `hive`, but the programmer has to go pretty far out of their way.
-There's no footgun analogous to `std::hive<int>({1,2,3}, {3,3})`.
+Using my proposed `hive`, it will still be possible to simulate a rope of fixed-size blocks;
+but the programmer will have to go pretty far out of their way.
+There will be no footgun analogous to `std::hive<int>({1,2,3}, {3,3})`.
 
 <xmp>
     auto make_block = []() {
@@ -268,7 +306,7 @@ we assign into it from another sequence in various ways.
     h.splice({1,2,3,4,5});  // throws length_error
 </xmp>
 
-The capacity limits of a hive are not part of its "value," yet they still
+The <i>`current-limits`</i> of a hive are not part of its "value," yet they still
 affect its behavior in critical ways. Worse, the capacity limits are
 "sticky" in a way that reminds me of `std::pmr` allocators: *most* modifying
 operations don't affect a hive's limits (resp. a `pmr` container's allocator),
@@ -299,13 +337,6 @@ then `h.splice(h2)` will fail and throw `length_error`! This is a problem on thr
 - It's a performance pessimization: Again, `splice` "should" just twiddle a few pointers.
     But P0447R20's specification requires us to traverse `h2` looking for too-large
     active blocks. This adds an O(n) step that doesn't "need" to be there.
-
-Now, we've already mentioned [[#motivation-complexity|above]] that in fact `splice`
-must still traverse `h2` to update its active blocks' serial numbers; so removing
-this one linear-time operation won't improve the big-O of the operation. But
-the embedded programmer's mantra still applies: "No-work is faster than some-work."
-Eliminating the comparison, conditional branch, and throwing machinery from `splice`
-is still a major win.
 
 If my proposal is adopted, `hive::splice` will be "Throws: Nothing," just
 like `list::splice`.
@@ -368,25 +399,18 @@ If user-specified limits are supplied to a function which are not within an impl
 or if the user-specified minimum is larger than the user-specified maximum capacity, the behaviour is undefined.
 </blockquote>
 
-This means that the following program's behavior is undefined:
+In Matt Bentley's reference implementation, this program will manifest its UB by throwing `std::length_error`.
+
+The following program's behavior is always undefined:
 
 <xmp>
     std::hive<int> h;
     h.reshape({0, SIZE_MAX}); // UB! Throws.
 </xmp>
 
-In Matt Bentley's reference implementation, this program will throw `std::length_error`.
-The correct way to express "I don't care about the limits anymore" is:
-
-<xmp>
-    std::hive<int> h;
-    h.reshape(h.block_capacity_hard_limits());  // OK
-</xmp>
-
-Worse, the following program's behavior is undefined on the reference implementation ([Godbolt](https://godbolt.org/z/naT7GqEMo)).
-Its definedness hinges on whether the user-provided maximum `1000` is greater than the implementation's hard limit
-`hive<char>::block_capacity_hard_limits().max`. On the reference implementation, `hive<char>::block_capacity_hard_limits().max`
-is `255`, so the following program has undefined behavior.
+Worse, the following program's definedness hinges on whether the user-provided max `1000` is greater than the implementation-defined
+`hive<char>::block_capacity_hard_limits().max`. The reference implementation's `hive<char>::block_capacity_hard_limits().max`
+is `255`, so this program has undefined behavior ([Godbolt](https://godbolt.org/z/naT7GqEMo)):
 
 <xmp>
     std::hive<char> h;
@@ -396,16 +420,15 @@ is `255`, so the following program has undefined behavior.
 There are two problems here. The first is trivial to solve: P0447R20 adds to the set of unnecessary library UB.
 We could fix that by simply saying that the implementation must *clamp the provided limits* to the hard limits; this will
 make `h.reshape({0, SIZE_MAX})` well-defined, and make `h.reshape({10, 1000})` UB only in the unlikely case that
-the implementation doesn't support _any_ block sizes in the range [10, 1000].
+the implementation doesn't support _any_ block sizes in the range [10, 1000]. We could even mandate that the implementation
+_must_ throw `length_error`, instead of having UB.
 
 The second problem is bigger: The presence of `hive_limits` vastly increases the "specification surface area" of `hive`'s API.
-Many hive operations need to think about `hive_limits`:
+Many hive operations interact with `hive_limits`:
 
 - Every constructor needs to specify (or UB) what happens when the supplied `hive_limits` are invalid.
 
 - `reshape` needs to specify (or UB) what happens when the supplied `hive_limits` are invalid.
-
-- `reshape` needs to think about how to restore the hive's invariants if an exception is thrown. (See below.)
 
 - `splice` needs to specify what happens when the two hives' <i>`current-limits`</i> are incompatible.
 
@@ -413,6 +436,8 @@ Many hive operations need to think about `hive_limits`:
     their effect on each operand's <i>`current-limits`</i>. For example, is `operator=(const hive&)` permitted to preserve its
     left-hand side's <i>`current-limits`</i>, in the same way that `vector::operator=(const vector&)` is permitted to preserve
     the left-hand side's capacity? The Standard needs to specify this.
+
+- `reshape` needs to think about how to restore the hive's invariants if an exception is thrown. (See below.)
 
 All this extra specification effort is costly, for LWG and for vendors. Notice that my proposal's "Proposed Wording"
 is mostly deletions.

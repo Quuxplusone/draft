@@ -2127,7 +2127,12 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <a href="#motivation"><span class="secno">3</span> <span class="content">Criticisms of P0447R20’s model</span></a>
      <ol class="toc">
       <li><a href="#motivation-useless"><span class="secno">3.1</span> <span class="content">Max block size is not useful in practice</span></a>
-      <li><a href="#motivation-complexity"><span class="secno">3.2</span> <span class="content">Max block size causes O(n) behavior</span></a>
+      <li>
+       <a href="#motivation-bigo"><span class="secno">3.2</span> <span class="content">Max block size causes O(n) behavior</span></a>
+       <ol class="toc">
+        <li><a href="#motivation-bigo-1"><span class="secno">3.2.1</span> <span class="content">Example 1</span></a>
+        <li><a href="#motivation-bigo-2"><span class="secno">3.2.2</span> <span class="content">Example 2</span></a>
+       </ol>
       <li><a href="#motivation-pmr-analogy"><span class="secno">3.3</span> <span class="content">Move semantics are arguably unintuitive</span></a>
       <li><a href="#motivation-splice"><span class="secno">3.4</span> <span class="content"><code class="highlight"><c- n>splice</c-></code> is O(n), and can throw</span></a>
       <li><a href="#motivation-bloat"><span class="secno">3.5</span> <span class="content"><code class="highlight"><c- n>hive_limits</c-></code> causes constructor overload set bloat</span></a>
@@ -2284,7 +2289,11 @@ and thus a hive can be used to simulate a traditional "rope" of fixed-capacity b
    <p>No, the real-world <code class="highlight"><c- n>vector</c-></code> sensibly says that it should just keep geometrically resizing until the underlying allocator
 conks out. In my opinion, <code class="highlight"><c- n>hive</c-></code> should behave the same way. Let the <em>allocator</em> decide how many bytes
 is too much to allocate at once. Don’t make it the container’s problem.</p>
-   <h3 class="heading settled" data-level="3.2" id="motivation-complexity"><span class="secno">3.2. </span><span class="content">Max block size causes O(n) behavior</span><a class="self-link" href="#motivation-complexity"></a></h3>
+   <h3 class="heading settled" data-level="3.2" id="motivation-bigo"><span class="secno">3.2. </span><span class="content">Max block size causes O(n) behavior</span><a class="self-link" href="#motivation-bigo"></a></h3>
+   <h4 class="heading settled" data-level="3.2.1" id="motivation-bigo-1"><span class="secno">3.2.1. </span><span class="content">Example 1</span><a class="self-link" href="#motivation-bigo-1"></a></h4>
+   <p class="note" role="note"><span>Note:</span> The quadratic behavior shown below was <i>previously</i> present in Matt Bentley’s reference implementation
+(as late as <a href="https://github.com/mattreecebentley/plf_hive/blob/94862621b2466735989c88dec5b7b23a6e04e757/plf_hive.h">git commit 9486262</a>),
+but was fixed in <a href="https://github.com/mattreecebentley/plf_hive/commit/7ac1f03abd9aebfae242ba7fe3c22ab1115550e9">git commit 7ac1f03</a> by renumbering the blocks less often.</p>
    <p>Consider this program parameterized on <code class="highlight"><c- n>N</c-></code>:</p>
 <pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>hive_limits</c-><c- p>(</c-><c- mi>3</c-><c- p>,</c-> <c- mi>3</c-><c- p>));</c->
 <c- n>h</c-><c- p>.</c-><c- n>assign</c-><c- p>(</c-><c- n>N</c-><c- p>,</c-> <c- mi>1</c-><c- p>);</c-> <c- c1>// [1 1 1] [1 1 1] [1 1 1] [...</c->
@@ -2306,15 +2315,38 @@ does not become empty as a result of this function call. If it does become empty
 at worst linear in the number of subsequent blocks in the iterative sequence. </blockquote>
    <p>Since this program sets the max block capacity to 3, it will hit the linear-time
 case once for every three erasures. Result: quadratic running time.</p>
+   <h4 class="heading settled" data-level="3.2.2" id="motivation-bigo-2"><span class="secno">3.2.2. </span><span class="content">Example 2</span><a class="self-link" href="#motivation-bigo-2"></a></h4>
+   <p class="note" role="note"><span>Note:</span> The quadratic behavior shown below is <i>currently</i> present in Matt Bentley’s reference implementation,
+as of <a href="https://github.com/mattreecebentley/plf_hive/blob/ef9bad9c83919c9728a7ce99b98992ce60af0438/plf_hive.h">git commit ef9bad9</a>.</p>
+   <p>Consider this program parameterized on <code class="highlight"><c- n>N</c-></code>:</p>
+<pre class="highlight"><c- n>plf</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>;</c->
+<c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>({</c-><c- mi>4</c-><c- p>,</c-> <c- mi>4</c-><c- p>});</c->
+<c- k>for</c-> <c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- o>=</c-><c- mi>0</c-><c- p>;</c-> <c- n>i</c-> <c- o>&lt;</c-> <c- n>N</c-><c- p>;</c-> <c- o>++</c-><c- n>i</c-><c- p>)</c-> <c- p>{</c->
+    <c- n>h</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- mi>1</c-><c- p>);</c->
+    <c- n>h</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- mi>2</c-><c- p>);</c->
+<c- p>}</c->
+<c- n>erase</c-><c- p>(</c-><c- n>h</c-><c- p>,</c-> <c- mi>1</c-><c- p>);</c-> <c- c1>// [_ 2 _ 2] [_ 2 _ 2] [_ 2 _ 2] [...</c->
+<c- k>while</c-> <c- p>(</c-><c- o>!</c-><c- n>h</c-><c- p>.</c-><c- n>empty</c-><c- p>())</c-> <c- p>{</c->
+    <c- n>h</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->
+<c- p>}</c->
+</pre>
+   <p>The final loop takes O(<code class="highlight"><c- n>N</c-></code><sup>2</sup>) time to run! The reason is that in the
+reference implementation, <code class="highlight"><c- n>hive</c-></code>'s list of blocks-with-erasures is singly linked.
+Every time you <code class="highlight"><c- n>erase</c-></code> the last element from a block (in other words,
+every time you change <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- n>_</c-> <c- mi>2</c-><c- p>]</c-></code> into <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- n>_</c-> <c- n>_</c-><c- p>]</c-></code>), you need to unlink the
+newly empty block from the list of blocks with erasures; and thanks to how we
+set up this snippet, the current block will always happen to be at the end of
+that list! So each <code class="highlight"><c- n>erase</c-></code> takes O(<code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code>) time, and the overall program
+takes O(<code class="highlight"><c- n>N</c-></code><sup>2</sup>) time.</p>
    <p>Such "secret quadratic behavior" is caused <em>primarily</em> by how <code class="highlight"><c- n>hive</c-></code> permits
 the programmer to set a max block size. If we get rid of the max block size,
 then the implementation is free to allocate larger blocks, and so we’ll hit
 the linear-time cases geometrically less often — we’ll get amortized O(<code class="highlight"><c- n>N</c-></code>)
 instead of O(<code class="highlight"><c- n>N</c-></code><sup>2</sup>).</p>
    <div class="note" role="note">
-     It’s still possible to simulate a rope of fixed-size blocks using my
-proposed <code class="highlight"><c- n>hive</c-></code>, but the programmer has to go pretty far out of their way.
-There’s no footgun analogous to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>},</c-> <c- p>{</c-><c- mi>3</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code>. 
+     Using my proposed <code class="highlight"><c- n>hive</c-></code>, it will still be possible to simulate a rope of fixed-size blocks;
+but the programmer will have to go pretty far out of their way.
+There will be no footgun analogous to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>},</c-> <c- p>{</c-><c- mi>3</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code>. 
 <pre class="highlight"><c- k>auto</c-> <c- n>make_block</c-> <c- o>=</c-> <c- p>[]()</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>;</c->
     <c- n>h</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- mi>3</c-><c- p>);</c->
@@ -2351,7 +2383,7 @@ we assign into it from another sequence in various ways.</p>
 <c- n>h</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>hive_limits</c-><c- p>(</c-><c- mi>3</c-><c- p>,</c-> <c- mi>3</c-><c- p>));</c->
 <c- n>h</c-><c- p>.</c-><c- n>splice</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>,</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>});</c->  <c- c1>// throws length_error</c->
 </pre>
-   <p>The capacity limits of a hive are not part of its "value," yet they still
+   <p>The <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>limits</c-></code></i> of a hive are not part of its "value," yet they still
 affect its behavior in critical ways. Worse, the capacity limits are
 "sticky" in a way that reminds me of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-></code> allocators: <em>most</em> modifying
 operations don’t affect a hive’s limits (resp. a <code class="highlight"><c- n>pmr</c-></code> container’s allocator),
@@ -2376,10 +2408,6 @@ that it might actually <em>fail</em> is not likely to occur to the working progr
 But P0447R20’s specification requires us to traverse <code class="highlight"><c- n>h2</c-></code> looking for too-large
 active blocks. This adds an O(n) step that doesn’t "need" to be there.</p>
    </ul>
-   <p>Now, we’ve already mentioned <a href="#motivation-complexity">above</a> that in fact <code class="highlight"><c- n>splice</c-></code> must still traverse <code class="highlight"><c- n>h2</c-></code> to update its active blocks' serial numbers; so removing
-this one linear-time operation won’t improve the big-O of the operation. But
-the embedded programmer’s mantra still applies: "No-work is faster than some-work."
-Eliminating the comparison, conditional branch, and throwing machinery from <code class="highlight"><c- n>splice</c-></code> is still a major win.</p>
    <p>If my proposal is adopted, <code class="highlight"><c- n>hive</c-><c- o>::</c-><c- n>splice</c-></code> will be "Throws: Nothing," just
 like <code class="highlight"><c- n>list</c-><c- o>::</c-><c- n>splice</c-></code>.</p>
    <p class="note" role="note"><span>Note:</span> I would expect that both <code class="highlight"><c- n>hive</c-><c- o>::</c-><c- n>splice</c-></code> and <code class="highlight"><c- n>list</c-><c- o>::</c-><c- n>splice</c-></code> <em>ought</em> to throw <code class="highlight"><c- n>length_error</c-></code> if the resulting container would exceed <code class="highlight"><c- n>max_size</c-><c- p>()</c-></code> in size; but I guess that’s
@@ -2422,33 +2450,27 @@ more important to the average programmer than min and max block capacities!</p>
    <p><a data-link-type="biblio" href="#biblio-d0447r20">[D0447R20]</a> currently says ([hive.overview]/5):</p>
    <blockquote> If user-specified limits are supplied to a function which are not within an implementation’s <i>hard limits</i>,
 or if the user-specified minimum is larger than the user-specified maximum capacity, the behaviour is undefined. </blockquote>
-   <p>This means that the following program’s behavior is undefined:</p>
+   <p>In Matt Bentley’s reference implementation, this program will manifest its UB by throwing <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>length_error</c-></code>.</p>
+   <p>The following program’s behavior is always undefined:</p>
 <pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>;</c->
 <c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>({</c-><c- mi>0</c-><c- p>,</c-> <c- n>SIZE_MAX</c-><c- p>});</c-> <c- c1>// UB! Throws.</c->
 </pre>
-   <p>In Matt Bentley’s reference implementation, this program will throw <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>length_error</c-></code>.
-The correct way to express "I don’t care about the limits anymore" is:</p>
-<pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>;</c->
-<c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>block_capacity_hard_limits</c-><c- p>());</c->  <c- c1>// OK</c->
-</pre>
-   <p>Worse, the following program’s behavior is undefined on the reference implementation (<a href="https://godbolt.org/z/naT7GqEMo">Godbolt</a>).
-Its definedness hinges on whether the user-provided maximum <code class="highlight"><c- mi>1000</c-></code> is greater than the implementation’s hard limit <code class="highlight"><c- n>hive</c-><c- o>&lt;</c-><c- b>char</c-><c- o>>::</c-><c- n>block_capacity_hard_limits</c-><c- p>().</c-><c- n>max</c-></code>. On the reference implementation, <code class="highlight"><c- n>hive</c-><c- o>&lt;</c-><c- b>char</c-><c- o>>::</c-><c- n>block_capacity_hard_limits</c-><c- p>().</c-><c- n>max</c-></code> is <code class="highlight"><c- mi>255</c-></code>, so the following program has undefined behavior.</p>
+   <p>Worse, the following program’s definedness hinges on whether the user-provided max <code class="highlight"><c- mi>1000</c-></code> is greater than the implementation-defined <code class="highlight"><c- n>hive</c-><c- o>&lt;</c-><c- b>char</c-><c- o>>::</c-><c- n>block_capacity_hard_limits</c-><c- p>().</c-><c- n>max</c-></code>. The reference implementation’s <code class="highlight"><c- n>hive</c-><c- o>&lt;</c-><c- b>char</c-><c- o>>::</c-><c- n>block_capacity_hard_limits</c-><c- p>().</c-><c- n>max</c-></code> is <code class="highlight"><c- mi>255</c-></code>, so this program has undefined behavior (<a href="https://godbolt.org/z/naT7GqEMo">Godbolt</a>):</p>
 <pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>char</c-><c- o>></c-> <c- n>h</c-><c- p>;</c->
 <c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>({</c-><c- mi>10</c-><c- p>,</c-> <c- mi>1000</c-><c- p>});</c-> <c- c1>// UB! Throws.</c->
 </pre>
    <p>There are two problems here. The first is trivial to solve: P0447R20 adds to the set of unnecessary library UB.
 We could fix that by simply saying that the implementation must <em>clamp the provided limits</em> to the hard limits; this will
 make <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>({</c-><c- mi>0</c-><c- p>,</c-> <c- n>SIZE_MAX</c-><c- p>})</c-></code> well-defined, and make <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>({</c-><c- mi>10</c-><c- p>,</c-> <c- mi>1000</c-><c- p>})</c-></code> UB only in the unlikely case that
-the implementation doesn’t support _any_ block sizes in the range [10, 1000].</p>
+the implementation doesn’t support _any_ block sizes in the range [10, 1000]. We could even mandate that the implementation
+_must_ throw <code class="highlight"><c- n>length_error</c-></code>, instead of having UB.</p>
    <p>The second problem is bigger: The presence of <code class="highlight"><c- n>hive_limits</c-></code> vastly increases the "specification surface area" of <code class="highlight"><c- n>hive</c-></code>'s API.
-Many hive operations need to think about <code class="highlight"><c- n>hive_limits</c-></code>:</p>
+Many hive operations interact with <code class="highlight"><c- n>hive_limits</c-></code>:</p>
    <ul>
     <li data-md>
      <p>Every constructor needs to specify (or UB) what happens when the supplied <code class="highlight"><c- n>hive_limits</c-></code> are invalid.</p>
     <li data-md>
      <p><code class="highlight"><c- n>reshape</c-></code> needs to specify (or UB) what happens when the supplied <code class="highlight"><c- n>hive_limits</c-></code> are invalid.</p>
-    <li data-md>
-     <p><code class="highlight"><c- n>reshape</c-></code> needs to think about how to restore the hive’s invariants if an exception is thrown. (See below.)</p>
     <li data-md>
      <p><code class="highlight"><c- n>splice</c-></code> needs to specify what happens when the two hives' <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>limits</c-></code></i> are incompatible.</p>
     <li data-md>
@@ -2456,6 +2478,8 @@ Many hive operations need to think about <code class="highlight"><c- n>hive_limi
 their effect on each operand’s <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>limits</c-></code></i>. For example, is <code class="highlight"><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>hive</c-><c- o>&amp;</c-><c- p>)</c-></code> permitted to preserve its
 left-hand side’s <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>limits</c-></code></i>, in the same way that <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>vector</c-><c- o>&amp;</c-><c- p>)</c-></code> is permitted to preserve
 the left-hand side’s capacity? The Standard needs to specify this.</p>
+    <li data-md>
+     <p><code class="highlight"><c- n>reshape</c-></code> needs to think about how to restore the hive’s invariants if an exception is thrown. (See below.)</p>
    </ul>
    <p>All this extra specification effort is costly, for LWG and for vendors. Notice that my proposal’s "Proposed Wording"
 is mostly deletions.</p>
