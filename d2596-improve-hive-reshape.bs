@@ -2,7 +2,7 @@
 Title: Improve std::hive::reshape
 Shortname: D2596
 Revision: 0
-!Draft Revision: 3
+!Draft Revision: 4
 Audience: LEWG, LWG
 Status: D
 Group: WG21
@@ -28,7 +28,7 @@ Abstract:
   a max block size, so "secret quadratic behavior" is less common. This model
   does not require the container to track anything; the new `reshape` is
   a simple mutating operation analogous to `reserve` or `sort`.
-Date: 2022-05-28
+Date: 2022-05-29
 </pre>
 
 <style>
@@ -289,6 +289,11 @@ we assign into it from another sequence in various ways.
     h.assign({1,2,3,4,5});                // [1 2 3] [4 5 _]
     h = {1,2,3,4,5};                      // [1 2 3] [4 5 _]
     h.assign_range(std::hive{1,2,3,4,5}); // [1 2 3] [4 5 _]
+
+    std::hive<int> d = h;                 // [1 2 3] [4 5 _]
+    std::hive<int> d = std::move(h);      // [1 2 3] [4 5 _]
+    std::hive<int> d(h, Alloc());            // [1 2 3] [4 5 _]
+    std::hive<int> d(std::move(h), Alloc()); // [1 2 3] [4 5 _]
 
     // BUT:
 
@@ -895,7 +900,7 @@ that remains allocated is greater than or equal to `min`, and `capacity()` is gr
 If reallocation takes place, all iterators, pointers, and references to elements of the container, including the past-the-end iterator, are invalidated.
 Reallocation may change the iteration order of the elements of `*this`.</ins>
 
-<ins><i>Returns:</i> `true` if reallocation took place; otherwise `false`.</ins>
+<ins><i>Returns:</i> `true` if any iterators were invalidated; otherwise `false`.</ins>
 
 <i>Complexity:</i> <del>At worst linear in the number of active and reserved blocks in `*this`. If reallocation occurs, also linear in
 the number of elements reallocated.</del> <ins>Linear in `size()`.</ins>
