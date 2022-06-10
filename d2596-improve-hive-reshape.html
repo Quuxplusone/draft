@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>5
+     <dd>6
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2596-improve-hive-reshape.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2596-improve-hive-reshape.bs</a>
      <dt>Current:
@@ -2138,30 +2138,31 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#motivation-bloat"><span class="secno">3.5</span> <span class="content"><code class="highlight"><c- n>hive_limits</c-></code> causes constructor overload set bloat</span></a>
       <li><a href="#motivation-ub"><span class="secno">3.6</span> <span class="content"><code class="highlight"><c- n>hive_limits</c-></code> introduces unnecessary UB</span></a>
      </ol>
+    <li><a href="#new-model"><span class="secno">4</span> <span class="content">New model</span></a>
     <li>
-     <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording relative to P0447R20</span></a>
+     <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording relative to P0447R20</span></a>
      <ol class="toc">
-      <li><a href="#wording-hive-overview"><span class="secno">4.1</span> <span class="content">[hive.overview]</span></a>
-      <li><a href="#wording-hive-cons"><span class="secno">4.2</span> <span class="content">[hive.cons]</span></a>
+      <li><a href="#wording-hive-overview"><span class="secno">5.1</span> <span class="content">[hive.overview]</span></a>
+      <li><a href="#wording-hive-cons"><span class="secno">5.2</span> <span class="content">[hive.cons]</span></a>
       <li>
-       <a href="#wording-hive-capacity"><span class="secno">4.3</span> <span class="content">[hive.capacity]</span></a>
+       <a href="#wording-hive-capacity"><span class="secno">5.3</span> <span class="content">[hive.capacity]</span></a>
        <ol class="toc">
-        <li><a href="#max_block_size"><span class="secno">4.3.1</span> <span class="content">max_block_size</span></a>
-        <li><a href="#capacity"><span class="secno">4.3.2</span> <span class="content">capacity</span></a>
-        <li><a href="#reserve"><span class="secno">4.3.3</span> <span class="content">reserve</span></a>
-        <li><a href="#shrink_to_fit"><span class="secno">4.3.4</span> <span class="content">shrink_to_fit</span></a>
-        <li><a href="#trim_capacity"><span class="secno">4.3.5</span> <span class="content">trim_capacity</span></a>
+        <li><a href="#max_block_size"><span class="secno">5.3.1</span> <span class="content">max_block_size</span></a>
+        <li><a href="#capacity"><span class="secno">5.3.2</span> <span class="content">capacity</span></a>
+        <li><a href="#reserve"><span class="secno">5.3.3</span> <span class="content">reserve</span></a>
+        <li><a href="#shrink_to_fit"><span class="secno">5.3.4</span> <span class="content">shrink_to_fit</span></a>
+        <li><a href="#trim_capacity"><span class="secno">5.3.5</span> <span class="content">trim_capacity</span></a>
        </ol>
       <li>
-       <a href="#wording-hive-operations"><span class="secno">4.4</span> <span class="content">[hive.operations]</span></a>
+       <a href="#wording-hive-operations"><span class="secno">5.4</span> <span class="content">[hive.operations]</span></a>
        <ol class="toc">
-        <li><a href="#splice"><span class="secno">4.4.1</span> <span class="content">splice</span></a>
-        <li><a href="#block_capacity_limits"><span class="secno">4.4.2</span> <span class="content">block_capacity_limits</span></a>
-        <li><a href="#block_capacity_hard_limits"><span class="secno">4.4.3</span> <span class="content">block_capacity_hard_limits</span></a>
-        <li><a href="#reshape"><span class="secno">4.4.4</span> <span class="content">reshape</span></a>
+        <li><a href="#splice"><span class="secno">5.4.1</span> <span class="content">splice</span></a>
+        <li><a href="#block_capacity_limits"><span class="secno">5.4.2</span> <span class="content">block_capacity_limits</span></a>
+        <li><a href="#block_capacity_hard_limits"><span class="secno">5.4.3</span> <span class="content">block_capacity_hard_limits</span></a>
+        <li><a href="#reshape"><span class="secno">5.4.4</span> <span class="content">reshape</span></a>
        </ol>
      </ol>
-    <li><a href="#acknowledgements"><span class="secno">5</span> <span class="content">Acknowledgements</span></a>
+    <li><a href="#acknowledgements"><span class="secno">6</span> <span class="content">Acknowledgements</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -2289,6 +2290,9 @@ and thus a hive can be used to simulate a traditional "rope" of fixed-capacity b
    <p>No, the real-world <code class="highlight"><c- n>vector</c-></code> sensibly says that it should just keep geometrically resizing until the underlying allocator
 conks out. In my opinion, <code class="highlight"><c- n>hive</c-></code> should behave the same way. Let the <em>allocator</em> decide how many bytes
 is too much to allocate at once. Don’t make it the container’s problem.</p>
+   <p class="note" role="note"><span>Note:</span> Discussion in SG14 (2022-06-08) suggested that maybe <code class="highlight"><c- n>hive_limits</c-><c- p>(</c-><c- mi>16</c-><c- p>,</c-> <c- mi>16</c-><c- p>)</c-></code> would be useful for SIMD processing;
+but that doesn’t hold up well under scrutiny. The reference implementation doesn’t store <code class="highlight"><c- n>T</c-></code> objects contiguously.
+And even if <code class="highlight"><c- n>hive_limits</c-><c- p>(</c-><c- mi>16</c-><c- p>,</c-> <c- mi>16</c-><c- p>)</c-></code> were useful (which it’s not), that rationale wouldn’t apply to <code class="highlight"><c- n>hive_limits</c-><c- p>(</c-><c- mi>23</c-><c- p>,</c-> <c- mi>29</c-><c- p>)</c-></code> and so on.</p>
    <h3 class="heading settled" data-level="3.2" id="motivation-bigo"><span class="secno">3.2. </span><span class="content">Max block size causes O(n) behavior</span><a class="self-link" href="#motivation-bigo"></a></h3>
    <h4 class="heading settled" data-level="3.2.1" id="motivation-bigo-1"><span class="secno">3.2.1. </span><span class="content">Example 1</span><a class="self-link" href="#motivation-bigo-1"></a></h4>
    <p class="note" role="note"><span>Note:</span> The quadratic behavior shown below was <i>previously</i> present in Matt Bentley’s reference implementation
@@ -2305,8 +2309,7 @@ but was fixed in <a href="https://github.com/mattreecebentley/plf_hive/commit/7a
 active blocks are stored in a linked list, but also <em>numbered</em> in sequential
 order starting from 1; those "serial numbers" are required by <code class="highlight"><c- n>hive</c-><c- o>::</c-><c- n>iterator</c-></code>'s <code class="highlight"><c- k>operator</c-><c- o>&lt;</c-></code>. (Aside: I don’t think <code class="highlight"><c- k>operator</c-><c- o>&lt;</c-></code> should exist either, but
 my understanding is that that’s already been litigated.)</p>
-   <p>Every time you <code class="highlight"><c- n>erase</c-></code> the last element from a block (in other words,
-every time you change <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- mi>1</c-><c- p>]</c-></code> into <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- n>_</c-><c- p>]</c-></code>), you need to move the
+   <p>Every time you <code class="highlight"><c- n>erase</c-></code> the last element from a block (changing <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- mi>1</c-><c- p>]</c-></code> into <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- n>_</c-><c- p>]</c-></code>), you need to move the
 newly unused block from the active block list to the unused block list.
 And then you need to renumber all the subsequent blocks. Quoting P0447R20’s
 specification of <code class="highlight"><c- n>erase</c-></code>:</p>
@@ -2332,8 +2335,8 @@ as of <a href="https://github.com/mattreecebentley/plf_hive/blob/ef9bad9c83919c9
 </pre>
    <p>The final loop takes O(<code class="highlight"><c- n>N</c-></code><sup>2</sup>) time to run! The reason is that in the
 reference implementation, <code class="highlight"><c- n>hive</c-></code>'s list of blocks-with-erasures is singly linked.
-Every time you <code class="highlight"><c- n>erase</c-></code> the last element from a block (in other words,
-every time you change <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- n>_</c-> <c- mi>2</c-><c- p>]</c-></code> into <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- n>_</c-> <c- n>_</c-><c- p>]</c-></code>), you need to unlink the
+Every time you <code class="highlight"><c- n>erase</c-></code> the last element from a block
+(changing <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- n>_</c-> <c- mi>2</c-><c- p>]</c-></code> into <code class="highlight"><c- p>[</c-><c- n>_</c-> <c- n>_</c-> <c- n>_</c-> <c- n>_</c-><c- p>]</c-></code>), you need to unlink the
 newly empty block from the list of blocks with erasures; and thanks to how we
 set up this snippet, the current block will always happen to be at the end of
 that list! So each <code class="highlight"><c- n>erase</c-></code> takes O(<code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code>) time, and the overall program
@@ -2403,13 +2406,13 @@ This means that if <code class="highlight"><c- n>h2</c-></code> contains any act
 then <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>splice</c-><c- p>(</c-><c- n>h2</c-><c- p>)</c-></code> will fail and throw <code class="highlight"><c- n>length_error</c-></code>! This is a problem on three levels:</p>
    <ul>
     <li data-md>
-     <p>It’s a specification speedbump: Should we say something about the state of <code class="highlight"><c- n>h2</c-></code> after the throw? for example, should we guarantee that any too-large blocks not
+     <p>Specification speedbump: Should we say something about the state of <code class="highlight"><c- n>h2</c-></code> after the throw? for example, should we guarantee that any too-large blocks not
 transferred out of <code class="highlight"><c- n>h2</c-></code> will remain in <code class="highlight"><c- n>h2</c-></code>, kind of like what happens in <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>set</c-><c- o>::</c-><c- n>merge</c-></code>? Or should we leave it unspecified?</p>
     <li data-md>
-     <p>It’s a correctness pitfall: <code class="highlight"><c- n>splice</c-></code> "should" just twiddle a few pointers. The idea
+     <p>Correctness pitfall: <code class="highlight"><c- n>splice</c-></code> "should" just twiddle a few pointers. The idea
 that it might actually <em>fail</em> is not likely to occur to the working programmer.</p>
     <li data-md>
-     <p>It’s a performance pessimization: Again, <code class="highlight"><c- n>splice</c-></code> "should" just twiddle a few pointers.
+     <p>Performance pessimization: Again, <code class="highlight"><c- n>splice</c-></code> "should" just twiddle a few pointers.
 But P0447R20’s specification requires us to traverse <code class="highlight"><c- n>h2</c-></code> looking for too-large
 active blocks. This adds an O(n) step that doesn’t "need" to be there.</p>
    </ul>
@@ -2419,8 +2422,7 @@ like <code class="highlight"><c- n>list</c-><c- o>::</c-><c- n>splice</c-></code
 intended to be impossible in practice.</p>
    <h3 class="heading settled" data-level="3.5" id="motivation-bloat"><span class="secno">3.5. </span><span class="content"><code class="highlight"><c- n>hive_limits</c-></code> causes constructor overload set bloat</span><a class="self-link" href="#motivation-bloat"></a></h3>
    <p>Every STL container’s constructor overload set is "twice as big as necessary"
-because of the duplication between <code class="highlight"><c- n>container</c-><c- p>(</c-><c- n>Args</c-><c- p>...)</c-></code> and <code class="highlight"><c- n>container</c-><c- p>(</c-><c- n>Args</c-><c- p>...,</c-> <c- n>Alloc</c-><c- p>)</c-></code>.
-Hive’s constructor overload set is "four times as big as necessary" because
+because of the duplication between <code class="highlight"><c- n>container</c-><c- p>(</c-><c- n>Args</c-><c- p>...)</c-></code> and <code class="highlight"><c- n>container</c-><c- p>(</c-><c- n>Args</c-><c- p>...,</c-> <c- n>Alloc</c-><c- p>)</c-></code>. <code class="highlight"><c- n>hive</c-></code>'s constructor overload set is "four times as big as necessary" because
 of the duplication between <code class="highlight"><c- n>container</c-><c- p>(</c-><c- n>Args</c-><c- p>...)</c-></code> and <code class="highlight"><c- n>container</c-><c- p>(</c-><c- n>Args</c-><c- p>...,</c-> <c- n>hive_limits</c-><c- p>)</c-></code>.</p>
    <p>P0447R20 <code class="highlight"><c- n>hive</c-></code> has 18 constructor overloads. My proposal removes 7 of them.
 (Of course, we could always eliminate these same 7 constructor overloads
@@ -2432,18 +2434,19 @@ that sets the overall capacity in one step — even though overall capacity is
 more important to the average programmer than min and max block capacities!</p>
 <pre class="highlight"><c- c1>// Today’s multi-step process for vector</c->
 <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>v</c-><c- p>;</c->
-<c- n>v</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- mi>12</c-><c- p>);</c->
+<c- n>v</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- mi>12</c-><c- p>);</c->            <c- c1>// [_ _ _ _ _ _ _ _ _ _ _ _]</c->
 <c- n>v</c-><c- p>.</c-><c- n>assign</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>,</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>,</c-><c- mi>6</c-><c- p>});</c->  <c- c1>// [1 2 3 4 5 6 _ _ _ _ _ _]</c->
 
 <c- c1>// Today’s multi-step process for hive</c->
 <c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>;</c->
-<c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>hive_limits</c-><c- p>(</c-><c- mi>3</c-><c- p>,</c-> <c- mi>5</c-><c- p>));</c->
-<c- n>h</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- mi>12</c-><c- p>);</c->            <c- c1>// [_ _ _ _ _] [_ _ _ _ _] [_ _ _]</c->
-<c- n>h</c-><c- p>.</c-><c- n>assign</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>,</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>,</c-><c- mi>6</c-><c- p>});</c->  <c- c1>// [1 2 3 4 5] [6 _ _ _ _] [_ _ _]</c->
+<c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>hive_limits</c-><c- p>(</c-><c- mi>12</c-><c- p>,</c-> <c- n>h</c-><c- p>.</c-><c- n>block_capacity_hard_limits</c-><c- p>().</c-><c- n>max</c-><c- p>));</c->
+<c- n>h</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- mi>12</c-><c- p>);</c->            <c- c1>// [_ _ _ _ _ _ _ _ _ _ _ _ _]</c->
+<c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>block_capacity_hard_limits</c-><c- p>());</c->
+<c- n>h</c-><c- p>.</c-><c- n>assign</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>,</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>,</c-><c- mi>6</c-><c- p>});</c->  <c- c1>// [1 2 3 4 5 6 _ _ _ _ _ _ _]</c->
 
 <c- c1>// Today’s (insufficient) single-step process for hive</c->
 <c- c1>// fails to provide a setting for overall capacity</c->
-<c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>,</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>,</c-><c- mi>6</c-><c- p>},</c-> <c- p>{</c-><c- mi>3</c-><c- p>,</c-><c- mi>5</c-><c- p>});</c->
+<c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>,</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>,</c-><c- mi>6</c-><c- p>},</c-> <c- p>{</c-><c- mi>3</c-><c- p>,</c-> <c- mi>5</c-><c- p>});</c->
                           <c- c1>// [1 2 3 4 5] [6 _ _]</c->
 </pre>
    <p>If my proposal is adopted, the analogous multi-step process will be:</p>
@@ -2468,8 +2471,7 @@ or if the user-specified minimum is larger than the user-specified maximum capac
 We could fix that by simply saying that the implementation must <em>clamp the provided limits</em> to the hard limits; this will
 make <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>({</c-><c- mi>0</c-><c- p>,</c-> <c- n>SIZE_MAX</c-><c- p>})</c-></code> well-defined, and make <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>({</c-><c- mi>10</c-><c- p>,</c-> <c- mi>1000</c-><c- p>})</c-></code> UB only in the unlikely case that
 the implementation doesn’t support <em>any</em> block sizes in the range [10, 1000]. We could even mandate that the implementation <em>must</em> throw <code class="highlight"><c- n>length_error</c-></code>, instead of having UB.</p>
-   <p>The second problem is bigger: The presence of <code class="highlight"><c- n>hive_limits</c-></code> vastly increases the "specification surface area" of <code class="highlight"><c- n>hive</c-></code>'s API.
-Many hive operations interact with <code class="highlight"><c- n>hive_limits</c-></code>:</p>
+   <p>The second problem is bigger: <code class="highlight"><c- n>hive_limits</c-></code> vastly increases the "specification surface area" of <code class="highlight"><c- n>hive</c-></code>'s API.</p>
    <ul>
     <li data-md>
      <p>Every constructor needs to specify (or UB) what happens when the supplied <code class="highlight"><c- n>hive_limits</c-></code> are invalid.</p>
@@ -2485,8 +2487,8 @@ the left-hand side’s capacity? The Standard needs to specify this.</p>
     <li data-md>
      <p><code class="highlight"><c- n>reshape</c-></code> needs to think about how to restore the hive’s invariants if an exception is thrown. (See below.)</p>
    </ul>
-   <p>All this extra specification effort is costly, for LWG and for vendors. Notice that my proposal’s "Proposed Wording"
-is mostly deletions.</p>
+   <p>All this extra specification effort is costly, for LWG and for vendors.
+My "Proposed Wording" is mostly deletions.</p>
    <p>When I say "<code class="highlight"><c- n>reshape</c-></code> needs to think about how to restore the hive’s invariants," I’m talking about this example:</p>
 <pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- n>W</c-><c- o>></c-> <c- n>h</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>,</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>},</c-> <c- p>{</c-><c- mi>4</c-><c- p>,</c-><c- mi>4</c-><c- p>});</c-> <c- c1>// [1 2 3 4] [5 _ _ _]</c->
 <c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>({</c-><c- mi>5</c-><c- p>,</c-><c- mi>5</c-><c- p>});</c->  <c- c1>// suppose W(W&amp;&amp;) can throw</c->
@@ -2500,26 +2502,62 @@ then we’ll lose data (namely element <code class="highlight"><c- mi>5</c-></co
 something "consistent but novel" such as <code class="highlight"><c- p>{</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>}</c-></code> or <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>block_capacity_hard_limits</c-><c- p>()</c-></code>. In short: May a failed operation leave
 the hive with an "out-of-thin-air" <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>limits</c-></code></i>? Implementors must grapple with this kind of question
 in many places.</p>
-   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording relative to P0447R20</span><a class="self-link" href="#wording"></a></h2>
+   <h2 class="heading settled" data-level="4" id="new-model"><span class="secno">4. </span><span class="content">New model</span><a class="self-link" href="#new-model"></a></h2>
+   <p>In my proposed new capacity model, <code class="highlight"><c- n>hive_limits</c-></code> is gone. Shape becomes an ephemeral property of a <code class="highlight"><c- n>hive</c-></code> object,
+just like capacity is an ephemeral property of a <code class="highlight"><c- n>vector</c-></code> or <code class="highlight"><c- n>deque</c-></code>. Other ephemeral properties of <code class="highlight"><c- n>hive</c-></code> include
+capacity and sortedness:</p>
+<pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
+<c- n>h</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->  <c- c1>// [_ 2 3]</c->
+<c- n>h</c-><c- p>.</c-><c- n>sort</c-><c- p>();</c->            <c- c1>// [_ 2 3]</c->
+<c- n>h</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- mi>4</c-><c- p>);</c->         <c- c1>// [4 2 3], no longer sorted</c->
+
+<c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- mi>4</c-><c- p>,</c-> <c- mi>8</c-><c- p>);</c->     <c- c1>// [4 2 3 _] [_ _ _ _]</c->
+<c- k>auto</c-> <c- n>h2</c-> <c- o>=</c-> <c- n>h</c-><c- p>;</c->         <c- c1>// [4 2 3], no longer capacious</c->
+</pre>
+   <p>I propose the interface <code class="highlight"><c- b>bool</c-> <c- n>reshape</c-><c- p>(</c-><c- b>size_t</c-> <c- n>min</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>n</c-><c- o>=</c-><c- mi>0</c-><c- p>)</c-></code>, where <code class="highlight"><c- n>min</c-></code> is the new minimum block size (that is,
+the new hive’s elements are guaranteed at least <em>x</em> degree of cache-friendliness) and <code class="highlight"><c- n>n</c-></code> is the new capacity (that is,
+you’re guaranteed to be able to insert <em>x</em> more elements before touching the allocator again). Note that <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- mi>0</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c-></code> means the same thing as <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code> except that <code class="highlight"><c- n>reshape</c-></code> is allowed to invalidate iterators.</p>
+   <ul>
+    <li data-md>
+     <p>The <code class="highlight"><c- b>bool</c-></code> return value tells the programmer whether iterator invalidation occurred.
+I think this is likely to be useful information; if it is not provided, then the programmer <em>must always assume</em> that iterator invalidation has taken place.</p>
+    <li data-md>
+     <p><code class="highlight"><c- n>min</c-></code> is the argument that affects the hive’s shape (so it is non-optional); <code class="highlight"><c- n>n</c-></code> has a sensible default.
+If you call <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- n>min</c-><c- p>)</c-></code> without providing a new capacity <code class="highlight"><c- n>n</c-></code>, then you’re saying you don’t care about
+the capacity of the hive. One-argument <code class="highlight"><c- n>reshape</c-></code> is very much like <code class="highlight"><c- n>shrink_to_fit</c-></code>.</p>
+    <li data-md>
+     <p>Taking two adjacent <code class="highlight"><c- b>size_t</c-></code> arguments is unfortunate. But notice that they are in the "correct" order: if you
+flipped them around, like <code class="highlight"><c- n>reshape</c-><c- p>(</c-><c- n>n</c-><c- p>,</c-> <c- n>min</c-><c- o>=</c-><c- mi>0</c-><c- p>)</c-></code>, then <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> would do exactly the same thing as <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-></code>,
+and that would be silly. So we have a good mnemonic for why the <code class="highlight"><c- n>min</c-></code> argument should come first.</p>
+    <li data-md>
+     <p>There is no longer any way to force a max block size. If the implementation wants to make your elements
+"more contiguous," you can’t stop it (fixing <a href="#motivation-bigo">§ 3.2 Max block size causes O(n) behavior</a>).</p>
+    <li data-md>
+     <p>Block sizes are ephemeral, not "sticky"; they needn’t be stored in data members (fixing <a href="#motivation-pmr-analogy">§ 3.3 Move semantics are arguably unintuitive</a>).</p>
+   </ul>
+   <p>This new model has been implemented in a fork of Matt Bentley’s implementation; see <a data-link-type="biblio" href="#biblio-impl">[Impl]</a>.
+Compile with <code class="highlight"><c- o>-</c-><c- n>DPLF_HIVE_P2596</c-><c- o>=</c-><c- mi>0</c-></code> for P0447R20, or <code class="highlight"><c- o>-</c-><c- n>DPLF_HIVE_P2596</c-><c- o>=</c-><c- mi>1</c-></code> for
+this new model.</p>
+   <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording relative to P0447R20</span><a class="self-link" href="#wording"></a></h2>
    <p>The wording in this section is relative to <a data-link-type="biblio" href="#biblio-d0447r20">[D0447R20]</a> as it stands today.</p>
    <div class="note" role="note">
-     In addition to these core changes, I claim that every reference in P0447 to
-"reserved blocks" should be changed to "unused blocks" for clarity. And then the
+     In addition to these changes, every reference in P0447 to
+"reserved blocks" should be changed to "unused blocks" for clarity. The
 vast majority of those references can simply be deleted, because my proposal largely
 eliminates the normative distinction between "active" and "unused" blocks.
 For example, P0447R20’s specification for <code class="highlight"><c- n>erase</c-></code> currently says 
     <blockquote> If the active block which <code class="highlight"><c- n>position</c-></code> is located within becomes empty [...] as a result of the function call,
 that active block is either deallocated or transformed into a reserved block. </blockquote>
-    <p>After my proposal, that sentence can be removed, because it doesn’t carry any normative weight
+    <p>After my proposal, that sentence can be removed, because it doesn’t carry normative weight
 anymore: sure, the container will still behave exactly that way, but we no longer need to
 normatively <em>specify</em> that the empty block is non-active, because we no longer need to
 normatively prevent it from interfering with a <code class="highlight"><c- n>splice</c-></code>. (After this patch, <code class="highlight"><c- n>splice</c-></code> can
 never fail to transfer a block for any reason, so it doesn’t need to go out of its way to
 avoid transferring unused blocks, so we don’t need to normatively describe the tracking of
 unused blocks anymore. The separate unused-block list remains the intended implementation
-technique, for performance reasons; but it will no longer be directly observable by the programmer.)</p>
+technique, for performance; but it will no longer be directly observable by the programmer.)</p>
    </div>
-   <h3 class="heading settled" data-level="4.1" id="wording-hive-overview"><span class="secno">4.1. </span><span class="content">[hive.overview]</span><a class="self-link" href="#wording-hive-overview"></a></h3>
+   <h3 class="heading settled" data-level="5.1" id="wording-hive-overview"><span class="secno">5.1. </span><span class="content">[hive.overview]</span><a class="self-link" href="#wording-hive-overview"></a></h3>
    <ol>
     <li data-md>
      <p>A hive is a sequence container that allows constant-time insert and erase operations.
@@ -2710,7 +2748,7 @@ in the sequence of a hive instance.</p>
 </pre>
    <p>An incomplete type <code class="highlight"><c- n>T</c-></code> may be used when instantiating <code class="highlight"><c- n>hive</c-></code> if the allocator meets the allocator completeness requirements
 ([allocator.requirements.completeness]). <code class="highlight"><c- n>T</c-></code> shall be complete before any member of the resulting specialization of <code class="highlight"><c- n>hive</c-></code> is referenced.</p>
-   <h3 class="heading settled" data-level="4.2" id="wording-hive-cons"><span class="secno">4.2. </span><span class="content">[hive.cons]</span><a class="self-link" href="#wording-hive-cons"></a></h3>
+   <h3 class="heading settled" data-level="5.2" id="wording-hive-cons"><span class="secno">5.2. </span><span class="content">[hive.cons]</span><a class="self-link" href="#wording-hive-cons"></a></h3>
 <pre class="highlight"><c- k>explicit</c-> <c- n>hive</c-><c- p>(</c-><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
 </pre>
    <p><i>Effects:</i> Constructs an empty hive, using the specified allocator.</p>
@@ -2775,15 +2813,15 @@ also initializes <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>
     <i>Complexity</i>: Linear in <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code>. 
     <del>Creates at most <code class="highlight"><c- p>(</c-><c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-> <c- o>/</c-> <c- n>current</c-><c- o>-</c-><c- n>limits</c-><c- p>.</c-><c- n>max</c-><c- p>)</c-> <c- o>+</c-> <c- mi>1</c-></code> element block allocations.</del>
    </p>
-   <h3 class="heading settled" data-level="4.3" id="wording-hive-capacity"><span class="secno">4.3. </span><span class="content">[hive.capacity]</span><a class="self-link" href="#wording-hive-capacity"></a></h3>
-   <h4 class="heading settled" data-level="4.3.1" id="max_block_size"><span class="secno">4.3.1. </span><span class="content">max_block_size</span><a class="self-link" href="#max_block_size"></a></h4>
+   <h3 class="heading settled" data-level="5.3" id="wording-hive-capacity"><span class="secno">5.3. </span><span class="content">[hive.capacity]</span><a class="self-link" href="#wording-hive-capacity"></a></h3>
+   <h4 class="heading settled" data-level="5.3.1" id="max_block_size"><span class="secno">5.3.1. </span><span class="content">max_block_size</span><a class="self-link" href="#max_block_size"></a></h4>
 <pre class="highlight"><ins><c- n>size_type</c-> <c- nf>max_block_size</c-><c- p>()</c-> <c- k>const</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
 </pre>
    <ins><i>Returns:</i> The largest possible capacity of a single memory block.</ins>
    <p>
     <ins><i>Complexity:</i> Constant.</ins>
    </p>
-   <h4 class="heading settled" data-level="4.3.2" id="capacity"><span class="secno">4.3.2. </span><span class="content">capacity</span><a class="self-link" href="#capacity"></a></h4>
+   <h4 class="heading settled" data-level="5.3.2" id="capacity"><span class="secno">5.3.2. </span><span class="content">capacity</span><a class="self-link" href="#capacity"></a></h4>
 <pre class="highlight"><c- n>size_type</c-> <c- nf>capacity</c-><c- p>()</c-> <c- k>const</c-> <c- k>noexcept</c-><c- p>;</c->
 </pre>
    <p>
@@ -2792,7 +2830,7 @@ also initializes <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>
      blocks.
    </p>
    <p><i>Complexity:</i> Constant time.</p>
-   <h4 class="heading settled" data-level="4.3.3" id="reserve"><span class="secno">4.3.3. </span><span class="content">reserve</span><a class="self-link" href="#reserve"></a></h4>
+   <h4 class="heading settled" data-level="5.3.3" id="reserve"><span class="secno">5.3.3. </span><span class="content">reserve</span><a class="self-link" href="#reserve"></a></h4>
 <pre class="highlight"><c- b>void</c-> <c- nf>reserve</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>);</c->
 </pre>
    <p>
@@ -2811,7 +2849,7 @@ references</ins>
     <ins>Any exception thrown from <code class="highlight"><c- n>allocate</c-></code>.</ins>
    </p>
    <p><i>Postconditions:</i> <code class="highlight"><c- n>capacity</c-><c- p>()</c-> <c- o>>=</c-> <c- n>n</c-></code> is <code class="highlight">true</code>.</p>
-   <h4 class="heading settled" data-level="4.3.4" id="shrink_to_fit"><span class="secno">4.3.4. </span><span class="content">shrink_to_fit</span><a class="self-link" href="#shrink_to_fit"></a></h4>
+   <h4 class="heading settled" data-level="5.3.4" id="shrink_to_fit"><span class="secno">5.3.4. </span><span class="content">shrink_to_fit</span><a class="self-link" href="#shrink_to_fit"></a></h4>
 <pre class="highlight"><c- b>void</c-> <c- nf>shrink_to_fit</c-><c- p>();</c->
 </pre>
    <p><i>Preconditions:</i> <code class="highlight"><c- n>T</c-></code> is <em>Cpp17MoveInsertable</em> into <code class="highlight"><c- n>hive</c-></code>.</p>
@@ -2833,7 +2871,7 @@ iterator. [<i>Note:</i> This operation may change the iterative order of the ele
 as well as the past-the-end iterator.
 [<i>Note:</i> If no reallocation happens, they remain valid. <i>—end note</i>]
 [<i>Note:</i> This operation may change the iterative order of the elements in *this. <i>—end note</i>]</del>
-   <h4 class="heading settled" data-level="4.3.5" id="trim_capacity"><span class="secno">4.3.5. </span><span class="content">trim_capacity</span><a class="self-link" href="#trim_capacity"></a></h4>
+   <h4 class="heading settled" data-level="5.3.5" id="trim_capacity"><span class="secno">5.3.5. </span><span class="content">trim_capacity</span><a class="self-link" href="#trim_capacity"></a></h4>
 <pre class="highlight"><del><c- b>void</c-> <c- nf>trim_capacity</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c-></del>
 <del><c- b>void</c-> <c- nf>trim_capacity</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
 <ins><c- b>void</c-> <c- nf>trim_capacity</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-> <c- o>=</c-> <c- mi>0</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
@@ -2851,21 +2889,18 @@ closer to <code class="highlight"><c- n>n</c-></code>. It does not increase <cod
     .
    </p>
    <p>
-    <ins><i>Postconditions:</i> <code class="highlight"><c- n>capacity</c-><c- p>()</c-> <c- o>>=</c-> <c- n>n</c-></code> is <code class="highlight">true</code>.</ins>
-   </p>
-   <p>
     <i>Remarks:</i> 
     <del>Does not reallocate elements and no</del>
     <ins>No</ins>
      iterators or references to elements in <code class="highlight"><c- o>*</c-><c- k>this</c-></code> are invalidated.
    </p>
-   <h3 class="heading settled" data-level="4.4" id="wording-hive-operations"><span class="secno">4.4. </span><span class="content">[hive.operations]</span><a class="self-link" href="#wording-hive-operations"></a></h3>
+   <h3 class="heading settled" data-level="5.4" id="wording-hive-operations"><span class="secno">5.4. </span><span class="content">[hive.operations]</span><a class="self-link" href="#wording-hive-operations"></a></h3>
    <p>In this subclause, arguments for a template parameter named <code class="highlight"><c- n>Predicate</c-></code> or <code class="highlight"><c- n>BinaryPredicate</c-></code> shall meet the
 corresponding requirements in [algorithms.requirements]. The semantics of <code class="highlight"><c- n>i</c-> <c- o>+</c-> <c- n>n</c-></code> and <code class="highlight"><c- n>i</c-> <c- o>-</c-> <c- n>n</c-></code>, where <code class="highlight"><c- n>i</c-></code> is an iterator into the list and <code class="highlight"><c- n>n</c-></code> is an integer, are the same as those of <code class="highlight"><c- n>next</c-><c- p>(</c-><c- n>i</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c-></code> and <code class="highlight"><c- n>prev</c-><c- p>(</c-><c- n>i</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c-></code>,
 respectively. For <code class="highlight"><c- n>sort</c-></code>, the definitions and requirements in [alg.sorting] apply.</p>
    <del><code class="highlight"><c- n>hive</c-></code> provides a splice operation that destructively moves all elements from one hive to another.
 The behavior of splice operations is undefined if <code class="highlight"><c- n>get_allocator</c-><c- p>()</c-> <c- o>!=</c-> <c- n>x</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-></code>.</del>
-   <h4 class="heading settled" data-level="4.4.1" id="splice"><span class="secno">4.4.1. </span><span class="content">splice</span><a class="self-link" href="#splice"></a></h4>
+   <h4 class="heading settled" data-level="5.4.1" id="splice"><span class="secno">5.4.1. </span><span class="content">splice</span><a class="self-link" href="#splice"></a></h4>
 <pre class="highlight"><c- b>void</c-> <c- nf>splice</c-><c- p>(</c-><c- n>hive</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>);</c->
 <c- b>void</c-> <c- nf>splice</c-><c- p>(</c-><c- n>hive</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
 </pre>
@@ -2892,21 +2927,21 @@ to refer to their elements, but they now behave as iterators into <code class="h
      is undefined if <code class="highlight"><c- n>get_allocator</c-><c- p>()</c-> <c- o>!=</c-> <c- n>x</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-></code>. 
     <del>Reserved blocks in <code class="highlight"><c- n>x</c-></code> are not transferred into <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</del>
    </p>
-   <h4 class="heading settled" data-level="4.4.2" id="block_capacity_limits"><span class="secno">4.4.2. </span><span class="content">block_capacity_limits</span><a class="self-link" href="#block_capacity_limits"></a></h4>
+   <h4 class="heading settled" data-level="5.4.2" id="block_capacity_limits"><span class="secno">5.4.2. </span><span class="content">block_capacity_limits</span><a class="self-link" href="#block_capacity_limits"></a></h4>
 <pre class="highlight"><del><c- n>hive_limits</c-> <c- nf>block_capacity_limits</c-><c- p>()</c-> <c- k>const</c-> <c- k>noexcept</c-><c- p>;</c-></del>
 </pre>
    <del><i>Effects:</i> Returns <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>limits</c-></code></i>.</del>
    <p>
     <del><i>Complexity:</i> Constant.</del>
    </p>
-   <h4 class="heading settled" data-level="4.4.3" id="block_capacity_hard_limits"><span class="secno">4.4.3. </span><span class="content">block_capacity_hard_limits</span><a class="self-link" href="#block_capacity_hard_limits"></a></h4>
+   <h4 class="heading settled" data-level="5.4.3" id="block_capacity_hard_limits"><span class="secno">5.4.3. </span><span class="content">block_capacity_hard_limits</span><a class="self-link" href="#block_capacity_hard_limits"></a></h4>
 <pre class="highlight"><del><c- k>static</c-> <c- k>constexpr</c-> <c- n>hive_limits</c-> <c- nf>block_capacity_hard_limits</c-><c- p>();</c-></del>
 </pre>
    <del><i>Returns:</i> A <code class="highlight"><c- n>hive_limits</c-></code> struct with the <code class="highlight"><c- n>min</c-></code> and <code class="highlight"><c- n>max</c-></code> members set to the implementation’s hard limits.</del>
    <p>
     <del><i>Complexity:</i> Constant.</del>
    </p>
-   <h4 class="heading settled" data-level="4.4.4" id="reshape"><span class="secno">4.4.4. </span><span class="content">reshape</span><a class="self-link" href="#reshape"></a></h4>
+   <h4 class="heading settled" data-level="5.4.4" id="reshape"><span class="secno">5.4.4. </span><span class="content">reshape</span><a class="self-link" href="#reshape"></a></h4>
 <pre class="highlight"><del><c- b>void</c-> <c- nf>reshape</c-><c- p>(</c-><c- n>hive_limits</c-> <c- n>block_limits</c-><c- p>);</c-></del>
 <ins><c- b>bool</c-> <c- nf>reshape</c-><c- p>(</c-><c- b>size_t</c-> <c- n>min</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>n</c-> <c- o>=</c-> <c- mi>0</c-><c- p>);</c-></ins>
 </pre>
@@ -2938,8 +2973,10 @@ of <code class="highlight"><c- n>T</c-></code>.</ins>
     <del>If reallocation occurs, uses <code class="highlight"><c- n>Allocator</c-><c- o>::</c-><c- n>allocate</c-><c- p>()</c-></code> which may throw an appropriate exception. [<i>Note:</i> This operation
 may change the iterative order of the elements in <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. <i>—end note</i>]</del>
    </p>
-   <h2 class="heading settled" data-level="5" id="acknowledgements"><span class="secno">5. </span><span class="content">Acknowledgements</span><a class="self-link" href="#acknowledgements"></a></h2>
+   <ins><i>Postconditions:</i> <code class="highlight"><c- n>capacity</c-><c- p>()</c-> <c- o>>=</c-> <c- n>n</c-></code> is <code class="highlight">true</code>.</ins>
+   <h2 class="heading settled" data-level="6" id="acknowledgements"><span class="secno">6. </span><span class="content">Acknowledgements</span><a class="self-link" href="#acknowledgements"></a></h2>
    <p>Thanks to Matthew Bentley for proposing <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>hive</c-></code>.</p>
+   <p>Thanks to Joe Gottman for his comments on a draft of this paper.</p>
   </main>
 <script>
 (function() {
@@ -3075,4 +3112,6 @@ may change the iterative order of the elements in <code class="highlight"><c- o>
   <dl>
    <dt id="biblio-d0447r20">[D0447R20]
    <dd>Matthew Bentley. <a href="https://plflib.org/D0447R20_-_Introduction_of_hive_to_the_Standard_Library.html"><cite>Introduction of std::hive to the standard library</cite></a>. May 2022. URL: <a href="https://plflib.org/D0447R20_-_Introduction_of_hive_to_the_Standard_Library.html">https://plflib.org/D0447R20_-_Introduction_of_hive_to_the_Standard_Library.html</a>
+   <dt id="biblio-impl">[Impl]
+   <dd>Arthur O'Dwyer. <a href="https://github.com/Quuxplusone/SG14/blob/ajo/include/sg14/plf_hive.h"><cite>Reference implementation of this proposal</cite></a>. May 2022. URL: <a href="https://github.com/Quuxplusone/SG14/blob/ajo/include/sg14/plf_hive.h">https://github.com/Quuxplusone/SG14/blob/ajo/include/sg14/plf_hive.h</a>
   </dl>

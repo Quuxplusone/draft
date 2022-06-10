@@ -2,7 +2,7 @@
 Title: Improve std::hive::reshape
 Shortname: D2596
 Revision: 0
-!Draft Revision: 5
+!Draft Revision: 6
 Audience: LEWG, LWG
 Status: D
 Group: WG21
@@ -180,6 +180,12 @@ No, the real-world `vector` sensibly says that it should just keep geometrically
 conks out. In my opinion, `hive` should behave the same way. Let the *allocator* decide how many bytes
 is too much to allocate at once. Don't make it the container's problem.
 
+Note:
+Discussion in SG14 (2022-06-08) suggested that maybe `hive_limits(16, 16)` would be useful for SIMD processing;
+but that doesn't hold up well under scrutiny. The reference implementation doesn't store `T` objects contiguously.
+And even if `hive_limits(16, 16)` were useful (which it's not), that rationale wouldn't apply to
+`hive_limits(23, 29)` and so on.
+
 
 ## Max block size causes O(n) behavior ## {#motivation-bigo}
 
@@ -207,8 +213,8 @@ order starting from 1; those "serial numbers" are required by `hive::iterator`'s
 `operator<`. (Aside: I don't think `operator<` should exist either, but
 my understanding is that that's already been litigated.)
 
-Every time you `erase` the last element from a block (in other words,
-every time you change `[_ _ 1]` into `[_ _ _]`), you need to move the
+Every time you `erase` the last element from a block (changing `[_ _ 1]`
+into `[_ _ _]`), you need to move the
 newly unused block from the active block list to the unused block list.
 And then you need to renumber all the subsequent blocks. Quoting P0447R20's
 specification of `erase`:
@@ -245,8 +251,8 @@ Consider this program parameterized on `N`:
 
 The final loop takes O(`N`<sup>2</sup>) time to run! The reason is that in the
 reference implementation, `hive`'s list of blocks-with-erasures is singly linked.
-Every time you `erase` the last element from a block (in other words,
-every time you change `[_ _ _ 2]` into `[_ _ _ _]`), you need to unlink the
+Every time you `erase` the last element from a block
+(changing `[_ _ _ 2]` into `[_ _ _ _]`), you need to unlink the
 newly empty block from the list of blocks with erasures; and thanks to how we
 set up this snippet, the current block will always happen to be at the end of
 that list! So each `erase` takes O(`h.size()`) time, and the overall program
@@ -331,15 +337,15 @@ In P0447R20, `h.splice(h2)` is a "sticky" operation: it does not change `h`'s li
 This means that if `h2` contains any active blocks larger than `h.block_capacity_limits().max`,
 then `h.splice(h2)` will fail and throw `length_error`! This is a problem on three levels:
 
-- It's a specification speedbump: Should we say something about the state of `h2`
+- Specification speedbump: Should we say something about the state of `h2`
     after the throw? for example, should we guarantee that any too-large blocks not
     transferred out of `h2` will remain in `h2`, kind of like what happens in
     `std::set::merge`? Or should we leave it unspecified?
 
-- It's a correctness pitfall: `splice` "should" just twiddle a few pointers. The idea
+- Correctness pitfall: `splice` "should" just twiddle a few pointers. The idea
     that it might actually *fail* is not likely to occur to the working programmer.
 
-- It's a performance pessimization: Again, `splice` "should" just twiddle a few pointers.
+- Performance pessimization: Again, `splice` "should" just twiddle a few pointers.
     But P0447R20's specification requires us to traverse `h2` looking for too-large
     active blocks. This adds an O(n) step that doesn't "need" to be there.
 
@@ -355,7 +361,7 @@ intended to be impossible in practice.
 
 Every STL container's constructor overload set is "twice as big as necessary"
 because of the duplication between `container(Args...)` and `container(Args..., Alloc)`.
-Hive's constructor overload set is "four times as big as necessary" because
+`hive`'s constructor overload set is "four times as big as necessary" because
 of the duplication between `container(Args...)` and `container(Args..., hive_limits)`.
 
 P0447R20 `hive` has 18 constructor overloads. My proposal removes 7 of them.
@@ -371,18 +377,19 @@ more important to the average programmer than min and max block capacities!
 <xmp>
     // Today's multi-step process for vector
     std::vector<int> v;
-    v.reserve(12);
+    v.reserve(12);            // [_ _ _ _ _ _ _ _ _ _ _ _]
     v.assign({1,2,3,4,5,6});  // [1 2 3 4 5 6 _ _ _ _ _ _]
 
     // Today's multi-step process for hive
     std::hive<int> h;
-    h.reshape(std::hive_limits(3, 5));
-    h.reserve(12);            // [_ _ _ _ _] [_ _ _ _ _] [_ _ _]
-    h.assign({1,2,3,4,5,6});  // [1 2 3 4 5] [6 _ _ _ _] [_ _ _]
+    h.reshape(std::hive_limits(12, h.block_capacity_hard_limits().max));
+    h.reserve(12);            // [_ _ _ _ _ _ _ _ _ _ _ _ _]
+    h.reshape(h.block_capacity_hard_limits());
+    h.assign({1,2,3,4,5,6});  // [1 2 3 4 5 6 _ _ _ _ _ _ _]
 
     // Today's (insufficient) single-step process for hive
     // fails to provide a setting for overall capacity
-    std::hive<int> h({1,2,3,4,5,6}, {3,5});
+    std::hive<int> h({1,2,3,4,5,6}, {3, 5});
                               // [1 2 3 4 5] [6 _ _]
 </xmp>
 
@@ -428,8 +435,7 @@ make `h.reshape({0, SIZE_MAX})` well-defined, and make `h.reshape({10, 1000})` U
 the implementation doesn't support *any* block sizes in the range [10, 1000]. We could even mandate that the implementation
 *must* throw `length_error`, instead of having UB.
 
-The second problem is bigger: The presence of `hive_limits` vastly increases the "specification surface area" of `hive`'s API.
-Many hive operations interact with `hive_limits`:
+The second problem is bigger: `hive_limits` vastly increases the "specification surface area" of `hive`'s API.
 
 - Every constructor needs to specify (or UB) what happens when the supplied `hive_limits` are invalid.
 
@@ -444,8 +450,8 @@ Many hive operations interact with `hive_limits`:
 
 - `reshape` needs to think about how to restore the hive's invariants if an exception is thrown. (See below.)
 
-All this extra specification effort is costly, for LWG and for vendors. Notice that my proposal's "Proposed Wording"
-is mostly deletions.
+All this extra specification effort is costly, for LWG and for vendors.
+My "Proposed Wording" is mostly deletions.
 
 When I say "`reshape` needs to think about how to restore the hive's invariants," I'm talking about this example:
 
@@ -467,13 +473,56 @@ the hive with an "out-of-thin-air" <i>`current-limits`</i>? Implementors must gr
 in many places.
 
 
+# New model # {#new-model}
+
+In my proposed new capacity model, `hive_limits` is gone. Shape becomes an ephemeral property of a `hive` object,
+just like capacity is an ephemeral property of a `vector` or `deque`. Other ephemeral properties of `hive` include
+capacity and sortedness:
+
+<xmp>
+    std::hive<int> h = {1,2,3};
+    h.erase(h.begin());  // [_ 2 3]
+    h.sort();            // [_ 2 3]
+    h.insert(4);         // [4 2 3], no longer sorted
+
+    h.reshape(4, 8);     // [4 2 3 _] [_ _ _ _]
+    auto h2 = h;         // [4 2 3], no longer capacious
+</xmp>
+
+I propose the interface `bool reshape(size_t min, size_t n=0)`, where `min` is the new minimum block size (that is,
+the new hive's elements are guaranteed at least *x* degree of cache-friendliness) and `n` is the new capacity (that is,
+you're guaranteed to be able to insert *x* more elements before touching the allocator again). Note that `h.reshape(0, n)`
+means the same thing as `h.reserve(n)` except that `reshape` is allowed to invalidate iterators.
+
+* The `bool` return value tells the programmer whether iterator invalidation occurred.
+    I think this is likely to be useful information; if it is not provided, then the programmer
+    *must always assume* that iterator invalidation has taken place.
+
+* `min` is the argument that affects the hive's shape (so it is non-optional); `n` has a sensible default.
+    If you call `h.reshape(min)` without providing a new capacity `n`, then you're saying you don't care about
+    the capacity of the hive. One-argument `reshape` is very much like `shrink_to_fit`.
+
+* Taking two adjacent `size_t` arguments is unfortunate. But notice that they are in the "correct" order: if you
+    flipped them around, like `reshape(n, min=0)`, then `h.reshape(x)` would do exactly the same thing as `h.reserve(x)`,
+    and that would be silly. So we have a good mnemonic for why the `min` argument should come first.
+
+* There is no longer any way to force a max block size. If the implementation wants to make your elements
+    "more contiguous," you can't stop it (fixing [[#motivation-bigo]]).
+
+* Block sizes are ephemeral, not "sticky"; they needn't be stored in data members (fixing [[#motivation-pmr-analogy]]).
+
+This new model has been implemented in a fork of Matt Bentley's implementation; see [[Impl]].
+Compile with `-DPLF_HIVE_P2596=0` for P0447R20, or `-DPLF_HIVE_P2596=1` for
+this new model.
+
+
 # Proposed wording relative to P0447R20 # {#wording}
 
 The wording in this section is relative to [[D0447R20]] as it stands today.
 
 <div class="note">
-In addition to these core changes, I claim that every reference in P0447 to
-"reserved blocks" should be changed to "unused blocks" for clarity. And then the
+In addition to these changes, every reference in P0447 to
+"reserved blocks" should be changed to "unused blocks" for clarity. The
 vast majority of those references can simply be deleted, because my proposal largely
 eliminates the normative distinction between "active" and "unused" blocks.
 For example, P0447R20's specification for `erase` currently says
@@ -483,14 +532,14 @@ If the active block which `position` is located within becomes empty [...] as a 
 that active block is either deallocated or transformed into a reserved block.
 </blockquote>
 
-After my proposal, that sentence can be removed, because it doesn't carry any normative weight
+After my proposal, that sentence can be removed, because it doesn't carry normative weight
 anymore: sure, the container will still behave exactly that way, but we no longer need to
 normatively *specify* that the empty block is non-active, because we no longer need to
 normatively prevent it from interfering with a `splice`. (After this patch, `splice` can
 never fail to transfer a block for any reason, so it doesn't need to go out of its way to
 avoid transferring unused blocks, so we don't need to normatively describe the tracking of
 unused blocks anymore. The separate unused-block list remains the intended implementation
-technique, for performance reasons; but it will no longer be directly observable by the programmer.)
+technique, for performance; but it will no longer be directly observable by the programmer.)
 </div>
 
 ## [hive.overview] ## {#wording-hive-overview}
@@ -828,8 +877,6 @@ closer to `n`. It does not increase `capacity()`; it may reduce `capacity()`, bu
 
 <i>Complexity:</i> Linear in the number of reserved blocks <del>deallocated</del>.
 
-<p><ins><i>Postconditions:</i> `capacity() >= n` is `true`.</ins>
-
 <i>Remarks:</i> <del>Does not reallocate elements and no</del> <ins>No</ins> iterators or references to elements in `*this` are invalidated.
 
 ## [hive.operations] ## {#wording-hive-operations}
@@ -909,10 +956,14 @@ the number of elements reallocated.</del> <ins>Linear in `size()`.</ins>
 of `T`.</ins> <del>If reallocation occurs, uses `Allocator::allocate()` which may throw an appropriate exception. [<i>Note:</i> This operation
 may change the iterative order of the elements in `*this`. <i>—end note</i>]</del>
 
+<ins><i>Postconditions:</i> `capacity() >= n` is `true`.</ins>
+
 
 # Acknowledgements # {#acknowledgements}
 
 Thanks to Matthew Bentley for proposing `std::hive`.
+
+Thanks to Joe Gottman for his comments on a draft of this paper.
 
 <pre class=biblio>
 {
@@ -922,6 +973,14 @@ Thanks to Matthew Bentley for proposing `std::hive`.
     ],
     "title": "Introduction of std::hive to the standard library",
     "href": "https://plflib.org/D0447R20_-_Introduction_of_hive_to_the_Standard_Library.html",
+    "date": "May 2022"
+  },
+  "Impl": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "Reference implementation of this proposal",
+    "href": "https://github.com/Quuxplusone/SG14/blob/ajo/include/sg14/plf_hive.h",
     "date": "May 2022"
   }
 }
