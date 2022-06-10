@@ -1560,7 +1560,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version fb1e763a4, updated Tue Mar 1 13:13:50 2022 -0800" name="generator">
+  <meta content="Bikeshed version 511ccb7, updated Mon Jun 6 13:31:59 2022 -0700" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 ins  {background-color: #CCFFCC; text-decoration: underline;}
@@ -2126,7 +2126,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R6<br>Object relocation in terms of move plus destroy</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2022-06-01">2022-06-01</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2022-06-10">2022-06-10</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -2138,7 +2138,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>29
+     <dd>30
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs">github.com/Quuxplusone/draft/blob/gh-pages/d1144-object-relocation.bs</a>
      <dt>Current:
@@ -2252,8 +2252,6 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <p>R6:</p>
      <ul>
       <li data-md>
-       <p>Fixed some typos.</p>
-      <li data-md>
        <p>Added <code class="highlight"><c- n>T</c-> <c- n>std</c-><c- o>::</c-><c- n>relocate</c-><c- p>(</c-><c- n>T</c-> <c- o>*</c-><c- n>source</c-><c- p>)</c-></code>.</p>
       <li data-md>
        <p>Changed the exception guarantee of <code class="highlight"><c- n>uninitialized_relocate</c-></code> and <code class="highlight"><c- n>uninitialized_relocate_n</c-></code> in accord with feedback from David Stone.</p>
@@ -2296,10 +2294,10 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    </ul>
    <h2 class="heading settled" data-level="2" id="intro"><span class="secno">2. </span><span class="content">Introduction and motivation</span><a class="self-link" href="#intro"></a></h2>
    <p>C++17 knows the verbs "move," "copy," "destroy," and "swap," where "swap" is a higher-level operation
-composed of several lower-level operations. To this list we propose to add the verb "relocate,"
+composed of several lower-level operations. To this list we add the verb "relocate,"
 which is a higher-level operation composed of exactly two lower-level operations.
 Given an object type <code class="highlight"><c- n>T</c-></code> and memory addresses <code class="highlight"><c- n>src</c-></code> and <code class="highlight"><c- n>dst</c-></code>,
-the phrase "<b><i>relocate</i></b> a <code class="highlight"><c- n>T</c-></code> from <code class="highlight"><c- n>src</c-></code> to <code class="highlight"><c- n>dst</c-></code>" means no more and no
+the phrase "<b><i>relocate</i></b> a <code class="highlight"><c- n>T</c-></code> from <code class="highlight"><c- n>src</c-></code> to <code class="highlight"><c- n>dst</c-></code>" means no more or
 less than "<em>move-construct</em> <code class="highlight"><c- n>dst</c-></code> from <code class="highlight"><c- n>src</c-></code>, and then immediately <em>destroy</em> the object at <code class="highlight"><c- n>src</c-></code>."</p>
    <p>Any type which is both move-constructible and destructible is <b><i>relocatable</i></b>.
 The notion can be modified by adverbs: we say that a type
@@ -2339,8 +2337,9 @@ we can optimize any routine that uses the moral equivalent of <code class="highl
 <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>R</c-><c- o>>::</c-><c- n>insert</c->
 </pre>
    <p>Optimizing <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code> produces massive code-size improvements for all swap-based
-algorithms, including <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>sort</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rotate</c-></code>. See <a href="https://www.youtube.com/watch?v=SGdfPextuAU&amp;t=19m56s">@19:56–21:22</a> in my C++Now 2019 talk.</p>
-   <p>However, see <a href="#pmr-concerns">§ 6.6 Confusing interactions with std::pmr and vector::insert</a> for further discussion of <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code>.</p>
+algorithms, including <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>sort</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rotate</c-></code>. See <a href="https://www.youtube.com/watch?v=SGdfPextuAU&amp;t=19m56s">@19:56–21:22</a> in my C++Now 2019 talk,
+and see <a href="https://p1144.godbolt.org/z/PPYhcYd8d">this Godbolt</a>.</p>
+   <p>But see <a href="#pmr-concerns">§ 6.6 Confusing interactions with std::pmr and vector::insert</a> for further discussion of <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code>.</p>
    <h4 class="heading settled" data-level="2.1.3" id="benefit-type-erasure"><span class="secno">2.1.3. </span><span class="content">More efficient small-buffer type-erasure</span><a class="self-link" href="#benefit-type-erasure"></a></h4>
    <p>Given a reliable way of detecting trivial relocatability,
 we can de-duplicate the code generated by small-buffer-optimized (SBO) type-erasing wrappers
@@ -2384,7 +2383,7 @@ warrant will be discovered only at runtime, via undefined behavior. See <a href=
 </pre>
    <p>If this proposal is adopted, then Folly can start using <code class="highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c-></code> in the implementation of <code class="highlight"><c- n>fbvector</c-></code>, and the programmer can stop writing explicit warrants.
 Finally, the programmer can start writing assertions of correctness, which aids maintainability and
-can even find real bugs. <a href="https://p1144.godbolt.org/z/dax9BR">Example:</a></p>
+can even find real bugs. <a href="https://p1144.godbolt.org/z/7b8893sjr">Example:</a></p>
 <pre class="language-c++ highlight"><c- n>class</c-> <c- n>Widget</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>lst_</c-><c- p>;</c->
 <c- p>};</c->
@@ -2575,7 +2574,7 @@ associated with the relocation of the value of <code class="highlight"><c- o>*</
 </pre><p>except that if <code class="highlight"><c- n>T</c-></code> is trivially relocatable <i>[basic.types]</i>, side effects
 associated with the relocation of the object’s value might not happen.</p> </small>
    </blockquote>
-   <p class="note" role="note"><span>Note:</span> These functions have both been implemented in my libc++ fork; for <code class="highlight"><c- n>relocate</c-></code>, see <a href="https://godbolt.org/z/cqPP4oeE9">godbolt.org/z/cqPP4oeE9</a> and <a data-link-type="biblio" href="#biblio-stdrelocateiscute">[StdRelocateIsCute]</a>. My implementation of their "as-if-by-memcpy" codepaths relies on UB,
+   <p class="note" role="note"><span>Note:</span> These functions have both been implemented in my libc++ fork; for <code class="highlight"><c- n>relocate</c-></code>, see <a href="https://p1144.godbolt.org/z/cqPP4oeE9">godbolt.org/z/cqPP4oeE9</a> and <a data-link-type="biblio" href="#biblio-stdrelocateiscute">[StdRelocateIsCute]</a>. My implementation of their "as-if-by-memcpy" codepaths relies on UB,
 but Richard Smith confirmed (at Kona, February 2019) that a vendor <em>could</em> implement these codepaths
 by a call to some <code class="highlight"><c- n>out_of_line_memcpy</c-></code> function whose implementation is invisible to the compiler’s optimizer.
 See <a href="https://www.youtube.com/watch?v=SGdfPextuAU&amp;t=45m23s">@45:23–48:39</a> in my C++Now 2019 talk.
@@ -2760,7 +2759,7 @@ mildly unintuitive behavior.</p>
    <h3 class="heading settled" data-level="6.6" id="pmr-concerns"><span class="secno">6.6. </span><span class="content">Confusing interactions with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-></code> and <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>insert</c-></code></span><a class="self-link" href="#pmr-concerns"></a></h3>
    <p class="note" role="note"><span>Note:</span> This section was added in P1144R5.</p>
    <p>The main thing P1144 does for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-></code> is efficient reallocation of the whole buffer.
-However, a secondary goal is to permit efficient insertion and erasure. <a href="https://godbolt.org/z/YOrD1F">Example:</a></p>
+However, a secondary goal is to permit efficient insertion and erasure. <a href="https://p1144.godbolt.org/z/vv5q69q44">Example:</a></p>
 <pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>></c-> <c- n>vs</c-><c- p>(</c-><c- mi>1000</c-><c- p>);</c->
 <c- n>vs</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>vs</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-><c- o>+</c-><c- mi>500</c-><c- p>);</c->
 </pre>
@@ -3039,7 +3038,7 @@ iterator from <code class="highlight"><c- n>InputIterator</c-></code> to <code c
    </table>
    <h2 class="heading settled" id="samples"><span class="content">Appendix B: Sample code</span><a class="self-link" href="#samples"></a></h2>
    <h3 class="heading settled" id="sample-uninit-relocate"><span class="content">Reference implementations of <code class="highlight"><c- n>relocate</c-></code>, <code class="highlight"><c- n>relocate_at</c-></code>, and <code class="highlight"><c- n>uninitialized_relocate</c-></code></span><a class="self-link" href="#sample-uninit-relocate"></a></h3>
-   <p>See this C++20 code at <a href="https://godbolt.org/z/vMbTYrdrP">godbolt.org/z/vMbTYrdrP</a>.</p>
+   <p>See this C++20 code at <a href="https://p1144.godbolt.org/z/vMbTYrdrP">godbolt.org/z/vMbTYrdrP</a>.</p>
    <p><small></small></p>
    <small> <pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
 <c- n>T</c-> <c- n>relocate</c-><c- p>(</c-><c- n>T</c-> <c- o>*</c-><c- n>source</c-><c- p>)</c->
@@ -3329,17 +3328,16 @@ virtual methods to be "naturally" trivially relocatable.</p>
 and <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>(</c-><c- b>bool</c-><c- p>)]]</c-></code> are given in <a href="#sample-conditional">Conditionally trivial relocation</a>.</p>
    <p>As of November 2018, libstdc++ performs the <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>resize</c-></code> optimization
 for any type which has manually specialized <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>__is_bitwise_relocatable</c-></code>.
-(See it on godbolt.org <a href="https://godbolt.org/z/hvx5bg">here</a>.)
+(See <a href="https://godbolt.org/z/f7971hEcG">this Godbolt</a>.)
 Manual specialization is also the approach used by <a data-link-type="biblio" href="#biblio-eastl">[EASTL]</a>, <a data-link-type="biblio" href="#biblio-folly">[Folly]</a>, and <a data-link-type="biblio" href="#biblio-bsl">[BSL]</a>.
 As of 2022-06-01, the only libstdc++ library type for which <code class="highlight"><c- n>__is_bitwise_relocatable</c-></code> has
 been specialized is <code class="highlight"><c- n>deque</c-></code>; see <a data-link-type="biblio" href="#biblio-deque">[Deque]</a> and <a href="#nothrow-relocatable">§ 6.5 Unintuitive is_nothrow_relocatable</a>.</p>
    <p>As of April 2022, Clang trunk provides a compiler builtin type trait <code class="highlight"><c- n>__is_trivially_relocatable</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code> (see <a data-link-type="biblio" href="#biblio-d114732">[D114732]</a>), which is largely the same as the trait proposed in this paper. (There are slight
-differences; for example, Clang reports polymorphic types, reference types, and incomplete types
-as trivially relocatable, whereas P1144’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable</c-></code> does not.
-I’m not aware that any of these differences in Clang were done intentionally.)
-Clang trunk does <em>not</em> provide any equivalent of the <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> attribute, though, so <code class="highlight"><c- n>__is_trivially_relocatable</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code> is true only for types <code class="highlight"><c- n>T</c-></code> that are "naturally"
-trivially relocatable, such as trivially copyable types and types marked with the <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivial_abi</c-><c- p>]]</c-></code> attribute. As of 2022-06-01, Clang trunk has no conception of a type which is non-trivial for purposes of calls
-and yet is trivially relocatable. But Clang’s current status is compatible with P1144 (except for the
+differences; <a href="https://p1144.godbolt.org/z/MhncMxrdj">e.g.</a>, Clang reports polymorphic types, reference types, and incomplete types
+as trivially relocatable, whereas P1144 does not. I’m not aware that any of Clang’s differences were intentional.)
+Clang trunk doesn’t provide any equivalent of the <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> attribute, so <code class="highlight"><c- n>__is_trivially_relocatable</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code> is true only for types <code class="highlight"><c- n>T</c-></code> that are "naturally"
+trivially relocatable, such as trivially copyable types and types marked with the <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivial_abi</c-><c- p>]]</c-></code> attribute. As of 2022-06-10, Clang trunk has no conception of a type which is non-trivial for purposes of calls
+and yet is trivially relocatable. But Clang’s current status is compatible with P1144 (modulo the
 few unintentional differences in <code class="highlight"><c- n>__is_trivially_relocatable</c-></code> mentioned above).</p>
   </main>
 <script>
