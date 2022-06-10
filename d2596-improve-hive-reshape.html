@@ -2085,7 +2085,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2596R0<br>Improve std::hive::reshape</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2022-05-29">2022-05-29</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2022-06-10">2022-06-10</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>6
+     <dd>8
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2596-improve-hive-reshape.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2596-improve-hive-reshape.bs</a>
      <dt>Current:
@@ -2137,6 +2137,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#motivation-splice"><span class="secno">3.4</span> <span class="content"><code class="highlight"><c- n>splice</c-></code> is O(n), and can throw</span></a>
       <li><a href="#motivation-bloat"><span class="secno">3.5</span> <span class="content"><code class="highlight"><c- n>hive_limits</c-></code> causes constructor overload set bloat</span></a>
       <li><a href="#motivation-ub"><span class="secno">3.6</span> <span class="content"><code class="highlight"><c- n>hive_limits</c-></code> introduces unnecessary UB</span></a>
+      <li><a href="#motivation-batches"><span class="secno">3.7</span> <span class="content">Un-criticism: Batches of input/output</span></a>
      </ol>
     <li><a href="#new-model"><span class="secno">4</span> <span class="content">New model</span></a>
     <li>
@@ -2502,6 +2503,84 @@ then we’ll lose data (namely element <code class="highlight"><c- mi>5</c-></co
 something "consistent but novel" such as <code class="highlight"><c- p>{</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>}</c-></code> or <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>block_capacity_hard_limits</c-><c- p>()</c-></code>. In short: May a failed operation leave
 the hive with an "out-of-thin-air" <i><code class="highlight"><c- n>current</c-><c- o>-</c-><c- n>limits</c-></code></i>? Implementors must grapple with this kind of question
 in many places.</p>
+   <h3 class="heading settled" data-level="3.7" id="motivation-batches"><span class="secno">3.7. </span><span class="content">Un-criticism: Batches of input/output</span><a class="self-link" href="#motivation-batches"></a></h3>
+   <p>The <code class="highlight"><c- n>reshape</c-></code> and <code class="highlight"><c- n>hive_limits</c-></code> features are not mentioned in any user-submitted issues on <a data-link-type="biblio" href="#biblio-plfcolony">[PlfColony]</a>,
+but there is one relevant user-submitted issue on <a data-link-type="biblio" href="#biblio-plfstack">[PlfStack]</a>:</p>
+   <blockquote>
+    <p>If you know that your data is coming in groups of let’s say 100, and then another 100,
+and then 100 again etc but you don’t know when it is gonna stop. Having the size of the group
+set at 100 would allow to allocate the right amount of memory each time.</p>
+   </blockquote>
+   <p>In other words, this programmer wants to do something like this:</p>
+<pre class="highlight"><c- c1>// OldSmart</c->
+<c- b>int</c-> <c- n>fake_input</c-><c- p>[</c-><c- mi>100</c-><c- p>]</c-> <c- o>=</c-> <c- p>{};</c->
+<c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>;</c->
+<c- n>h</c-><c- p>.</c-><c- n>reshape</c-><c- p>(</c-><c- mi>100</c-><c- p>,</c-> <c- mi>100</c-><c- p>);</c->  <c- c1>// blocks of size exactly 100</c->
+<c- k>while</c-> <c- p>(</c->true<c- p>)</c-> <c- p>{</c->
+    <c- k>if</c-> <c- p>(</c-><c- n>rand</c-><c- p>()</c-> <c- o>%</c-> <c- mi>2</c-><c- p>)</c-> <c- p>{</c->
+        <c- n>h</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>fake_input</c-><c- p>,</c-> <c- n>fake_input</c-><c- o>+</c-><c- mi>100</c-><c- p>);</c->  <c- c1>// read a whole block</c->
+    <c- p>}</c-> <c- k>else</c-> <c- p>{</c->
+        <c- n>h</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>std</c-><c- o>::</c-><c- n>next</c-><c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- mi>100</c-><c- p>));</c->  <c- c1>// erase and "unuse" a whole block</c->
+    <c- p>}</c->
+<c- p>}</c->
+</pre>
+   <p>If the programmer doesn’t call <code class="highlight"><c- n>reshape</c-></code>, we’ll end up with <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>capacity</c-><c- p>()</c-> <c- o>==</c-> <c- mi>2</c-><c- o>*</c-><c- n>h</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> in the worst case, and a single big block
+being used roughly like a circular buffer. This is actually not bad.</p>
+   <p>A programmer who desperately wants the exactly-100 behavior can still get it,
+after this patch, by working only a tiny bit harder:</p>
+<pre class="highlight"><c- c1>// NewSmart</c->
+<c- b>int</c-> <c- n>fake_input</c-><c- p>[</c-><c- mi>100</c-><c- p>]</c-> <c- o>=</c-> <c- p>{};</c->
+<c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>h</c-><c- p>;</c->
+<c- k>while</c-> <c- p>(</c->true<c- p>)</c-> <c- p>{</c->
+    <c- k>if</c-> <c- p>(</c-><c- n>rand</c-><c- p>()</c-> <c- o>%</c-> <c- mi>2</c-><c- p>)</c-> <c- p>{</c->
+        <c- k>if</c-> <c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>capacity</c-><c- p>()</c-> <c- o>==</c-> <c- n>h</c-><c- p>.</c-><c- n>size</c-><c- p>())</c-> <c- p>{</c->
+            <c- n>std</c-><c- o>::</c-><c- n>hive</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>temp</c-><c- p>;</c->
+            <c- n>temp</c-><c- p>.</c-><c- n>reserve</c-><c- p>(</c-><c- mi>100</c-><c- p>);</c->
+            <c- n>h</c-><c- p>.</c-><c- n>splice</c-><c- p>(</c-><c- n>temp</c-><c- p>);</c->
+        <c- p>}</c->
+        <c- n>h</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>fake_input</c-><c- p>,</c-> <c- n>fake_input</c-><c- o>+</c-><c- mi>100</c-><c- p>);</c->  <c- c1>// read a whole block</c->
+    <c- p>}</c-> <c- k>else</c-> <c- p>{</c->
+        <c- n>h</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>std</c-><c- o>::</c-><c- n>next</c-><c- p>(</c-><c- n>h</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- mi>100</c-><c- p>));</c->  <c- c1>// erase and "unuse" a whole block</c->
+    <c- p>}</c->
+<c- p>}</c->
+</pre>
+   <p>I have benchmarked these options (<a data-link-type="biblio" href="#biblio-bench">[Bench]</a>) and see the following results.
+(<code class="highlight"><c- n>Matt</c-></code> is Matthew Bentley’s original <code class="highlight"><c- n>plf</c-><c- o>::</c-><c- n>hive</c-></code>, <code class="highlight"><c- n>Old</c-></code> is my implementation of P0447, <code class="highlight"><c- n>New</c-></code> is my implementation of P2596; <code class="highlight"><c- n>Naive</c-></code> simply omits the call to <code class="highlight"><c- n>reshape</c-></code>, <code class="highlight"><c- n>Smart</c-></code> ensures all blocks are size-<code class="highlight"><c- n>N</c-></code> using the corresponding approach above.)
+With N=100, no significant difference between the <code class="highlight"><c- n>Smart</c-></code> and <code class="highlight"><c- n>Naive</c-></code> versions:</p>
+<pre class="highlight"><c- n>$</c-> <c- n>bin</c-><c- o>/</c-><c- n>ubench</c-> <c- o>--</c-><c- n>benchmark_display_aggregates_only</c-><c- o>=</c->true <c- o>--</c-><c- n>benchmark_repetitions</c-><c- o>=</c-><c- mi>5</c-> <c- o>|</c-> <c- n>grep</c-> <c- n>mean</c->
+<c- mi>2022</c-><c- mo>-06</c-><c- mi>-10</c-><c- n>T00</c-><c- o>:</c-><c- mi>32</c-><c- o>:</c-><c- mi>11</c-><c- mo>-04</c-><c- o>:</c-><c- mo>00</c->
+<c- n>Running</c-> <c- n>bin</c-><c- o>/</c-><c- n>ubench</c->
+<c- n>Run</c-> <c- n>on</c-> <c- p>(</c-><c- mi>8</c-> <c- n>X</c-> <c- mi>2200</c-> <c- n>MHz</c-> <c- n>CPU</c-> <c- n>s</c-><c- p>)</c->
+<c- n>CPU</c-> <c- n>Caches</c-><c- o>:</c->
+  <c- n>L1</c-> <c- n>Data</c-> <c- mi>32</c-> <c- n>KiB</c-> <c- p>(</c-><c- n>x4</c-><c- p>)</c->
+  <c- n>L1</c-> <c- n>Instruction</c-> <c- mi>32</c-> <c- n>KiB</c-> <c- p>(</c-><c- n>x4</c-><c- p>)</c->
+  <c- n>L2</c-> <c- n>Unified</c-> <c- mi>256</c-> <c- n>KiB</c-> <c- p>(</c-><c- n>x4</c-><c- p>)</c->
+  <c- n>L3</c-> <c- n>Unified</c-> <c- mi>6144</c-> <c- n>KiB</c-> <c- p>(</c-><c- n>x1</c-><c- p>)</c->
+<c- n>Load</c-> <c- n>Average</c-><c- o>:</c-> <c- mf>2.28</c-><c- p>,</c-> <c- mf>2.14</c-><c- p>,</c-> <c- mf>2.06</c->
+<c- n>BM_PlfStackIssue1_MattSmart_mean</c->        <c- mi>93298</c-> <c- n>ns</c->        <c- mi>93173</c-> <c- n>ns</c->            <c- mi>5</c->
+<c- n>BM_PlfStackIssue1_MattNaive_mean</c->        <c- mi>93623</c-> <c- n>ns</c->        <c- mi>93511</c-> <c- n>ns</c->            <c- mi>5</c->
+<c- n>BM_PlfStackIssue1_OldSmart_mean</c->        <c- mi>114478</c-> <c- n>ns</c->       <c- mi>114282</c-> <c- n>ns</c->            <c- mi>5</c->
+<c- n>BM_PlfStackIssue1_OldNaive_mean</c->        <c- mi>113285</c-> <c- n>ns</c->       <c- mi>113124</c-> <c- n>ns</c->            <c- mi>5</c->
+<c- n>BM_PlfStackIssue1_NewSmart_mean</c->        <c- mi>128535</c-> <c- n>ns</c->       <c- mi>128330</c-> <c- n>ns</c->            <c- mi>5</c->
+<c- n>BM_PlfStackIssue1_NewNaive_mean</c->        <c- mi>116530</c-> <c- n>ns</c->       <c- mi>116380</c-> <c- n>ns</c->            <c- mi>5</c->
+</pre>
+   <p>With N=1000 (<code class="highlight"><c- n>Matt</c-></code> can’t handle this because <code class="highlight"><c- n>h</c-><c- p>.</c-><c- n>block_capacity_hard_limits</c-><c- p>().</c-><c- n>max</c-> <c- o>&lt;</c-> <c- mi>1000</c-></code>),
+again no significant difference:</p>
+<pre class="nohighlight highlight"><c- n>$</c-> <c- n>bin</c-><c- o>/</c-><c- n>ubench</c-> <c- o>--</c-><c- n>benchmark_display_aggregates_only</c-><c- o>=</c->true <c- o>--</c-><c- n>benchmark_repetitions</c-><c- o>=</c-><c- mi>5</c-> <c- o>|</c-> <c- n>grep</c-> <c- n>mean</c->
+<c- mi>2022</c-><c- mo>-06</c-><c- mi>-10</c-><c- n>T00</c-><c- o>:</c-><c- mi>33</c-><c- o>:</c-><c- mi>12</c-><c- mo>-04</c-><c- o>:</c-><c- mo>00</c->
+<c- n>Running</c-> <c- n>bin</c-><c- o>/</c-><c- n>ubench</c->
+<c- n>Run</c-> <c- n>on</c-> <c- p>(</c-><c- mi>8</c-> <c- n>X</c-> <c- mi>2200</c-> <c- n>MHz</c-> <c- n>CPU</c-> <c- n>s</c-><c- p>)</c->
+<c- n>CPU</c-> <c- n>Caches</c-><c- o>:</c->
+  <c- n>L1</c-> <c- n>Data</c-> <c- mi>32</c-> <c- n>KiB</c-> <c- p>(</c-><c- n>x4</c-><c- p>)</c->
+  <c- n>L1</c-> <c- n>Instruction</c-> <c- mi>32</c-> <c- n>KiB</c-> <c- p>(</c-><c- n>x4</c-><c- p>)</c->
+  <c- n>L2</c-> <c- n>Unified</c-> <c- mi>256</c-> <c- n>KiB</c-> <c- p>(</c-><c- n>x4</c-><c- p>)</c->
+  <c- n>L3</c-> <c- n>Unified</c-> <c- mi>6144</c-> <c- n>KiB</c-> <c- p>(</c-><c- n>x1</c-><c- p>)</c->
+<c- n>Load</c-> <c- n>Average</c-><c- o>:</c-> <c- mf>2.13</c-><c- p>,</c-> <c- mf>2.17</c-><c- p>,</c-> <c- mf>2.08</c->
+<c- n>BM_PlfStackIssue1_OldSmart_mean</c->       <c- mi>973149</c-> <c- n>ns</c->       <c- mi>972004</c-> <c- n>ns</c->            <c- mi>5</c->
+<c- n>BM_PlfStackIssue1_OldNaive_mean</c->       <c- mi>970737</c-> <c- n>ns</c->       <c- mi>969565</c-> <c- n>ns</c->            <c- mi>5</c->
+<c- n>BM_PlfStackIssue1_NewSmart_mean</c->      <c- mi>1032303</c-> <c- n>ns</c->      <c- mi>1031035</c-> <c- n>ns</c->            <c- mi>5</c->
+<c- n>BM_PlfStackIssue1_NewNaive_mean</c->      <c- mi>1011931</c-> <c- n>ns</c->      <c- mi>1010680</c-> <c- n>ns</c->            <c- mi>5</c->
+</pre>
    <h2 class="heading settled" data-level="4" id="new-model"><span class="secno">4. </span><span class="content">New model</span><a class="self-link" href="#new-model"></a></h2>
    <p>In my proposed new capacity model, <code class="highlight"><c- n>hive_limits</c-></code> is gone. Shape becomes an ephemeral property of a <code class="highlight"><c- n>hive</c-></code> object,
 just like capacity is an ephemeral property of a <code class="highlight"><c- n>vector</c-></code> or <code class="highlight"><c- n>deque</c-></code>. Other ephemeral properties of <code class="highlight"><c- n>hive</c-></code> include
@@ -3110,8 +3189,14 @@ may change the iterative order of the elements in <code class="highlight"><c- o>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
+   <dt id="biblio-bench">[Bench]
+   <dd>Arthur O'Dwyer. <a href="https://github.com/Quuxplusone/SG14/blob/e0012e6b56/benchmarks/hive_bench.cpp"><cite>Benchmark code (git branch 'ajo')</cite></a>. June 2022. URL: <a href="https://github.com/Quuxplusone/SG14/blob/e0012e6b56/benchmarks/hive_bench.cpp">https://github.com/Quuxplusone/SG14/blob/e0012e6b56/benchmarks/hive_bench.cpp</a>
    <dt id="biblio-d0447r20">[D0447R20]
    <dd>Matthew Bentley. <a href="https://plflib.org/D0447R20_-_Introduction_of_hive_to_the_Standard_Library.html"><cite>Introduction of std::hive to the standard library</cite></a>. May 2022. URL: <a href="https://plflib.org/D0447R20_-_Introduction_of_hive_to_the_Standard_Library.html">https://plflib.org/D0447R20_-_Introduction_of_hive_to_the_Standard_Library.html</a>
    <dt id="biblio-impl">[Impl]
-   <dd>Arthur O'Dwyer. <a href="https://github.com/Quuxplusone/SG14/blob/ajo/include/sg14/plf_hive.h"><cite>Reference implementation of this proposal</cite></a>. May 2022. URL: <a href="https://github.com/Quuxplusone/SG14/blob/ajo/include/sg14/plf_hive.h">https://github.com/Quuxplusone/SG14/blob/ajo/include/sg14/plf_hive.h</a>
+   <dd>Arthur O'Dwyer. <a href="https://github.com/Quuxplusone/SG14/blob/e0012e6b56/include/sg14/plf_hive.h"><cite>Reference implementation of P2596R0 (git branch 'ajo')</cite></a>. June 2022. URL: <a href="https://github.com/Quuxplusone/SG14/blob/e0012e6b56/include/sg14/plf_hive.h">https://github.com/Quuxplusone/SG14/blob/e0012e6b56/include/sg14/plf_hive.h</a>
+   <dt id="biblio-plfcolony">[PlfColony]
+   <dd>Matthew Bentley. <a href="https://github.com/mattreecebentley/plf_colony/issues?q=is%3Aissue"><cite>plf_colony: All Issues</cite></a>. August 2016–April 2022. URL: <a href="https://github.com/mattreecebentley/plf_colony/issues?q=is%3Aissue">https://github.com/mattreecebentley/plf_colony/issues?q=is%3Aissue</a>
+   <dt id="biblio-plfstack">[PlfStack]
+   <dd>Etienne Parmentier; Matthew Bentley. <a href="https://github.com/mattreecebentley/plf_stack/issues/1"><cite>plf_stack: change_group_sizes and related functions not available</cite></a>. November 2020. URL: <a href="https://github.com/mattreecebentley/plf_stack/issues/1">https://github.com/mattreecebentley/plf_stack/issues/1</a>
   </dl>

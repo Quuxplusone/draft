@@ -2,7 +2,7 @@
 Title: Improve std::hive::reshape
 Shortname: D2596
 Revision: 0
-!Draft Revision: 6
+!Draft Revision: 8
 Audience: LEWG, LWG
 Status: D
 Group: WG21
@@ -28,7 +28,7 @@ Abstract:
   a max block size, so "secret quadratic behavior" is less common. This model
   does not require the container to track anything; the new `reshape` is
   a simple mutating operation analogous to `reserve` or `sort`.
-Date: 2022-05-29
+Date: 2022-06-10
 </pre>
 
 <style>
@@ -471,6 +471,101 @@ cannot hold a block of capacity 4! So we must either lose data, or replace `h`'s
 something "consistent but novel" such as `{4,5}` or `h.block_capacity_hard_limits()`. In short: May a failed operation leave
 the hive with an "out-of-thin-air" <i>`current-limits`</i>? Implementors must grapple with this kind of question
 in many places.
+
+## Un-criticism: Batches of input/output ## {#motivation-batches}
+
+The `reshape` and `hive_limits` features are not mentioned in any user-submitted issues on [[PlfColony]],
+but there is one relevant user-submitted issue on [[PlfStack]]:
+
+> If you know that your data is coming in groups of let's say 100, and then another 100,
+> and then 100 again etc but you don't know when it is gonna stop. Having the size of the group
+> set at 100 would allow to allocate the right amount of memory each time.
+
+In other words, this programmer wants to do something like this:
+
+<xmp>
+    // OldSmart
+    int fake_input[100] = {};
+    std::hive<int> h;
+    h.reshape(100, 100);  // blocks of size exactly 100
+    while (true) {
+        if (rand() % 2) {
+            h.insert(fake_input, fake_input+100);  // read a whole block
+        } else {
+            h.erase(h.begin(), std::next(h.begin(), 100));  // erase and "unuse" a whole block
+        }
+    }
+</xmp>
+
+If the programmer doesn't call `reshape`, we'll end up with
+`h.capacity() == 2*h.size()` in the worst case, and a single big block
+being used roughly like a circular buffer. This is actually not bad.
+
+A programmer who desperately wants the exactly-100 behavior can still get it,
+after this patch, by working only a tiny bit harder:
+
+<xmp>
+    // NewSmart
+    int fake_input[100] = {};
+    std::hive<int> h;
+    while (true) {
+        if (rand() % 2) {
+            if (h.capacity() == h.size()) {
+                std::hive<int> temp;
+                temp.reserve(100);
+                h.splice(temp);
+            }
+            h.insert(fake_input, fake_input+100);  // read a whole block
+        } else {
+            h.erase(h.begin(), std::next(h.begin(), 100));  // erase and "unuse" a whole block
+        }
+    }
+</xmp>
+
+I have benchmarked these options ([[Bench]]) and see the following results.
+(`Matt` is Matthew Bentley's original `plf::hive`, `Old` is my implementation of P0447,
+`New` is my implementation of P2596; `Naive` simply omits the call to `reshape`,
+`Smart` ensures all blocks are size-`N` using the corresponding approach above.)
+With N=100, no significant difference between the `Smart` and `Naive` versions:
+
+<xmp>
+$ bin/ubench --benchmark_display_aggregates_only=true --benchmark_repetitions=5 | grep mean
+2022-06-10T00:32:11-04:00
+Running bin/ubench
+Run on (8 X 2200 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x4)
+  L1 Instruction 32 KiB (x4)
+  L2 Unified 256 KiB (x4)
+  L3 Unified 6144 KiB (x1)
+Load Average: 2.28, 2.14, 2.06
+BM_PlfStackIssue1_MattSmart_mean        93298 ns        93173 ns            5
+BM_PlfStackIssue1_MattNaive_mean        93623 ns        93511 ns            5
+BM_PlfStackIssue1_OldSmart_mean        114478 ns       114282 ns            5
+BM_PlfStackIssue1_OldNaive_mean        113285 ns       113124 ns            5
+BM_PlfStackIssue1_NewSmart_mean        128535 ns       128330 ns            5
+BM_PlfStackIssue1_NewNaive_mean        116530 ns       116380 ns            5
+</xmp>
+
+With N=1000 (`Matt` can't handle this because `h.block_capacity_hard_limits().max < 1000`),
+again no significant difference:
+
+<xmp class="nohighlight">
+$ bin/ubench --benchmark_display_aggregates_only=true --benchmark_repetitions=5 | grep mean
+2022-06-10T00:33:12-04:00
+Running bin/ubench
+Run on (8 X 2200 MHz CPU s)
+CPU Caches:
+  L1 Data 32 KiB (x4)
+  L1 Instruction 32 KiB (x4)
+  L2 Unified 256 KiB (x4)
+  L3 Unified 6144 KiB (x1)
+Load Average: 2.13, 2.17, 2.08
+BM_PlfStackIssue1_OldSmart_mean       973149 ns       972004 ns            5
+BM_PlfStackIssue1_OldNaive_mean       970737 ns       969565 ns            5
+BM_PlfStackIssue1_NewSmart_mean      1032303 ns      1031035 ns            5
+BM_PlfStackIssue1_NewNaive_mean      1011931 ns      1010680 ns            5
+</xmp>
 
 
 # New model # {#new-model}
@@ -967,6 +1062,14 @@ Thanks to Joe Gottman for his comments on a draft of this paper.
 
 <pre class=biblio>
 {
+  "Bench": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "Benchmark code (git branch 'ajo')",
+    "href": "https://github.com/Quuxplusone/SG14/blob/e0012e6b56/benchmarks/hive_bench.cpp",
+    "date": "June 2022"
+  },
   "D0447R20": {
     "authors": [
       "Matthew Bentley"
@@ -979,9 +1082,26 @@ Thanks to Joe Gottman for his comments on a draft of this paper.
     "authors": [
       "Arthur O'Dwyer"
     ],
-    "title": "Reference implementation of this proposal",
-    "href": "https://github.com/Quuxplusone/SG14/blob/ajo/include/sg14/plf_hive.h",
-    "date": "May 2022"
+    "title": "Reference implementation of P2596R0 (git branch 'ajo')",
+    "href": "https://github.com/Quuxplusone/SG14/blob/e0012e6b56/include/sg14/plf_hive.h",
+    "date": "June 2022"
+  },
+  "PlfColony": {
+    "authors": [
+      "Matthew Bentley"
+    ],
+    "title": "plf_colony: All Issues",
+    "href": "https://github.com/mattreecebentley/plf_colony/issues?q=is%3Aissue",
+    "date": "August 2016–April 2022"
+  },
+  "PlfStack": {
+    "authors": [
+      "Etienne Parmentier",
+      "Matthew Bentley"
+    ],
+    "title": "plf_stack: change_group_sizes and related functions not available",
+    "href": "https://github.com/mattreecebentley/plf_stack/issues/1",
+    "date": "November 2020"
   }
 }
 </pre>
