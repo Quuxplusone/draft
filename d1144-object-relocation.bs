@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 6
-!Draft Revision: 29
+!Draft Revision: 30
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -20,7 +20,7 @@ Abstract:
   that it is trivially relocatable.
   This paper was presented at C++Now 2019 as a 90-minute talk titled
   ["Trivially Relocatable."](https://www.youtube.com/watch?v=SGdfPextuAU)
-Date: 2022-06-01
+Date: 2022-06-10
 </pre>
 
 <style>
@@ -32,8 +32,6 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 # Changelog # {#changelog}
 
 - R6:
-
-    - Fixed some typos.
 
     - Added `T std::relocate(T *source)`.
 
@@ -78,10 +76,10 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 # Introduction and motivation # {#intro}
 
 C++17 knows the verbs "move," "copy," "destroy," and "swap," where "swap" is a higher-level operation
-composed of several lower-level operations. To this list we propose to add the verb "relocate,"
+composed of several lower-level operations. To this list we add the verb "relocate,"
 which is a higher-level operation composed of exactly two lower-level operations.
 Given an object type `T` and memory addresses `src` and `dst`,
-the phrase "<b><i>relocate</i></b> a `T` from `src` to `dst`" means no more and no
+the phrase "<b><i>relocate</i></b> a `T` from `src` to `dst`" means no more or
 less than "*move-construct* `dst` from `src`, and then immediately
 *destroy* the object at `src`."
 
@@ -144,9 +142,10 @@ we can optimize any routine that uses the moral equivalent of `std::swap`, such 
 
 Optimizing `std::swap` produces massive code-size improvements for all swap-based
 algorithms, including `std::sort` and `std::rotate`. See
-[@19:56–21:22](https://www.youtube.com/watch?v=SGdfPextuAU&t=19m56s) in my C++Now 2019 talk.
+[@19:56–21:22](https://www.youtube.com/watch?v=SGdfPextuAU&t=19m56s) in my C++Now 2019 talk,
+and see [this Godbolt](https://p1144.godbolt.org/z/PPYhcYd8d).
 
-However, see [[#pmr-concerns]] for further discussion of `vector::insert`.
+But see [[#pmr-concerns]] for further discussion of `vector::insert`.
 
 
 ### More efficient small-buffer type-erasure ### {#benefit-type-erasure}
@@ -219,7 +218,7 @@ in my C++Now 2019 talk.
 If this proposal is adopted, then Folly can start using `static_assert(std::is_trivially_relocatable_v<T>)`
 in the implementation of `fbvector`, and the programmer can stop writing explicit warrants.
 Finally, the programmer can start writing assertions of correctness, which aids maintainability and
-can even find real bugs. [Example:](https://p1144.godbolt.org/z/dax9BR)
+can even find real bugs. [Example:](https://p1144.godbolt.org/z/7b8893sjr)
 
 ```c++
     class Widget {
@@ -492,7 +491,7 @@ associated with the relocation of the object's value might not happen.
 </blockquote></small>
 
 Note:
-These functions have both been implemented in my libc++ fork; for `relocate`, see [godbolt.org/z/cqPP4oeE9](https://godbolt.org/z/cqPP4oeE9)
+These functions have both been implemented in my libc++ fork; for `relocate`, see [godbolt.org/z/cqPP4oeE9](https://p1144.godbolt.org/z/cqPP4oeE9)
 and [[StdRelocateIsCute]]. My implementation of their "as-if-by-memcpy" codepaths relies on UB,
 but Richard Smith confirmed (at Kona, February 2019) that a vendor *could* implement these codepaths
 by a call to some `out_of_line_memcpy` function whose implementation is invisible to the compiler's optimizer.
@@ -838,7 +837,7 @@ Note: This section was added in P1144R5.
 
 The main thing P1144 does for `std::vector` is efficient reallocation of the whole buffer.
 However, a secondary goal is to permit efficient insertion and erasure.
-[Example:](https://godbolt.org/z/YOrD1F)
+[Example:](https://p1144.godbolt.org/z/vv5q69q44)
 
 ```c++
     std::vector<std::string> vs(1000);
@@ -1047,7 +1046,7 @@ Appendix B: Sample code {#samples}
 
 ## Reference implementations of `relocate`, `relocate_at`, and `uninitialized_relocate` ## {#sample-uninit-relocate}
 
-See this C++20 code at [godbolt.org/z/vMbTYrdrP](https://godbolt.org/z/vMbTYrdrP).
+See this C++20 code at [godbolt.org/z/vMbTYrdrP](https://p1144.godbolt.org/z/vMbTYrdrP).
 
 <small>
 ```c++
@@ -1392,21 +1391,20 @@ and `[[trivially_relocatable(bool)]]` are given in [[#sample-conditional]].
 
 As of November 2018, libstdc++ performs the `vector::resize` optimization
 for any type which has manually specialized `std::__is_bitwise_relocatable`.
-(See it on godbolt.org <a href="https://godbolt.org/z/hvx5bg">here</a>.)
+(See [this Godbolt](https://godbolt.org/z/f7971hEcG).)
 Manual specialization is also the approach used by [[EASTL]], [[Folly]], and [[BSL]].
 As of 2022-06-01, the only libstdc++ library type for which `__is_bitwise_relocatable` has
 been specialized is `deque`; see [[Deque]] and [[#nothrow-relocatable]].
 
 As of April 2022, Clang trunk provides a compiler builtin type trait `__is_trivially_relocatable(T)`
 (see [[D114732]]), which is largely the same as the trait proposed in this paper. (There are slight
-differences; for example, Clang reports polymorphic types, reference types, and incomplete types
-as trivially relocatable, whereas P1144's `std::is_trivially_relocatable` does not.
-I'm not aware that any of these differences in Clang were done intentionally.)
-Clang trunk does *not* provide any equivalent of the `[[trivially_relocatable]]`
-attribute, though, so `__is_trivially_relocatable(T)` is true only for types `T` that are "naturally"
+differences; [e.g.](https://p1144.godbolt.org/z/MhncMxrdj), Clang reports polymorphic types, reference types, and incomplete types
+as trivially relocatable, whereas P1144 does not. I'm not aware that any of Clang's differences were intentional.)
+Clang trunk doesn't provide any equivalent of the `[[trivially_relocatable]]`
+attribute, so `__is_trivially_relocatable(T)` is true only for types `T` that are "naturally"
 trivially relocatable, such as trivially copyable types and types marked with the `[[clang::trivial_abi]]`
-attribute. As of 2022-06-01, Clang trunk has no conception of a type which is non-trivial for purposes of calls
-and yet is trivially relocatable. But Clang's current status is compatible with P1144 (except for the
+attribute. As of 2022-06-10, Clang trunk has no conception of a type which is non-trivial for purposes of calls
+and yet is trivially relocatable. But Clang's current status is compatible with P1144 (modulo the
 few unintentional differences in `__is_trivially_relocatable` mentioned above).
 
 
