@@ -15001,13 +15001,42 @@ namespace std {
       -> flat_map<typename KeyContainer::value_type, typename MappedContainer::value_type,
                   less<typename KeyContainer::value_type>, KeyContainer, MappedContainer>;
 
-  template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>>
-    flat_map(InputIterator, InputIterator, Compare = Compare())
-      -> flat_map<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>, Compare>;
+  template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>,
+           class Allocator = allocator<byte>>
+    flat_map(InputIterator, InputIterator, Compare = Compare(), Allocator = Allocator())
+      -> flat_map<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>, Compare,
+                  vector<@\exposid{iter-key-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-key-type}@<InputIterator>>>,
+                  vector<@\exposid{iter-mapped-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-mapped-type}@<InputIterator>>>>;
 
-  template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>>
-    flat_map(sorted_unique_t, InputIterator, InputIterator, Compare = Compare())
-      -> flat_map<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>, Compare>;
+  template<class InputIterator, class Allocator>
+    flat_map(InputIterator, InputIterator, Allocator)
+      -> flat_map<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>,
+                  less<@\exposid{iter-key-type}@<InputIterator>>,
+                  vector<@\exposid{iter-key-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-key-type}@<InputIterator>>>,
+                  vector<@\exposid{iter-mapped-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-mapped-type}@<InputIterator>>>>;
+
+  template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>,
+           class Allocator = allocator<byte>>
+    flat_map(sorted_unique_t, InputIterator, InputIterator, Compare = Compare(),
+             Allocator = Allocator())
+      -> flat_map<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>, Compare,
+                  vector<@\exposid{iter-key-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-key-type}@<InputIterator>>>,
+                  vector<@\exposid{iter-mapped-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-mapped-type}@<InputIterator>>>>;
+
+  template<class InputIterator, class Allocator>
+    flat_map(sorted_unique_t, InputIterator, InputIterator, Allocator)
+      -> flat_map<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>,
+                  less<@\exposid{iter-key-type}@<InputIterator>>,
+                  vector<@\exposid{iter-key-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-key-type}@<InputIterator>>>,
+                  vector<@\exposid{iter-mapped-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-mapped-type}@<InputIterator>>>>;
 
   template<ranges::@\libconcept{input_range}@ R, class Compare = less<@\exposid{range-key-type}@<R>>,
            class Allocator = allocator<byte>>
@@ -15022,13 +15051,26 @@ namespace std {
                   vector<@\exposid{range-key-type}@<R>, @\exposid{alloc-rebind}@<Allocator, @\exposid{range-key-type}@<R>>,
                   vector<@\exposid{range-mapped-type}@<R>, @\exposid{alloc-rebind}@<Allocator, @\exposid{range-mapped-type}@<R>>>;
 
-  template<class Key, class T, class Compare = less<Key>>
-    flat_map(initializer_list<pair<Key, T>>, Compare = Compare())
-      -> flat_map<Key, T, Compare>;
+  template<class Key, class T, class Compare = less<Key>, class Allocator = allocator<byte>>
+    flat_map(initializer_list<pair<Key, T>>, Compare = Compare(), Allocator = Allocator())
+      -> flat_map<Key, T, Compare, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>,
+                  vector<T, @\exposid{alloc-rebind}@<Allocator, T>>>;
 
-  template<class Key, class T, class Compare = less<Key>>
-    flat_map(sorted_unique_t, initializer_list<pair<Key, T>>, Compare = Compare())
-        -> flat_map<Key, T, Compare>;
+  template<class Key, class T, class Allocator>
+    flat_map(initializer_list<pair<Key, T>>, Allocator)
+      -> flat_map<Key, T, less<Key>, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>,
+                  vector<T, @\exposid{alloc-rebind}@<Allocator, T>>>;
+
+  template<class Key, class T, class Compare = less<Key>, class Allocator = allocator<byte>>
+    flat_map(sorted_unique_t, initializer_list<pair<Key, T>>, Compare = Compare(),
+             Allocator = Allocator())
+      -> flat_map<Key, T, Compare, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>,
+                  vector<T, @\exposid{alloc-rebind}@<Allocator, T>>>;
+
+  template<class Key, class T, class Allocator>
+    flat_map(sorted_unique_t, initializer_list<pair<Key, T>>, Allocator)
+      -> flat_map<Key, T, less<Key>, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>,
+                  vector<T, @\exposid{alloc-rebind}@<Allocator, T>>>;
 
   template<class Key, class T, class Compare, class KeyContainer, class MappedContainer,
             class Allocator>
@@ -16113,13 +16155,42 @@ namespace std {
       -> flat_multimap<typename KeyContainer::value_type, typename MappedContainer::value_type,
                        less<typename KeyContainer::value_type>, KeyContainer, MappedContainer>;
 
-  template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>>
-    flat_multimap(InputIterator, InputIterator, Compare = Compare())
-      -> flat_multimap<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>, Compare>;
+  template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>,
+           class Allocator = allocator<byte>>
+    flat_multimap(InputIterator, InputIterator, Compare = Compare(), Allocator = Allocator())
+      -> flat_multimap<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>, Compare,
+                       vector<@\exposid{iter-key-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-key-type}@<InputIterator>>>,
+                       vector<@\exposid{iter-mapped-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-mapped-type}@<InputIterator>>>>;
 
-  template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>>
-    flat_multimap(sorted_equivalent_t, InputIterator, InputIterator, Compare = Compare())
-      -> flat_multimap<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>, Compare>;
+  template<class InputIterator, class Allocator>
+    flat_multimap(InputIterator, InputIterator, Allocator)
+      -> flat_multimap<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>,
+                       less<@\exposid{iter-key-type}@<InputIterator>>,
+                       vector<@\exposid{iter-key-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-key-type}@<InputIterator>>>,
+                       vector<@\exposid{iter-mapped-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-mapped-type}@<InputIterator>>>>;
+
+  template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>,
+           class Allocator = allocator<byte>>
+    flat_multimap(sorted_equivalent_t, InputIterator, InputIterator, Compare = Compare(),
+                  Allocator = Allocator())
+      -> flat_multimap<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>, Compare,
+                       vector<@\exposid{iter-key-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-key-type}@<InputIterator>>>,
+                       vector<@\exposid{iter-mapped-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-mapped-type}@<InputIterator>>>>;
+
+  template<class InputIterator, class Allocator>
+    flat_multimap(sorted_equivalent_t, InputIterator, InputIterator, Allocator)
+      -> flat_multimap<@\exposid{iter-key-type}@<InputIterator>, @\exposid{iter-mapped-type}@<InputIterator>,
+                       less<@\exposid{iter-key-type}@<InputIterator>>,
+                       vector<@\exposid{iter-key-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-key-type}@<InputIterator>>>,
+                       vector<@\exposid{iter-mapped-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-mapped-type}@<InputIterator>>>>;
 
   template<ranges::@\libconcept{input_range}@ R, class Compare = less<@\exposid{range-key-type}@<R>>,
            class Allocator = allocator<byte>>
@@ -16138,13 +16209,26 @@ namespace std {
                        vector<@\exposid{range-mapped-type}@<R>,
                               @\exposid{alloc-rebind}@<Allocator, @\exposid{range-mapped-type}@<R>>>;
 
-  template<class Key, class T, class Compare = less<Key>>
-    flat_multimap(initializer_list<pair<Key, T>>, Compare = Compare())
-      -> flat_multimap<Key, T, Compare>;
+  template<class Key, class T, class Compare = less<Key>, class Allocator = allocator<byte>>
+    flat_multimap(initializer_list<pair<Key, T>>, Compare = Compare(), Allocator = Allocator())
+      -> flat_multimap<Key, T, Compare, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>,
+                       vector<T, @\exposid{alloc-rebind}@<Allocator, T>>>;
 
-  template<class Key, class T, class Compare = less<Key>>
-    flat_multimap(sorted_equivalent_t, initializer_list<pair<Key, T>>, Compare = Compare())
-        -> flat_multimap<Key, T, Compare>;
+  template<class Key, class T, class Allocator>
+    flat_multimap(initializer_list<pair<Key, T>>, Allocator)
+      -> flat_multimap<Key, T, less<Key>, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>,
+                       vector<T, @\exposid{alloc-rebind}@<Allocator, T>>>;
+
+  template<class Key, class T, class Compare = less<Key>, class Allocator = allocator<byte>>
+    flat_multimap(sorted_equivalent_t, initializer_list<pair<Key, T>>, Compare = Compare(),
+                  Allocator = Allocator())
+      -> flat_multimap<Key, T, Compare, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>,
+                       vector<T, @\exposid{alloc-rebind}@<Allocator, T>>>;
+
+  template<class Key, class T, class Allocator>
+    flat_multimap(sorted_equivalent_t, initializer_list<pair<Key, T>>, Allocator)
+      -> flat_multimap<Key, T, less<Key>, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>,
+                       vector<T, @\exposid{alloc-rebind}@<Allocator, T>>>;
 
   template<class Key, class T, class Compare, class KeyContainer, class MappedContainer,
             class Allocator>
@@ -16598,13 +16682,32 @@ namespace std {
     key_compare @\exposid{compare}@;        // \expos
   };
 
-  template<class InputIterator, class Compare = less<@\placeholder{iter-value-type}@<InputIterator>>>
-    flat_set(InputIterator, InputIterator, Compare = Compare())
-      -> flat_set<@\placeholder{iter-value-type}@<InputIterator>, Compare>;
+  template<class InputIterator, class Compare = less<@\placeholder{iter-value-type}@<InputIterator>>,
+           class Allocator = allocator<byte>>
+    flat_set(InputIterator, InputIterator, Compare = Compare(), Allocator = Allocator())
+      -> flat_set<@\exposid{iter-value-type}@<InputIterator>, Compare,
+                  vector<@\exposid{iter-value-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-value-type}@<InputIterator>>>>;
 
-  template<class InputIterator, class Compare = less<@\placeholder{iter-value-type}@<InputIterator>>>
-    flat_set(sorted_unique_t, InputIterator, InputIterator, Compare = Compare())
-      -> flat_set<@\placeholder{iter-value-type}@<InputIterator>, Compare>;
+  template<class InputIterator, class Allocator>
+    flat_set(InputIterator, InputIterator, Allocator)
+      -> flat_set<@\exposid{iter-value-type}@<InputIterator>, less<@\placeholder{iter-value-type}@<InputIterator>>,
+                  vector<@\exposid{iter-value-type}@<InputIterator>,
+                  @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-value-type}@<InputIterator>>>>;
+
+  template<class InputIterator, class Compare = less<@\placeholder{iter-value-type}@<InputIterator>>,
+           class Allocator = allocator<byte>>
+    flat_set(sorted_unique_t, InputIterator, InputIterator, Compare = Compare(),
+             Allocator = Allocator())
+      -> flat_set<@\exposid{iter-value-type}@<InputIterator>, Compare,
+                  vector<@\exposid{iter-value-type}@<InputIterator>,
+                         @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-value-type}@<InputIterator>>>>;
+
+  template<class InputIterator, class Allocator>
+    flat_set(sorted_unique_t, InputIterator, InputIterator, Allocator)
+      -> flat_set<@\exposid{iter-value-type}@<InputIterator>, less<@\placeholder{iter-value-type}@<InputIterator>>,
+                  vector<@\exposid{iter-value-type}@<InputIterator>,
+                  @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-value-type}@<InputIterator>>>>;
 
   template<ranges::@\libconcept{input_range}@ R, class Compare = less<ranges::range_value_t<R>>,
           class Allocator = allocator<byte>>
@@ -16619,13 +16722,15 @@ namespace std {
                   vector<ranges::range_value_t<R>,
                          @\exposid{alloc-rebind}@<Allocator, ranges::range_value_t<R>>>>;
 
-  template<class Key, class Compare = less<Key>>
-    flat_set(initializer_list<Key>, Compare = Compare())
-      -> flat_set<Key, Compare>;
+  template<class Key, class Compare = less<Key>, class Allocator = allocator<byte>>
+    flat_set(initializer_list<Key>, Compare = Compare(), Allocator = Allocator())
+      -> flat_set<Key, Compare,
+                  vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>>;
 
-  template<class Key, class Compare = less<Key>>
-    flat_set(sorted_unique_t, initializer_list<Key>, Compare = Compare())
-      -> flat_set<Key, Compare>;
+  template<class Key, class Allocator>
+    flat_set(initializer_list<Key>, Allocator)
+      -> flat_set<Key, less<Key>,
+                  vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>>;
 
   template<class Key, class Compare, class KeyContainer, class Allocator>
     struct uses_allocator<flat_set<Key, Compare, KeyContainer>, Allocator>
@@ -17209,13 +17314,34 @@ namespace std {
     key_compare @\exposid{compare}@;    // \expos
   };
 
-  template<class InputIterator, class Compare = less<@\placeholder{iter-value-type}@<InputIterator>>>
-    flat_multiset(InputIterator, InputIterator, Compare = Compare())
-      -> flat_multiset<@\placeholder{iter-value-type}@<InputIterator>, @\placeholder{iter-value-type}@<InputIterator>, Compare>;
+  template<class InputIterator, class Compare = less<@\exposid{iter-value-type}@<InputIterator>>,
+           class Allocator = allocator<byte>>
+    flat_multiset(InputIterator, InputIterator, Compare = Compare(), Allocator = Allocator())
+      -> flat_multiset<@\exposid{iter-value-type}@<InputIterator>, @\exposid{iter-value-type}@<InputIterator>, Compare,
+                       vector<@\exposid{iter-value-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-value-type}@<InputIterator>>>>;
 
-  template<class InputIterator, class Compare = less<@\placeholder{iter-value-type}@<InputIterator>>>
-    flat_multiset(sorted_equivalent_t, InputIterator, InputIterator, Compare = Compare())
-      -> flat_multiset<@\placeholder{iter-value-type}@<InputIterator>, @\placeholder{iter-value-type}@<InputIterator>, Compare>;
+  template<class InputIterator, class Allocator>
+    flat_multiset(InputIterator, InputIterator, Allocator)
+      -> flat_multiset<@\exposid{iter-value-type}@<InputIterator>, @\exposid{iter-value-type}@<InputIterator>,
+                       less<@\exposid{iter-value-type}@<InputIterator>>,
+                       vector<@\exposid{iter-value-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-value-type}@<InputIterator>>>>;
+
+  template<class InputIterator, class Compare = less<@\exposid{iter-value-type}@<InputIterator>>,
+           class Allocator = allocator<byte>>
+    flat_multiset(sorted_equivalent_t, InputIterator, InputIterator, Compare = Compare(),
+                  Allocator = Allocator())
+      -> flat_multiset<@\exposid{iter-value-type}@<InputIterator>, @\exposid{iter-value-type}@<InputIterator>, Compare,
+                       vector<@\exposid{iter-value-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-value-type}@<InputIterator>>>>;
+
+  template<class InputIterator, class Allocator>
+    flat_multiset(sorted_equivalent_t, InputIterator, InputIterator, Allocator)
+      -> flat_multiset<@\exposid{iter-value-type}@<InputIterator>, @\exposid{iter-value-type}@<InputIterator>,
+                       less<@\exposid{iter-value-type}@<InputIterator>>,
+                       vector<@\exposid{iter-value-type}@<InputIterator>,
+                              @\exposid{alloc-rebind}@<Allocator, @\exposid{iter-value-type}@<InputIterator>>>>;
 
   template<ranges::@\libconcept{input_range}@ R, class Compare = less<ranges::range_value_t<R>>,
            class Allocator = allocator<byte>>
@@ -17230,13 +17356,22 @@ namespace std {
                        vector<ranges::range_value_t<R>,
                               @\exposid{alloc-rebind}@<Allocator, ranges::range_value_t<R>>>>;
 
-  template<class Key, class Compare = less<Key>>
-    flat_multiset(initializer_list<Key>, Compare = Compare())
-      -> flat_multiset<Key, Compare>;
+  template<class Key, class Compare = less<Key>, class Allocator = allocator<byte>>
+    flat_multiset(initializer_list<Key>, Compare = Compare(), Allocator = Allocator())
+      -> flat_multiset<Key, Compare, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>>;
 
-  template<class Key, class Compare = less<Key>>
-  flat_multiset(sorted_equivalent_t, initializer_list<Key>, Compare = Compare())
-      -> flat_multiset<Key, Compare>;
+  template<class Key, class Compare = less<Key>, class Allocator>
+    flat_multiset(initializer_list<Key>, Allocator)
+      -> flat_multiset<Key, less<Key>, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>>;
+
+  template<class Key, class Compare = less<Key>, class Allocator = allocator<byte>>
+    flat_multiset(sorted_equivalent_t, initializer_list<Key>, Compare = Compare(),
+                  Allocator = Allocator())
+      -> flat_multiset<Key, Compare, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>>;
+
+  template<class Key, class Compare = less<Key>, class Allocator>
+    flat_multiset(sorted_equivalent_t, initializer_list<Key>, Allocator)
+      -> flat_multiset<Key, less<Key>, vector<Key, @\exposid{alloc-rebind}@<Allocator, Key>>>;
 
   template<class Key, class Compare, class KeyContainer, class Allocator>
     struct uses_allocator<flat_multiset<Key, Compare, KeyContainer>, Allocator>
