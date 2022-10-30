@@ -14749,6 +14749,11 @@ namespace std {
     flat_map(key_container_type key_cont, mapped_container_type mapped_cont);
     flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont);
 
+    flat_map(const key_compare& comp, key_container_type key_cont,
+             mapped_container_type mapped_cont);
+    flat_map(sorted_unique_t, const key_compare& comp, key_container_type key_cont,
+             mapped_container_type mapped_cont);
+
     template<class InputIterator>
       flat_map(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
         : c(), compare(comp) { insert(first, last); }
@@ -14800,6 +14805,31 @@ namespace std {
                const mapped_container_type& mapped_cont, const Alloc& a);
     template<class Alloc>
       flat_map(sorted_unique_t, key_container_type&& key_cont,
+               mapped_container_type&& mapped_cont, const Alloc& a);
+
+    template<class Alloc>
+      flat_map(const key_compare& comp, const key_container_type& key_cont,
+               const mapped_container_type& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_map(const key_compare& comp, const key_container_type& key_cont,
+               mapped_container_type&& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_map(const key_compare& comp, key_container_type&& key_cont,
+               const mapped_container_type& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_map(const key_compare& comp, key_container_type&& key_cont,
+               mapped_container_type&& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_map(sorted_unique_t, const key_compare& comp, const key_container_type& key_cont,
+               const mapped_container_type& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_map(sorted_unique_t, const key_compare& comp, const key_container_type& key_cont,
+               mapped_container_type&& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_map(sorted_unique_t, const key_compare& comp, key_container_type&& key_cont,
+               const mapped_container_type& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_map(sorted_unique_t, const key_compare& comp, key_container_type&& key_cont,
                mapped_container_type&& mapped_cont, const Alloc& a);
 
     template<class InputIterator, class Alloc>
@@ -15001,6 +15031,26 @@ namespace std {
       -> flat_map<typename KeyContainer::value_type, typename MappedContainer::value_type,
                   less<typename KeyContainer::value_type>, KeyContainer, MappedContainer>;
 
+  template<class Compare, class KeyContainer, class MappedContainer>
+    flat_map(Compare, KeyContainer, MappedContainer)
+      -> flat_map<typename KeyContainer::value_type, typename MappedContainer::value_type,
+                  Compare, KeyContainer, MappedContainer>;
+
+  template<class Compare, class KeyContainer, class MappedContainer, class Allocator>
+    flat_map(Compare, KeyContainer, MappedContainer, Allocator)
+      -> flat_map<typename KeyContainer::value_type, typename MappedContainer::value_type,
+                  Compare, KeyContainer, MappedContainer>;
+
+  template<class Compare, class KeyContainer, class MappedContainer>
+    flat_map(sorted_unique_t, Compare, KeyContainer, MappedContainer)
+      -> flat_map<typename KeyContainer::value_type, typename MappedContainer::value_type,
+                  Compare, KeyContainer, MappedContainer>;
+
+  template<class Compare, class KeyContainer, class MappedContainer, class Allocator>
+    flat_map(sorted_unique_t, Compare, KeyContainer, MappedContainer, Allocator)
+      -> flat_map<typename KeyContainer::value_type, typename MappedContainer::value_type,
+                  Compare, KeyContainer, MappedContainer>;
+
   template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>,
            class Allocator = allocator<byte>>
     flat_map(InputIterator, InputIterator, Compare = Compare(), Allocator = Allocator())
@@ -15090,6 +15140,8 @@ It has no base classes or members other than those specified.
 \indexlibraryctor{flat_map}%
 \begin{itemdecl}
 flat_map(key_container_type key_cont, mapped_container_type mapped_cont);
+flat_map(const key_compare& comp, key_container_type key_cont,
+         mapped_container_type mapped_cont);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -15097,7 +15149,8 @@ flat_map(key_container_type key_cont, mapped_container_type mapped_cont);
 \effects
 Initializes \tcode{c.keys} with \tcode{std::move(key_cont)} and
 \tcode{c.values} with \tcode{std::move(mapped_cont)};
-value-initializes \tcode{compare};
+value-initializes \tcode{compare} or
+initializes \tcode{compare} with \tcode{comp}, respectively;
 sorts the range \range{begin()}{end()} with respect to \tcode{value_comp()}; and
 finally erases the duplicate elements as if by:
 \begin{codeblock}
@@ -15118,6 +15171,8 @@ where $N$ is the value of \tcode{key_cont.size()} before this call.
 \indexlibraryctor{flat_map}%
 \begin{itemdecl}
 flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont);
+flat_map(sorted_unique_t, const key_compare& comp, key_container_type key_cont,
+         mapped_container_type mapped_cont);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -15125,7 +15180,8 @@ flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type map
 \effects
 Initializes \tcode{c.keys} with \tcode{std::move(key_cont)} and
 \tcode{c.values} with \tcode{std::move(mapped_cont)};
-value-initializes \tcode{compare}.
+value-initializes \tcode{compare} or
+initializes \tcode{compare} with \tcode{comp}, respectively.
 
 \pnum
 \complexity
@@ -15168,6 +15224,30 @@ template<class Alloc>
            const mapped_container_type& mapped_cont, const Alloc& a);
 template<class Alloc>
   flat_map(sorted_unique_t, key_container_type&& key_cont,
+           mapped_container_type&& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_map(const key_compare& comp, const key_container_type& key_cont,
+           const mapped_container_type& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_map(const key_compare& comp, const key_container_type& key_cont,
+           mapped_container_type&& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_map(const key_compare& comp, key_container_type&& key_cont,
+           const mapped_container_type& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_map(const key_compare& comp, key_container_type&& key_cont,
+           mapped_container_type&& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_map(sorted_unique_t, const key_compare& comp, const key_container_type& key_cont,
+           const mapped_container_type& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_map(sorted_unique_t, const key_compare& comp, const key_container_type& key_cont,
+           mapped_container_type&& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_map(sorted_unique_t, const key_compare& comp, key_container_type&& key_cont,
+           const mapped_container_type& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_map(sorted_unique_t, const key_compare& comp, key_container_type&& key_cont,
            mapped_container_type&& mapped_cont, const Alloc& a);
 template<class InputIterator, class Alloc>
   flat_map(InputIterator first, InputIterator last, const Alloc& a);
@@ -15939,6 +16019,11 @@ namespace std {
     flat_multimap(sorted_equivalent_t,
                   key_container_type key_cont, mapped_container_type mapped_cont);
 
+    flat_multimap(const key_compare& comp, key_container_type key_cont,
+                  mapped_container_type mapped_cont);
+    flat_multimap(sorted_equivalent_t, const key_compare& comp,
+                  key_container_type key_cont, mapped_container_type mapped_cont);
+
     template<class InputIterator>
       flat_multimap(InputIterator first, InputIterator last,
                     const key_compare& comp = key_compare())
@@ -15992,6 +16077,33 @@ namespace std {
                     const mapped_container_type& mapped_cont, const Alloc& a);
     template<class Alloc>
       flat_multimap(sorted_equivalent_t, key_container_type&& key_cont,
+                   mapped_container_type&& mapped_cont, const Alloc& a);
+
+    template<class Alloc>
+      flat_multimap(const key_compare& comp, const key_container_type& key_cont,
+                    const mapped_container_type& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_multimap(const key_compare& comp, const key_container_type& key_cont,
+                    mapped_container_type&& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_multimap(const key_compare& comp, key_container_type&& key_cont,
+                    const mapped_container_type& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_multimap(const key_compare& comp, key_container_type&& key_cont,
+                    mapped_container_type&& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_multimap(sorted_equivalent_t, const key_compare& comp,
+                    const key_container_type& key_cont,
+                    const mapped_container_type& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_multimap(sorted_equivalent_t, const key_compare& comp,
+                    const key_container_type& key_cont,
+                    mapped_container_type&& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_multimap(sorted_equivalent_t, const key_compare& comp, key_container_type&& key_cont,
+                    const mapped_container_type& mapped_cont, const Alloc& a);
+    template<class Alloc>
+      flat_multimap(sorted_equivalent_t, const key_compare& comp, key_container_type&& key_cont,
                    mapped_container_type&& mapped_cont, const Alloc& a);
 
     template<class InputIterator, class Alloc>
@@ -16155,6 +16267,26 @@ namespace std {
       -> flat_multimap<typename KeyContainer::value_type, typename MappedContainer::value_type,
                        less<typename KeyContainer::value_type>, KeyContainer, MappedContainer>;
 
+  template<class Compare, class KeyContainer, class MappedContainer>
+    flat_multimap(Compare, KeyContainer, MappedContainer)
+      -> flat_multimap<typename KeyContainer::value_type, typename MappedContainer::value_type,
+                       Compare, KeyContainer, MappedContainer>;
+
+  template<class Compare, class KeyContainer, class MappedContainer, class Allocator>
+    flat_multimap(Compare, KeyContainer, MappedContainer, Allocator)
+      -> flat_multimap<typename KeyContainer::value_type, typename MappedContainer::value_type,
+                       Compare, KeyContainer, MappedContainer>;
+
+  template<class Compare, class KeyContainer, class MappedContainer>
+    flat_multimap(sorted_equivalent_t, Compare, KeyContainer, MappedContainer)
+      -> flat_multimap<typename KeyContainer::value_type, typename MappedContainer::value_type,
+                       Compare, KeyContainer, MappedContainer>;
+
+  template<class Compare, class KeyContainer, class MappedContainer, class Allocator>
+    flat_multimap(sorted_equivalent_t, Compare, KeyContainer, MappedContainer, Allocator)
+      -> flat_multimap<typename KeyContainer::value_type, typename MappedContainer::value_type,
+                       Compare, KeyContainer, MappedContainer>;
+
   template<class InputIterator, class Compare = less<@\exposid{iter-key-type}@<InputIterator>>,
            class Allocator = allocator<byte>>
     flat_multimap(InputIterator, InputIterator, Compare = Compare(), Allocator = Allocator())
@@ -16249,6 +16381,8 @@ specified.
 \indexlibraryctor{flat_multimap}%
 \begin{itemdecl}
 flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont);
+flat_multimap(const key_compare& comp, key_container_type key_cont,
+              mapped_container_type mapped_cont);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -16256,7 +16390,8 @@ flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont);
 \effects
 Initializes \tcode{c.keys} with \tcode{std::move(key_cont)} and
 \tcode{c.values} with \tcode{std::move(mapped_cont)};
-value-initializes \tcode{compare}; and
+value-initializes \tcode{compare} or
+initializes \tcode{compare} with \tcode{comp}, respectively; and
 sorts the range \range{begin()}{end()} with respect to \tcode{value_comp()}.
 
 \pnum
@@ -16269,6 +16404,8 @@ where $N$ is the value of \tcode{key_cont.size()} before this call.
 \indexlibraryctor{flat_multimap}%
 \begin{itemdecl}
 flat_multimap(sorted_equivalent_t, key_container_type key_cont, mapped_container_type mapped_cont);
+flat_multimap(sorted_equivalent_t, const key_compare& comp, key_container_type key_cont,
+              mapped_container_type mapped_cont);
 \end{itemdecl}
 
 \begin{itemdescr}
@@ -16276,7 +16413,8 @@ flat_multimap(sorted_equivalent_t, key_container_type key_cont, mapped_container
 \effects
 Initializes \tcode{c.keys} with \tcode{std::move(key_cont)} and
 \tcode{c.values} with \tcode{std::move(mapped_cont)};
-value-initializes \tcode{compare}.
+value-initializes \tcode{compare} or
+initializes \tcode{compare} with \tcode{comp}, respectively.
 
 \pnum
 \complexity
@@ -16319,6 +16457,30 @@ template<class Alloc>
                 const mapped_container_type& mapped_cont, const Alloc& a);
 template<class Alloc>
   flat_multimap(sorted_equivalent_t, key_container_type&& key_cont,
+                mapped_container_type&& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_multimap(const key_compare& comp, const key_container_type& key_cont,
+                const mapped_container_type& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_multimap(const key_compare& comp, const key_container_type& key_cont,
+                mapped_container_type&& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_multimap(const key_compare& comp, key_container_type&& key_cont,
+                const mapped_container_type& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_multimap(const key_compare& comp, key_container_type&& key_cont,
+                mapped_container_type&& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_multimap(sorted_equivalent_t, const key_compare& comp, const key_container_type& key_cont,
+                const mapped_container_type& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_multimap(sorted_equivalent_t, const key_compare& comp, const key_container_type& key_cont,
+                mapped_container_type&& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_multimap(sorted_equivalent_t, const key_compare& comp, key_container_type&& key_cont,
+                const mapped_container_type& mapped_cont, const Alloc& a);
+template<class Alloc>
+  flat_multimap(sorted_equivalent_t, const key_compare& comp, key_container_type&& key_cont,
                 mapped_container_type&& mapped_cont, const Alloc& a);
 template<class InputIterator, class Alloc>
   flat_multimap(InputIterator first, InputIterator last, const Alloc& a);
