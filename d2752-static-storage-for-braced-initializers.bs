@@ -1,0 +1,362 @@
+<pre class='metadata'>
+Title: Static storage for braced initializers
+Shortname: D2752
+Revision: 0
+!Draft Revision: 0
+Audience: EWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2752-static-storage-for-braced-initializers.html">rawgit.com/Quuxplusone/draft/gh-pages/d2752-static-storage-for-braced-initializers.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Initializing a vector from a <i>braced-initializer-list</i> like <code>{1,2,3}</code>
+  copies the data from static storage to a backing array on the stack,
+  and thence into the vector. This wastes CPU cycles, but more importantly, it wastes stack space.
+  We propose to eliminate the waste by permitting a <code>std::initializer_list&lt;T&gt;</code>'s
+  backing array to exist in static storage.
+Date: 2022-12-24
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial draft.
+
+
+# Background # {#background}
+
+<a href="https://eel.is/c++draft/dcl.init.list#5">[dcl.init.list]/5–6</a> says:
+
+<blockquote>
+An object of type `std::initializer_list<E>` is constructed from an initializer list
+as if the implementation generated and materialized a prvalue of type “array of *N* `const E`”,
+where *N* is the number of elements in the initializer list. Each element of that array
+is copy-initialized with the corresponding element of the initializer list,
+and the `std::initializer_list<E>` object is constructed to refer to that array.
+
+[<i>Example 12:</i><small><pre>
+    struct X {
+      X(std::initializer_list&lt;double&gt; v);
+    };
+    X x{ 1,2,3 };
+</pre></small> The initialization will be implemented in a way roughly equivalent to this: <small><pre>
+    const double __a[3] = {double{1}, double{2}, double{3}};
+    X x(std::initializer_list&lt;double&gt;(__a, __a+3));
+</pre></small> assuming that the implementation can construct an `initializer_list` object with a pair of pointers.
+<i>—end example</i>] [...]
+
+<b>[<i>Note 6: The implementation is free to allocate the array in read-only memory
+if an explicit array with the same initializer can be so allocated. —end note</i>]</b>
+</blockquote>
+
+In December 2022, Jason Merrill observed ([[CoreReflector]]) that this note isn't saying much.
+Consider the following translation unit:
+
+```c++
+    void f(std::initializer_list<int> il);
+
+    void g() {
+        f({1,2,3});
+    }
+
+    int main() { g(); }
+```
+
+Can the backing array for `{1,2,3}` be allocated in static storage?
+No, because `f`'s implementation might look like this:
+
+```c++
+    void g();
+
+    void f(std::initializer_list<int> il) {
+        static const int *ptr = nullptr;
+        if (ptr == nullptr) {
+            ptr = il.begin();
+            g();
+        } else {
+            assert(ptr != il.begin());
+        }
+    }
+```
+
+A conforming C++23 implementation must compile this code in such a way that the
+two temporary backing arrays — the one pointed to by `il.begin()` during the first
+recursive call to `f`, and the one pointed to by `il.begin()` during the second recursive call
+to `f` — have distinct addresses, because that would also be true of "an explicit array [variable]"
+in the scope of `g`.
+
+All three of GCC, Clang, and MSVC compile this code in a conforming manner.
+([Godbolt.](https://godbolt.org/z/xqMs8xrve))
+
+Expert programmers tend to understand that when they write
+```c++
+    std::vector<int> v = {1,2,3,4,5,6,7,8,9,10};
+```
+they're getting a copy of the data from its original storage into the heap-allocated
+STL container: obviously the data has to get from point A to point B somehow.
+But even expert programmers are surprised to learn that there are actually *two*
+copies happening here — one from static storage onto the stack, and another from
+stack to heap!
+
+Worse: [[P1967R9]] (adopted for C++26) allows programmers to write
+```c++
+    std::vector<char> v = {
+        #embed "2mb-image.png"
+    };
+```
+Suppose "2mb-image.png" contains 2MB of data. Then the function that initializes `v`
+here will create a temporary backing array of size 2MB. That is, we're adding 2MB to
+the stack frame of that function.
+Suddenly your function's stack frame is 2MB larger than you expected!
+And this applies even if the "function" in question is the compiler-generated
+initialization routine for a dynamically initialized global variable `v`.
+You might not even control the function whose stack frame is blowing up.
+
+This kind of thing was always possible pre-P1967, but was hard to hit in human-generated code,
+because braced initializer lists were generally short. But post-P1967, this is easy
+to hit. I think this stack-frame blowup is going to become a well-known problem unless we solve it first.
+
+## Workaround ## {#workaround}
+
+This code creates a 2MB backing array on the stack frame of the function that initializes `v`:
+```c++
+    std::vector<char> v = {
+        #embed "2mb-image.png"
+    };
+```
+This code does not:
+```c++
+    static const char backing[] = {
+        #embed "2mb-image.png"
+    };
+    std::vector<char> v = std::vector<char>(backing, std::end(backing));
+```
+So the latter is a workaround. But it shouldn't be necessary to work around this issue;
+we should fix it instead.
+
+
+# Solution # {#solution}
+
+Essentially we want the semantics of braced initializer lists to match the semantics
+of string literals (<a href="https://timsong-cpp.github.io/cppwp/n4861/lex.string#9">[lex.string]/9</a>).
+
+We want to encourage tomorrow's compilers to avoid taking up any stack space for
+constant-initialized initializer lists. If possible I'd like to *mandate* they not take
+any stack space, but I don't currently know how to specify that. Quality implementations
+will take advantage of this permission anyway.
+```c++
+    std::initializer_list<int> i1 = {
+        #embed "very-large-file.png"  // OK
+    };
+
+    void f2(std::initializer_list<int> ia,
+            std::initializer_list<int> ib) {
+        PERMIT(ia.begin() == ib.begin());
+    }
+    int main() {
+        f2({1,2,3}, {1,2,3});
+    }
+```
+
+We want to permit tomorrow's compilers to share backing arrays with elements in common, just like
+today's compilers can share string literals. High-quality implementations might take advantage
+of this permission, even though mainstream compilers probably won't bother.
+```c++
+    const char *p1 = "hello world";
+    const char *p2 = "world";
+    PERMIT(p2 == p1 + 6);  // today's behavior
+
+    std::initializer_list<int> i1 = {1,2,3,4,5};
+    std::initializer_list<int> i2 = {2,3,4};
+    PERMIT(i1.begin() == i2.begin() + 1);  // tomorrow's proposed behavior
+```
+
+We even intend to permit tomorrow's compilers to share backing arrays between static
+and dynamic initializer lists. It would take a really smart compiler to exploit this
+new permission, but we have no reason to forbid it. For example:
+```c++
+    void f3(int argc, std::initializer_list<int> ia,
+                      std::initializer_list<int> ib) {
+        if (argc != 2) {
+            assert(ia.begin() != ib.begin());
+        } else {
+            PERMIT(ia.begin() == ib.begin());
+        }
+    }
+    int main(int argc, char **argv) {
+        f3(argc, {1,2,3}, {1,argc,3});
+    }
+```
+
+We do not intend to permit accessing a backing array outside of its lifetime,
+even when it happens to be stored in static storage.
+```c++
+    const int *f4(std::initializer_list<int> i4) {
+        return i4.begin();
+    }
+    int main() {
+        const int *p = f4({1,2,3});
+        std::cout << *p;  // still UB, not OK
+    }
+```
+
+We do not intend to permit tomorrow's compiler to defer or omit the side effects of
+constructor or destructor calls involved with the creation of a backing array.
+In practice, we expect quality implementations to "static-fy" backing arrays of
+types that are trivially destructible, and not to "static-fy" anything else.
+```c++
+    struct A {
+        constexpr A(int i) {}
+        ~A() { printf(" X"); }
+    };
+    void f5(std::initializer_list<A>) {}
+    int main() {
+        f5({1,2,3}); // must still print X X X
+        f5({1,2,3}); // must still print X X X
+    }
+```
+
+We do not intend to cause any new race conditions when `initializer_list` is
+mixed with `thread_local`. Since the contents of a backing array are never
+modified, I don't see any way that static-fying a backing array could interfere
+with multithreading; but I mention it specifically here in case someone sees
+a problem that I don't.
+```c++
+    void f6() {
+        thread_local std::vector<int> v = {1,2,3};  // still OK
+    }
+```
+
+
+# Implementation experience # {#experience}
+
+None yet.
+
+
+# Proposed wording relative to the current C++23 draft # {#wording}
+
+Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init.list#5">[dcl.init.list]/5–6</a> as follows:
+
+<blockquote>
+An object of type `std::initializer_list<E>` is constructed from an initializer list
+as if the implementation generated and materialized <del>a prvalue</del> <ins>an object</ins> of type “array of *N* `const E`”,
+where *N* is the number of elements in the initializer list<ins>; this is called the initializer list's *backing array*</ins>.
+Each element of <del>that array</del> <ins>the backing array</ins> is copy-initialized with the corresponding element of the initializer list,
+and the `std::initializer_list<E>` object is constructed to refer to that array.
+
+<p>
+<del>[*Example 12:*</del>
+<small><pre>
+    <del>struct X {</del>
+      <del>X(std::initializer_list&lt;double&gt; v);</del>
+    <del>};</del>
+    <del>X x{ 1,2,3 };</del>
+</pre></small>
+<del>The initialization will be implemented in a way roughly equivalent to this:</del>
+<small><pre>
+    <del>const double __a[3] = {double{1}, double{2}, double{3}};</del>
+    <del>X x(std::initializer_list&lt;double&gt;(__a, __a+3));</del>
+</pre></small>
+<del>assuming that the implementation can construct an `initializer_list` object with a pair of pointers.
+*—end example*]</del>
+
+<p>
+<ins>Whether two backing arrays with the same contents are distinct (that is,
+are stored in nonoverlapping objects) is unspecified.</ins>
+
+The <ins>backing</ins> array has the same lifetime as any other temporary object, except that initializing
+an `initializer_list` object from the array extends the lifetime of the array exactly like
+binding a reference to a temporary.
+
+<ins>[*Example 12:*</ins>
+<small><pre>
+    <ins>void f(std::initializer_list&lt;double&gt; il);</ins>
+    <ins>void g(float x) {</ins>
+      <ins>f({1, x, 3});</ins>
+    <ins>}</ins>
+    <ins>void h() {</ins>
+      <ins>f({1, 2, 3});</ins>
+    <ins>}</ins>
+</pre></small>
+<ins>The initialization will be implemented in a way roughly equivalent to this:</ins>
+<small><pre>
+    <ins>void g(float x) {</ins>
+      <ins>const double __a[3] = {double{1}, double{x}, double{3}};</ins>
+      <ins>f(std::initializer_list&lt;double&gt;(__a, __a+3));</ins>
+    <ins>}</ins>
+    <ins>void h() {</ins>
+      <ins>static constexpr double __b[3] = {double{1}, double{2}, double{3}};</ins>
+      <ins>f(std::initializer_list&lt;double&gt;(__b, __b+3));</ins>
+    <ins>}</ins>
+</pre></small>
+<ins>assuming that the implementation can construct an `initializer_list` object with a pair of pointers.
+*—end example*]</ins>
+
+[*Example 13:*
+<small><pre>
+    typedef std::complex&lt;double> cmplx;
+    std::vector&lt;cmplx> v1 = { 1, 2, 3 };
+    void f() {
+      std::vector&lt;cmplx> v2{ 1, 2, 3 };
+      std::initializer_list&lt;int> i3 = { 1, 2, 3 };
+    }
+    struct A {
+      std::initializer_list&lt;int> i4;
+      A() : i4{ 1, 2, 3 } {}            // ill-formed, would create a dangling reference
+    };
+</pre></small>
+For `v1` and `v2`, the `initializer_list` object is a parameter in a function call,
+so the array created for `{ 1, 2, 3 }` has full-expression lifetime. For `i3`, the
+`initializer_list` object is a variable, so the array persists for the lifetime of
+the variable. For `i4`, the `initializer_list` object is initialized in the constructor's
+<i>ctor-initializer</i> as if by binding a temporary array to a reference member, so the
+program is ill-formed. *—end example*]
+
+<p>
+<del>[*Note 6: The implementation is free to allocate the array in read-only memory
+if an explicit array with the same initializer can be so allocated. —end note*]</del>
+</blockquote>
+
+
+## Addition to Annex C ## {#wording-annexc}
+
+We might want to add something to Annex C <a href="https://eel.is/c++draft/diff.cpp20.expr">[diff.cpp20.expr]</a>,
+since technically this is a breaking change; but on the other hand we don't actually
+expect anyone to notice. Their code should just silently get faster.
+
+
+# Acknowledgments # {#acknowledgments}
+
+- Thanks to Jason Merrill for the original issue, and to Andrew Tomazos for recommending Arthur write this paper.
+
+
+<pre class=biblio>
+{
+  "CoreReflector": {
+    "title": "[isocpp-core] initializer_list and read-only memory",
+    "authors": [
+      "Jason Merrill"
+    ],
+    "href": "https://lists.isocpp.org/core/2022/12/13625.php",
+    "date": "December 2022"
+  },
+  "P1967R9": {
+    "title": "#embed - a scannable, tooling-friendly binary resource inclusion mechanism",
+    "authors": [
+      "JeanHeyd Meneide"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html",
+    "date": "October 2022"
+  }
+}
+</pre>
