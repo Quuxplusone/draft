@@ -2,7 +2,7 @@
 Title: Static storage for braced initializers
 Shortname: D2752
 Revision: 0
-!Draft Revision: 0
+!Draft Revision: 2
 Audience: EWG
 Status: D
 Group: WG21
@@ -17,7 +17,7 @@ Abstract:
   and thence into the vector. This wastes CPU cycles, but more importantly, it wastes stack space.
   We propose to eliminate the waste by permitting a <code>std::initializer_list&lt;T&gt;</code>'s
   backing array to exist in static storage.
-Date: 2022-12-24
+Date: 2022-12-31
 </pre>
 
 <style>
@@ -210,19 +210,30 @@ even when it happens to be stored in static storage.
     }
 ```
 
+We do not intend to interfere with <a href="https://eel.is/c++draft/class.base.init#11">[class.base.init]/11</a>,
+which makes it not just UB but actually ill-formed to bind a reference member to a temporary.
+([CWG 1696](https://cplusplus.github.io/CWG/issues/1696.html), from 2014, seems to be related.
+As of December 2022, Clang diagnoses this example; GCC doesn't; MSVC gives a possibly unrelated error message.)
+```c++
+    struct C5 {
+        C5() : i5 {1,2,3} {}  // still ill-formed, not OK
+        std::initializer_list<int> i5;
+    };
+```
+
 We do not intend to permit tomorrow's compiler to defer or omit the side effects of
 constructor or destructor calls involved with the creation of a backing array.
-In practice, we expect quality implementations to "static-fy" backing arrays of
+In practice, we expect compilers to "static-fy" backing arrays of
 types that are trivially destructible, and not to "static-fy" anything else.
 ```c++
     struct A {
         constexpr A(int i) {}
         ~A() { printf(" X"); }
     };
-    void f5(std::initializer_list<A>) {}
+    void f6(std::initializer_list<A>) {}
     int main() {
-        f5({1,2,3}); // must still print X X X
-        f5({1,2,3}); // must still print X X X
+        f6({1,2,3}); // must still print X X X
+        f6({1,2,3}); // must still print X X X
     }
 ```
 
@@ -232,7 +243,7 @@ modified, I don't see any way that static-fying a backing array could interfere
 with multithreading; but I mention it specifically here in case someone sees
 a problem that I don't.
 ```c++
-    void f6() {
+    void f7() {
         thread_local std::vector<int> v = {1,2,3};  // still OK
     }
 ```
@@ -240,7 +251,29 @@ a problem that I don't.
 
 # Implementation experience # {#experience}
 
-None yet.
+I have an experimental patch against Clang trunk; see [[Patch]].
+It is likely incomplete and buggy; it has not received attention from anyone but myself.
+
+## Implications for ABI vendors ## {#abi}
+
+So that inline functions will agree on the names of their hidden backing-array variables,
+I think it's possible that each ABI (Itanium, Microsoft) will have to agree on a mangling scheme
+for those hidden variables, just as each ABI has agreed on manglings for the names of (1) guard variables
+for thread-safe static initialization; (2) backing variables for structured bindings;
+(3) lambda closure types. On the other hand, these static backing arrays behave very much
+like string literals, which are implemented with non-external symbols and need no mangling;
+so maybe there is no need for different TUs to agree on their names.
+```c++
+    template<class T> void escape(T);
+    void escape(std::initializer_list<int>);
+    inline void f(int i) {
+        static int x = i; // guard variable _ZGVZ1fiE1x, ?$TSS0@?1??f@@YAXH@Z@4HA
+        static auto [a,b] = std::make_pair(1,2); // backing variable _ZZ1fiEDC1a1bE, ?$S1@?1??f@@YAXH@Z@4U?$pair@HH@std@@A
+        escape([]() { return 42; }); // lambda closure type Z1fiEUlvE_, V<lambda_1>@?1??f@@YAXH@Z@
+        escape({1,2,3}); // backing array might need a mangling
+        escape("abc"); // backing array needs no mangling
+    }
+```
 
 
 # Proposed wording relative to the current C++23 draft # {#wording}
@@ -357,6 +390,14 @@ expect anyone to notice. Their code should just silently get faster.
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html",
     "date": "October 2022"
+  },
+  "Patch": {
+    "title": "Implement P2752R0 Static storage for braced initializers",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://github.com/Quuxplusone/llvm-project/tree/p2752",
+    "date": "January 2023"
   }
 }
 </pre>
