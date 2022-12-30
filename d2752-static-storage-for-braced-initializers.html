@@ -2094,7 +2094,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2752R0<br>Static storage for braced initializers</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2022-12-24">2022-12-24</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2022-12-31">2022-12-31</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2104,7 +2104,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>0
+     <dd>2
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs</a>
      <dt>Current:
@@ -2131,7 +2131,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#workaround"><span class="secno">2.1</span> <span class="content">Workaround</span></a>
      </ol>
     <li><a href="#solution"><span class="secno">3</span> <span class="content">Solution</span></a>
-    <li><a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
+    <li>
+     <a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
+     <ol class="toc">
+      <li><a href="#abi"><span class="secno">4.1</span> <span class="content">Implications for ABI vendors</span></a>
+     </ol>
     <li>
      <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording relative to the current C++23 draft</span></a>
      <ol class="toc">
@@ -2296,18 +2300,27 @@ even when it happens to be stored in static storage.</p>
     <c- n>std</c-><c- o>::</c-><c- n>cout</c-> <c- o>&lt;&lt;</c-> <c- o>*</c-><c- n>p</c-><c- p>;</c->  <c- c1>// still UB, not OK</c->
 <c- p>}</c->
 </pre>
+   <p>We do not intend to interfere with <a href="https://eel.is/c++draft/class.base.init#11">[class.base.init]/11</a>,
+which makes it not just UB but actually ill-formed to bind a reference member to a temporary.
+(<a href="https://cplusplus.github.io/CWG/issues/1696.html">CWG 1696</a>, from 2014, seems to be related.
+As of December 2022, Clang diagnoses this example; GCC doesn’t; MSVC gives a possibly unrelated error message.)</p>
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>C5</c-> <c- p>{</c->
+    <c- n>C5</c-><c- p>()</c-> <c- o>:</c-> <c- n>i5</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>}</c-> <c- p>{}</c->  <c- c1>// still ill-formed, not OK</c->
+    <c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>i5</c-><c- p>;</c->
+<c- p>};</c->
+</pre>
    <p>We do not intend to permit tomorrow’s compiler to defer or omit the side effects of
 constructor or destructor calls involved with the creation of a backing array.
-In practice, we expect quality implementations to "static-fy" backing arrays of
+In practice, we expect compilers to "static-fy" backing arrays of
 types that are trivially destructible, and not to "static-fy" anything else.</p>
 <pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
     <c- n>constexpr</c-> <c- nf>A</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- p>{}</c->
     <c- o>~</c-><c- n>A</c-><c- p>()</c-> <c- p>{</c-> <c- n>printf</c-><c- p>(</c-><c- s>" X"</c-><c- p>);</c-> <c- p>}</c->
 <c- p>};</c->
-<c- b>void</c-> <c- nf>f5</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>A</c-><c- o>></c-><c- p>)</c-> <c- p>{}</c->
+<c- b>void</c-> <c- nf>f6</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>A</c-><c- o>></c-><c- p>)</c-> <c- p>{}</c->
 <c- b>int</c-> <c- nf>main</c-><c- p>()</c-> <c- p>{</c->
-    <c- n>f5</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c-> <c- c1>// must still print X X X</c->
-    <c- n>f5</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c-> <c- c1>// must still print X X X</c->
+    <c- n>f6</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c-> <c- c1>// must still print X X X</c->
+    <c- n>f6</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c-> <c- c1>// must still print X X X</c->
 <c- p>}</c->
 </pre>
    <p>We do not intend to cause any new race conditions when <code class="highlight"><c- n>initializer_list</c-></code> is
@@ -2315,12 +2328,31 @@ mixed with <code class="highlight"><c- k>thread_local</c-></code>. Since the con
 modified, I don’t see any way that static-fying a backing array could interfere
 with multithreading; but I mention it specifically here in case someone sees
 a problem that I don’t.</p>
-<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>f6</c-><c- p>()</c-> <c- p>{</c->
+<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>f7</c-><c- p>()</c-> <c- p>{</c->
     <c- k>thread_local</c-> <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>v</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->  <c- c1>// still OK</c->
 <c- p>}</c->
 </pre>
    <h2 class="heading settled" data-level="4" id="experience"><span class="secno">4. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
-   <p>None yet.</p>
+   <p>I have an experimental patch against Clang trunk; see <a data-link-type="biblio" href="#biblio-patch" title="Implement P2752R0 Static storage for braced initializers">[Patch]</a>.
+It is likely incomplete and buggy; it has not received attention from anyone but myself.</p>
+   <h3 class="heading settled" data-level="4.1" id="abi"><span class="secno">4.1. </span><span class="content">Implications for ABI vendors</span><a class="self-link" href="#abi"></a></h3>
+   <p>So that inline functions will agree on the names of their hidden backing-array variables,
+I think it’s possible that each ABI (Itanium, Microsoft) will have to agree on a mangling scheme
+for those hidden variables, just as each ABI has agreed on manglings for the names of (1) guard variables
+for thread-safe static initialization; (2) backing variables for structured bindings;
+(3) lambda closure types. On the other hand, these static backing arrays behave very much
+like string literals, which are implemented with non-external symbols and need no mangling;
+so maybe there is no need for different TUs to agree on their names.</p>
+<pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c-> <c- b>void</c-> <c- n>escape</c-><c- p>(</c-><c- n>T</c-><c- p>);</c->
+<c- b>void</c-> <c- nf>escape</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>);</c->
+<c- kr>inline</c-> <c- b>void</c-> <c- nf>f</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- p>{</c->
+    <c- k>static</c-> <c- b>int</c-> <c- n>x</c-> <c- o>=</c-> <c- n>i</c-><c- p>;</c-> <c- c1>// guard variable _ZGVZ1fiE1x, ?$TSS0@?1??f@@YAXH@Z@4HA</c->
+    <c- k>static</c-> <c- k>auto</c-> <c- p>[</c-><c- n>a</c-><c- p>,</c-><c- n>b</c-><c- p>]</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>make_pair</c-><c- p>(</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>);</c-> <c- c1>// backing variable _ZZ1fiEDC1a1bE, ?$S1@?1??f@@YAXH@Z@4U?$pair@HH@std@@A</c->
+    <c- n>escape</c-><c- p>([]()</c-> <c- p>{</c-> <c- k>return</c-> <c- mi>42</c-><c- p>;</c-> <c- p>});</c-> <c- c1>// lambda closure type Z1fiEUlvE_, V&lt;lambda_1>@?1??f@@YAXH@Z@</c->
+    <c- n>escape</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c-> <c- c1>// backing array might need a mangling</c->
+    <c- n>escape</c-><c- p>(</c-><c- s>"abc"</c-><c- p>);</c-> <c- c1>// backing array needs no mangling</c->
+<c- p>}</c->
+</pre>
    <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording relative to the current C++23 draft</span><a class="self-link" href="#wording"></a></h2>
    <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init.list#5">[dcl.init.list]/5–6</a> as follows:</p>
    <blockquote>
@@ -2549,4 +2581,6 @@ expect anyone to notice. Their code should just silently get faster.</p>
    <dd>Jason Merrill. <a href="https://lists.isocpp.org/core/2022/12/13625.php"><cite>[isocpp-core] initializer_list and read-only memory</cite></a>. December 2022. URL: <a href="https://lists.isocpp.org/core/2022/12/13625.php">https://lists.isocpp.org/core/2022/12/13625.php</a>
    <dt id="biblio-p1967r9">[P1967R9]
    <dd>JeanHeyd Meneide. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html"><cite>#embed - a scannable, tooling-friendly binary resource inclusion mechanism</cite></a>. October 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html</a>
+   <dt id="biblio-patch">[Patch]
+   <dd>Arthur O'Dwyer. <a href="https://github.com/Quuxplusone/llvm-project/tree/p2752"><cite>Implement P2752R0 Static storage for braced initializers</cite></a>. January 2023. URL: <a href="https://github.com/Quuxplusone/llvm-project/tree/p2752">https://github.com/Quuxplusone/llvm-project/tree/p2752</a>
   </dl>
