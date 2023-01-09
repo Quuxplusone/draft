@@ -2,7 +2,7 @@
 Title: Static storage for braced initializers
 Shortname: D2752
 Revision: 0
-!Draft Revision: 3
+!Draft Revision: 4
 Audience: EWG
 Status: D
 Group: WG21
@@ -17,7 +17,7 @@ Abstract:
   and thence into the vector. This wastes CPU cycles, but more importantly, it wastes stack space.
   We propose to eliminate the waste by permitting a <code>std::initializer_list&lt;T&gt;</code>'s
   backing array to exist in static storage.
-Date: 2022-12-31
+Date: 2023-01-09
 </pre>
 
 <style>
@@ -126,7 +126,7 @@ This kind of thing was always possible pre-P1967, but was hard to hit in human-g
 because braced initializer lists were generally short. But post-P1967, this is easy
 to hit. I think this stack-frame blowup is going to become a well-known problem unless we solve it first.
 
-## Workaround ## {#workaround}
+## Workarounds ## {#workarounds}
 
 This code creates a 2MB backing array on the stack frame of the function that initializes `v`:
 ```c++
@@ -143,6 +143,21 @@ This code does not:
 ```
 So the latter is a workaround. But it shouldn't be necessary to work around this issue;
 we should fix it instead.
+
+JeanHeyd Meneide points out that C's "compound literals" have the same problem, and they
+chose to permit the programmer to work around it in C23 by adding storage class annotations
+directly to their literals, like this:
+```c++
+    int f(const int *p);
+    int x = f((static const int[]){ // C23 syntax
+        #embed "2mb-image.png"
+    });
+```
+Zhihao Yuan's [[P2174R1]]
+proposes adding C-compatible compound literals to C++, but does not propose storage-class
+annotations. Anyway, that's not a solution to the `std::initializer_list` problem, because `initializer_list`
+syntax is lightweight by design. We don't need new syntax; we just need the existing syntax to
+Do The Right Thing by default.
 
 
 # Solution # {#solution}
@@ -226,11 +241,11 @@ constructor or destructor calls involved with the creation of a backing array.
 In practice, we expect compilers to "static-fy" backing arrays of
 types that are trivially destructible, and not to "static-fy" anything else.
 ```c++
-    struct A {
-        constexpr A(int i) {}
-        ~A() { printf(" X"); }
+    struct C6 {
+        constexpr C6(int i) {}
+        ~C6() { printf(" X"); }
     };
-    void f6(std::initializer_list<A>) {}
+    void f6(std::initializer_list<C6>) {}
     int main() {
         f6({1,2,3}); // must still print X X X
         f6({1,2,3}); // must still print X X X
@@ -247,6 +262,20 @@ a problem that I don't.
         thread_local std::vector<int> v = {1,2,3};  // still OK
     }
 ```
+
+We do not intend to describe backing arrays as "variables" or permit anything
+new in terms of constexpr evaluation. For example, this code is ill-formed today
+and will remain ill-formed tomorrow. Now, if it ever *became* legal, we'd have to
+accept that it would be unspecified whether `c8a` and `c8b` had the same type or not.
+But this is not new: the situation with `c8c` and `c8d` is exactly analogous.
+```c++
+    template<const char *P> struct C8 {};
+    C8<std::begin({1,2,3})> c8a;  // still ill-formed, P must address a variable
+    C8<std::begin({1,2,3})> c8b;  // still ill-formed, P must address a variable
+    C8<"abc"> c8c;                // still ill-formed, P must address a variable
+    C8<"abc"> c8d;                // still ill-formed, P must address a variable
+```
+
 
 
 # Implementation experience # {#experience}
@@ -393,6 +422,14 @@ expect anyone to notice. Their code should just silently get faster.
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html",
     "date": "October 2022"
+  },
+  "P2174R1": {
+    "title": "Compound Literals",
+    "authors": [
+      "Zhihao Yuan"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2174r1.html",
+    "date": "April 2022"
   },
   "Patch": {
     "title": "Implement P2752R0 Static storage for braced initializers",
