@@ -2094,7 +2094,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2752R0<br>Static storage for braced initializers</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2022-12-31">2022-12-31</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-01-09">2023-01-09</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2104,7 +2104,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>3
+     <dd>4
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs</a>
      <dt>Current:
@@ -2128,7 +2128,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     <li>
      <a href="#background"><span class="secno">2</span> <span class="content">Background</span></a>
      <ol class="toc">
-      <li><a href="#workaround"><span class="secno">2.1</span> <span class="content">Workaround</span></a>
+      <li><a href="#workarounds"><span class="secno">2.1</span> <span class="content">Workarounds</span></a>
      </ol>
     <li><a href="#solution"><span class="secno">3</span> <span class="content">Solution</span></a>
     <li>
@@ -2231,7 +2231,7 @@ You might not even control the function whose stack frame is blowing up.
    <p>This kind of thing was always possible pre-P1967, but was hard to hit in human-generated code,
 because braced initializer lists were generally short. But post-P1967, this is easy
 to hit. I think this stack-frame blowup is going to become a well-known problem unless we solve it first.</p>
-   <h3 class="heading settled" data-level="2.1" id="workaround"><span class="secno">2.1. </span><span class="content">Workaround</span><a class="self-link" href="#workaround"></a></h3>
+   <h3 class="heading settled" data-level="2.1" id="workarounds"><span class="secno">2.1. </span><span class="content">Workarounds</span><a class="self-link" href="#workarounds"></a></h3>
    <p>This code creates a 2MB backing array on the stack frame of the function that initializes <code class="highlight"><c- n>v</c-></code>:</p>
 <pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>char</c-><c- o>></c-> <c- n>v</c-> <c- o>=</c-> <c- p>{</c->
     <c- cp>#embed "2mb-image.png"</c->
@@ -2245,6 +2245,17 @@ to hit. I think this stack-frame blowup is going to become a well-known problem 
 </pre>
    So the latter is a workaround. But it shouldn’t be necessary to work around this issue;
 we should fix it instead. 
+   <p>JeanHeyd Meneide points out that C’s "compound literals" have the same problem, and they
+chose to permit the programmer to work around it in C23 by adding storage class annotations
+directly to their literals, like this:</p>
+<pre class="language-c++ highlight"><c- b>int</c-> <c- nf>f</c-><c- p>(</c-><c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>p</c-><c- p>);</c->
+<c- b>int</c-> <c- n>x</c-> <c- o>=</c-> <c- n>f</c-><c- p>((</c-><c- k>static</c-> <c- k>const</c-> <c- b>int</c-><c- p>[]){</c-> <c- c1>// C23 syntax</c->
+    <c- cp>#embed "2mb-image.png"</c->
+<c- p>});</c->
+</pre>
+   Zhihao Yuan’s <a data-link-type="biblio" href="#biblio-p2174r1" title="Compound Literals">[P2174R1]</a> proposes adding C-compatible compound literals to C++, but does not propose storage-class
+annotations. Anyway, that’s not a solution to the <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code> problem, because <code class="highlight"><c- n>initializer_list</c-></code> syntax is lightweight by design. We don’t need new syntax; we just need the existing syntax to
+Do The Right Thing by default. 
    <h2 class="heading settled" data-level="3" id="solution"><span class="secno">3. </span><span class="content">Solution</span><a class="self-link" href="#solution"></a></h2>
    <p>Essentially we want the semantics of braced initializer lists to match the semantics
 of string literals (<a href="https://timsong-cpp.github.io/cppwp/n4861/lex.string#9">[lex.string]/9</a>).</p>
@@ -2313,11 +2324,11 @@ As of December 2022, Clang diagnoses this example; GCC doesn’t; MSVC gives a p
 constructor or destructor calls involved with the creation of a backing array.
 In practice, we expect compilers to "static-fy" backing arrays of
 types that are trivially destructible, and not to "static-fy" anything else.</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
-    <c- n>constexpr</c-> <c- nf>A</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- p>{}</c->
-    <c- o>~</c-><c- n>A</c-><c- p>()</c-> <c- p>{</c-> <c- n>printf</c-><c- p>(</c-><c- s>" X"</c-><c- p>);</c-> <c- p>}</c->
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>C6</c-> <c- p>{</c->
+    <c- n>constexpr</c-> <c- nf>C6</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- p>{}</c->
+    <c- o>~</c-><c- n>C6</c-><c- p>()</c-> <c- p>{</c-> <c- n>printf</c-><c- p>(</c-><c- s>" X"</c-><c- p>);</c-> <c- p>}</c->
 <c- p>};</c->
-<c- b>void</c-> <c- nf>f6</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>A</c-><c- o>></c-><c- p>)</c-> <c- p>{}</c->
+<c- b>void</c-> <c- nf>f6</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>C6</c-><c- o>></c-><c- p>)</c-> <c- p>{}</c->
 <c- b>int</c-> <c- nf>main</c-><c- p>()</c-> <c- p>{</c->
     <c- n>f6</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c-> <c- c1>// must still print X X X</c->
     <c- n>f6</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c-> <c- c1>// must still print X X X</c->
@@ -2331,6 +2342,17 @@ a problem that I don’t.</p>
 <pre class="language-c++ highlight"><c- b>void</c-> <c- nf>f7</c-><c- p>()</c-> <c- p>{</c->
     <c- k>thread_local</c-> <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>v</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->  <c- c1>// still OK</c->
 <c- p>}</c->
+</pre>
+   <p>We do not intend to describe backing arrays as "variables" or permit anything
+new in terms of constexpr evaluation. For example, this code is ill-formed today
+and will remain ill-formed tomorrow. Now, if it ever <em>became</em> legal, we’d have to
+accept that it would be unspecified whether <code class="highlight"><c- n>c8a</c-></code> and <code class="highlight"><c- n>c8b</c-></code> had the same type or not.
+But this is not new: the situation with <code class="highlight"><c- n>c8c</c-></code> and <code class="highlight"><c- n>c8d</c-></code> is exactly analogous.</p>
+<pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- n>P</c-><c- o>></c-> <c- k>struct</c-> <c- nc>C8</c-> <c- p>{};</c->
+<c- n>C8</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-><c- o>></c-> <c- n>c8a</c-><c- p>;</c->  <c- c1>// still ill-formed, P must address a variable</c->
+<c- n>C8</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-><c- o>></c-> <c- n>c8b</c-><c- p>;</c->  <c- c1>// still ill-formed, P must address a variable</c->
+<c- n>C8</c-><c- o>&lt;</c-><c- s>"abc"</c-><c- o>></c-> <c- n>c8c</c-><c- p>;</c->                <c- c1>// still ill-formed, P must address a variable</c->
+<c- n>C8</c-><c- o>&lt;</c-><c- s>"abc"</c-><c- o>></c-> <c- n>c8d</c-><c- p>;</c->                <c- c1>// still ill-formed, P must address a variable</c->
 </pre>
    <h2 class="heading settled" data-level="4" id="experience"><span class="secno">4. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>I have an experimental patch against Clang trunk; see <a data-link-type="biblio" href="#biblio-patch" title="Implement P2752R0 Static storage for braced initializers">[Patch]</a>.
@@ -2583,6 +2605,8 @@ expect anyone to notice. Their code should just silently get faster.</p>
    <dd>Jason Merrill. <a href="https://lists.isocpp.org/core/2022/12/13625.php"><cite>[isocpp-core] initializer_list and read-only memory</cite></a>. December 2022. URL: <a href="https://lists.isocpp.org/core/2022/12/13625.php">https://lists.isocpp.org/core/2022/12/13625.php</a>
    <dt id="biblio-p1967r9">[P1967R9]
    <dd>JeanHeyd Meneide. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html"><cite>#embed - a scannable, tooling-friendly binary resource inclusion mechanism</cite></a>. October 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1967r9.html</a>
+   <dt id="biblio-p2174r1">[P2174R1]
+   <dd>Zhihao Yuan. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2174r1.html"><cite>Compound Literals</cite></a>. April 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2174r1.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2174r1.html</a>
    <dt id="biblio-patch">[Patch]
    <dd>Arthur O'Dwyer. <a href="https://github.com/Quuxplusone/llvm-project/tree/p2752"><cite>Implement P2752R0 Static storage for braced initializers</cite></a>. January 2023. URL: <a href="https://github.com/Quuxplusone/llvm-project/tree/p2752">https://github.com/Quuxplusone/llvm-project/tree/p2752</a>
   </dl>
