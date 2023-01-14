@@ -1,0 +1,249 @@
+<pre class='metadata'>
+Title: `flat_set` inconsistencies with other containers
+Shortname: D2767
+Revision: 0
+!Draft Revision: 1
+Audience: LWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2767-flat-set-inconsistencies.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2767-flat-set-inconsistencies.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2767-flat-set-inconsistencies.html">rawgit.com/Quuxplusone/draft/gh-pages/d2767-flat-set-inconsistencies.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Dummy text
+Date: 2023-01-15
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial draft.
+
+
+# Deduction guide inconsistencies # {#deduction-guides}
+
+Notice that an allocator-aware container's `value_type` must be the same
+as its allocator's `value_type`, by the <i>Precondition</i> in <a href="https://eel.is/c++draft/container.alloc.reqmts#6">[container.alloc.reqmts]/6</a>.
+
+In the current C++23 draft, as modified by the proposed resolutions of
+[[LWG3506]] (adopted), [[LWG3804]] (open), and [[LWG3786]] (tentatively ready),
+we have:
+
+```c++
+    int r[10];
+    int *it = nullptr;
+    using AllocByte = std::pmr::polymorphic_allocator<std::byte>;
+    using AllocInt = std::pmr::polymorphic_allocator<int>;
+    AllocByte alloc;
+
+    auto v = std::vector(std::from_range, r, alloc);
+      // Deduction guide -> vector<int, AllocByte>
+      // Violates precondition
+    auto d = std::deque(std::from_range, r, alloc);
+      // Deduction guide -> deque<int, AllocByte>
+      // Violates precondition
+    auto s = std::set(std::from_range, r, alloc);
+      // Deduction guide -> set<int, less<int>, AllocByte>
+      // Violates precondition
+    auto qq = std::queue(std::from_range, r, alloc);
+      // Deduction guide -> queue<int, deque<int, AllocByte>>
+      // Violates precondition on deque
+    auto st = std::stack(std::from_range, r, alloc);
+      // Deduction guide -> stack<int, deque<int, AllocByte>>
+      // Violates precondition on deque
+    auto pq = std::priority_queue(std::from_range, r, alloc);
+      // Deduction guide -> priority_queue<int, vector<int, AllocByte>>
+      // Violates precondition on vector
+    auto fs = std::flat_set(std::from_range, r, alloc);
+      // Pre-3786: Deduction guide -> flat_set<int, less<int>, allocator<int>>
+                   Overload resolution fails
+      // Post-3786: Deduction guide -> flat_set<int, less<int>, AllocInt>
+      //            OK
+
+    auto v = std::vector(it, it, alloc);
+      // Deduction guide -> vector<int, AllocByte>
+      // Violates precondition
+    auto d = std::deque(it, it, alloc);
+      // Deduction guide -> deque<int, AllocByte>
+      // Violates precondition
+    auto s = std::set(it, it, alloc);
+      // Deduction guide -> set<int, less<int>, AllocByte>
+      // Violates precondition
+    auto qq = std::queue(it, it, alloc);
+      // Deduction guide -> queue<int, deque<int, AllocByte>>
+      // Violates precondition on deque
+    auto st = std::stack(it, it, alloc);
+      // Deduction guide -> stack<int, deque<int, AllocByte>>
+      // Violates precondition on deque
+    auto pq = std::priority_queue(it, it, alloc);
+      // Pre-3506: Deduction fails
+      // Post-3506: Deduction guide -> priority_queue<int, vector<int, AllocByte>, less<int>>
+      //            Violates precondition on vector 
+    auto fs = std::flat_set(it, it, alloc);
+      // Pre-3804: Deduction fails
+      // Post-3804: Deduction guide -> flat_set<int, vector<int, AllocInt>, less<int>>
+      //                               OK
+```
+
+That is, the resolution of [[LWG3786]] makes `flat_set` better-behaved than any of the existing
+containers or container adaptors, which makes the existing types look inferior by comparison.
+If we're going to rebind allocators, we should do it consistently across the whole library.
+
+
+# LWG3803: `flat_set` has no constructor taking both `KeyContainer` and `Compare` # {#fs-compare}
+
+The current situation for passing "just elements" to various containers is:
+```c++
+    std::less<int> comp;
+    std::vector<int> elts = {1,2,3};
+
+    auto s = std::set<int>({1,2,3});             // OK (initializer_list<value_type>, const Compare&)
+    auto s = std::set<int>(elts);                // Error
+    auto pq = std::priority_queue<int>({1,2,3}); // Error
+    auto pq = std::priority_queue<int>(elts);    // Error
+    auto fs = std::flat_set<int>({1,2,3});       // OK (initializer_list<value_type>, const key_compare&)
+    auto fs = std::flat_set<int>(elts);          // OK (container_type)
+```
+For passing "elements, comparator":
+```c++
+    auto s = std::set<int>({1,2,3}, comp);             // OK (initializer_list<value_type>, const Compare&)
+    auto s = std::set<int>(elts, comp);                // Error
+    auto pq = std::priority_queue<int>({1,2,3}, comp); // Error
+    auto pq = std::priority_queue<int>(elts, comp);    // Error
+    auto fs = std::flat_set<int>({1,2,3}, comp);       // OK (initializer_list<value_type>, const key_compare&)
+    auto fs = std::flat_set<int>(elts, comp);          // Error today, PROPOSED OK (container_type, const key_compare&)
+```
+And for passing "comparator, elements":
+```
+    auto s = std::set<int>(comp, {1,2,3});             // Error
+    auto s = std::set<int>(comp, elts);                // Error
+    auto pq = std::priority_queue<int>(comp, {1,2,3}); // OK (const Compare&, Container&&)
+    auto pq = std::priority_queue<int>(comp, elts);    // OK (const Compare&, const Container&)
+    auto fs = std::flat_set<int>(comp, elts);          // Error
+    auto fs = std::flat_set<int>(comp, {1,2,3});       // Error
+```
+
+It seems that `flat_set` really ought to gain a constructor taking `(container_type, const key_compare&)`.
+
+It is unfortunate that `priority_queue` takes its initializer-list (container) and comparator parameters in the opposite
+order from `set` and `flat_set`; but since that has been the case since C++98, we probably can't change it now.
+This paper does not propose any change to `priority_queue` in that respect.
+
+
+# LWG3802: Allocator-extended constructors lack move semantics # {#move-semantics}
+
+Compare:
+```c++
+    template<class T, class Comp = std::less<T>, class Container = std::pmr::vector<T>>
+    using pmr_flatset = std::flat_set<T, Comp, Container>;
+
+    template<class T, class Container = std::pmr::vector<T>, class Comp = std::less<T>>
+    using pmr_priqueue = std::priority_queue<T, Container, Comp>;
+
+    std::less<int> comp;
+    std::pmr::vector<int> elts = {1,2,3};
+
+    std::pmr::vector<pmr_priqueue<int>> pqs;
+    pqs.emplace_back(comp, std::move(elts));  // moves from elts
+
+    std::pmr::vector<pmr_flatset<int>> fss;
+    fss.emplace_back(std::move(elts), comp);  // copies from elts
+```
+
+`flat_set`'s ordinary "from-container" constructor takes `key_container` by value;
+but the matching allocator-extended constructor takes `const key_container&`.
+We don't want the allocator-extended one to take by value (because preemptively
+making a copy of a PMR container might use the wrong memory resource); but we do
+want to move from that container when possible. So it seems that we should replace
+`flat_set`'s constructor
+```c++
+    template<class Allocator>
+      flat_set(const container_type& cont, const Allocator& a);
+```
+with two overloads:
+```c++
+    template<class Alloc>
+      flat_set(const container_type& cont, const Alloc& a);
+    template<class Alloc>
+      flat_set(container_type&& cont, const Alloc& a);
+```
+And likewise for `flat_multiset`, `flat_map`, and `flat_multimap`.
+
+
+# Implementation experience # {#experience}
+
+I have implemented this proposal as a patch against libc++ trunk; see [[Patch]].
+You can experiment with it [on Godbolt Compiler Explorer]();
+just use the P1144 branch of Clang, which uses this patched libc++ by default.
+
+The complete wording diff against `cplusplus/draft:main` is also available
+on my GitHub; see [[Wording]].
+
+
+# Proposed wording relative to the current C++23 draft # {#wording}
+
+See [[Wording]].
+
+
+# Acknowledgments # {#acknowledgments}
+
+- Thanks to Tomasz Kamiński for recommending Arthur write this paper.
+
+
+<pre class=biblio>
+{
+  "LWG3506": {
+    "title": "flat_foo missing some allocator-extended deduction guides",
+    "authors": [
+      "Tim Song"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3506",
+    "date": "November 2020"
+  },
+  "LWG3802": {
+    "title": "flat_foo allocator-extended constructors lack move semantics",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3802",
+    "date": "October 2022"
+  },
+  "LWG3803": {
+    "title": "flat_foo constructors taking KeyContainer lack KeyCompare parameter",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3803",
+    "date": "October 2022"
+  },
+  "LWG3804": {
+    "title": "flat_foo missing some allocator-extended deduction guides",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3804",
+    "date": "October 2022"
+  },
+  "LWG3786": {
+    "title": "Flat maps' deduction guide needs to default Allocator to be useful",
+    "authors": [
+      "Johel Ernesto Guerrero Peña"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3786",
+    "date": "September 2022"
+  },
+  "Patch": {
+  },
+  "Wording": {
+  }
+}
+</pre>
