@@ -2,7 +2,7 @@
 Title: Object relocation in terms of move plus destroy
 Shortname: D1144
 Revision: 7
-!Draft Revision: 31
+!Draft Revision: 35
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -20,7 +20,7 @@ Abstract:
   that it is trivially relocatable.
   P1144R3 was presented at C++Now 2019 as a 90-minute talk titled
   ["Trivially Relocatable."](https://www.youtube.com/watch?v=SGdfPextuAU)
-Date: 2023-02-13
+Date: 2023-02-15
 </pre>
 
 <style>
@@ -37,8 +37,16 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
             reference members and/or a mix of public and private members) inhibit "natural"
             trivial relocatability. Thanks to Dana Jansens for helping work this out.
 
+    - Jonathan Hopkins points out that (contrary to the English description in [[EASTL]])
+            EASTL's current definition of `has_trivial_relocate` is a synonym for
+            `is_trivially_move_assignable`, thus not prior art for this notion.
+
+    - Added [[#applications|table §2.1]] comparing this proposal to Folly, BSL, and Qt.
+
     - Added straw poll results from Issaquah, and removed much background and discussion
             (leaving only references for the interested reader to consult [[P1144R6]]).
+
+    - Added "open issues list" in Appendix E.
 
 - R6:
 
@@ -109,59 +117,69 @@ is trivially relocatable.
 
 The most important thing about P1144 relocation is that it is backward compatible and does not
 break either API or ABI. My intention is simply to legalize the well-understood tricks
-that every industry codebase is already doing in practice (see [[BSL]], [[EASTL]], [[Folly]], [[Deque]]).
+that many industry codebases are already doing in practice (see [[BSL]], [[Folly]], [[Deque]]).
 P1144 is not intended to change the behavior of any existing source code (except to speed it up),
 nor to require major work from standard library vendors.
 
 
 ## Optimizations enabled by trivial relocatability ## {#applications}
 
-### Vector resize ### {#benefit-resize}
+The following optimizations are possible according to P1144R7's notion of
+trivial relocatability. Here's who does these optimizations in practice:
 
-If we have a reliable way of detecting "trivial relocatability,"
-we can optimize any routine that performs the moral equivalent of `realloc`, including
+<table>
+<tr>
+<td></td><td> vector realloc </td><td> type erasure </td><td> fixed-cap move </td><td> vector `erase` </td><td> vector `insert` </td><td> `swap` </td>
+</tr><tr>
+<td> Arthur's libc++ `std::is_trivially_relocatable_v<T>` </td><td>
+     <a href="https://github.com/Quuxplusone/llvm-project/blob/d0c5d3639e/libcxx/include/vector#L936-L942">`std::vector`</a> </td><td>
+     no </td><td>
+     N/A </td><td>
+     no </td><td>
+     <a href="https://github.com/Quuxplusone/llvm-project/blob/d0c5d3639e/libcxx/include/vector#L1728-L1744">`std::vector`</a> </td><td>
+     <a href="https://github.com/Quuxplusone/llvm-project/blob/d0c5d3639e/libcxx/include/__utility/swap.h#L45-L57">`std::swap`</a> </td>
+</tr><tr>
+<td> [[BSL]] `bslmf::IsBitwiseMoveable<T>` </td><td>
+     <a href="https://github.com/bloomberg/bde/blob/e15f05b/groups/bsl/bslstl/bslstl_vector.h#L3374-L3398">`bsl::vector`</a> </td><td>
+     ? </td><td>
+     ? </td><td>
+     <a href="https://github.com/bloomberg/bde/blob/e15f05b/groups/bsl/bslalg/bslalg_arrayprimitives.h#L3769-L3800">`bsl::vector`</a> </td><td>
+     ? </td><td>
+     ? </td>
+</tr><tr>
+<td> [[Folly]] `folly::IsRelocatable<T>` </td><td>
+     <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L945-L966">`fbvector`</a> </td><td>
+     <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/Function.h#L749-L755">no</a> </td><td>
+     [proposed](https://github.com/facebook/folly/pull/1934) for `small_vector` </td><td>
+     <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1232-L1259">`fbvector`</a> </td><td>
+     <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1273-L1292">`fbvector`</a> </td><td>
+     N/A </td>     
+</tr><tr>
+<td> [[Qt]] `QTypeInfo<T>::isRelocatable` </td><td>
+     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L865-L872">`QList`</a> </td><td>
+     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/kernel/qvariant.h#L73-L94">`QVariant`</a> </td><td>
+     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qvarlengtharray.h#L312-L328">`QVarLengthArray`</a> </td><td>
+     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L842-L863">`QList`</a> </td><td>
+     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L679-L730">`QList`</a> </td><td>
+     ? </td>
+</tr>
+</table>
 
-```c++
-    std::vector<R>::resize
-    std::vector<R>::reserve
-    std::vector<R>::emplace_back
-    std::vector<R>::push_back
-```
+
+### Contiguous reallocation ### {#benefit-resize}
+
+Trivial relocation can be used anywhere we do the moral equivalent of `realloc`,
+such as in `vector<R>::reserve`.
 
 [[Bench]] (presented at C++Now 2018) shows a 3x speedup on `std::vector<std::unique_ptr<int>>::resize`.
 [This Reddit thread](https://www.reddit.com/r/cpp/comments/9wj4vt/trivially_relocatable_in_san_diego_call_for/e9p76i4/)
 demonstrates a similar 3x speedup using the online tool Quick-Bench.
 
 
-### Swap ### {#benefit-swap}
+### Moving in-place/SBO type-erased types like `any` and `function` ### {#benefit-type-erasure}
 
-Given a reliable way of detecting trivial relocatability,
-we can optimize any routine that uses the moral equivalent of `std::swap`, such as
-
-```c++
-    std::swap
-    std::rotate
-    std::sort
-    std::vector<R>::insert
-    std::vector<R>::erase
-```
-
-Optimizing `std::swap` produces massive code-size improvements for all swap-based
-algorithms, including `std::sort` and `std::rotate`. 
-See
-[@19:56–21:22](https://www.youtube.com/watch?v=SGdfPextuAU&t=19m56s) in my C++Now 2019 talk,
-and see [this Godbolt](https://p1144.godbolt.org/z/PPYhcYd8d).
-[This Quick-Bench](https://quick-bench.com/q/suAss7ElmwgLDbOJQGnlEseheSQ) shows a 25% speedup
-in `std::rotate` when it is allowed to use bitwise swap on a Rule-of-Zero type.
-
-But see [[#pmr-concerns]] for further discussion of optimizing `swap`.
-
-
-### More efficient small-buffer type-erasure ### {#benefit-type-erasure}
-
-Given a reliable way of detecting trivial relocatability,
-we can de-duplicate the code generated by small-buffer-optimized (SBO) type-erasing wrappers
-such as `std::function` and `std::any`.
+Trivial relocation can be used to de-duplicate the code generated by type-erasing wrappers
+like `std::any`, `std::function`, and `std::move_only_function`.
 For these types, a *move* of the wrapper object is implemented in terms of a
 *relocation* of the contained object. (See for example [[LibcxxAny|libc++'s std::any]],
 where the function that performs the relocation operation is confusingly named `__move`.)
@@ -172,7 +190,7 @@ a smaller text section, and "hotter" code (because a relatively higher proportio
 code now fits in icache).
 
 
-### More efficient fixed-capacity containers ### {#benefit-fixed-capacity}
+### Moving fixed-capacity containers like `static_vector` and `small_vector` ### {#benefit-fixed-capacity}
 
 Given a reliable way of detecting trivial relocatability,
 we can optimize the move-constructor of `fixed_capacity_vector<R,N>`,
@@ -190,13 +208,42 @@ naïve element-by-element-move strategy, but after LEWG feedback,
 the faster relocation strategy.
 
 
-### Assertions, not assumptions ### {#benefit-assertions}
+### Contiguous insert and erase ### {#benefit-insert-erase}
 
-Some concurrent data structures might reasonably assert the trivial relocatability of
+Trivial relocation can be used anywhere we shift a contiguous range left or right,
+such as in `vector::erase` (i.e., destroy the erased elements and "close the window"
+by memmoving left) and `vector::insert` (i.e., "make a window" by memmoving right and
+then construct the new elements in place). [[Folly]]'s `fbvector` is prior art
+for this optimization; see [`fbvector::make_window`](https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1273-L1308).
+
+But [[#pmr-concerns]] determines whether this optimization will be possible in Standard C++.
+
+
+### Swap ### {#benefit-swap}
+
+Given a reliable way of detecting trivial relocatability,
+we can optimize any routine that uses the moral equivalent of `std::swap`, such as
+`std::rotate`, `std::partition`, or `std::sort`.
+
+Optimizing `std::swap` produces massive code-size improvements for all swap-based
+algorithms, including `std::sort` and `std::rotate`. 
+See
+[@19:56–21:22](https://www.youtube.com/watch?v=SGdfPextuAU&t=19m56s) in my C++Now 2019 talk,
+and see [this Godbolt](https://p1144.godbolt.org/z/PPYhcYd8d).
+[This Quick-Bench](https://quick-bench.com/q/suAss7ElmwgLDbOJQGnlEseheSQ) shows a 25% speedup
+in `std::rotate` when it is allowed to use bitwise swap on a Rule-of-Zero type.
+
+But [[#pmr-concerns]] determines whether this optimization will be possible in Standard C++.
+
+
+## Assertions, not assumptions ## {#benefit-assertions}
+
+Some data structures might reasonably assert the trivial relocatability of
 their elements, just as they sometimes assert the stronger property of trivial *copyability* today.
+This might help them guarantee reasonable performance, or guarantee exception-safety.
 
 
-## The most important benefit ## {#doing-it-wrong}
+## Eliminate manual warrants, improve safety ## {#doing-it-wrong}
 
 Many real-world codebases already contain templates which require
 trivial relocatability of their template parameters, but currently have no way to *verify*
@@ -243,7 +290,7 @@ can even find real bugs. [Example:](https://p1144.godbolt.org/z/7b8893sjr)
     static_assert(std::is_trivially_relocatable_v<Gadget>);  // correctly ERRORS OUT
 ```
 
-The improvement in user experience for real-world codebases (such as [[Folly]], [[EASTL]], BDE, Qt, etc.)
+The improvement in user experience and safety in real-world codebases ([[Folly]], [[BSL]], [[Qt]], etc.)
 is the most important benefit to be gained by this proposal.
 
 
@@ -257,7 +304,7 @@ The optimizations above are in the domain of library writers. If you're writing
 a vector, and you detect that your element type `T` is trivially relocatable, then
 whether you optimize in that case is up to you.
 This proposal does not require any library vendor to guarantee that any particular optimization
-happens. (But we assume that quality implementations will do so on their own.)
+happens. (We assume that quality implementations will do so on their own.)
 
 What C++ lacks is a standard way for library writers to *detect* the (existing) trivial relocatability
 of a type `T`, so that they can reliably apply their (existing) optimizations.
@@ -275,7 +322,7 @@ the standard library, and for improving the correctness of libraries such as
 In order to optimize `std::vector<std::string>::resize`, we must come up with a way to achieve
 ```c++
     #include <string>
-    static_assert(is_trivially_relocatable< std::string >::value);
+    static_assert(std::is_trivially_relocatable_v< std::string >);
 ```
 This could be done unilaterally by the library vendor — via a non-standard attribute
 (`[[clang::trivially_relocatable]]`), or a member typedef with a reserved name,
@@ -292,16 +339,16 @@ we must come up with a way to achieve
 ```c++
     #include <string>
     auto lam2 = [x=std::string("hello")]{};
-    static_assert(is_trivially_relocatable< decltype(lam2) >::value);
+    static_assert(std::is_trivially_relocatable_v< decltype(lam2) >);
 ```
 Lambdas are not a special case in C++; they are simply class types with all their special members defaulted.
-Therefore, presumably we should be able to use the same solution for lambdas as for
+Therefore, lambdas can use the same solution as
 ```c++
     #include <string>
     struct A {
         std::string s;
     };
-    static_assert(is_trivially_relocatable< A >::value);
+    static_assert(std::is_trivially_relocatable_v< A >);
 ```
 Here `struct A` follows the Rule of Zero: its move-constructor and destructor are both defaulted.
 If they were also *trivial*, then we'd be done. In fact they are non-trivial; and yet, because the type's
@@ -309,8 +356,8 @@ bases and members are all of trivially relocatable types, the type as a whole *i
 
 §3.2 asks that we make the `static_assert` succeed without breaking the "Rule of Zero."
 We do not want to require the programmer to annotate `struct A` with a special attribute, or
-a special member typedef, or anything like that. We want it to Just Work. Even for lambda types.
-This is a much harder problem than §3.1; it requires standard support in the core language.
+a special member typedef, or anything like that. We want it to Just Work.
+This is a harder problem than §3.1; it requires standard support in the core language.
 But it still does not require any new *syntax*.
 
 
@@ -323,32 +370,17 @@ we must come up with a way to achieve
         B(B&&);  // non-trivial
         ~B();  // non-trivial
     };
-    static_assert(is_trivially_relocatable< B >::value);
+    static_assert(std::is_trivially_relocatable_v< B >);
 ```
 via some standard annotation applied to class type `B` (which in this example is standing in for
 `boost::shared_ptr`).
-
-Note:
 We cannot possibly do it without annotation, because there exist
 examples of types that look just like `B` and *are* trivially relocatable (for example,
 [[LibstdcxxFunction|libstdc++'s std::function]]) and there exist types that look just like `B` and are
 *not* trivially relocatable (for example, [[LibcxxFunction|libc++'s std::function]]).
-The compiler cannot "crack open" the definitions of `B(B&&)` and `~B()` to see if
-they combine to form a trivial operation:
-the definitions of `B(B&&)` and `~B()` might not even be available in the current translation unit.
 So, without some kind of opt-in annotation, we cannot achieve our goal.
 
-This use-case is the only one that requires us to design the "opt-in" syntax.
-In [[#use1|§3.1]], any special syntax is hidden inside the
-implementation's own headers. In [[#use2|§3.2]], our design goal is to *avoid* special syntax.
-In [[#use3|§3.3]], WG21 must actually design user-facing syntax.
-
-Therefore, I believe it would be acceptable to punt on §3.3 and come back to it later.
-We say, "Sure, that would be nice, but there's no syntax for it. Be glad that it works for
-core-language and library types. Ask again in three years."  As long as we leave the design
-space open, I believe we wouldn't lose much by delaying a solution to §3.3.
-
-This paper does propose a standard syntax for §3.3 — an attribute — which in turn
+This paper proposes a standard syntax for §3.3, which in turn
 provides a *simple and portable* way for library vendors to implement §3.1.
 
 
@@ -374,42 +406,6 @@ communicate trivial relocatability in each of the three use-cases above.
   - A new attribute, `[[trivially_relocatable]]`, in the core language.
     This is the *opt-in* mechanism for program-defined types.
 
-These five bullet points are severable to some degree. For example, if the `[[trivially_relocatable]]`
-attribute (point 5) is adopted, library vendors will certainly use it in their implementations;
-but if the attribute is rejected, library vendors could still indicate the trivial relocatability
-of certain standard library types by providing library specializations of `is_trivially_relocatable`
-(point 3).
-
-Points 1 and 2 are completely severable from points 3, 4, and 5;
-but we believe these algorithms should be provided for symmetry with the
-other uninitialized-memory algorithms in the `<memory>` header
-(e.g. `uninitialized_move`)
-and the other trios of type-traits in the `<type_traits>` header
-(e.g. `is_destructible`, `is_nothrow_destructible`,
-`is_trivially_destructible`). I do not expect these templates to be frequently useful,
-but I believe they should be provided, so as not to surprise the programmer
-by their absence.
-
-Points 3 and 4 together motivate point 5. In order to achieve the goal of [[#use2]],
-we *must* define a core-language mechanism by which we can "inherit" trivial relocatability.
-This is especially important for the template case.
-```c++
-    template<class T>
-    struct D {
-        T t;
-    };
-
-    // class C comes in from outside, already marked, via whatever mechanism
-    constexpr bool c = is_trivially_relocatable< C >::value;
-    constexpr bool dc = is_trivially_relocatable< D<C> >::value;
-    static_assert(dc == c);
-```
-We strongly believe that `std::is_trivially_relocatable<T>` should be just a plain old
-class template, exactly like `std::is_trivially_destructible<T>` and so on.
-The core language <em>[[Contra|should not know or care]]</em> that the class template
-`is_trivially_relocatable` exists, any more than it knows that the class template
-`is_trivially_destructible` exists.
-
 We expect that the library vendor will implement `std::is_trivially_relocatable`,
 just like `std::is_trivially_destructible`, in terms of a non-standard compiler
 builtin whose natural spelling is `__is_trivially_relocatable(T)`.
@@ -417,13 +413,13 @@ This builtin has been implemented in my fork of Clang; see [[D50119]].
 The compiler computes the value of `__is_trivially_relocatable(T)` by inspecting the
 definition of `T` (and the definitions of its base classes and members, recursively).
 This recursive process "bottoms out" at primitive types, or at any type with a user-provided
-move or destroy operation. For safety, classes with user-provided move or destroy operations
+move or destroy operation. For safety, classes with user-provided lifetime operations
 (e.g. [[#non-trivial-samples]]) must be assumed *not* to be trivially relocatable. To achieve the goal
 of [[#use3]], we must provide a way that such a class can "opt in" and warrant to the
 implementation that it is in fact trivially relocatable (despite being non-trivially
 move-constructible and/or non-trivially destructible).
 
-In point 5 we propose that the opt-in mechanism should be an attribute. The programmer
+We propose that the opt-in mechanism should be an attribute. The programmer
 of a trivially relocatable but non-trivially destructible class `C` will mark it for
 the compiler using the attribute:
 ```c++
@@ -433,13 +429,16 @@ the compiler using the attribute:
     };
     static_assert(is_trivially_relocatable< C >::value);
 ```
-The attribute overrides the compiler's usual computation.
 
 The attribute is severable; WG21 could adopt all the rest of this proposal and
 leave vendors to implement `[[clang::trivially_relocatable]]`, `[[gnu::trivially_relocatable]]`, etc.,
 as non-standard extension mechanisms.
 In that case, we would strike all of [[#wording-dcl.attr.trivreloc|§5.5]] and one bullet point from [[#wording-basic.types.general|§5.4]];
 the rest of this proposal would remain exactly the same.
+
+There is no difficulty in changing the attribute syntax to a contextual-keyword syntax;
+the only downsides are aesthetic. We can defer that decision to the last minute, according
+to CWG's feedback on the final wording.
 
 
 # Proposed wording for C++2b # {#wording}
@@ -728,7 +727,7 @@ with an inconclusive 7–5–6 vote (the author of P1144 voting "For" and the th
 presumably voting "Against."
 
 
-## Confusing interactions with `std::pmr` and `vector::insert` ## {#pmr-concerns}
+## Confusing interactions with `std::pmr` ## {#pmr-concerns}
 
 Note: This section was added in P1144R5 and revised in P1144R7.
 Here I assume libc++, where `std::string` is trivially relocatable.
@@ -747,8 +746,9 @@ However, a secondary goal is to permit efficient insertion and erasure.
 
 This `erase` requires us to shift down 500 `std::string` objects, which can be done either
 by 500 calls to `string::operator=` followed by one call to `~string`, or by
-one call to `~string` followed by a `memcpy`. We want to permit the latter. That's why
-since P1144R3, the definition of "trivially relocatable" in [[#wording-basic.types.general]]
+one call to `~string` followed by a `memmove` (as seen for example in [[Folly]]; see [[#applications|table §2.1]]).
+We want to permit Folly's implementation. That's why since P1144R3, the definition of
+"trivially relocatable" in [[#wording-basic.types.general]]
 places semantic requirements on `T`'s assignment operators (if they exist) as well as on
 `T`'s constructors and destructors.
 
@@ -762,7 +762,7 @@ places semantic requirements on `T`'s assignment operators (if they exist) as we
     va.erase(va.begin());  // A
 ```
 
-Line "A" can use trivial relocation (`memcpy`) because it is fast and correct:
+Line "A" can use trivial relocation (`memmove`) because it is fast and correct:
 after line "A" we will have `vv[0].resource() == &mr2`.
 But an STL container *using* a `polymorphic_allocator` suddenly becomes problematic:
 
@@ -776,7 +776,7 @@ But an STL container *using* a `polymorphic_allocator` suddenly becomes problema
 ```
 
 Line "B" can certainly use trivial relocation (`memcpy`) because it is fast and correct.
-But on line "C", the difference between `pmr::string::operator=` and `memcpy` is detectable:
+But on line "C", the difference between `pmr::string::operator=` and `memmove` is detectable:
 the former makes `vp[0].get_allocator().resource() == &mr1` and the latter would make
 `vp[0].get_allocator().resource() == &mr2`. Finally, hypothetically, if `vector::erase` were
 implemented in terms of a single `std::rotate` followed by a call to `~string`, we'd have UB here
@@ -800,7 +800,7 @@ they should be made by the same person, at the same place in the source code.
 
 # Acknowledgements # {#acknowledgements}
 
-Thanks to Elias Kosunen, Niall Douglas, and John Bandela for their feedback on early drafts of this paper.
+Thanks to Elias Kosunen, Niall Douglas, and John Bandela for their feedback on early drafts of P1144R0.
 
 Many thanks to Matt Godbolt for allowing me to install the prototype Clang implementation on Compiler Explorer
 (<a href="https://p1144.godbolt.org/z/oWEd_X">godbolt.org</a>). See also [[Announcing]].
@@ -829,11 +829,12 @@ Thanks to John McCall for his thought-provoking review comments on the Clang imp
 Thanks to Marc Glisse for his work integrating a "trivially relocatable" trait into GNU libstdc++
 and for answering my questions on [GCC bug 87106](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87106).
 
-Thanks to Jens Maurer for his feedback on this paper at Kona 2019, and to Corentin Jabot for championing
+Thanks to Jens Maurer for his feedback on P1144R3 at Kona 2019, and to Corentin Jabot for championing
 P1144R4 at Prague 2020.
 
-Thanks to Dana Jansens for her contributions re non-standard-layout types, and to Alisdair Meredith
-for our extensive discussions during the February 2023 drafting of [[P2786R0]].
+Thanks to Dana Jansens for her contributions re non-standard-layout types, to Alisdair Meredith
+for our extensive discussions during the February 2023 drafting of [[P2786R0]], and to Giuseppe D'Angelo
+and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]].
 
 
 Appendix A: Straw polls {#polls}
@@ -1139,7 +1140,7 @@ and `[[trivially_relocatable(bool)]]` are given in [[P1144R6]].
 As of November 2018, libstdc++ performs the `vector::resize` optimization
 for any type which has manually specialized `std::__is_bitwise_relocatable`.
 (See [this Godbolt](https://godbolt.org/z/f7971hEcG).)
-Manual specialization is also the approach used by [[EASTL]], [[Folly]], and [[BSL]].
+Manual specialization is also the approach used by [[Qt]], [[Folly]], and [[BSL]].
 As of 2023-02-12, the only libstdc++ library type for which `__is_bitwise_relocatable` has
 been specialized is `deque`; see [[Deque]].
 
@@ -1147,12 +1148,50 @@ Clang trunk provides a compiler builtin type trait `__is_trivially_relocatable(T
 (see [[D114732]]), which is largely the same as the trait proposed in this paper. (There are slight
 differences; [e.g.](https://p1144.godbolt.org/z/MhncMxrdj), Clang reports polymorphic types, reference types, and incomplete types
 as trivially relocatable, whereas P1144 does not. I'm not aware that any of Clang's differences were intentional.)
-Clang trunk doesn't provide any equivalent of the `[[trivially_relocatable]]`
-attribute, so `__is_trivially_relocatable(T)` is true only for types `T` that are "naturally"
-trivially relocatable, such as trivially copyable types and types marked with the `[[clang::trivial_abi]]`
+Clang trunk has no equivalent of the `[[trivially_relocatable]]`
+attribute, so `__is_trivially_relocatable(T)` is true only for
+trivially copyable types and types marked with the `[[clang::trivial_abi]]`
 attribute. As of 2023-02-12, Clang trunk has no conception of a type which is non-trivial for purposes of calls
 and yet is trivially relocatable. But Clang's current status is compatible with P1144 (modulo the
 few unintentional differences in `__is_trivially_relocatable` mentioned above).
+
+
+Appendix E: Open issues {#open-issues}
+=====================================
+
+Issue: P1144R6 `uninitialized_relocate(In, In, Fwd)`'s spec lacks the magic either-direction-overlap-handling of `memmove`.
+Either-direction-overlap-handling is implementable only for contiguous iterators (which can be converted to pointers);
+it is not implementable for arbitrary random-access iterators. Is there ever a case where someone might want to e.g.
+`uninitialized_relocate(rbegin(a), rend(a), begin(b))`? Do we need a separate algorithm?
+[[Qt]] provides both
+<a href="https://github.com/qt/qtbase/blob/dev/src/corelib/tools/qcontainertools_impl.h#L203-L233">`q_relocate_overlap_n(T*, size_t, T*)`</a>
+with magic overlap handling, and
+<a href="https://github.com/qt/qtbase/blob/dev/src/corelib/tools/qcontainertools_impl.h#L71-L85">`q_uninitialized_relocate_n(T*, size_t, T*)`</a>
+without.
+[[P2786R0]] proposes only `relocate(T*, T*, T*)` with magic overlap handling.
+[[P1144R6]] proposed only `uninitialized_relocate(In, In, Fwd)` without.
+
+Issue: In P1144R6, types with vptrs are never naturally trivially relocatable (because they are not standard-layout).
+Arthur claims that types with vptrs should be used only with inheritance, which means they never do value semantics
+(they slice instead), which means relocating one is always a bug, just like assigning or copying one. But [[P2786R0]]
+proposes to make polymorphic types naturally trivially relocatable. Is there any use-case for this?
+
+Issue: In P1144R6, `std::vector<std::pmr::vector<int>>::erase(pos)` can use trivial relocation to
+"close up the window" in the vector; this is also done in [[Qt]], [[Folly]], and [[BSL]]. The difference between
+closing-the-window-by-move-assignment and closing-the-window-by-memmove is detectable in a conforming C++ program.
+Therefore [[P2786R0]] proposes that relocation should not be allowed here.
+Is there any implementation experience of P2786R0's position here? ([[BSL]]'s `bsl::vector` follows P1144R6 already.)
+
+Issue: In P1144R6, `std::rotate(a, a+2, a+8)` on an array `std::pmr::vector<int> a[10]` can use trivial relocation to
+swap the elements. The difference between swap-by-move-assignment and swap-by-trivial-relocation is not detectable
+in a conforming C++ program, because swapping `pmr::vector`s with unequal allocators is UB.
+[[P2786R0]] proposes that relocation should not be allowed here, anyway.
+Is there any usage experience in [[Qt]], [[BSL]], [[Folly]], or elsewhere that bears on this question?
+(Arthur's libc++ fork does relocation here, but doesn't really count as usage experience since he's the only one using it.)
+
+Issue: P1144R7 made non-standard-layout types no longer naturally trivially relocatable, which fixes the problem
+with [[Subobjects]] as far as we know; but, are there still corner cases re potentially overlapping subobjects
+where P1144R7's new rules will have unusually surprising behavior?
 
 
 <pre class=biblio>
@@ -1188,14 +1227,6 @@ few unintentional differences in `__is_trivially_relocatable` mentioned above).
     "title": "bslmf::IsBitwiseMoveable: bitwise moveable trait metafunction",
     "href": "https://github.com/bloomberg/bde/blob/master/groups/bsl/bslmf/bslmf_isbitwisemoveable.h#L17",
     "date": "2013–2017"
-  },
-  "Contra": {
-    "authors": [
-      "Arthur O'Dwyer"
-    ],
-    "title": "Contra built-in library types",
-    "href": "https://quuxplusone.github.io/blog/2018/04/15/built-in-library-types/",
-    "date": "April 2018"
   },
   "CppChat": {
     "authors": [
@@ -1347,6 +1378,11 @@ few unintentional differences in `__is_trivially_relocatable` mentioned above).
     ],
     "title": "P2786R0: Trivial relocatability options",
     "href": "https://wg21.link/p2786r0",
+    "date": "February 2023"
+  },
+  "Qt": {
+    "title": "Qt Base",
+    "href": "https://github.com/qt/qtbase/",
     "date": "February 2023"
   },
   "StdRelocateIsCute": {
