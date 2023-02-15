@@ -1,5 +1,5 @@
 <pre class='metadata'>
-Title: Object relocation in terms of move plus destroy
+Title: `std::is_trivially_relocatable`
 Shortname: D1144
 Revision: 7
 !Draft Revision: 35
@@ -33,20 +33,26 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 - R7:
 
+    - Post–Issaquah 2023. [[P2786R0]] debuted at Issaquah; it raised several
+            open questions (see [[#open-questions]]). The authors of P1144 and P2786
+            plan a joint paper to resolve some of these design issues.
+
     - Non-standard-layout types (including polymorphic types, but also including types with
             reference members and/or a mix of public and private members) inhibit "natural"
-            trivial relocatability. Thanks to Dana Jansens for helping work this out.
+            trivial relocatability. I'm trying this out for R7, but might undo it later.
 
     - Jonathan Hopkins points out that (contrary to the English description in [[EASTL]])
-            EASTL's current definition of `has_trivial_relocate` is a synonym for
-            `is_trivially_move_assignable`, thus not prior art for this notion.
+            EASTL defines `has_trivial_relocate` as a synonym for
+            `is_trivially_move_assignable`, thus it's not prior art for this notion.
+            (In particular, EASTL considers `unique_ptr<int>` non-trivially relocatable.)
+            Remove mentions of EASTL.
 
-    - Added [[#applications|table §2.1]] comparing this proposal to Folly, BSL, and Qt.
+    - Added [[#applications|table §2.1]] directly comparing this proposal to Folly, BSL, and Qt.
 
     - Added straw poll results from Issaquah, and removed much background and discussion
             (leaving only references for the interested reader to consult [[P1144R6]]).
 
-    - Added "open issues list" in Appendix E.
+    - Added [[#open-questions|Appendix E]].
 
 - R6:
 
@@ -797,6 +803,63 @@ the choice whether to respect POCMA/POCCA/POCS, and also makes the choice
 when to warrant trivial relocatability. These choices are correlated, and so it is natural that
 they should be made by the same person, at the same place in the source code.
 
+## Overlapping base-class subobjects ## {#non-trivial-sample-nonsl}
+
+Note: This section was added in P1144R7.
+
+In the following snippet, `struct Dangerous` fails to be trivially relocatable in practice
+because its assignment operator doesn't overwrite all `sizeof(Dangerous)` bytes of the
+destination object. The tail padding of `Dangerous` is allowed to contain the value of
+`Derived::k`. ([Godbolt.](https://godbolt.org/z/T7rzrY3x9))
+
+```c++
+struct Dangerous {
+    Dangerous(int i, int j) : i(i), j(j) {}
+    int i;
+    short j;
+};
+static_assert(std::is_standard_layout_v<Dangerous>);
+static_assert(std::is_trivially_relocatable_v<Dangerous>);
+
+struct Derived : Dangerous {
+    Derived(int i, int j, int k) : Dangerous(i, j), k(k) {}
+    short k;
+};
+static_assert(!std::is_standard_layout_v<Derived>);
+static_assert(!std::is_trivially_relocatable_v<Derived>);
+
+int main() {
+    Derived a = Derived(1,2,3);
+    Derived b = Derived(4,5,6);
+    Dangerous &ra = a, &rb = b;
+    std::swap(ra, rb);
+    assert(a.k == 3 && b.k == 6);
+}
+```
+
+[[Subspace]] presented a version of this snippet, and was the motivation to (since P1144R7) consider only
+standard-layout types "naturally" trivially relocatable. Unfortunately, that criterion affects only
+`Derived`, whereas it's `Dangerous` that we can't trivially swap.
+
+Possible solution #1 is due to [[Subspace]]: Bring the ABI notion of "data size" into standard C++,
+so that we can say that the "data size" of `Dangerous` is less than its "size." Types with "data size"
+less than "size" aren't naturally trivially relocatable. But this is painful, because it makes
+`is_trivially_relocatable_v<Dangerous>` false.
+
+Possible solution #2: Disallow `std::swap(T&, T&)` from using trivial relocation unless
+it can prove that it's operating on complete objects. This would also disallow e.g. `std::rotate`
+from using trivial relocation unless _it's_ operating on complete objects (e.g.
+because it received a contiguous range). This creates fewer surprises, but makes it very difficult
+for the vendor to actually benefit from trivial relocation in `rotate` (because they can't just get
+it for free by calling `swap`; the vendor would have to create a second entrypoint `__swap_complete_objects`
+and figure out how to call that instead of `std::swap` from algorithms that would benefit from it).
+This would make `is_trivially_relocatable_v<Dangerous>` true, and make `std::swap(ra, rb)` non-trivial.
+
+Possible solution #3: Put a precondition on `swap(T&, T&)` (both the template and user-defined ADL
+overloads) that says it's UB to call it with references that don't refer to complete objects.
+This would make `is_trivially_relocatable_v<Dangerous>` true, and make `std::swap(ra, rb)` undefined behavior.
+I doubt this new precondition would be palatable to WG21.
+
 
 # Acknowledgements # {#acknowledgements}
 
@@ -832,7 +895,7 @@ and for answering my questions on [GCC bug 87106](https://gcc.gnu.org/bugzilla/s
 Thanks to Jens Maurer for his feedback on P1144R3 at Kona 2019, and to Corentin Jabot for championing
 P1144R4 at Prague 2020.
 
-Thanks to Dana Jansens for her contributions re non-standard-layout types, to Alisdair Meredith
+Thanks to Dana Jansens for her contributions re non-standard-layout types (see [[Subspace]]), to Alisdair Meredith
 for our extensive discussions during the February 2023 drafting of [[P2786R0]], and to Giuseppe D'Angelo
 and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]].
 
@@ -843,10 +906,10 @@ Appendix A: Straw polls {#polls}
 
 ## Polls taken at EWGI at Issaquah on 2023-02-10 ## {#taken-polls-2023-02-10}
 
-Arthur O'Dwyer championed P1144R6. Alisdair Meredith presented [[P2786R0]] (which proposed a
+Arthur O'Dwyer presented P1144R6. Alisdair Meredith presented [[P2786R0]] (which proposed a
 `[[maybe_trivially_relocatable]]`-style facility, and expressed it as a contextual keyword instead
 of an attribute). EWGI took the following [straw polls](https://wiki.edg.com/bin/view/Wg21issaquah2023/EWGIP1144R6)
-(as well as a poll on the attribute syntax and on both papers' readiness for EWG).
+(as well as polls on attribute syntax and on both papers' readiness for EWG).
 
 <table class="def">
 <tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
@@ -1088,44 +1151,6 @@ This is why (since P1144R5) the compiler will not consider types with
 virtual methods to be "naturally" trivially relocatable.
 
 
-## Overlapping subobject cannot be the target of a trivial copy ## {#non-trivial-sample-nonsl}
-
-Note: This section was added in P1144R7.
-
-In the following snippet, `struct Dangerous` is relocatable, but not trivially relocatable,
-because its assignment operator doesn't overwrite all `sizeof(Dangerous)` bytes of the
-destination object. The tail padding of `Dangerous` is allowed to contain the value of
-`Derived::k`.
-
-```c++
-struct Dangerous {
-    Dangerous(int i, int j) : i(i), j(j) {}
-    int i;
-protected:
-    short j;
-};
-struct Derived : Dangerous {
-    Derived(int i, int j, int k) : Dangerous(i, j), k(k) {}
-    short k;
-};
-
-int main() {
-    Derived a = Derived(1,2,3);
-    Derived b = Derived(4,5,6);
-    Dangerous &ra = a, &rb = b;
-    std::swap(ra, rb);
-    assert(a.k == 3 && b.k == 6);
-}
-```
-
-This is why (since P1144R7) the compiler will not consider non-standard-layout types
-to be "naturally" trivially relocatable. The programmer can still manually mark
-a `Dangerous` type as `[[trivially_relocatable]]`; if the type ends up being used in a way
-that violates its precondition (such as being made the base of a `Derived` type),
-then the program has undefined behavior under <a href="#wording-dcl.attr.trivreloc">[dcl.attr.trivreloc]</a>.
-See also [[Subobjects]].
-
-
 Appendix D: Implementation experience {#implementation}
 =====================================
 
@@ -1156,7 +1181,7 @@ and yet is trivially relocatable. But Clang's current status is compatible with 
 few unintentional differences in `__is_trivially_relocatable` mentioned above).
 
 
-Appendix E: Open issues {#open-issues}
+Appendix E: Open questions {#open-questions}
 =====================================
 
 Issue: P1144R6 `uninitialized_relocate(In, In, Fwd)`'s spec lacks the magic either-direction-overlap-handling of `memmove`.
@@ -1400,6 +1425,14 @@ where P1144R7's new rules will have unusually surprising behavior?
     "title": "When is a trivially copyable object not trivially copyable?",
     "href": "https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/",
     "date": "July 2018"
+  },
+  "Subspace": {
+    "authors": [
+      "Dana Jansens"
+    ],
+    "title": "Trivially Relocatable Types in C++/Subspace",
+    "href": "https://danakj.github.io/2023/01/15/trivially-relocatable.html",
+    "date": "January 2023"
   }
 }
 </pre>
