@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D1144R7: Object relocation in terms of move plus destroy</title>
+  <title>D1144R7: `std::is_trivially_relocatable`</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -2133,7 +2133,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D1144R7<br>Object relocation in terms of move plus destroy</h1>
+   <h1 class="p-name no-ref" id="title">D1144R7<br>`std::is_trivially_relocatable`</h1>
    <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-02-15">2023-02-15</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
@@ -2210,6 +2210,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <ol class="toc">
       <li><a href="#maybe-trivially-relocatable"><span class="secno">6.1</span> <span class="content">Attribute <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code></span></a>
       <li><a href="#pmr-concerns"><span class="secno">6.2</span> <span class="content">Confusing interactions with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-></code></span></a>
+      <li><a href="#non-trivial-sample-nonsl"><span class="secno">6.3</span> <span class="content">Overlapping base-class subobjects</span></a>
      </ol>
     <li><a href="#acknowledgements"><span class="secno">7</span> <span class="content">Acknowledgements</span></a>
     <li>
@@ -2227,10 +2228,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#non-trivial-sample-offset-ptr"><span class="secno"></span> <span class="content">Class invariant depends on <code class="highlight"><c- k>this</c-></code></span></a>
       <li><a href="#non-trivial-sample-registry"><span class="secno"></span> <span class="content">Program invariant depends on <code class="highlight"><c- k>this</c-></code></span></a>
       <li><a href="#non-trivial-sample-polymorphic"><span class="secno"></span> <span class="content">Polymorphic downcast effectively relies on offset-into-self</span></a>
-      <li><a href="#non-trivial-sample-nonsl"><span class="secno"></span> <span class="content">Overlapping subobject cannot be the target of a trivial copy</span></a>
      </ol>
     <li><a href="#implementation"><span class="secno"></span> <span class="content">Appendix D: Implementation experience</span></a>
-    <li><a href="#open-issues"><span class="secno"></span> <span class="content">Appendix E: Open issues</span></a>
+    <li><a href="#open-questions"><span class="secno"></span> <span class="content">Appendix E: Open questions</span></a>
     <li>
      <a href="#index"><span class="secno"></span> <span class="content">Index</span></a>
      <ol class="toc">
@@ -2252,19 +2252,25 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <p>R7:</p>
      <ul>
       <li data-md>
+       <p>Post–Issaquah 2023. <a data-link-type="biblio" href="#biblio-p2786r0" title="P2786R0: Trivial relocatability options">[P2786R0]</a> debuted at Issaquah; it raised several
+    open questions (see <a href="#open-questions">Appendix E: Open questions</a>). The authors of P1144 and P2786
+    plan a joint paper to resolve some of these design issues.</p>
+      <li data-md>
        <p>Non-standard-layout types (including polymorphic types, but also including types with
     reference members and/or a mix of public and private members) inhibit "natural"
-    trivial relocatability. Thanks to Dana Jansens for helping work this out.</p>
+    trivial relocatability. I’m trying this out for R7, but might undo it later.</p>
       <li data-md>
        <p>Jonathan Hopkins points out that (contrary to the English description in <a data-link-type="biblio" href="#biblio-eastl" title="N2271: EASTL — Electronic Arts Standard Template Library">[EASTL]</a>)
-    EASTL’s current definition of <code class="highlight"><c- n>has_trivial_relocate</c-></code> is a synonym for <code class="highlight"><c- n>is_trivially_move_assignable</c-></code>, thus not prior art for this notion.</p>
+    EASTL defines <code class="highlight"><c- n>has_trivial_relocate</c-></code> as a synonym for <code class="highlight"><c- n>is_trivially_move_assignable</c-></code>, thus it’s not prior art for this notion.
+    (In particular, EASTL considers <code class="highlight"><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code> non-trivially relocatable.)
+    Remove mentions of EASTL.</p>
       <li data-md>
-       <p>Added <a href="#applications">table §2.1</a> comparing this proposal to Folly, BSL, and Qt.</p>
+       <p>Added <a href="#applications">table §2.1</a> directly comparing this proposal to Folly, BSL, and Qt.</p>
       <li data-md>
        <p>Added straw poll results from Issaquah, and removed much background and discussion
     (leaving only references for the interested reader to consult <a data-link-type="biblio" href="#biblio-p1144r6" title="P1144R6: Object relocation in terms of move plus destroy">[P1144R6]</a>).</p>
       <li data-md>
-       <p>Added "open issues list" in Appendix E.</p>
+       <p>Added <a href="#open-questions">Appendix E</a>.</p>
      </ul>
     <li data-md>
      <p>R6:</p>
@@ -2752,6 +2758,49 @@ the <em>container’s</em> <code class="highlight"><c- k>operator</c-><c- o>=</c
 the choice whether to respect POCMA/POCCA/POCS, and also makes the choice
 when to warrant trivial relocatability. These choices are correlated, and so it is natural that
 they should be made by the same person, at the same place in the source code.</p>
+   <h3 class="heading settled" data-level="6.3" id="non-trivial-sample-nonsl"><span class="secno">6.3. </span><span class="content">Overlapping base-class subobjects</span><a class="self-link" href="#non-trivial-sample-nonsl"></a></h3>
+   <p class="note" role="note"><span class="marker">Note:</span> This section was added in P1144R7.</p>
+   <p>In the following snippet, <code class="highlight"><c- k>struct</c-> <c- nc>Dangerous</c-></code> fails to be trivially relocatable in practice
+because its assignment operator doesn’t overwrite all <code class="highlight"><c- k>sizeof</c-><c- p>(</c-><c- n>Dangerous</c-><c- p>)</c-></code> bytes of the
+destination object. The tail padding of <code class="highlight"><c- n>Dangerous</c-></code> is allowed to contain the value of <code class="highlight"><c- n>Derived</c-><c- o>::</c-><c- n>k</c-></code>. (<a href="https://godbolt.org/z/T7rzrY3x9">Godbolt.</a>)</p>
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Dangerous</c-> <c- p>{</c->
+    <c- n>Dangerous</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>,</c-> <c- b>int</c-> <c- n>j</c-><c- p>)</c-> <c- o>:</c-> <c- n>i</c-><c- p>(</c-><c- n>i</c-><c- p>),</c-> <c- n>j</c-><c- p>(</c-><c- n>j</c-><c- p>)</c-> <c- p>{}</c->
+    <c- b>int</c-> <c- n>i</c-><c- p>;</c->
+    <c- b>short</c-> <c- n>j</c-><c- p>;</c->
+<c- p>};</c->
+<c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_standard_layout_v</c-><c- o>&lt;</c-><c- n>Dangerous</c-><c- o>></c-><c- p>);</c->
+<c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Dangerous</c-><c- o>></c-><c- p>);</c->
+
+<c- k>struct</c-> <c- nc>Derived</c-> <c- o>:</c-> <c- n>Dangerous</c-> <c- p>{</c->
+    <c- n>Derived</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>,</c-> <c- b>int</c-> <c- n>j</c-><c- p>,</c-> <c- b>int</c-> <c- n>k</c-><c- p>)</c-> <c- o>:</c-> <c- n>Dangerous</c-><c- p>(</c-><c- n>i</c-><c- p>,</c-> <c- n>j</c-><c- p>),</c-> <c- n>k</c-><c- p>(</c-><c- n>k</c-><c- p>)</c-> <c- p>{}</c->
+    <c- b>short</c-> <c- n>k</c-><c- p>;</c->
+<c- p>};</c->
+<c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_standard_layout_v</c-><c- o>&lt;</c-><c- n>Derived</c-><c- o>></c-><c- p>);</c->
+<c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Derived</c-><c- o>></c-><c- p>);</c->
+
+<c- b>int</c-> <c- nf>main</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>Derived</c-> <c- n>a</c-> <c- o>=</c-> <c- n>Derived</c-><c- p>(</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>);</c->
+    <c- n>Derived</c-> <c- n>b</c-> <c- o>=</c-> <c- n>Derived</c-><c- p>(</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>,</c-><c- mi>6</c-><c- p>);</c->
+    <c- n>Dangerous</c-> <c- o>&amp;</c-><c- n>ra</c-> <c- o>=</c-> <c- n>a</c-><c- p>,</c-> <c- o>&amp;</c-><c- n>rb</c-> <c- o>=</c-> <c- n>b</c-><c- p>;</c->
+    <c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>ra</c-><c- p>,</c-> <c- n>rb</c-><c- p>);</c->
+    <c- n>assert</c-><c- p>(</c-><c- n>a</c-><c- p>.</c-><c- n>k</c-> <c- o>==</c-> <c- mi>3</c-> <c- o>&amp;&amp;</c-> <c- n>b</c-><c- p>.</c-><c- n>k</c-> <c- o>==</c-> <c- mi>6</c-><c- p>);</c->
+<c- p>}</c->
+</pre>
+   <p><a data-link-type="biblio" href="#biblio-subspace" title="Trivially Relocatable Types in C++/Subspace">[Subspace]</a> presented a version of this snippet, and was the motivation to (since P1144R7) consider only
+standard-layout types "naturally" trivially relocatable. Unfortunately, that criterion affects only <code class="highlight"><c- n>Derived</c-></code>, whereas it’s <code class="highlight"><c- n>Dangerous</c-></code> that we can’t trivially swap.</p>
+   <p>Possible solution #1 is due to <a data-link-type="biblio" href="#biblio-subspace" title="Trivially Relocatable Types in C++/Subspace">[Subspace]</a>: Bring the ABI notion of "data size" into standard C++,
+so that we can say that the "data size" of <code class="highlight"><c- n>Dangerous</c-></code> is less than its "size." Types with "data size"
+less than "size" aren’t naturally trivially relocatable. But this is painful, because it makes <code class="highlight"><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Dangerous</c-><c- o>></c-></code> false.</p>
+   <p>Possible solution #2: Disallow <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-><c- p>)</c-></code> from using trivial relocation unless
+it can prove that it’s operating on complete objects. This would also disallow e.g. <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rotate</c-></code> from using trivial relocation unless _it’s_ operating on complete objects (e.g.
+because it received a contiguous range). This creates fewer surprises, but makes it very difficult
+for the vendor to actually benefit from trivial relocation in <code class="highlight"><c- n>rotate</c-></code> (because they can’t just get
+it for free by calling <code class="highlight"><c- n>swap</c-></code>; the vendor would have to create a second entrypoint <code class="highlight"><c- n>__swap_complete_objects</c-></code> and figure out how to call that instead of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code> from algorithms that would benefit from it).
+This would make <code class="highlight"><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Dangerous</c-><c- o>></c-></code> true, and make <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>ra</c-><c- p>,</c-> <c- n>rb</c-><c- p>)</c-></code> non-trivial.</p>
+   <p>Possible solution #3: Put a precondition on <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-><c- p>)</c-></code> (both the template and user-defined ADL
+overloads) that says it’s UB to call it with references that don’t refer to complete objects.
+This would make <code class="highlight"><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Dangerous</c-><c- o>></c-></code> true, and make <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>ra</c-><c- p>,</c-> <c- n>rb</c-><c- p>)</c-></code> undefined behavior.
+I doubt this new precondition would be palatable to WG21.</p>
    <h2 class="heading settled" data-level="7" id="acknowledgements"><span class="secno">7. </span><span class="content">Acknowledgements</span><a class="self-link" href="#acknowledgements"></a></h2>
    <p>Thanks to Elias Kosunen, Niall Douglas, and John Bandela for their feedback on early drafts of P1144R0.</p>
    <p>Many thanks to Matt Godbolt for allowing me to install the prototype Clang implementation on Compiler Explorer
@@ -2772,13 +2821,13 @@ in Mungo Gill &amp; Alisdair Meredith’s <a data-link-type="biblio" href="#bibl
 and for answering my questions on <a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87106">GCC bug 87106</a>.</p>
    <p>Thanks to Jens Maurer for his feedback on P1144R3 at Kona 2019, and to Corentin Jabot for championing
 P1144R4 at Prague 2020.</p>
-   <p>Thanks to Dana Jansens for her contributions re non-standard-layout types, to Alisdair Meredith
+   <p>Thanks to Dana Jansens for her contributions re non-standard-layout types (see <a data-link-type="biblio" href="#biblio-subspace" title="Trivially Relocatable Types in C++/Subspace">[Subspace]</a>), to Alisdair Meredith
 for our extensive discussions during the February 2023 drafting of <a data-link-type="biblio" href="#biblio-p2786r0" title="P2786R0: Trivial relocatability options">[P2786R0]</a>, and to Giuseppe D’Angelo
 and Thiago Maceira for contributing the Qt entries in <a href="#applications">table §2.1</a>.</p>
    <h2 class="heading settled" id="polls"><span class="content">Appendix A: Straw polls</span><a class="self-link" href="#polls"></a></h2>
    <h3 class="heading settled" id="taken-polls-2023-02-10"><span class="content">Polls taken at EWGI at Issaquah on 2023-02-10</span><a class="self-link" href="#taken-polls-2023-02-10"></a></h3>
-   <p>Arthur O’Dwyer championed P1144R6. Alisdair Meredith presented <a data-link-type="biblio" href="#biblio-p2786r0" title="P2786R0: Trivial relocatability options">[P2786R0]</a> (which proposed a <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>-style facility, and expressed it as a contextual keyword instead
-of an attribute). EWGI took the following <a href="https://wiki.edg.com/bin/view/Wg21issaquah2023/EWGIP1144R6">straw polls</a> (as well as a poll on the attribute syntax and on both papers' readiness for EWG).</p>
+   <p>Arthur O’Dwyer presented P1144R6. Alisdair Meredith presented <a data-link-type="biblio" href="#biblio-p2786r0" title="P2786R0: Trivial relocatability options">[P2786R0]</a> (which proposed a <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>-style facility, and expressed it as a contextual keyword instead
+of an attribute). EWGI took the following <a href="https://wiki.edg.com/bin/view/Wg21issaquah2023/EWGIP1144R6">straw polls</a> (as well as polls on attribute syntax and on both papers' readiness for EWG).</p>
    <table class="def">
     <tbody>
      <tr>
@@ -3007,36 +3056,6 @@ with virtual methods. Here is the same snippet using <code class="highlight"><c-
 </pre>
    <p>This is why (since P1144R5) the compiler will not consider types with
 virtual methods to be "naturally" trivially relocatable.</p>
-   <h3 class="heading settled" id="non-trivial-sample-nonsl"><span class="content">Overlapping subobject cannot be the target of a trivial copy</span><a class="self-link" href="#non-trivial-sample-nonsl"></a></h3>
-   <p class="note" role="note"><span class="marker">Note:</span> This section was added in P1144R7.</p>
-   <p>In the following snippet, <code class="highlight"><c- k>struct</c-> <c- nc>Dangerous</c-></code> is relocatable, but not trivially relocatable,
-because its assignment operator doesn’t overwrite all <code class="highlight"><c- k>sizeof</c-><c- p>(</c-><c- n>Dangerous</c-><c- p>)</c-></code> bytes of the
-destination object. The tail padding of <code class="highlight"><c- n>Dangerous</c-></code> is allowed to contain the value of <code class="highlight"><c- n>Derived</c-><c- o>::</c-><c- n>k</c-></code>.</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Dangerous</c-> <c- p>{</c->
-    <c- n>Dangerous</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>,</c-> <c- b>int</c-> <c- n>j</c-><c- p>)</c-> <c- o>:</c-> <c- n>i</c-><c- p>(</c-><c- n>i</c-><c- p>),</c-> <c- n>j</c-><c- p>(</c-><c- n>j</c-><c- p>)</c-> <c- p>{}</c->
-    <c- b>int</c-> <c- n>i</c-><c- p>;</c->
-<c- n>protected</c-><c- o>:</c->
-    <c- b>short</c-> <c- n>j</c-><c- p>;</c->
-<c- p>};</c->
-<c- k>struct</c-> <c- nc>Derived</c-> <c- o>:</c-> <c- n>Dangerous</c-> <c- p>{</c->
-    <c- n>Derived</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>,</c-> <c- b>int</c-> <c- n>j</c-><c- p>,</c-> <c- b>int</c-> <c- n>k</c-><c- p>)</c-> <c- o>:</c-> <c- n>Dangerous</c-><c- p>(</c-><c- n>i</c-><c- p>,</c-> <c- n>j</c-><c- p>),</c-> <c- n>k</c-><c- p>(</c-><c- n>k</c-><c- p>)</c-> <c- p>{}</c->
-    <c- b>short</c-> <c- n>k</c-><c- p>;</c->
-<c- p>};</c->
-
-<c- b>int</c-> <c- nf>main</c-><c- p>()</c-> <c- p>{</c->
-    <c- n>Derived</c-> <c- n>a</c-> <c- o>=</c-> <c- n>Derived</c-><c- p>(</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>);</c->
-    <c- n>Derived</c-> <c- n>b</c-> <c- o>=</c-> <c- n>Derived</c-><c- p>(</c-><c- mi>4</c-><c- p>,</c-><c- mi>5</c-><c- p>,</c-><c- mi>6</c-><c- p>);</c->
-    <c- n>Dangerous</c-> <c- o>&amp;</c-><c- n>ra</c-> <c- o>=</c-> <c- n>a</c-><c- p>,</c-> <c- o>&amp;</c-><c- n>rb</c-> <c- o>=</c-> <c- n>b</c-><c- p>;</c->
-    <c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>ra</c-><c- p>,</c-> <c- n>rb</c-><c- p>);</c->
-    <c- n>assert</c-><c- p>(</c-><c- n>a</c-><c- p>.</c-><c- n>k</c-> <c- o>==</c-> <c- mi>3</c-> <c- o>&amp;&amp;</c-> <c- n>b</c-><c- p>.</c-><c- n>k</c-> <c- o>==</c-> <c- mi>6</c-><c- p>);</c->
-<c- p>}</c->
-</pre>
-   <p>This is why (since P1144R7) the compiler will not consider non-standard-layout types
-to be "naturally" trivially relocatable. The programmer can still manually mark
-a <code class="highlight"><c- n>Dangerous</c-></code> type as <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code>; if the type ends up being used in a way
-that violates its precondition (such as being made the base of a <code class="highlight"><c- n>Derived</c-></code> type),
-then the program has undefined behavior under <a href="#wording-dcl.attr.trivreloc">[dcl.attr.trivreloc]</a>.
-See also <a data-link-type="biblio" href="#biblio-subobjects" title="When is a trivially copyable object not trivially copyable?">[Subobjects]</a>.</p>
    <h2 class="heading settled" id="implementation"><span class="content">Appendix D: Implementation experience</span><a class="self-link" href="#implementation"></a></h2>
    <p>A prototype Clang/libc++ implementation is at</p>
    <ul>
@@ -3060,7 +3079,7 @@ Clang trunk has no equivalent of the <code class="highlight"><c- p>[[</c-><c- n>
 trivially copyable types and types marked with the <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivial_abi</c-><c- p>]]</c-></code> attribute. As of 2023-02-12, Clang trunk has no conception of a type which is non-trivial for purposes of calls
 and yet is trivially relocatable. But Clang’s current status is compatible with P1144 (modulo the
 few unintentional differences in <code class="highlight"><c- n>__is_trivially_relocatable</c-></code> mentioned above).</p>
-   <h2 class="heading settled" id="open-issues"><span class="content">Appendix E: Open issues</span><a class="self-link" href="#open-issues"></a></h2>
+   <h2 class="heading settled" id="open-questions"><span class="content">Appendix E: Open questions</span><a class="self-link" href="#open-questions"></a></h2>
    <p class="issue" id="issue-7a8f73c4"><a class="self-link" href="#issue-7a8f73c4"></a> P1144R6 <code class="highlight"><c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>In</c-><c- p>,</c-> <c- n>In</c-><c- p>,</c-> <c- n>Fwd</c-><c- p>)</c-></code>'s spec lacks the magic either-direction-overlap-handling of <code class="highlight"><c- n>memmove</c-></code>.
 Either-direction-overlap-handling is implementable only for contiguous iterators (which can be converted to pointers);
 it is not implementable for arbitrary random-access iterators. Is there ever a case where someone might want to e.g. <code class="highlight"><c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>rbegin</c-><c- p>(</c-><c- n>a</c-><c- p>),</c-> <c- n>rend</c-><c- p>(</c-><c- n>a</c-><c- p>),</c-> <c- n>begin</c-><c- p>(</c-><c- n>b</c-><c- p>))</c-></code>? Do we need a separate algorithm? <a data-link-type="biblio" href="#biblio-qt" title="Qt Base">[Qt]</a> provides both <a href="https://github.com/qt/qtbase/blob/dev/src/corelib/tools/qcontainertools_impl.h#L203-L233"><code class="highlight"><c- n>q_relocate_overlap_n</c-><c- p>(</c-><c- n>T</c-><c- o>*</c-><c- p>,</c-> <c- b>size_t</c-><c- p>,</c-> <c- n>T</c-><c- o>*</c-><c- p>)</c-></code></a> with magic overlap handling, and <a href="https://github.com/qt/qtbase/blob/dev/src/corelib/tools/qcontainertools_impl.h#L71-L85"><code class="highlight"><c- n>q_uninitialized_relocate_n</c-><c- p>(</c-><c- n>T</c-><c- o>*</c-><c- p>,</c-> <c- b>size_t</c-><c- p>,</c-> <c- n>T</c-><c- o>*</c-><c- p>)</c-></code></a> without. <a data-link-type="biblio" href="#biblio-p2786r0" title="P2786R0: Trivial relocatability options">[P2786R0]</a> proposes only <code class="highlight"><c- n>relocate</c-><c- p>(</c-><c- n>T</c-><c- o>*</c-><c- p>,</c-> <c- n>T</c-><c- o>*</c-><c- p>,</c-> <c- n>T</c-><c- o>*</c-><c- p>)</c-></code> with magic overlap handling. <a data-link-type="biblio" href="#biblio-p1144r6" title="P1144R6: Object relocation in terms of move plus destroy">[P1144R6]</a> proposed only <code class="highlight"><c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>In</c-><c- p>,</c-> <c- n>In</c-><c- p>,</c-> <c- n>Fwd</c-><c- p>)</c-></code> without.</p>
@@ -3276,6 +3295,8 @@ where P1144R7’s new rules will have unusually surprising behavior?</p>
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2022/05/18/std-relocate/"><cite>std::relocate's implementation is cute</cite></a>. May 2022. URL: <a href="https://quuxplusone.github.io/blog/2022/05/18/std-relocate/">https://quuxplusone.github.io/blog/2022/05/18/std-relocate/</a>
    <dt id="biblio-subobjects">[Subobjects]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/"><cite>When is a trivially copyable object not trivially copyable?</cite></a>. July 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/">https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/</a>
+   <dt id="biblio-subspace">[Subspace]
+   <dd>Dana Jansens. <a href="https://danakj.github.io/2023/01/15/trivially-relocatable.html"><cite>Trivially Relocatable Types in C++/Subspace</cite></a>. January 2023. URL: <a href="https://danakj.github.io/2023/01/15/trivially-relocatable.html">https://danakj.github.io/2023/01/15/trivially-relocatable.html</a>
   </dl>
   <h2 class="no-num no-ref heading settled" id="issues-index"><span class="content">Issues Index</span><a class="self-link" href="#issues-index"></a></h2>
   <div style="counter-reset:issue">
