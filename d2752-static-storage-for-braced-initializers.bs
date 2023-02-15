@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Static storage for braced initializers
 Shortname: D2752
-Revision: 0
-!Draft Revision: 4
+Revision: 1
+!Draft Revision: 6
 Audience: EWG
 Status: D
 Group: WG21
@@ -310,11 +310,13 @@ so maybe there is no need for different TUs to agree on their names.
 
 # Proposed wording relative to the current C++23 draft # {#wording}
 
+Thanks to Jens Maurer for reviewing this proposed wording.
+
 Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init.list#5">[dcl.init.list]/5–6</a> as follows:
 
 <blockquote>
 An object of type `std::initializer_list<E>` is constructed from an initializer list
-as if the implementation generated and materialized <del>a prvalue</del> <ins>an object</ins> of type “array of *N* `const E`”,
+as if the implementation generated <del>and materialized a prvalue</del> <ins>an object</ins> of type “array of *N* `const E`”,
 where *N* is the number of elements in the initializer list<ins>; this is called the initializer list's *backing array*</ins>.
 Each element of <del>that array</del> <ins>the backing array</ins> is copy-initialized with the corresponding element of the initializer list,
 and the `std::initializer_list<E>` object is constructed to refer to that array.
@@ -339,7 +341,7 @@ and the `std::initializer_list<E>` object is constructed to refer to that array.
 <ins>Whether two backing arrays with the same contents are distinct (that is,
 are stored in nonoverlapping objects) is unspecified.</ins>
 
-The <ins>backing</ins> array has the same lifetime as any other temporary object, except that initializing
+The <ins>backing</ins> array has the same lifetime as <del>any other</del> <ins>a</ins> temporary object, except that initializing
 an `initializer_list` object from the array extends the lifetime of the array exactly like
 binding a reference to a temporary.
 
@@ -356,11 +358,11 @@ binding a reference to a temporary.
 <ins>The initialization will be implemented in a way roughly equivalent to this:</ins>
 <small><pre>
     <ins>void g(float x) {</ins>
-      <ins>const double __a[3] = {double{1}, double{x}, double{3}};</ins>
+      <ins>const double __a[3] = {double{1}, double{x}, double{3}}; // backing array</ins>
       <ins>f(std::initializer_list&lt;double&gt;(__a, __a+3));</ins>
     <ins>}</ins>
     <ins>void h() {</ins>
-      <ins>static constexpr double __b[3] = {double{1}, double{2}, double{3}};</ins>
+      <ins>static constexpr double __b[3] = {double{1}, double{2}, double{3}}; // backing array</ins>
       <ins>f(std::initializer_list&lt;double&gt;(__b, __b+3));</ins>
     <ins>}</ins>
 </pre></small>
