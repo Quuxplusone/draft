@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2752R0: Static storage for braced initializers</title>
+  <title>D2752R1: Static storage for braced initializers</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1560,7 +1560,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version 26e85e599, updated Thu Dec 8 15:29:31 2022 -0800" name="generator">
+  <meta content="Bikeshed version 42a48c451, updated Tue Feb 14 14:52:15 2023 -0800" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
@@ -2093,7 +2093,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2752R0<br>Static storage for braced initializers</h1>
+   <h1 class="p-name no-ref" id="title">D2752R1<br>Static storage for braced initializers</h1>
    <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-01-09">2023-01-09</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
@@ -2104,7 +2104,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>4
+     <dd>6
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs</a>
      <dt>Current:
@@ -2378,11 +2378,12 @@ so maybe there is no need for different TUs to agree on their names.</p>
 <c- p>}</c->
 </pre>
    <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording relative to the current C++23 draft</span><a class="self-link" href="#wording"></a></h2>
+   <p>Thanks to Jens Maurer for reviewing this proposed wording.</p>
    <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init.list#5">[dcl.init.list]/5–6</a> as follows:</p>
    <blockquote>
      An object of type <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-></code> is constructed from an initializer list
-as if the implementation generated and materialized 
-    <del>a prvalue</del>
+as if the implementation generated 
+    <del>and materialized a prvalue</del>
     <ins>an object</ins>
      of type “array of <em>N</em> <code class="highlight"><c- k>const</c-> <c- n>E</c-></code>”,
 where <em>N</em> is the number of elements in the initializer list
@@ -2414,7 +2415,10 @@ are stored in nonoverlapping objects) is unspecified.</ins>
     <p>
      The 
      <ins>backing</ins>
-      array has the same lifetime as any other temporary object, except that initializing
+      array has the same lifetime as 
+     <del>any other</del>
+     <ins>a</ins>
+      temporary object, except that initializing
 an <code class="highlight"><c- n>initializer_list</c-></code> object from the array extends the lifetime of the array exactly like
 binding a reference to a temporary.
     </p>
@@ -2429,11 +2433,11 @@ binding a reference to a temporary.
 </pre></small> 
     <ins>The initialization will be implemented in a way roughly equivalent to this:</ins>
      <small><pre class="highlight">    <ins><c- b>void</c-> <c- nf>g</c-><c- p>(</c-><c- b>float</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c-></ins>
-      <ins><c- k>const</c-> <c- b>double</c-> <c- n>__a</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{</c-><c- b>double</c-><c- p>{</c-><c- mi>1</c-><c- p>},</c-> <c- b>double</c-><c- p>{</c-><c- n>x</c-><c- p>},</c-> <c- b>double</c-><c- p>{</c-><c- mi>3</c-><c- p>}};</c-></ins>
+      <ins><c- k>const</c-> <c- b>double</c-> <c- n>__a</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{</c-><c- b>double</c-><c- p>{</c-><c- mi>1</c-><c- p>},</c-> <c- b>double</c-><c- p>{</c-><c- n>x</c-><c- p>},</c-> <c- b>double</c-><c- p>{</c-><c- mi>3</c-><c- p>}};</c-> <c- c1>// backing array</c-></ins>
       <ins><c- n>f</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>double</c-><c- o>></c-><c- p>(</c-><c- n>__a</c-><c- p>,</c-> <c- n>__a</c-><c- o>+</c-><c- mi>3</c-><c- p>));</c-></ins>
     <ins><c- p>}</c-></ins>
     <ins><c- b>void</c-> <c- nf>h</c-><c- p>()</c-> <c- p>{</c-></ins>
-      <ins><c- k>static</c-> <c- k>constexpr</c-> <c- b>double</c-> <c- n>__b</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{</c-><c- b>double</c-><c- p>{</c-><c- mi>1</c-><c- p>},</c-> <c- b>double</c-><c- p>{</c-><c- mi>2</c-><c- p>},</c-> <c- b>double</c-><c- p>{</c-><c- mi>3</c-><c- p>}};</c-></ins>
+      <ins><c- k>static</c-> <c- k>constexpr</c-> <c- b>double</c-> <c- n>__b</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{</c-><c- b>double</c-><c- p>{</c-><c- mi>1</c-><c- p>},</c-> <c- b>double</c-><c- p>{</c-><c- mi>2</c-><c- p>},</c-> <c- b>double</c-><c- p>{</c-><c- mi>3</c-><c- p>}};</c-> <c- c1>// backing array</c-></ins>
       <ins><c- n>f</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>double</c-><c- o>></c-><c- p>(</c-><c- n>__b</c-><c- p>,</c-> <c- n>__b</c-><c- o>+</c-><c- mi>3</c-><c- p>));</c-></ins>
     <ins><c- p>}</c-></ins>
 </pre></small> 
