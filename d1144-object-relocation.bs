@@ -2,7 +2,7 @@
 Title: `std::is_trivially_relocatable`
 Shortname: D1144
 Revision: 7
-!Draft Revision: 35
+!Draft Revision: 36
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -36,10 +36,6 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
     - Post–Issaquah 2023. [[P2786R0]] debuted at Issaquah; it raised several
             open questions (see [[#open-questions]]). The authors of P1144 and P2786
             plan a joint paper to resolve some of these design issues.
-
-    - Non-standard-layout types (including polymorphic types, but also including types with
-            reference members and/or a mix of public and private members) inhibit "natural"
-            trivial relocatability. I'm trying this out for R7, but might undo it later.
 
     - Jonathan Hopkins points out that (contrary to the English description in [[EASTL]])
             EASTL defines `has_trivial_relocate` as a synonym for
@@ -159,7 +155,7 @@ trivial relocatability. Here's who does these optimizations in practice:
      [proposed](https://github.com/facebook/folly/pull/1934) for `small_vector` </td><td>
      <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1232-L1259">`fbvector`</a> </td><td>
      <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1273-L1292">`fbvector`</a> </td><td>
-     N/A </td>     
+     N/A </td>
 </tr><tr>
 <td> [[Qt]] `QTypeInfo<T>::isRelocatable` </td><td>
      <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L865-L872">`QList`</a> </td><td>
@@ -589,15 +585,17 @@ An object type `T` is a <dfn dfn-type="abstract-op">trivially relocatable</dfn> 
 
   - a (possibly cv-qualified) class type which:
 
-    - is standard-layout (<a href="http://eel.is/c++draft/class.prop#3">[class.prop]</a>),
-
     - has no user-provided move constructors or move assignment operators,
 
     - has no user-provided copy constructors or copy assignment operators,
 
     - has no user-provided destructors,
 
-    - all of whose members are of trivially relocatable type, and
+    - has no virtual member functions,
+
+    - has no virtual base classes,
+
+    - all of whose members are either of reference type or of trivially relocatable type, and
 
     - all of whose base classes are of trivially relocatable type.
 
@@ -609,9 +607,9 @@ to a simple copy of the underlying bytes. *—end note*]
 
 </blockquote></small>
 
-Note: Polymorphic types, being non-standard-layout, are disallowed from "natural" trivial relocatability.
-See [[#non-trivial-sample-polymorphic|Appendix C, example 5]] and [[#non-trivial-sample-nonsl|example 6]].
-Reference members are similarly disallowed. Volatile members are not disallowed. See [[Subobjects]].
+Note: Polymorphic types are disallowed from "natural" trivial relocatability.
+See [[#non-trivial-sample-polymorphic|Appendix C, example 5]].
+Volatile members are not disallowed. See [[Subobjects]].
 
 
 ## `[[trivially_relocatable]]` attribute [dcl.attr.trivreloc] ## {#wording-dcl.attr.trivreloc}
@@ -803,7 +801,7 @@ the choice whether to respect POCMA/POCCA/POCS, and also makes the choice
 when to warrant trivial relocatability. These choices are correlated, and so it is natural that
 they should be made by the same person, at the same place in the source code.
 
-## Overlapping base-class subobjects ## {#non-trivial-sample-nonsl}
+## Overlapping base-class subobjects ## {#overlap-concerns}
 
 Note: This section was added in P1144R7.
 
@@ -837,7 +835,7 @@ int main() {
 }
 ```
 
-[[Subspace]] presented a version of this snippet, and was the motivation to (since P1144R7) consider only
+[[Subspace]] presented a version of this snippet, which led to the suggestion to consider only
 standard-layout types "naturally" trivially relocatable. Unfortunately, that criterion affects only
 `Derived`, whereas it's `Dangerous` that we can't trivially swap.
 
@@ -853,12 +851,23 @@ because it received a contiguous range). This creates fewer surprises, but makes
 for the vendor to actually benefit from trivial relocation in `rotate` (because they can't just get
 it for free by calling `swap`; the vendor would have to create a second entrypoint `__swap_complete_objects`
 and figure out how to call that instead of `std::swap` from algorithms that would benefit from it).
-This would make `is_trivially_relocatable_v<Dangerous>` true, and make `std::swap(ra, rb)` non-trivial.
+This would make `is_trivially_relocatable_v<Dangerous>` true, makes `std::swap(ra, rb)` non-trivial,
+and makes `std::rotate` trivial with heroics.
 
-Possible solution #3: Put a precondition on `swap(T&, T&)` (both the template and user-defined ADL
-overloads) that says it's UB to call it with references that don't refer to complete objects.
-This would make `is_trivially_relocatable_v<Dangerous>` true, and make `std::swap(ra, rb)` undefined behavior.
-I doubt this new precondition would be palatable to WG21.
+Possible solution #3: Bring the ABI notion of "data size" into standard C++, and make the trivial
+version of `std::swap(T&, T&)` swap only `datasizeof(T)` bytes of memory instead of `sizeof(T)` bytes.
+This makes it difficult for the vendor to benefit from trivial relocation in `rotate` (because
+just calling `swap` won't swap all the bytes, which makes it impossible for the optimizer
+to coalesce adjacent memcpy operations into one big memcpy).
+This makes `is_trivially_relocatable_v<Dangerous>` true, makes `std::swap(ra, rb)` trivial,
+and makes `std::rotate` trivial with heroics.
+
+Possible solution #4 is what [[P1144R6]] implicitly assumed: Put a precondition on `swap(T&, T&)`
+(both the template and user-defined ADL overloads) that says it's UB if either argument refers
+to an overlapping subobject.
+This makes `is_trivially_relocatable_v<Dangerous>` true, makes `std::swap(ra, rb)` undefined behavior,
+and makes `std::rotate` trivial for free.
+But I doubt this new precondition on `swap` would be palatable to WG21.
 
 
 # Acknowledgements # {#acknowledgements}
@@ -884,7 +893,7 @@ of N4158 at Urbana</a> (November 2014).
 Significantly different approaches to this problem have previously appeared in Rodrigo Castro Campos's
 [[N2754]], Denis Bider's [[P0023R0]] (introducing a core-language "relocation" operator), and
 Niall Douglas's [[P1029R3]] (treating trivial relocatability as an aspect of move-construction in isolation,
-rather than an aspect of the class type as a whole). A less significantly different approach is taken
+rather than an aspect of the class type as a whole). A less different approach is taken
 in Mungo Gill & Alisdair Meredith's [[P2786R0]].
 
 Thanks to John McCall for his thought-provoking review comments on the Clang implementation [[D50119]].
@@ -895,9 +904,9 @@ and for answering my questions on [GCC bug 87106](https://gcc.gnu.org/bugzilla/s
 Thanks to Jens Maurer for his feedback on P1144R3 at Kona 2019, and to Corentin Jabot for championing
 P1144R4 at Prague 2020.
 
-Thanks to Dana Jansens for her contributions re non-standard-layout types (see [[Subspace]]), to Alisdair Meredith
-for our extensive discussions during the February 2023 drafting of [[P2786R0]], and to Giuseppe D'Angelo
-and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]].
+Thanks to Dana Jansens for her contributions re overlapping and non-standard-layout types (see [[Subspace]]),
+to Alisdair Meredith for our extensive discussions during the February 2023 drafting of [[P2786R0]],
+and to Giuseppe D'Angelo and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]].
 
 
 Appendix A: Straw polls {#polls}
@@ -1196,28 +1205,27 @@ without.
 [[P2786R0]] proposes only `relocate(T*, T*, T*)` with magic overlap handling.
 [[P1144R6]] proposed only `uninitialized_relocate(In, In, Fwd)` without.
 
-Issue: In P1144R6, types with vptrs are never naturally trivially relocatable (because they are not standard-layout).
+Issue: In P1144R7, types with vptrs are never naturally trivially relocatable.
 Arthur claims that types with vptrs should be used only with inheritance, which means they never do value semantics
 (they slice instead), which means relocating one is always a bug, just like assigning or copying one. But [[P2786R0]]
-proposes to make polymorphic types naturally trivially relocatable. Is there any use-case for this?
+proposes to make polymorphic types naturally trivially relocatable. Is there any use-case for relocating polymorphic
+types? Is P1144 being too conservative here?
 
-Issue: In P1144R6, `std::vector<std::pmr::vector<int>>::erase(pos)` can use trivial relocation to
+Issue: In P1144R7, `std::vector<std::pmr::vector<int>>::erase(pos)` can use trivial relocation to
 "close up the window" in the vector; this is also done in [[Qt]], [[Folly]], and [[BSL]]. The difference between
 closing-the-window-by-move-assignment and closing-the-window-by-memmove is detectable in a conforming C++ program.
 Therefore [[P2786R0]] proposes that relocation should not be allowed here.
-Is there any implementation experience of P2786R0's position here? ([[BSL]]'s `bsl::vector` follows P1144R6 already.)
+Is there any implementation experience of P2786R0's conservative position here?
+([[BSL]]'s `bsl::vector` follows P1144R7's liberal position already.)
 
 Issue: In P1144R6, `std::rotate(a, a+2, a+8)` on an array `std::pmr::vector<int> a[10]` can use trivial relocation to
 swap the elements. The difference between swap-by-move-assignment and swap-by-trivial-relocation is not detectable
 in a conforming C++ program, because swapping `pmr::vector`s with unequal allocators is UB.
-[[P2786R0]] proposes that relocation should not be allowed here, anyway.
+[[P2786R0]] conservatively proposes that relocation should not be allowed here, anyway.
 Is there any usage experience in [[Qt]], [[BSL]], [[Folly]], or elsewhere that bears on this question?
 (Arthur's libc++ fork does relocation here, but doesn't really count as usage experience since he's the only one using it.)
 
-Issue: P1144R7 made non-standard-layout types no longer naturally trivially relocatable, which fixes the problem
-with [[Subobjects]] as far as we know; but, are there still corner cases re potentially overlapping subobjects
-where P1144R7's new rules will have unusually surprising behavior?
-
+Issue: We need a solution for potentially overlapping subobjects; see [[#overlap-concerns]].
 
 <pre class=biblio>
 {
