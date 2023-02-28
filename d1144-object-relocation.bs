@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 7
-!Draft Revision: 40
+!Draft Revision: 42
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -12,7 +12,7 @@ URL:
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  We define a new verb, "relocate," which is equivalent to a move and a destroy.
+  We define a new verb, "relocate," equivalent to a move and a destroy.
   For many C++ types, the "relocate" operation is implementable as a single <code>memcpy</code>.
   We provide a standard trait to detect types which are trivially relocatable, for the benefit of library writers.
   We provide a rule that correctly propagates trivial relocatability among Rule-of-Zero types.
@@ -20,7 +20,7 @@ Abstract:
   that it is trivially relocatable.
   P1144R3 was presented at C++Now 2019 as a 90-minute talk titled
   ["Trivially Relocatable."](https://www.youtube.com/watch?v=SGdfPextuAU)
-Date: 2023-02-27
+Date: 2023-03-10
 </pre>
 
 <style>
@@ -31,22 +31,27 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R7:
+- R7 (post-Issaquah 2023):
 
-    - Post–Issaquah 2023. [[P2786R0]] debuted at Issaquah; it raised several
+    - [[P2786R0]] debuted at Issaquah; it raised several
             open questions (see [[#open-questions]]). The authors of P1144 and P2786
             plan a joint paper to resolve some of these design issues.
+
+    - Added `std::uninitialized_relocate_backward`, the building block of `vector::insert`.
+
+    - Removed "move-constructible, destructible" from the requirements in [[#wording-basic.types.general|basic.types.general]].
+            Now trivially relocatable types, like trivially copyable types, can be non-relocatable.
+
+    - Added [[#applications|table §2.1]] directly comparing this proposal to Folly, BSL, and Qt.
+
+    - Added straw poll results from Issaquah; removed much background and discussion
+            (leaving only references for the interested reader to consult [[P1144R6]]).
 
     - Jonathan Hopkins points out that (contrary to the English description in [[N2271]])
             EASTL defines `has_trivial_relocate` as a synonym for
             `is_trivially_move_assignable`, thus it's not prior art for this notion.
             (In particular, EASTL considers `unique_ptr<int>` non-trivially relocatable.)
             Remove mentions of EASTL.
-
-    - Added [[#applications|table §2.1]] directly comparing this proposal to Folly, BSL, and Qt.
-
-    - Added straw poll results from Issaquah, and removed much background and discussion
-            (leaving only references for the interested reader to consult [[P1144R6]]).
 
     - Added [[#open-questions|Appendix E]].
 
@@ -59,7 +64,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
     - Removed `std::ranges::relocate_at` (but kept `std::relocate_at`).
 
-- R5 (post-Prague):
+- R5 (post-Prague 2020):
 
     - Polymorphic types (those with any vptr at all) inhibit "natural" trivial relocatability.
             David Stone gave the motivating example. See [[#non-trivial-sample-polymorphic]].
@@ -67,21 +72,14 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
     - Updated `concept relocatable`. Added semantic requirements on assignment and some discussion
             of the issue with `vector::insert`.
 
-    - Added many direct links to sections of [my C++Now 2019 talk](https://www.youtube.com/watch?v=SGdfPextuAU)
-            covering particular motivations, design decisions, and implementation details.
+- R3 (post-Kona 2019):
 
-- R3 (post-Kona):
+    - User-provided copy constructors and copy/move assignment operators inhibit "natural" trivial relocatability.
+            This permits optimizing `vector::insert` and `vector::erase`.
 
-    - User-provided copy/move assignment operators inhibit "natural" trivial relocatability, just like
-            user-provided move constructors and destructors. This is intended to permit us
-            to optimize `vector::insert`.
+    - Adopted `[[trivially_relocatable(bool)]]`.
 
-    - User-provided copy constructors inhibit "natural" trivial relocatability, just like
-            user-provided move constructors and destructors.
-
-    - Adopted `[[trivially_relocatable(bool)]]`. The attribute-argument is optional.
-
-    - Added `std::relocate_at(source, dest)`. Note that this is *not* a customization point.
+    - Added `std::relocate_at(source, dest)`.
 
     - Removed the core-language blanket wording that permitted "the implementation" to eliminate
             moves and destroys of trivially relocatable types. Instead, the existence of
@@ -394,6 +392,28 @@ the only downsides are aesthetic. We can defer that decision to the last minute,
 to CWG's feedback on the final wording.
 
 
+## Nothrow bidirectional iterator [algorithms.requirements] ## {#wording-algorithms.requirements}
+
+Modify <a href="https://eel.is/c++draft/algorithms.requirements">[algorithms.requirements]</a> as follows:
+
+<small><blockquote>
+* If an algorithm's template parameter is named `ForwardIterator`, `ForwardIterator1`, `ForwardIterator2`, or `NoThrowForwardIterator`,
+    the template argument shall meet the *Cpp17ForwardIterator* requirements ([forward.iterators]) if it is required to be a mutable iterator,
+    or model `forward_iterator` ([iterator.concept.forward]) otherwise.
+
+* If an algorithm's template parameter is named `NoThrowForwardIterator`, the template argument is also required to have the property
+    that no exceptions are thrown from increment, assignment, or comparison of, or indirection through, valid iterators.
+
+* If an algorithm's template parameter is named `BidirectionalIterator`, `BidirectionalIterator1`, <del>or</del> `BidirectionalIterator2`, <ins>or
+    `NoThrowBidirectionalIterator`,</ins> the template argument shall meet the *Cpp17BidirectionalIterator* requirements ([bidirectional.iterators])
+    if it is required to be a mutable iterator, or model `bidirectional_iterator` ([iterator.concept.bidir]) otherwise.
+
+* <ins>If an algorithm's template parameter is named `NoThrowBidirectionalIterator`, the template argument is also required to have the property
+    that no exceptions are thrown from increment, decrement, assignment, or comparison of, or indirection through, valid iterators.</ins>
+
+</blockquote></small>
+
+
 ## Relocation operation [defns.relocation] ## {#wording-defns.relocation}
 
 Add a new section in <a href="http://eel.is/c++draft/definitions">[intro.defs]</a>:
@@ -452,7 +472,7 @@ The wording also deliberately permits a low-quality implementation with no such 
 See [@45:23–48:39](https://www.youtube.com/watch?v=SGdfPextuAU&t=45m23s) in my C++Now 2019 talk.
 
 
-## `uninitialized_relocate`, `uninitialized_relocate_n` [uninitialized.relocate] ## {#wording-uninitialized.relocate}
+## `uninitialized_relocate`, `uninitialized_relocate_n`, `uninitialized_relocate_backward` [uninitialized.relocate] ## {#wording-uninitialized.relocate}
 
 Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:
 
@@ -468,7 +488,7 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
   try {
     for (; first != last; ++result, (void)++first) {
       ::new (voidify(*result))
-        typename iterator_traits<NoThrowForwardIterator>::value_type(*first);
+        typename iterator_traits<NoThrowForwardIterator>::value_type(std::move(*first));
       destroy_at(addressof(*first));
     }
     return result;
@@ -494,12 +514,41 @@ ranges are destroyed.
   try {
     for (; n > 0; ++result, (void)++first, --n) {
       ::new (voidify(*result))
-        typename iterator_traits<NoThrowForwardIterator>::value_type(*first);
+        typename iterator_traits<NoThrowForwardIterator>::value_type(std::move(*first));
       destroy_at(addressof(*first));
     }
     return {first, result};
   } catch (...) {
     destroy_n(++first, --n);
+    throw;
+  }
+</xmp>
+except that if the iterators' common value type is trivially relocatable, side effects
+associated with the relocation of the object's value might not happen.
+
+*Remarks:* If an exception is thrown, all objects in both the source and destination
+ranges are destroyed.
+
+<xmp>
+  template<class BidirectionalIterator, class NoThrowBidirectionalIterator>
+    NoThrowBidirectionalIterator
+      uninitialized_relocate_backward(BidirectionalIterator first, BidirectionalIterator last,
+                                      NoThrowBidirectionalIterator result);
+</xmp>
+
+*Effects:* Equivalent to:
+<xmp>
+  try {
+    for (; last != first; ) {
+      --last;
+      --result;
+      ::new (voidify(*result))
+        typename iterator_traits<NoThrowBidirectionalIterator>::value_type(std::move(*last));
+      destroy_at(addressof(*last));
+    }
+    return result;
+  } catch (...) {
+    destroy(first, ++last);
     throw;
   }
 </xmp>
@@ -581,7 +630,7 @@ If a type `T` is declared with the `trivially_relocatable` attribute, and `T` is
 or not destructible, the program is ill-formed.
 
 If a class type is declared with the `trivially_relocatable` attribute, and the program relies on
-observable side-effects of relocation other than a copy of the underlying bytes, the behavior is undefined.
+observable side-effects of its relocation other than a copy of the underlying bytes, the behavior is undefined.
 </blockquote></small>
 
 Issue: "If a type `T` is declared with the `trivially_relocatable` attribute, and `T` is either not move-constructible
@@ -682,8 +731,7 @@ Feel free to substitute your favorite trivially relocatable container type;
 I'm sticking with `string` for these examples because it is short
 and easy to spell.
 
-The main thing P1144 does for `std::vector` is efficient reallocation of the whole buffer.
-However, a secondary goal is to permit efficient insertion and erasure.
+P1144 aims to permit efficient insertion and erasure in `std::vector`.
 [Example:](https://p1144.godbolt.org/z/vv5q69q44)
 
 ```c++
@@ -693,9 +741,9 @@ However, a secondary goal is to permit efficient insertion and erasure.
 
 This `erase` requires us to shift down 500 `std::string` objects, which can be done either
 by 500 calls to `string::operator=` followed by one call to `~string`, or by
-one call to `~string` followed by a `memmove` (as seen for example in [[Folly]]; see [[#applications|table §2.1]]).
-We want to permit Folly's implementation. That's why since P1144R3, the definition of
-"trivially relocatable" in [[#wording-basic.types.general]]
+one call to `~string` followed by a `memmove` (as seen for example in [[Folly]] and BSL;
+see [[#applications|table §2.1]]). We want to permit BSL's implementation.
+That's why since P1144R5, the definition of `concept relocatable` in [[#wording-concept.relocatable|§4.4]]
 places semantic requirements on `T`'s assignment operators (if they exist) as well as on
 `T`'s constructors and destructors.
 
@@ -821,16 +869,6 @@ The difficulty here is getting WG21 to accept a new precondition on `swap`.
 
 # Acknowledgements # {#acknowledgements}
 
-Thanks to Elias Kosunen, Niall Douglas, and John Bandela for their feedback on early drafts of P1144R0.
-
-Many thanks to Matt Godbolt for allowing me to install the prototype Clang implementation on Compiler Explorer
-(<a href="https://p1144.godbolt.org/z/oWEd_X">godbolt.org</a>). See also [[Announcing]].
-
-Thanks to Nicolas Lesser for his relentless feedback on drafts of P1144R0, and for his helpful
-review comments on the Clang implementation [[D50119]].
-
-Thanks to Howard Hinnant for appearing with me on [[CppChat]], and to Jon Kalb and Phil Nash for hosting us.
-
 Thanks to Pablo Halpern for [[N4158]], to which this paper bears a striking resemblance —
 including the meaning assigned to the word "trivial," and the library-algorithm approach to avoiding the
 problems with "lame duck objects" discussed in
@@ -845,7 +883,14 @@ Niall Douglas's [[P1029R3]] (treating trivial relocatability as an aspect of mov
 rather than an aspect of the class type as a whole). A less different approach is taken
 in Mungo Gill & Alisdair Meredith's [[P2786R0]].
 
-Thanks to John McCall for his thought-provoking review comments on the Clang implementation [[D50119]].
+Thanks to Elias Kosunen, Niall Douglas, John Bandela, and Nicolas Lesser for their feedback on early drafts of P1144R0.
+
+Thanks to Nicolas Lesser and John McCall for their review comments on the Clang implementation [[D50119]].
+
+Many thanks to Matt Godbolt for allowing me to install my Clang fork on Compiler Explorer
+(<a href="https://p1144.godbolt.org/z/oWEd_X">godbolt.org</a>). See also [[Announcing]].
+
+Thanks to Howard Hinnant for appearing with me on [[CppChat]], and to Jon Kalb and Phil Nash for hosting us.
 
 Thanks to Marc Glisse for his work integrating a "trivially relocatable" trait into GNU libstdc++
 and for answering my questions on [GCC bug 87106](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87106).
@@ -855,7 +900,8 @@ P1144R4 at Prague 2020.
 
 Thanks to Dana Jansens for her contributions re overlapping and non-standard-layout types (see [[Subspace]]),
 to Alisdair Meredith for our extensive discussions during the February 2023 drafting of [[P2786R0]],
-and to Giuseppe D'Angelo and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]].
+to Giuseppe D'Angelo and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]],
+and to Giuseppe D'Angelo for extensive review comments and discussion.
 
 
 Appendix A: Straw polls {#polls}
