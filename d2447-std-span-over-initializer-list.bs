@@ -1,0 +1,367 @@
+<pre class='metadata'>
+Title: <code>std::span</code> over an initializer list
+Shortname: D2447
+Revision: 3
+!Draft Revision: 2
+Audience: LEWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2447-std-span-over-initializer-list.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2447-std-span-over-initializer-list.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2447-std-span-over-initializer-list.html">rawgit.com/Quuxplusone/draft/gh-pages/d2447-std-span-over-initializer-list.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Editor: Federico Kircheis, federico.kircheis@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  <code>span&lt;const int&gt;</code> can be a lightweight drop-in replacement
+  for <code>const vector&lt;int&gt;&amp;</code> in the same way that <code>string_view</code>
+  can replace <code>const string&amp;</code>. While <code>"abc"</code> binds to a <code>string_view</code>
+  function parameter, <code>{1,2,3}</code> fails to bind to a <code>span&lt;const int&gt;</code> function parameter.
+  We show why this gap is undesirable, and propose to close it, ideally as a DR.
+Date: 2023-03-11
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+td {font-size: smaller;}
+</style>
+
+# Changelog # {#changelog}
+
+- R3:
+
+    - Changed primary authorship from Federico Kircheis to Arthur O'Dwyer.
+
+    - Removed R2's feature macro `__cpp_lib_span_init`; it didn't seem motivated.
+
+
+# Background # {#background}
+
+C++17 added `string_view` as a "view" over constant string data. Its main purpose
+is as a lightweight drop-in replacement for `const string&` function parameters.
+
+<table>
+<tr><td>Before</td><td>After</td></tr>
+<tr><td><xmp>
+int take(const std::string& s) {
+    return s[0] + s.size();
+}
+</xmp></td><td><xmp>
+int take(std::string_view sv) {
+    return s[0] + s.size();
+}
+</xmp></td></tr><tr><td><xmp>
+std::string abc = "abc";
+take(abc);
+</xmp></td><td><xmp>
+std::string abc = "abc";
+take(abc);
+</xmp></td></tr><tr><td><xmp>
+take("abc");
+</xmp></td><td><xmp>
+take("abc");
+</xmp></td></tr><tr><td><xmp>
+take(std::string("abc"));
+</xmp></td><td><xmp>
+take(std::string("abc"));
+take(std::string_view("abc"));
+</xmp></td></tr>
+</table>
+
+C++20 added `span<const T>` as a "view" over constant contiguous data of any type (such as
+arrays and vectors). One of its main purposes (although not its only purpose) is as a
+lightweight drop-in replacement for `const vector<T>&` function parameters.
+
+<table>
+<tr><td>Before</td><td>After</td></tr>
+<tr><td><xmp>
+int take(const std::vector<int>& v) {
+    return v[0] + v.size();
+}
+</xmp></td><td><xmp>
+int take(std::span<const int> v) {
+    return v[0] + v.size();
+}
+</xmp></td></tr><tr><td><xmp>
+std::vector<int> abc = {1,2,3};
+take(abc);
+</xmp></td><td><xmp>
+std::vector<int> abc = {1,2,3};
+take(abc);
+</xmp></td></tr><tr><td><xmp>
+take({1,2,3});
+</xmp></td><td>
+</td></tr><tr><td><xmp>
+take({}); // size=0
+take({{1,2,3}});
+take(std::vector{1,2,3});
+take(std::initializer_list<int>{1,2,3});
+</xmp></td><td><xmp>
+take({}); // size=0
+take({{1,2,3}});
+take(std::vector{1,2,3});
+take(std::initializer_list<int>{1,2,3});
+take(std::span<const int>({1,2,3}));
+</xmp></td></tr>
+</table>
+
+This table has a conspicuous gap. The braced initializer list `{1,2,3}`
+is implicitly convertible to `std::vector<int>`, but not to `std::span<const int>`.
+
+
+# Solution # {#solution}
+
+We propose simply that `std::span<const T>` should be convertible from an appropriate
+*braced-initializer-list*. In practice this means adding a constructor from `std::initializer_list`.
+
+## Implementation experience ## {#experience}
+
+This solution has been implemented in Arthur's fork of libc++ since October 2021.
+See <a href="https://quuxplusone.github.io/blog/2021/10/03/p2447-span-from-initializer-list/">"`span` should have a converting constructor from `initializer_list`"</a>
+(2021-10-03) and [[Patch]].
+
+## What about dangling? ## {#dangling}
+
+`span`, like `string_view`, is specifically designed to bind to rvalues as well as lvalues.
+This is what lets us write useful code like:
+```c++
+int take(std::string_view s);
+std::string give_string();
+int x = take(give_string());
+
+int take(std::span<const int> v);
+std::vector<int> give_vector();
+int x = take(give_vector());
+```
+
+Careless misuse of `string_view` and `span` outside a function parameter list produces dangling:
+```c++
+std::string_view s = give_string(); // dangles
+std::span<const int> v = give_vector(); // dangles
+```
+
+P2447 doesn't propose to increase the risk in this area; dangling is already likely when `span` or
+`string_view` is carelessly misused. We simply propose to close the ergonomic syntax gap between `span` and `string_view`.
+
+<table>
+<tr><td>Before</td><td>After</td></tr>
+<tr><td><xmp>
+std::string_view      s = "abc";  // OK
+std::string_view      s = "abc"s; // dangles
+std::span<const char> v = "abc";  // OK
+std::span<const char> v = "abc"s; // dangles
+</xmp></td><td><xmp>
+std::string_view      s = "abc";  // OK
+std::string_view      s = "abc"s; // dangles
+std::span<const char> v = "abc";  // OK
+std::span<const char> v = "abc"s; // dangles
+</xmp></td></tr><tr><td><xmp>
+std::span<const int> v = std::vector{1,2,3}; // dangles
+auto v = std::span<const int>({1,2,3});      // dangles
+std::span<const int> v = {{1,2,3}};          // dangles
+</xmp></td><td><xmp>
+std::span<const int> v = std::vector{1,2,3}; // dangles
+auto v = std::span<const int>({1,2,3});      // dangles
+std::span<const int> v = {{1,2,3}};          // dangles
+std::span<const int> v = {1,2,3};            // dangles
+</xmp></td></tr>
+</table>
+
+## Relation to P2752 Static storage for braced initializers ## {#p2752}
+
+[[P2752R1]] proposes to permit a constant `initializer_list` like `{1,2,3}` to refer to
+a backing array in static storage, rather than forcing all backing arrays onto the stack.
+At least for now, this doesn't change anything dangling-wise: referring to the backing array
+of an `initializer_list` outside the lifetime of that `initializer_list` remains undefined behavior.
+```c++
+std::string_view s = "abc";            // OK, no dangling
+std::span<const int> v1 = {1,2,3};     // dangles, even after P2752
+```
+
+## Why not just double the braces? ## {#braces}
+
+Since we can already write
+```c++
+std::span<const int> v = {{1,2,3}}; // dangles
+```
+then why not call that "good enough"? Why do we need to be able to use a single set of braces?
+
+Well, a single set of braces is good enough for `vector`, and we want `span` to be a drop-in replacement
+for `vector` in function parameter lists, so we need to support the syntax `vector` does.
+There was a period right after C++11 where people were writing
+```c++
+std::vector<int> v = {{1,2,3}};
+```
+but by C++14 we had settled firmly on "one set of braces" as the preferred style (matching the
+preferred style for C arrays, pairs, tuples, etc.)
+
+So I prefer to turn the question around and say: Since we can already implicitly treat `{{1,2,3}}`
+as a `span`, how could there be any additional harm in treating `{1,2,3}` as a `span`?
+
+This also relates to [[P2752R1]]: Today, `{{1,2,3}}` converts to `span` by materializing
+a temporary of type `const int[3]` on the stack. Tomorrow, if P2447 is adopted, `{1,2,3}` will convert to `span`
+via an `initializer_list` that refers to a backing array also allocated on the stack.
+[[P2752R1]] proposes to performance-optimize the latter case (permitting the backing array to occupy
+static storage) but not the former case (keeping the status quo for materialized array temporaries).
+In other words, tomorrow's (single-braced or double-braced) `initializer_list` constructor is
+"more optimizable" than today's double-braced array-temporary constructor.
+
+The following program (<a href="https://godbolt.org/z/7a5zGnx5s">Godbolt</a>) shows how
+P2447 lets us benefit from P2752's optimization:
+```c++
+int perf(std::span<const int>);
+
+int test() {
+    return perf({{1,2,3}});
+}
+```
+
+<table>
+<tr><td></td><td>`{{1,2,3}}`</td><td>`{1,2,3}`</td></tr>
+<tr><th>Today</th><td>Array on stack</td><td>Ill-formed</td></tr>
+<tr><th>P2752 only</th><td>Array on stack</td><td>Ill-formed</td></tr>
+<tr><th>P2447 only</th><td>IL on stack</td><td>IL on stack</td></tr>
+<tr><th>P2447+P2752</th><td>IL in rodata, tail-call</td><td>IL in rodata, tail-call</td></tr>
+</table>
+
+# Annex C examples # {#annex-c}
+
+This change will, of course, break some code (most of it pathological).
+We might want to add some of these examples to Annex C.
+
+However, *any* change to overload sets (particularly the addition of new
+non-`explicit` constructors) can break code.
+For example, there was nothing wrong with C++23's adopting [[P1425]] "Iterator-pair constructors for `stack` and `queue`"
+with no change to Annex C, despite its breaking code like this:
+```c++
+void zero(queue<int>);
+void zero(pair<int*,int*>);
+int a[10];
+void test() { zero({a, a+10}); }
+```
+<b>Before:</b> Calls `zero(pair<int, int>)`.<br/>
+<b>After:</b> Ambiguous.<br/>
+<b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to `pair`.
+
+We can simply agree that such examples are sufficiently unlikely in practice,
+and sufficiently easy to fix, that the benefits of the changed overload set
+outweigh the costs of running into these examples.
+
+
+## Overload resolution is affected ## {#annex-c-1}
+
+```c++
+void one(pair<int, int>);
+void one(span<const int>);
+void test() { one({1,2}); }
+```
+<b>Before:</b> Calls `one(pair<int, int>)`.<br/>
+<b>After:</b> Ambiguous.<br/>
+<b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to `pair`.
+
+## The `initializer_list` ctor has high precedence ## {#annex-c-2}
+
+```c++
+void two(span<const int, 2>);
+void test() { two({{1,2}}); }
+```
+<b>Before:</b> Selects `span(const int(&)[2])`, which is non-`explicit`; success.<br/>
+<b>After:</b> Selects `span(initializer_list<int>)`, which is `explicit` for `span<const int, 2>`; failure.<br/>
+<b>To fix:</b> Replace `{{1,2}}` with `std::array{1,2}`; or, replace `span<const int, 2>` with `span<const int>`.<br/>
+
+## Implicit two-argument construction with a highly convertible `value_type` ## {#annex-c-3}
+
+In these two highly contrived examples, the caller deliberately constructs
+a `span` via its iterator-pair constructor *implicitly, from a braced initializer of two elements,*
+and furthermore `value_type` is implicitly convertible from the iterator type.
+These examples strike me as highly contrived, because both conditions are unlikely, and their
+conjunction is unlikelier still.
+
+```c++
+int three(span<void* const> v) { return v.size(); }
+void *a[10];
+int x = three({a, 0});
+```
+<b>Before:</b> Selects `span(void**, int)`; `x` is 0.<br/>
+<b>After:</b> Selects `span(initializer_list<void*>)`; `x` is 2.<br/>
+<b>To fix:</b> Replace `{a, 0}` with `span(a, 0)`.
+
+```c++
+int four(span<const any> v) { return v.size(); }
+any a[10];
+int y = four({a, a+10});
+```
+<b>Before:</b> Selects `span(any*, any*)`; `y` is 10.<br/>
+<b>After:</b> Selects `span(initializer_list<any>)`; `y` is 2.<br/>
+<b>To fix:</b> Replace `{a, a+10}` with `span(a, a+10)`.
+
+
+# Proposed wording # {#wording}
+
+Modify <a href="https://eel.is/c++draft/span.syn">[span.syn]</a> as follows:
+
+<small><blockquote><pre>
+#include &lt;initializer_list&gt;     <i>// see [initializer.list.syn]</i></pre></blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/span.overview">[span.overview]</a> as follows:
+
+<small><blockquote><pre>
+  template&lt;size_t N>
+    constexpr span(type_identity_t&lt;element_type> (&amp;arr)\[N]) noexcept;
+  template&lt;class T, size_t N>
+    constexpr span(array&lt;T, N>&amp; arr) noexcept;
+  template&lt;class T, size_t N>
+    constexpr span(const array&lt;T, N>&amp; arr) noexcept;
+  template&lt;class R>
+    constexpr explicit(extent != dynamic_extent) span(R&amp;&amp; r);
+  <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list<value_type> il) noexcept;</ins>
+  constexpr span(const span&amp; other) noexcept = default;
+  template&lt;class OtherElementType, size_t OtherExtent>
+    constexpr explicit(<i>see below</i>) span(const span&lt;OtherElementType, OtherExtent>&amp; s) noexcept;
+</pre></blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:
+
+<blockquote><small><pre>
+   <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list<value_type> il) noexcept;</ins>
+</pre></small>
+<br><ins><i>Constraints:</i> `is_const_v<element_type>` is `true`.</ins>
+<p><ins><i>Preconditions:</i> If `extent` is not equal to `dynamic_extent`, then `il.size()` is equal to `extent`.</ins>
+<p><ins><i>Effects:</i> Initializes <i>`data_`</i> with `il.begin()` and <i>`size_`</i> with `il.size()`.</ins>
+</blockquote></small>
+
+
+# Acknowledgments # {#acknowledgments}
+
+- Thanks to Federico Kircheis for writing the first drafts of this paper.
+
+<pre class=biblio>
+{
+  "P1425": {
+    "title": "Iterator-pair constructors for stack and queue",
+    "authors": [
+      "Corentin Jabot"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r4.pdf",
+    "date": "March 2021"
+  },
+  "P2752R1": {
+    "title": "Static storage for braced initializers",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2752r1.html",
+    "date": "March 2023"
+  },
+  "Patch": {
+    "title": "Implement P2447 std::span convertible from std::initializer_list",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://github.com/Quuxplusone/llvm-project/commit/d0d11ae5f2146d2ac76680bd1ddaf1f011f96ef4",
+    "date": "October 2021"
+  }
+}
+</pre>
