@@ -1560,7 +1560,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version 42a48c451, updated Tue Feb 14 14:52:15 2023 -0800" name="generator">
+  <meta content="Bikeshed version 71458e5bb, updated Thu Mar 9 17:18:51 2023 -0800" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
@@ -1568,7 +1568,6 @@ ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 <style>/* style-autolinks */
-
 .css.css, .property.property, .descriptor.descriptor {
     color: var(--a-normal-text);
     font-size: inherit;
@@ -1628,7 +1627,8 @@ pre .property::before, pre .property::after {
 
 [data-link-type=biblio] {
     white-space: pre;
-}</style>
+}
+</style>
 <style>/* style-colors */
 
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
@@ -1737,9 +1737,9 @@ pre .property::before, pre .property::after {
     --outdated-shadow: red;
 
     --editedrec-bg: darkorange;
-}</style>
+}
+</style>
 <style>/* style-counters */
-
 body {
     counter-reset: example figure issue;
 }
@@ -1766,9 +1766,9 @@ figcaption {
 }
 figcaption:not(.no-marker)::before {
     content: "Figure " counter(figure) " ";
-}</style>
+}
+</style>
 <style>/* style-issues */
-
 a[href].issue-return {
     float: right;
     float: inline-end;
@@ -1778,7 +1778,6 @@ a[href].issue-return {
 }
 </style>
 <style>/* style-md-lists */
-
 /* This is a weird hack for me not yet following the commonmark spec
    regarding paragraph and lists. */
 [data-md] > :first-child {
@@ -1786,7 +1785,8 @@ a[href].issue-return {
 }
 [data-md] > :last-child {
     margin-bottom: 0;
-}</style>
+}
+</style>
 <style>/* style-selflinks */
 
 :root {
@@ -2019,6 +2019,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
        which is quite common in practice... */
     img { background: white; }
 }
+
 @media (prefers-color-scheme: dark) {
     :root {
         --selflink-text: black;
@@ -2094,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2752R1<br>Static storage for braced initializers</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-01-09">2023-01-09</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-03-10">2023-03-10</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2104,7 +2105,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>6
+     <dd>7
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2752-static-storage-for-braced-initializers.bs</a>
      <dt>Current:
@@ -2117,9 +2118,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
    <p>Initializing a vector from a <i>braced-initializer-list</i> like <code class="highlight"><c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>}</c-></code> copies the data from static storage to a backing array on the stack,
-  and thence into the vector. This wastes CPU cycles, but more importantly, it wastes stack space.
-  We propose to eliminate the waste by permitting a <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code>’s
-  backing array to exist in static storage.</p>
+  and thence into the vector. This wastes CPU cycles; more importantly, it wastes stack space.
+  We propose to eliminate the waste by letting a <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code>’s
+  backing array occupy static storage.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -2134,7 +2135,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     <li>
      <a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
      <ol class="toc">
-      <li><a href="#abi"><span class="secno">4.1</span> <span class="content">Implications for ABI vendors</span></a>
+      <li><a href="#fmerge-all-constants"><span class="secno">4.1</span> <span class="content">GCC <code class="highlight"><c- o>-</c-><c- n>fmerge</c-><c- o>-</c-><c- n>all</c-><c- o>-</c-><c- n>constants</c-></code></span></a>
      </ol>
     <li>
      <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording relative to the current C++23 draft</span></a>
@@ -2153,10 +2154,12 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
     <li data-md>
-     <p>R0:</p>
+     <p>R1:</p>
      <ul>
       <li data-md>
-       <p>Initial draft.</p>
+       <p>Remove discussion of mangling (it’s not a problem). Add discussion of GCC’s <code class="highlight"><c- o>-</c-><c- n>fmerge</c-><c- o>-</c-><c- n>all</c-><c- o>-</c-><c- n>constants</c-></code>.</p>
+      <li data-md>
+       <p>Proposed wording reviewed by Jens Maurer.</p>
      </ul>
    </ul>
    <h2 class="heading settled" data-level="2" id="background"><span class="secno">2. </span><span class="content">Background</span><a class="self-link" href="#background"></a></h2>
@@ -2359,26 +2362,17 @@ But this is not new: the situation with <code class="highlight"><c- n>c8c</c-></
 It is likely incomplete, and (as of this writing) certainly buggy; it has not received attention from anyone but myself.
 You can experiment with it <a href="https://godbolt.org/z/cxvdWcKbd">on Godbolt Compiler Explorer</a>;
 just use the P1144 branch of Clang, with the <code class="highlight"><c- o>-</c-><c- n>fstatic</c-><c- o>-</c-><c- n>init</c-><c- o>-</c-><c- n>lists</c-></code> command-line switch.</p>
-   <h3 class="heading settled" data-level="4.1" id="abi"><span class="secno">4.1. </span><span class="content">Implications for ABI vendors</span><a class="self-link" href="#abi"></a></h3>
-   <p>So that inline functions will agree on the names of their hidden backing-array variables,
-I think it’s possible that each ABI (Itanium, Microsoft) will have to agree on a mangling scheme
-for those hidden variables, just as each ABI has agreed on manglings for the names of (1) guard variables
-for thread-safe static initialization; (2) backing variables for structured bindings;
-(3) lambda closure types. On the other hand, these static backing arrays behave very much
-like string literals, which are implemented with non-external symbols and need no mangling;
-so maybe there is no need for different TUs to agree on their names.</p>
-<pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c-> <c- b>void</c-> <c- n>escape</c-><c- p>(</c-><c- n>T</c-><c- p>);</c->
-<c- b>void</c-> <c- nf>escape</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>);</c->
-<c- kr>inline</c-> <c- b>void</c-> <c- nf>f</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- p>{</c->
-    <c- k>static</c-> <c- b>int</c-> <c- n>x</c-> <c- o>=</c-> <c- n>i</c-><c- p>;</c-> <c- c1>// guard variable _ZGVZ1fiE1x, ?$TSS0@?1??f@@YAXH@Z@4HA</c->
-    <c- k>static</c-> <c- k>auto</c-> <c- p>[</c-><c- n>a</c-><c- p>,</c-><c- n>b</c-><c- p>]</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>make_pair</c-><c- p>(</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>);</c-> <c- c1>// backing variable _ZZ1fiEDC1a1bE, ?$S1@?1??f@@YAXH@Z@4U?$pair@HH@std@@A</c->
-    <c- n>escape</c-><c- p>([]()</c-> <c- p>{</c-> <c- k>return</c-> <c- mi>42</c-><c- p>;</c-> <c- p>});</c-> <c- c1>// lambda closure type Z1fiEUlvE_, V&lt;lambda_1>@?1??f@@YAXH@Z@</c->
-    <c- n>escape</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c-> <c- c1>// backing array might need a mangling</c->
-    <c- n>escape</c-><c- p>(</c-><c- s>"abc"</c-><c- p>);</c-> <c- c1>// backing array needs no mangling</c->
-<c- p>}</c->
+   <h3 class="heading settled" data-level="4.1" id="fmerge-all-constants"><span class="secno">4.1. </span><span class="content">GCC <code class="highlight"><c- o>-</c-><c- n>fmerge</c-><c- o>-</c-><c- n>all</c-><c- o>-</c-><c- n>constants</c-></code></span><a class="self-link" href="#fmerge-all-constants"></a></h3>
+   <p>See <a href="https://quuxplusone.github.io/blog/2023/02/17/issaquah-status/#static-storage-for-braced-initializers">this blog post</a>:
+GCC has for a long time implemented a non-conforming mode <code class="highlight"><c- o>-</c-><c- n>fmerge</c-><c- o>-</c-><c- n>all</c-><c- o>-</c-><c- n>constants</c-></code> in which all constants
+are merged, even constants that C++ requires to have different addresses, such as</p>
+<pre class="language-c++ highlight"><c- k>const</c-> <c- b>int</c-> <c- n>a</c-><c- p>[]</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
+<c- k>const</c-> <c- b>int</c-> <c- n>b</c-><c- p>[]</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
 </pre>
+   This is a superset of P2752’s proposed behavior. When P2752 is adopted, GCC can probably reuse
+some of that machinery to enable the optimization specifically for initializer lists (while leaving
+the rest disabled by default). 
    <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording relative to the current C++23 draft</span><a class="self-link" href="#wording"></a></h2>
-   <p>Thanks to Jens Maurer for reviewing this proposed wording.</p>
    <p>Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init.list#5">[dcl.init.list]/5–6</a> as follows:</p>
    <blockquote>
      An object of type <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-></code> is constructed from an initializer list
@@ -2471,6 +2465,8 @@ expect anyone to notice. Their code should just silently get faster.</p>
    <ul>
     <li data-md>
      <p>Thanks to Jason Merrill for the original issue, and to Andrew Tomazos for recommending Arthur write this paper.</p>
+    <li data-md>
+     <p>Thanks to Jens Maurer for reviewing P2752R1’s proposed wording.</p>
    </ul>
   </main>
 <script>

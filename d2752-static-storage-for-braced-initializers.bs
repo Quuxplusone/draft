@@ -2,7 +2,7 @@
 Title: Static storage for braced initializers
 Shortname: D2752
 Revision: 1
-!Draft Revision: 6
+!Draft Revision: 7
 Audience: EWG
 Status: D
 Group: WG21
@@ -14,10 +14,10 @@ Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Initializing a vector from a <i>braced-initializer-list</i> like <code>{1,2,3}</code>
   copies the data from static storage to a backing array on the stack,
-  and thence into the vector. This wastes CPU cycles, but more importantly, it wastes stack space.
-  We propose to eliminate the waste by permitting a <code>std::initializer_list&lt;T&gt;</code>'s
-  backing array to exist in static storage.
-Date: 2023-01-09
+  and thence into the vector. This wastes CPU cycles; more importantly, it wastes stack space.
+  We propose to eliminate the waste by letting a <code>std::initializer_list&lt;T&gt;</code>'s
+  backing array occupy static storage.
+Date: 2023-03-10
 </pre>
 
 <style>
@@ -28,9 +28,11 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R0:
+- R1:
 
-    - Initial draft.
+    - Remove discussion of mangling (it's not a problem). Add discussion of GCC's `-fmerge-all-constants`.
+
+    - Proposed wording reviewed by Jens Maurer.
 
 
 # Background # {#background}
@@ -285,32 +287,21 @@ It is likely incomplete, and (as of this writing) certainly buggy; it has not re
 You can experiment with it [on Godbolt Compiler Explorer](https://godbolt.org/z/cxvdWcKbd);
 just use the P1144 branch of Clang, with the `-fstatic-init-lists` command-line switch.
 
+## GCC `-fmerge-all-constants` ## {#fmerge-all-constants}
 
-## Implications for ABI vendors ## {#abi}
-
-So that inline functions will agree on the names of their hidden backing-array variables,
-I think it's possible that each ABI (Itanium, Microsoft) will have to agree on a mangling scheme
-for those hidden variables, just as each ABI has agreed on manglings for the names of (1) guard variables
-for thread-safe static initialization; (2) backing variables for structured bindings;
-(3) lambda closure types. On the other hand, these static backing arrays behave very much
-like string literals, which are implemented with non-external symbols and need no mangling;
-so maybe there is no need for different TUs to agree on their names.
+See [this blog post](https://quuxplusone.github.io/blog/2023/02/17/issaquah-status/#static-storage-for-braced-initializers):
+GCC has for a long time implemented a non-conforming mode `-fmerge-all-constants` in which all constants
+are merged, even constants that C++ requires to have different addresses, such as
 ```c++
-    template<class T> void escape(T);
-    void escape(std::initializer_list<int>);
-    inline void f(int i) {
-        static int x = i; // guard variable _ZGVZ1fiE1x, ?$TSS0@?1??f@@YAXH@Z@4HA
-        static auto [a,b] = std::make_pair(1,2); // backing variable _ZZ1fiEDC1a1bE, ?$S1@?1??f@@YAXH@Z@4U?$pair@HH@std@@A
-        escape([]() { return 42; }); // lambda closure type Z1fiEUlvE_, V<lambda_1>@?1??f@@YAXH@Z@
-        escape({1,2,3}); // backing array might need a mangling
-        escape("abc"); // backing array needs no mangling
-    }
+    const int a[] = {1,2,3};
+    const int b[] = {1,2,3};
 ```
+This is a superset of P2752's proposed behavior. When P2752 is adopted, GCC can probably reuse
+some of that machinery to enable the optimization specifically for initializer lists (while leaving
+the rest disabled by default).
 
 
 # Proposed wording relative to the current C++23 draft # {#wording}
-
-Thanks to Jens Maurer for reviewing this proposed wording.
 
 Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init.list#5">[dcl.init.list]/5–6</a> as follows:
 
@@ -406,6 +397,7 @@ expect anyone to notice. Their code should just silently get faster.
 
 - Thanks to Jason Merrill for the original issue, and to Andrew Tomazos for recommending Arthur write this paper.
 
+- Thanks to Jens Maurer for reviewing P2752R1's proposed wording.
 
 <pre class=biblio>
 {
