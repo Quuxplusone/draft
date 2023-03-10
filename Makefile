@@ -1,5 +1,6 @@
 
 all: \
+    d2447-std-span-over-initializer-list.html \
     d1808-contra-p0339.html \
     d1837-remove-class-type-nttps.html \
     d1144-object-relocation.html \
