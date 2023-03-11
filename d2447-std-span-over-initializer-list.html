@@ -2107,7 +2107,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>2
+     <dd>4
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2447-std-span-over-initializer-list.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2447-std-span-over-initializer-list.bs</a>
      <dt>Current:
@@ -2164,6 +2164,12 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li data-md>
        <p>Removed R2’s feature macro <code class="highlight"><c- n>__cpp_lib_span_init</c-></code>; it didn’t seem motivated.</p>
      </ul>
+    <li data-md>
+     <p>R2:</p>
+     <ul>
+      <li data-md>
+       <p>Discussed in LEWG telecon, <a href="https://wiki.edg.com/bin/view/Wg21telecons2022/P2447#Library-Evolution-2022-07-26">2022-07-26</a></p>
+     </ul>
    </ul>
    <h2 class="heading settled" data-level="2" id="background"><span class="secno">2. </span><span class="content">Background</span><a class="self-link" href="#background"></a></h2>
    <p>C++17 added <code class="highlight"><c- n>string_view</c-></code> as a "view" over constant string data. Its main purpose
@@ -2171,8 +2177,8 @@ is as a lightweight drop-in replacement for <code class="highlight"><c- k>const<
    <table>
     <tbody>
      <tr>
-      <td>Before
-      <td>After
+      <td>C++14 <code class="highlight"><c- n>string</c-></code>
+      <td>C++17 <code class="highlight"><c- n>string_view</c-></code>
      <tr>
       <td>
 <pre class="highlight"><c- b>int</c-> <c- nf>take</c-><c- p>(</c-><c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>&amp;</c-> <c- n>s</c-><c- p>)</c-> <c- p>{</c->
@@ -2209,14 +2215,14 @@ is as a lightweight drop-in replacement for <code class="highlight"><c- k>const<
 <c- n>take</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>string_view</c-><c- p>(</c-><c- s>"abc"</c-><c- p>));</c->
 </pre>
    </table>
-   <p>C++20 added <code class="highlight"><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- n>T</c-><c- o>></c-></code> as a "view" over constant contiguous data of any type (such as
-arrays and vectors). One of its main purposes (although not its only purpose) is as a
+   <p>C++20 added <code class="highlight"><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- n>T</c-><c- o>></c-></code> as a "view" over constant contiguous data of type <code class="highlight"><c- n>T</c-></code> (such as
+arrays and vectors). One of its main purposes (although not its only one) is as a
 lightweight drop-in replacement for <code class="highlight"><c- k>const</c-> <c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-></code> function parameters.</p>
    <table>
     <tbody>
      <tr>
-      <td>Before
-      <td>After
+      <td>C++17 <code class="highlight"><c- n>vector</c-></code>
+      <td>C++20 <code class="highlight"><c- n>span</c-></code>
      <tr>
       <td>
 <pre class="highlight"><c- b>int</c-> <c- nf>take</c-><c- p>(</c-><c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>&amp;</c-> <c- n>v</c-><c- p>)</c-> <c- p>{</c->
@@ -2257,11 +2263,11 @@ lightweight drop-in replacement for <code class="highlight"><c- k>const</c-> <c-
 <c- n>take</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- o>></c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>}));</c->
 </pre>
    </table>
-   <p>This table has a conspicuous gap. The braced initializer list <code class="highlight"><c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>}</c-></code> is implicitly convertible to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>, but not to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- o>></c-></code>.</p>
+   <p>This table has a conspicuous gap. The singly-braced initializer list <code class="highlight"><c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>}</c-></code> is implicitly convertible to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-></code>, but not to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- o>></c-></code>.</p>
    <h2 class="heading settled" data-level="3" id="solution"><span class="secno">3. </span><span class="content">Solution</span><a class="self-link" href="#solution"></a></h2>
    <p>We propose simply that <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- n>T</c-><c- o>></c-></code> should be convertible from an appropriate <em>braced-initializer-list</em>. In practice this means adding a constructor from <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code>.</p>
    <h3 class="heading settled" data-level="3.1" id="experience"><span class="secno">3.1. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h3>
-   <p>This solution has been implemented in Arthur’s fork of libc++ since October 2021.
+   <p>This proposal has been implemented in Arthur’s fork of libc++ since October 2021.
 See <a href="https://quuxplusone.github.io/blog/2021/10/03/p2447-span-from-initializer-list/">"<code class="highlight"><c- n>span</c-></code> should have a converting constructor from <code class="highlight"><c- n>initializer_list</c-></code>"</a> (2021-10-03) and <a data-link-type="biblio" href="#biblio-patch" title="Implement P2447 std::span convertible from std::initializer_list">[Patch]</a>.</p>
    <h3 class="heading settled" data-level="3.2" id="dangling"><span class="secno">3.2. </span><span class="content">What about dangling?</span><a class="self-link" href="#dangling"></a></h3>
    <p><code class="highlight"><c- n>span</c-></code>, like <code class="highlight"><c- n>string_view</c-></code>, is specifically designed to bind to rvalues as well as lvalues.
@@ -2274,7 +2280,7 @@ This is what lets us write useful code like:</p>
 <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>give_vector</c-><c- p>();</c->
 <c- b>int</c-> <c- n>x</c-> <c- o>=</c-> <c- n>take</c-><c- p>(</c-><c- n>give_vector</c-><c- p>());</c->
 </pre>
-   <p>Careless misuse of <code class="highlight"><c- n>string_view</c-></code> and <code class="highlight"><c- n>span</c-></code> outside a function parameter list produces dangling:</p>
+   <p>Careless misuse of <code class="highlight"><c- n>string_view</c-></code> and <code class="highlight"><c- n>span</c-></code> outside a function parameter list can dangle:</p>
 <pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>string_view</c-> <c- n>s</c-> <c- o>=</c-> <c- n>give_string</c-><c- p>();</c-> <c- c1>// dangles</c->
 <c- n>std</c-><c- o>::</c-><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- o>></c-> <c- n>v</c-> <c- o>=</c-> <c- n>give_vector</c-><c- p>();</c-> <c- c1>// dangles</c->
 </pre>
@@ -2283,7 +2289,7 @@ This is what lets us write useful code like:</p>
     <tbody>
      <tr>
       <td>Before
-      <td>After
+      <td>After P2447
      <tr>
       <td>
 <pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>string_view</c->      <c- n>s</c-> <c- o>=</c-> <c- s>"abc"</c-><c- p>;</c->  <c- c1>// OK</c->
@@ -2311,7 +2317,8 @@ This is what lets us write useful code like:</p>
 </pre>
    </table>
    <h3 class="heading settled" data-level="3.3" id="p2752"><span class="secno">3.3. </span><span class="content">Relation to P2752 Static storage for braced initializers</span><a class="self-link" href="#p2752"></a></h3>
-   <p><a data-link-type="biblio" href="#biblio-p2752r1" title="Static storage for braced initializers">[P2752R1]</a> proposes to permit a constant <code class="highlight"><c- n>initializer_list</c-></code> like <code class="highlight"><c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>}</c-></code> to refer to
+   <p><a data-link-type="biblio" href="#biblio-p2752r1" title="Static storage for braced initializers">[P2752R1]</a> (<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2752r0.html">R0</a>)
+proposes to permit a constant <code class="highlight"><c- n>initializer_list</c-></code> like <code class="highlight"><c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>}</c-></code> to refer to
 a backing array in static storage, rather than forcing all backing arrays onto the stack.
 At least for now, this doesn’t change anything dangling-wise: referring to the backing array
 of an <code class="highlight"><c- n>initializer_list</c-></code> outside the lifetime of that <code class="highlight"><c- n>initializer_list</c-></code> remains undefined behavior.</p>
@@ -2325,7 +2332,7 @@ of an <code class="highlight"><c- n>initializer_list</c-></code> outside the lif
    then why not call that "good enough"? Why do we need to be able to use a single set of braces? 
    <p>Well, a single set of braces is good enough for <code class="highlight"><c- n>vector</c-></code>, and we want <code class="highlight"><c- n>span</c-></code> to be a drop-in replacement
 for <code class="highlight"><c- n>vector</c-></code> in function parameter lists, so we need to support the syntax <code class="highlight"><c- n>vector</c-></code> does.
-There was a period right after C++11 where people were writing</p>
+There was a period right after C++11 where some people were writing</p>
 <pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>v</c-> <c- o>=</c-> <c- p>{{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>}};</c->
 </pre>
    but by C++14 we had settled firmly on "one set of braces" as the preferred style (matching the
@@ -2379,7 +2386,7 @@ with no change to Annex C, despite its breaking code like this:</p>
 <c- b>int</c-> <c- n>a</c-><c- p>[</c-><c- mi>10</c-><c- p>];</c->
 <c- b>void</c-> <c- nf>test</c-><c- p>()</c-> <c- p>{</c-> <c- n>zero</c-><c- p>({</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-><c- o>+</c-><c- mi>10</c-><c- p>});</c-> <c- p>}</c->
 </pre>
-   <b>Before:</b> Calls <code class="highlight"><c- n>zero</c-><c- p>(</c-><c- n>pair</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-><c- p>)</c-></code>.<br> <b>After:</b> Ambiguous.<br> <b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to <code class="highlight"><c- n>pair</c-></code>. 
+   <b>Before:</b> Calls <code class="highlight"><c- n>zero</c-><c- p>(</c-><c- n>pair</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-><c- p>)</c-></code>.<br> <b>After P1425:</b> Ambiguous.<br> <b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to <code class="highlight"><c- n>pair</c-></code>. 
    <p>We can simply agree that such examples are sufficiently unlikely in practice,
 and sufficiently easy to fix, that the benefits of the changed overload set
 outweigh the costs of running into these examples.</p>
@@ -2388,27 +2395,27 @@ outweigh the costs of running into these examples.</p>
 <c- b>void</c-> <c- nf>one</c-><c- p>(</c-><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- o>></c-><c- p>);</c->
 <c- b>void</c-> <c- nf>test</c-><c- p>()</c-> <c- p>{</c-> <c- n>one</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>});</c-> <c- p>}</c->
 </pre>
-   <b>Before:</b> Calls <code class="highlight"><c- n>one</c-><c- p>(</c-><c- n>pair</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-><c- p>)</c-></code>.<br> <b>After:</b> Ambiguous.<br> <b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to <code class="highlight"><c- n>pair</c-></code>. 
+   <b>Before:</b> Calls <code class="highlight"><c- n>one</c-><c- p>(</c-><c- n>pair</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-><c- p>)</c-></code>.<br> <b>After P2447:</b> Ambiguous.<br> <b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to <code class="highlight"><c- n>pair</c-></code>. 
    <h3 class="heading settled" data-level="4.2" id="annex-c-2"><span class="secno">4.2. </span><span class="content">The <code class="highlight"><c- n>initializer_list</c-></code> ctor has high precedence</span><a class="self-link" href="#annex-c-2"></a></h3>
 <pre class="language-c++ highlight"><c- b>void</c-> <c- nf>two</c-><c- p>(</c-><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- p>,</c-> <c- mi>2</c-><c- o>></c-><c- p>);</c->
 <c- b>void</c-> <c- nf>test</c-><c- p>()</c-> <c- p>{</c-> <c- n>two</c-><c- p>({{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>}});</c-> <c- p>}</c->
 </pre>
-   <b>Before:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- k>const</c-> <c- b>int</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- mi>2</c-><c- p>])</c-></code>, which is non-<code class="highlight"><c- k>explicit</c-></code>; success.<br> <b>After:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>)</c-></code>, which is <code class="highlight"><c- k>explicit</c-></code> for <code class="highlight"><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- p>,</c-> <c- mi>2</c-><c- o>></c-></code>; failure.<br> <b>To fix:</b> Replace <code class="highlight"><c- p>{{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>}}</c-></code> with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>array</c-><c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>}</c-></code>; or, replace <code class="highlight"><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- p>,</c-> <c- mi>2</c-><c- o>></c-></code> with <code class="highlight"><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- o>></c-></code>.<br> 
+   <b>Before:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- k>const</c-> <c- b>int</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- mi>2</c-><c- p>])</c-></code>, which is non-<code class="highlight"><c- k>explicit</c-></code>; success.<br> <b>After P2447:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>)</c-></code>, which is <code class="highlight"><c- k>explicit</c-></code> for <code class="highlight"><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- p>,</c-> <c- mi>2</c-><c- o>></c-></code>; failure.<br> <b>To fix:</b> Replace <code class="highlight"><c- p>{{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>}}</c-></code> with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>array</c-><c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>}</c-></code>; or, replace <code class="highlight"><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- p>,</c-> <c- mi>2</c-><c- o>></c-></code> with <code class="highlight"><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>int</c-><c- o>></c-></code>.<br> 
    <h3 class="heading settled" data-level="4.3" id="annex-c-3"><span class="secno">4.3. </span><span class="content">Implicit two-argument construction with a highly convertible <code class="highlight"><c- n>value_type</c-></code></span><a class="self-link" href="#annex-c-3"></a></h3>
    <p>In these two highly contrived examples, the caller deliberately constructs
 a <code class="highlight"><c- n>span</c-></code> via its iterator-pair constructor <em>implicitly, from a braced initializer of two elements,</em> and furthermore <code class="highlight"><c- n>value_type</c-></code> is implicitly convertible from the iterator type.
-These examples strike me as highly contrived, because both conditions are unlikely, and their
+These examples strike me as highly contrived: both conditions are unlikely, and their
 conjunction is unlikelier still.</p>
 <pre class="language-c++ highlight"><c- b>int</c-> <c- nf>three</c-><c- p>(</c-><c- n>span</c-><c- o>&lt;</c-><c- b>void</c-><c- o>*</c-> <c- k>const</c-><c- o>></c-> <c- n>v</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>v</c-><c- p>.</c-><c- n>size</c-><c- p>();</c-> <c- p>}</c->
 <c- b>void</c-> <c- o>*</c-><c- n>a</c-><c- p>[</c-><c- mi>10</c-><c- p>];</c->
 <c- b>int</c-> <c- n>x</c-> <c- o>=</c-> <c- n>three</c-><c- p>({</c-><c- n>a</c-><c- p>,</c-> <c- mi>0</c-><c- p>});</c->
 </pre>
-   <b>Before:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- b>void</c-><c- o>**</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-></code>; <code class="highlight"><c- n>x</c-></code> is 0.<br> <b>After:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>void</c-><c- o>*></c-><c- p>)</c-></code>; <code class="highlight"><c- n>x</c-></code> is 2.<br> <b>To fix:</b> Replace <code class="highlight"><c- p>{</c-><c- n>a</c-><c- p>,</c-> <c- mi>0</c-><c- p>}</c-></code> with <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- mi>0</c-><c- p>)</c-></code>. 
+   <b>Before:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- b>void</c-><c- o>**</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-></code>; <code class="highlight"><c- n>x</c-></code> is 0.<br> <b>After P2447:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>void</c-><c- o>*></c-><c- p>)</c-></code>; <code class="highlight"><c- n>x</c-></code> is 2.<br> <b>To fix:</b> Replace <code class="highlight"><c- p>{</c-><c- n>a</c-><c- p>,</c-> <c- mi>0</c-><c- p>}</c-></code> with <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- mi>0</c-><c- p>)</c-></code>. 
 <pre class="language-c++ highlight"><c- b>int</c-> <c- nf>four</c-><c- p>(</c-><c- n>span</c-><c- o>&lt;</c-><c- k>const</c-> <c- n>any</c-><c- o>></c-> <c- n>v</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>v</c-><c- p>.</c-><c- n>size</c-><c- p>();</c-> <c- p>}</c->
 <c- n>any</c-> <c- n>a</c-><c- p>[</c-><c- mi>10</c-><c- p>];</c->
 <c- b>int</c-> <c- n>y</c-> <c- o>=</c-> <c- n>four</c-><c- p>({</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-><c- o>+</c-><c- mi>10</c-><c- p>});</c->
 </pre>
-   <b>Before:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>any</c-><c- o>*</c-><c- p>,</c-> <c- n>any</c-><c- o>*</c-><c- p>)</c-></code>; <code class="highlight"><c- n>y</c-></code> is 10.<br> <b>After:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>any</c-><c- o>></c-><c- p>)</c-></code>; <code class="highlight"><c- n>y</c-></code> is 2.<br> <b>To fix:</b> Replace <code class="highlight"><c- p>{</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-><c- o>+</c-><c- mi>10</c-><c- p>}</c-></code> with <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-><c- o>+</c-><c- mi>10</c-><c- p>)</c-></code>. 
+   <b>Before:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>any</c-><c- o>*</c-><c- p>,</c-> <c- n>any</c-><c- o>*</c-><c- p>)</c-></code>; <code class="highlight"><c- n>y</c-></code> is 10.<br> <b>After P2447:</b> Selects <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>any</c-><c- o>></c-><c- p>)</c-></code>; <code class="highlight"><c- n>y</c-></code> is 2.<br> <b>To fix:</b> Replace <code class="highlight"><c- p>{</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-><c- o>+</c-><c- mi>10</c-><c- p>}</c-></code> with <code class="highlight"><c- n>span</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-><c- o>+</c-><c- mi>10</c-><c- p>)</c-></code>. 
    <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <p>Modify <a href="https://eel.is/c++draft/span.syn">[span.syn]</a> as follows:</p>
    <p><small></small></p>
