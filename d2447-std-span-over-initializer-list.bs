@@ -2,7 +2,7 @@
 Title: <code>std::span</code> over an initializer list
 Shortname: D2447
 Revision: 3
-!Draft Revision: 2
+!Draft Revision: 4
 Audience: LEWG
 Status: D
 Group: WG21
@@ -36,6 +36,10 @@ td {font-size: smaller;}
 
     - Removed R2's feature macro `__cpp_lib_span_init`; it didn't seem motivated.
 
+- R2:
+
+    - Discussed in LEWG telecon, <a href="https://wiki.edg.com/bin/view/Wg21telecons2022/P2447#Library-Evolution-2022-07-26">2022-07-26</a>
+
 
 # Background # {#background}
 
@@ -43,7 +47,7 @@ C++17 added `string_view` as a "view" over constant string data. Its main purpos
 is as a lightweight drop-in replacement for `const string&` function parameters.
 
 <table>
-<tr><td>Before</td><td>After</td></tr>
+<tr><td>C++14 `string`</td><td>C++17 `string_view`</td></tr>
 <tr><td><xmp>
 int take(const std::string& s) {
     return s[0] + s.size();
@@ -70,12 +74,12 @@ take(std::string_view("abc"));
 </xmp></td></tr>
 </table>
 
-C++20 added `span<const T>` as a "view" over constant contiguous data of any type (such as
-arrays and vectors). One of its main purposes (although not its only purpose) is as a
+C++20 added `span<const T>` as a "view" over constant contiguous data of type `T` (such as
+arrays and vectors). One of its main purposes (although not its only one) is as a
 lightweight drop-in replacement for `const vector<T>&` function parameters.
 
 <table>
-<tr><td>Before</td><td>After</td></tr>
+<tr><td>C++17 `vector`</td><td>C++20 `span`</td></tr>
 <tr><td><xmp>
 int take(const std::vector<int>& v) {
     return v[0] + v.size();
@@ -107,7 +111,7 @@ take(std::span<const int>({1,2,3}));
 </xmp></td></tr>
 </table>
 
-This table has a conspicuous gap. The braced initializer list `{1,2,3}`
+This table has a conspicuous gap. The singly-braced initializer list `{1,2,3}`
 is implicitly convertible to `std::vector<int>`, but not to `std::span<const int>`.
 
 
@@ -118,7 +122,7 @@ We propose simply that `std::span<const T>` should be convertible from an approp
 
 ## Implementation experience ## {#experience}
 
-This solution has been implemented in Arthur's fork of libc++ since October 2021.
+This proposal has been implemented in Arthur's fork of libc++ since October 2021.
 See <a href="https://quuxplusone.github.io/blog/2021/10/03/p2447-span-from-initializer-list/">"`span` should have a converting constructor from `initializer_list`"</a>
 (2021-10-03) and [[Patch]].
 
@@ -136,7 +140,7 @@ std::vector<int> give_vector();
 int x = take(give_vector());
 ```
 
-Careless misuse of `string_view` and `span` outside a function parameter list produces dangling:
+Careless misuse of `string_view` and `span` outside a function parameter list can dangle:
 ```c++
 std::string_view s = give_string(); // dangles
 std::span<const int> v = give_vector(); // dangles
@@ -146,7 +150,7 @@ P2447 doesn't propose to increase the risk in this area; dangling is already lik
 `string_view` is carelessly misused. We simply propose to close the ergonomic syntax gap between `span` and `string_view`.
 
 <table>
-<tr><td>Before</td><td>After</td></tr>
+<tr><td>Before</td><td>After P2447</td></tr>
 <tr><td><xmp>
 std::string_view      s = "abc";  // OK
 std::string_view      s = "abc"s; // dangles
@@ -171,7 +175,8 @@ std::span<const int> v = {1,2,3};            // dangles
 
 ## Relation to P2752 Static storage for braced initializers ## {#p2752}
 
-[[P2752R1]] proposes to permit a constant `initializer_list` like `{1,2,3}` to refer to
+[[P2752R1]] (<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2752r0.html">R0</a>)
+proposes to permit a constant `initializer_list` like `{1,2,3}` to refer to
 a backing array in static storage, rather than forcing all backing arrays onto the stack.
 At least for now, this doesn't change anything dangling-wise: referring to the backing array
 of an `initializer_list` outside the lifetime of that `initializer_list` remains undefined behavior.
@@ -190,7 +195,7 @@ then why not call that "good enough"? Why do we need to be able to use a single 
 
 Well, a single set of braces is good enough for `vector`, and we want `span` to be a drop-in replacement
 for `vector` in function parameter lists, so we need to support the syntax `vector` does.
-There was a period right after C++11 where people were writing
+There was a period right after C++11 where some people were writing
 ```c++
 std::vector<int> v = {{1,2,3}};
 ```
@@ -242,7 +247,7 @@ int a[10];
 void test() { zero({a, a+10}); }
 ```
 <b>Before:</b> Calls `zero(pair<int, int>)`.<br/>
-<b>After:</b> Ambiguous.<br/>
+<b>After P1425:</b> Ambiguous.<br/>
 <b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to `pair`.
 
 We can simply agree that such examples are sufficiently unlikely in practice,
@@ -258,7 +263,7 @@ void one(span<const int>);
 void test() { one({1,2}); }
 ```
 <b>Before:</b> Calls `one(pair<int, int>)`.<br/>
-<b>After:</b> Ambiguous.<br/>
+<b>After P2447:</b> Ambiguous.<br/>
 <b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to `pair`.
 
 ## The `initializer_list` ctor has high precedence ## {#annex-c-2}
@@ -268,7 +273,7 @@ void two(span<const int, 2>);
 void test() { two({{1,2}}); }
 ```
 <b>Before:</b> Selects `span(const int(&)[2])`, which is non-`explicit`; success.<br/>
-<b>After:</b> Selects `span(initializer_list<int>)`, which is `explicit` for `span<const int, 2>`; failure.<br/>
+<b>After P2447:</b> Selects `span(initializer_list<int>)`, which is `explicit` for `span<const int, 2>`; failure.<br/>
 <b>To fix:</b> Replace `{{1,2}}` with `std::array{1,2}`; or, replace `span<const int, 2>` with `span<const int>`.<br/>
 
 ## Implicit two-argument construction with a highly convertible `value_type` ## {#annex-c-3}
@@ -276,7 +281,7 @@ void test() { two({{1,2}}); }
 In these two highly contrived examples, the caller deliberately constructs
 a `span` via its iterator-pair constructor *implicitly, from a braced initializer of two elements,*
 and furthermore `value_type` is implicitly convertible from the iterator type.
-These examples strike me as highly contrived, because both conditions are unlikely, and their
+These examples strike me as highly contrived: both conditions are unlikely, and their
 conjunction is unlikelier still.
 
 ```c++
@@ -285,7 +290,7 @@ void *a[10];
 int x = three({a, 0});
 ```
 <b>Before:</b> Selects `span(void**, int)`; `x` is 0.<br/>
-<b>After:</b> Selects `span(initializer_list<void*>)`; `x` is 2.<br/>
+<b>After P2447:</b> Selects `span(initializer_list<void*>)`; `x` is 2.<br/>
 <b>To fix:</b> Replace `{a, 0}` with `span(a, 0)`.
 
 ```c++
@@ -294,7 +299,7 @@ any a[10];
 int y = four({a, a+10});
 ```
 <b>Before:</b> Selects `span(any*, any*)`; `y` is 10.<br/>
-<b>After:</b> Selects `span(initializer_list<any>)`; `y` is 2.<br/>
+<b>After P2447:</b> Selects `span(initializer_list<any>)`; `y` is 2.<br/>
 <b>To fix:</b> Replace `{a, a+10}` with `span(a, a+10)`.
 
 
