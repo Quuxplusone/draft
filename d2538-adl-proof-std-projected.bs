@@ -1,9 +1,9 @@
 <pre class='metadata'>
 Title: ADL-proof std::projected
 Shortname: D2538
-Revision: 1
-!Draft Revision: 3
-Audience: LEWG, LWG
+Revision: 2
+!Draft Revision: 5
+Audience: LWG
 Status: D
 Group: WG21
 URL:
@@ -16,12 +16,14 @@ Abstract:
   When <tt>it</tt> is a pointer of type <tt>Danger*</tt>, evaluating <tt>*it</tt> does not perform ADL and
   does not attempt to complete the associated type <tt>Danger</tt>. But when <tt>proj</tt> is an iterator
   of type <tt>projected&lt;Danger*, identity&gt;</tt>, evaluating <tt>*proj</tt> does perform ADL and will
-  attempt to complete <tt>Danger</tt>. As a result, most Ranges algorithms are fundamentally
+  attempt to complete <tt>Danger</tt>. Thus, most Ranges algorithms are fundamentally
   "less ADL-proof" than their STL Classic counterparts, and some concepts such as <tt>indirectly_comparable</tt>
   can result in unexpected hard errors.
   We fix this by respecifying <tt>projected&lt;I, Proj&gt;</tt> in a backward-compatible way so that its
   associated entities do not include its template arguments.
-Date: 2022-03-31
+  We also include the fix for [[LWG3859]].
+  The whole thing should be treated as a DR against C++20.
+Date: 2023-03-19
 </pre>
 
 <style>
@@ -32,15 +34,14 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
+- R2:
+
+    - Merge the fix for [[LWG3859]]. Add the `isNull` example, which is not
+        fixed by LWG3859 alone, but is fixed by this combined patch.
+
 - R1:
 
     - Added Casey Carter as coauthor.
-
-    - Added libc++ to Appendix A.
-
-- R0:
-
-    - Initial revision.
 
 # Background on ADL-proofing # {#background}
 
@@ -93,9 +94,9 @@ assert(std::count(a, a+10, nullptr) == 10); // OK
 
 The libc++ test suite includes a lot of "ADL-proofing" test cases, to make sure that
 our STL algorithms don't unnecessarily trigger the completion of associated types.
-As far as I know, we consider this _not_ a conformance issue, but a pretty important
+Libc++ considers this *not* a conformance issue, but a pretty important
 quality-of-implementation issue. Unnecessarily prematurely completing a type can
-cause hard errors for the user that are difficult to fix, and I imagine it could
+cause hard errors for the user that are difficult to fix; I imagine it could
 cause ODR issues too.
 
 For more information, see [[Uglification]].
@@ -111,8 +112,6 @@ assert(std::ranges::count(a, a+10, nullptr) == 10); // hard error
 ```
 
 This causes a hard error on all possible implementations.
-Because the error messages are so long, I've moved them into
-[[#appendix-a|Appendix A]].
 
 In fact, even the following program causes hard errors:
 
@@ -132,61 +131,33 @@ to complete all the associated types of `projected<T*, identity>`, which include
 all the associated types of `T`, which includes `Holder<Incomplete>`.
 
 So, we are in the sad state that `std::sort`, `std::count`, etc., are safe to use
-on "dangerous-to-ADL" types, but their `std::ranges::` counterparts are
+on "dangerous-to-ADL" pointer types, but their `std::ranges::` counterparts are
 not.
+
+The problem also exists with projections other than `identity`; for example,
+
+```c++
+using T = Holder<Incomplete>*;
+
+Holder<Incomplete> *a[10] = {}; // ten null pointers
+auto isNull = [](auto *p) { return p == nullptr; };
+assert(std::ranges::count(a, a+10, true, isNull) == 10); // hard error
+```
 
 # The solution: ADL-proof `std::projected` # {#solution}
 
 To fix the problem and ADL-proof all the Ranges algorithms, we simply have to
-stop `T` from being an associated type of `projected<T*, identity>`. We can
-do this by inserting an ADL firewall.
-
-The basic technique is to replace
-
-```c++
-template<class Associated>
-struct projected { };
-```
-
-with
-
-```c++
-template<class T>
-struct __projected_impl {
-  struct type { };
-};
-
-template<class NonAssociated>
-using projected =
-  __projected_impl<NonAssociated>::type;
-```
-
-ADL will associate the base classes of derived classes, but it does not
-associate the containing classes of nested classes. In short, the `::` in
-`__projected_impl<NonAssociated>::type` acts as a firewall against unwanted ADL.
-
-For more information, see [[Disable]].
+stop `T` from being an associated type of `projected<T*, Proj>`. We can
+do this by inserting an ADL firewall; see P2538R1 and [[Disable]] for details
+of the technique.
 
 [[P2300R4]] actually provides blanket wording and
-a phrase of power that denotes this technique, in their proposed new library section
-[lib.tmpl-heads]. Quote:
-
-> If a class template's *template-head* is marked with "arguments are not associated entities",
-> any template arguments do not contribute to the associated entities
-> of a function call where a specialization of the class template is an associated entity.
-> In such a case, the class template may be implemented as an alias template referring to
-> a templated class, or as a class template where the template arguments themselves are
-> templated classes.
-
-This is exactly the sort of thing I'm talking about, and if that wording is shipped,
-then we might consider rewording `std::projected` to use the phrase of power. However,
-I'm proposing a particular implementation technique below, so that the wording here
-(which I hope vendors will DR back to C++20) is not unnecessarily tied to the fate of P2300.
-The proposed wording here also removes some unnecessary complexity (a partial specialization
-of `incrementable_traits` that, after this patch, will not be physically possible to implement).
+a phrase of power, "arguments are not associated entities," that denotes this technique.
+However, I don't use that phrase of power here because we need wording that can be DR'ed back
+to C++20 and C++23; our wording can't depend on P2300.
 
 If we adopt this proposal and respecify `std::projected` along these lines, then the programmer
-will gain the ability to write:
+will be able to write:
 
 ```c++
 using T = Holder<Incomplete>*;
@@ -197,21 +168,22 @@ static_assert(std::sortable<T*>); // will be OK
 
 int main() {
   Holder<Incomplete> *a[10] = {}; // ten null pointers
+  auto isNull = [](auto *p) { return p == nullptr; };
   assert(std::count(a, a+10, nullptr) == 10); // OK
   assert(std::ranges::count(a, a+10, nullptr) == 10); // will be OK
+  assert(std::ranges::count(a, a+10, true, isNull) == 10); // will be OK
 }
 ```
 
 # Implementation experience # {#experience}
 
-This has been prototyped in a branch of libc++, and is just waiting for
-the paper to be adopted so that we can merge it. See [[D119029]].
+This has been prototyped in Arthur's libc++ fork; see [[Patch]].
 
-# Proposed wording relative to N4868 # {#wording}
+The P/R for [[LWG3859]] merge-conflicts with P2538R1; therefore I've included
+the fix for LWG3859 as part of P2538R2.
 
-Note: The phrase of power "present only if..." was recently introduced into the working draft
-by [[P2259R1]]; see for example <a href="https://eel.is/c++draft/counted.iterator">[counted.iterator]</a>
-and <a href="https://eel.is/c++draft/range.iota.iterator">[range.iota.iterator]</a>.
+
+# Proposed wording # {#wording}
 
 Note: I believe this doesn't need a feature-test macro, because it merely enables code that
 was ill-formed before, and I can't think of a scenario where you'd want to do one thing
@@ -250,10 +222,27 @@ namespace std {
   };
 
   template&lt;indirectly_readable I, indirectly_regular_unary_invocable&lt;I> Proj>
-  using projected = <i>projected-impl</i>&lt;I, Proj>::<i>type</i>;
+  using projected = conditional_t&lt;same_as&lt;Proj, identity>, I, <i>projected-impl</i>&lt;I, Proj>::<i>type</i>>;
 }
 </ins></pre>
 </blockquote>
+
+
+# Straw polls # {#polls}
+
+## Polls taken electronically, May 2022 ## {#taken-polls-2022-05}
+
+In May 2022, LEWG took an electronic straw poll of a number of papers, including P2538R0. The results
+are tallied in [P2575R0 "2022-05 Library Evolution Poll Outcomes."](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2575r0.html#p2538r0-adl-proof-projected)
+P2538R0's poll had this result:
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>Send P2538R0 to LWG for C++23, classified as an improvement of an existing feature.</small></th>
+<th> 8 </th><th> 11 </th><th> 2 </th><th> 0 </th><th> 0 </th></tr>
+</table>
+
 
 # Acknowledgments # {#acknowledgments}
 
@@ -262,117 +251,19 @@ namespace std {
 - Thanks to Barry Revzin for suggesting the "present only if..." wording, and
     to Hui Xie for pointing out the relevance of [[P2300R4]].
 
-# Appendix A: Compiler error messages for the `ranges::count` example # {#appendix-a}
+- Thanks to Walter E. Brown for pointing out P2538R1's merge-conflict with [[LWG3859]];
+    P2538R2 merges in the proposed fix for LWG3859.
 
-Here's the sample program again ([Godbolt](https://godbolt.org/z/9KEoETMfr)):
-
-```c++
-#include <algorithm>
-
-template<class T> struct Holder { T t; };
-struct Incomplete;
-
-int main() {
-    Holder<Incomplete> *a[10] = {}; // ten null pointers
-    // (void)std::count(a, a+10, nullptr); // OK on libstdc++ and libc++, hard error on Microsoft STL
-    (void)std::ranges::count(a, a+10, nullptr); // hard error
-}
-```
-
-GCC (with libstdc++) says:
-
-```
-  In instantiation of 'struct Holder<Incomplete>':
-bits/iterator_concepts.h:292:6:   required by substitution of 'template<class _Iterator>  requires (__iter_without_nested_types<_Iterator>) && (__cpp17_iterator<_Iterator>) struct std::__iterator_traits<_Iter, void> [with _Iterator = std::projected<Holder<Incomplete>**, std::identity>]'
-bits/stl_iterator_base_types.h:177:12:   required from 'struct std::iterator_traits<std::projected<Holder<Incomplete>**, std::identity> >'
-bits/iterator_concepts.h:191:4:   required by substitution of 'template<class _Iter, class _Tp>  requires  __primary_traits_iter<_Iter> struct std::__detail::__iter_traits_impl<_Iter, _Tp> [with _Iter = std::projected<Holder<Incomplete>**, std::identity>; _Tp = std::indirectly_readable_traits<std::projected<Holder<Incomplete>**, std::identity> >]'
-bits/iterator_concepts.h:204:13:   required by substitution of 'template<class _Iter, class _Tp> using __iter_traits = typename std::__detail::__iter_traits_impl::type [with _Iter = std::projected<Holder<Incomplete>**, std::identity>; _Tp = std::indirectly_readable_traits<std::projected<Holder<Incomplete>**, std::identity> >]'
-bits/iterator_concepts.h:278:13:   required by substitution of 'template<class _Tp> using __iter_value_t = typename std::__detail::__iter_traits_impl<_Tp, std::indirectly_readable_traits<_Iter> >::type::value_type [with _Tp = std::projected<Holder<Incomplete>**, std::identity>]'
-bits/iterator_concepts.h:283:11:   required by substitution of 'template<class _Tp> using iter_value_t = std::__detail::__iter_value_t<typename std::remove_cvref<_Tp>::type> [with _Tp = std::projected<Holder<Incomplete>**, std::identity>]'
-bits/iterator_concepts.h:515:11:   required by substitution of 'template<class _Iter, class _Sent, class _Tp, class _Proj>  requires (input_iterator<_Iter>) && (sentinel_for<_Sent, _Iter>) && (indirect_binary_predicate<std::ranges::equal_to, std::projected<_I1, _P1>, const _Tp*>) constexpr std::iter_difference_t<_Iter> std::ranges::__count_fn::operator()(_Iter, _Sent, const _Tp&, _Proj) const [with _Iter = Holder<Incomplete>**; _Sent = Holder<Incomplete>**; _Tp = std::nullptr_t; _Proj = std::identity]'
-  required from here
-error: 'Holder<T>::t' has incomplete type
-    5 | template<class T> struct Holder { T t; };
-      |                                     ^
-note: forward declaration of 'struct Incomplete'
-    4 | struct Incomplete;
-      |        ^~~~~~~~~~
-```
-
-Clang (with libc++, after applying [[D121523]]'s implementation of `ranges::count`) says:
-
-```
-error: field has incomplete type 'Incomplete'
-template<class T> struct Holder { T t; };
-                                    ^
-__iterator/iterator_traits.h:151:9: note: in instantiation of template class 'Holder<Incomplete>' requested here
-    {   *__i } -> __can_reference;
-        ^
-__iterator/iterator_traits.h:151:9: note: in instantiation of requirement here
-    {   *__i } -> __can_reference;
-        ^~~~
-__iterator/iterator_traits.h:150:3: note: while substituting template arguments into constraint expression here
-  requires(_Ip __i) {
-  ^~~~~~~~~~~~~~~~~~~
-__iterator/iterator_traits.h:237:3: note: while checking the satisfaction of concept '__cpp17_iterator<std::projected<Holder<Incomplete> **, std::identity>>' requested here
-  __iterator_traits_detail::__cpp17_iterator<_Tp>;
-  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-__iterator/iterator_traits.h:237:29: note: while substituting template arguments into constraint expression here
-  __iterator_traits_detail::__cpp17_iterator<_Tp>;
-                            ^~~~~~~~~~~~~~~~~~~~~
-__iterator/iterator_traits.h:241:3: note: (skipping 19 contexts in backtrace; use -ftemplate-backtrace-limit=0 to see all)
-  __cpp17_iterator_missing_members<_Tp> &&
-  ^
-__iterator/concepts.h:212:3: note: while substituting template arguments into constraint expression here
-  indirectly_readable<_It1> && indirectly_readable<_It2> &&
-  ^~~~~~~~~~~~~~~~~~~~~~~~~
-__algorithm/ranges_count.h:35:14: note: while checking the satisfaction of concept 'indirect_binary_predicate<std::ranges::equal_to, std::projected<Holder<Incomplete> **, std::identity>, const std::nullptr_t *>' requested here
-    requires indirect_binary_predicate<ranges::equal_to, projected<_Iter, _Proj>, const _Type*>
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-__algorithm/ranges_count.h:35:14: note: while substituting template arguments into constraint expression here
-    requires indirect_binary_predicate<ranges::equal_to, projected<_Iter, _Proj>, const _Type*>
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-note: while checking constraint satisfaction for template 'operator()<Holder<Incomplete> **, Holder<Incomplete> **, std::nullptr_t, std::identity>' required here
-    (void)std::ranges::count(a, a+10, nullptr); // hard error
-                            ^
-note: in instantiation of function template specialization 'std::ranges::__count::__fn::operator()<Holder<Incomplete> **, Holder<Incomplete> **, std::nullptr_t, std::identity>' requested here
-note: forward declaration of 'Incomplete'
-struct Incomplete;
-       ^
-1 error generated.
-```
-
-MSVC (with Microsoft STL, which already does not ADL-proof `std::count`) says:
-
-```
-error C2079: 'Holder<Incomplete>::t' uses undefined struct 'Incomplete'
-xutility(471): note: see reference to class template instantiation 'Holder<Incomplete>' being compiled
-xutility(485): note: see reference to variable template 'bool _Cpp17_iterator<std::projected<Holder<Incomplete> * *,std::identity> >' being compiled
-xutility(362): note: see reference to class template instantiation 'std::iterator_traits<std::projected<Holder<Incomplete> **,std::identity>>' being compiled
-xutility(417): note: see reference to variable template 'bool _Is_from_primary<std::iterator_traits<std::projected<Holder<Incomplete> * *,std::identity> > >' being compiled
-xutility(718): note: see reference to alias template instantiation 'std::iter_value_t<std::projected<Holder<Incomplete> **,std::identity>>' being compiled
-xutility(728): note: see reference to variable template 'bool _Indirectly_readable_impl<std::projected<Holder<Incomplete> * *,std::identity> >' being compiled
-xutility(904): note: see reference to variable template 'bool indirectly_readable<std::projected<Holder<Incomplete> * *,std::identity> >' being compiled
-algorithm(466): note: see reference to variable template 'bool indirect_binary_predicate<std::ranges::equal_to,std::projected<Holder<Incomplete> * *,std::identity>,std::nullptr_t const *>' being compiled
-```
 
 <pre class=biblio>
 {
-  "D119029": {
-    "title": "[libc++] [D2358R0] ADL-proof `projected`",
+  "Patch": {
+    "title": "[libc++] [LWG3859] [P2538] ADL-proof std::projected",
     "authors": [
         "Arthur O'Dwyer"
     ],
-    "href": "https://reviews.llvm.org/D119029",
-    "date": "February 2022"
-  },
-  "D121523": {
-    "title": "[libc++][ranges] Implement ranges::count{, _if}",
-    "authors": [
-        "Nikolas Klauser"
-    ],
-    "href": "https://reviews.llvm.org/D121523",
-    "date": "March 2022"
+    "href": "https://github.com/Quuxplusone/llvm-project/commit/25fe7624552cb601417204f1d0164ae8c91ac4dd",
+    "date": "March 2023"
   },
   "Disable": {
     "title": "How hana::type<T> disables ADL",
@@ -382,13 +273,13 @@ algorithm(466): note: see reference to variable template 'bool indirect_binary_p
     "href": "https://quuxplusone.github.io/blog/2019/04/09/adl-insanity-round-2/",
     "date": "April 2019"
   },
-  "P2259R1": {
-    "title": "Repairing input range adaptors and counted_iterator",
+  "LWG3859": {
+    "title": "std::projected cannot handle proxy iterator",
     "authors": [
-        "Tim Song"
+      "Hewill Kang"
     ],
-    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2259r1.html",
-    "date": "January 2021"
+    "href": "https://cplusplus.github.io/LWG/issue3859",
+    "date": "January 2023"
   },
   "P2300R4": {
     "title": "std::execution",
