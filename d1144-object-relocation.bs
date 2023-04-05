@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: std::is_trivially_relocatable
 Shortname: D1144
-Revision: 7
-!Draft Revision: 42
+Revision: 8
+!Draft Revision: 43
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -20,7 +20,7 @@ Abstract:
   that it is trivially relocatable.
   P1144R3 was presented at C++Now 2019 as a 90-minute talk titled
   ["Trivially Relocatable."](https://www.youtube.com/watch?v=SGdfPextuAU)
-Date: 2023-03-10
+Date: 2023-04-05
 </pre>
 
 <style>
@@ -47,11 +47,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
     - Added straw poll results from Issaquah; removed much background and discussion
             (leaving only references for the interested reader to consult [[P1144R6]]).
 
-    - Jonathan Hopkins points out that (contrary to the English description in [[N2271]])
-            EASTL defines `has_trivial_relocate` as a synonym for
-            `is_trivially_move_assignable`, thus it's not prior art for this notion.
-            (In particular, EASTL considers `unique_ptr<int>` non-trivially relocatable.)
-            Remove mentions of EASTL.
+    - Removed mentions of EASTL.
 
     - Added [[#open-questions|Appendix E]].
 
@@ -437,7 +433,7 @@ Add a new section after <a href="http://eel.is/c++draft/specialized.destroy">[sp
   T *relocate_at(T* source, T* dest);
 </xmp>
 
-*Mandates:* `T` shall be a complete non-array object type.
+*Mandates:* `T` is a complete non-array object type.
 
 *Effects:* Equivalent to:
 <xmp>
@@ -452,11 +448,11 @@ associated with the relocation of the value of `*source` might not happen.
   T relocate(T* source);
 </xmp>
 
-*Mandates:* `T` shall be a complete non-array object type.
+*Mandates:* `T` is a complete non-array object type.
 
 *Effects:* Equivalent to:
 <xmp>
-  T t = move(source);
+  T t = std::move(source);
   destroy_at(source);
   return t;
 </xmp>
