@@ -1,0 +1,208 @@
+<pre class='metadata'>
+Title: std::is_uniqued
+Shortname: D2848
+Revision: 0
+!Draft Revision: 3
+Audience: EWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2848-std-is-uniqued.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2848-std-is-uniqued.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2848-std-is-uniqued.html">rawgit.com/Quuxplusone/draft/gh-pages/d2848-std-is-uniqued.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Editor: Enrico Mauro, aurumpuro@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  The STL provides the triples (<code>std::sort</code>, <code>std::is_sorted_until</code>, <code>std::is_sorted</code>)
+  and (<code>std::make_heap</code>, <code>std::is_heap_until</code>, <code>std::is_heap</code>)
+  and (<code>std::unique</code>, <code>std::adjacent_find</code>, [blank]). We fill in the blank
+  by proposing <code>std::is_uniqued</code>.
+Date: 2023-04-22
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial revision.
+
+
+# Motivation and solution # {#motivation}
+
+The "classic STL" provides the following sets of related algorithms:
+
+- <a href="https://eel.is/c++draft/is.sorted">`is_sorted_until`</a> (returns iterator),
+    <a href="https://eel.is/c++draft/is.sorted">`is_sorted`</a> (i.e. `is_sorted_until == end()`)
+- <a href="https://eel.is/c++draft/is.heap">`is_heap_until`</a> (returns iterator),
+    <a href="https://eel.is/c++draft/is.heap">`is_heap`</a> (i.e. `is_heap_until == end()`)
+- <a href="https://eel.is/c++draft/alg.adjacent.find">`adjacent_find`</a> (returns iterator),
+    <b>[blank]</b> (i.e. `adjacent_find == end()`)
+- <a href="https://eel.is/c++draft/mismatch">`mismatch`</a> (returns iterators),
+    <a href="https://eel.is/c++draft/alg.equal">`equal`</a> (i.e. `mismatch == {end(), end()}`)
+- <a href="https://eel.is/c++draft/alg.find">`find_if`</a> (returns iterator),
+    <a href="https://eel.is/c++draft/alg.none.of">`none_of`</a> (i.e. `find_if == end()`)
+- <a href="https://eel.is/c++draft/alg.find">`find`</a> (returns iterator),
+    <a href="https://eel.is/c++draft/alg.contains">`contains`</a> (i.e. `find != end()`)
+- <a href="https://eel.is/c++draft/alg.search">`search`</a> (returns iterator),
+    <a href="https://eel.is/c++draft/alg.contains">`contains_subrange`</a> (i.e. `search != end()`)
+
+And these, too:
+
+- <a href="https://eel.is/c++draft/sort">`sort`</a> (i.e. make the input range satisfy <a href="https://eel.is/c++draft/is.sorted">`is_sorted`</a>)
+- <a href="https://eel.is/c++draft/make.heap">`make_heap`</a> (i.e. make the input range satisfy <a href="https://eel.is/c++draft/is.heap">`is_heap`</a>)
+- <a href="https://eel.is/c++draft/alg.unique">`unique`</a> (i.e. make the input range satisfy <b>[blank]</b>)
+
+The missing algorithm is what would fill in the blank in the following invariant assertions:
+
+<xmp>
+    std::set<K> s = { ... };
+    std::multiset<K> ms = { ... };
+    std::map<K, V> m = { ... };
+    std::multimap<K, V> mm = { ... };
+    std::unordered_set<K> us = { ... };
+    std::unordered_map<K, V> um = { ... };
+
+    template<class M, class P = M::value_type>
+    auto ValueEq(const M& m) {
+        return [eq = m.key_eq()](const P& a, const P& b) {
+            return eq(a.first, b.first);
+        };
+    }
+
+    assert(std::is_sorted(s.begin(), s.end(), s.value_comp()));
+    assert(std::is_sorted(ms.begin(), ms.end(), ms.value_comp()));
+    assert(std::is_sorted(m.begin(), m.end(), m.value_comp()));
+    assert(std::is_sorted(mm.begin(), mm.end(), mm.value_comp()));
+    assert(std::is______ed(s.begin(), s.end(), std::not_fn(s.value_comp())));
+    assert(std::is______ed(m.begin(), m.end(), std::not_fn(m.value_comp())));
+    assert(std::is______ed(us.begin(), us.end(), us.key_eq()));
+    assert(std::is______ed(um.begin(), um.end(), ValueEq(um)));
+</xmp>
+
+We propose that this algorithm should exist, and should be spelled `std::is_uniqued`.
+
+## Prior art in other languages ## {#prior-art}
+
+The C++ STL verb `std::unique` is derived from Unix's <a href="https://linux.die.net/man/1/uniq">`uniq`</a> filter,
+which filters adjacent matching lines from the input.
+
+The Swift language provides a transformation named <a href="https://swiftinit.org/reference/swift/array.sorted%28%29">`sorted`</a>
+(corresponding to C++'s `std::sort`), and a transformation named
+<a href="https://swiftinit.org/reference/swift/sequence.uniqued%28%29?from=swift-algorithms">`uniqued`</a>.
+The latter doesn't quite correspond to the C++/Unix notion of "uniquing": it removes even non-adjacent
+duplicates, by putting all the elements into a hashset and then pulling them out again.
+Still, this is prior art for the idea of treating "unique, uniqued, uniquing" as a verb.
+
+<xmp>
+    let animals = ["dog", "pig", "cat", "ox", "dog", "cat"]
+    let u = Array(animals.uniqued())
+    // 'u' is now ["dog", "pig", "cat", "ox"]
+</xmp>
+
+## Should we require `pred` to be an equivalence relation? ## {#gratuitous-ub}
+
+Currently, <a href="https://eel.is/c++draft/alg.unique#2">`std::unique`</a> has undefined behavior
+if you pass it a predicate that is not an *equivalence relation.* Fortunately,
+<a href="https://eel.is/c++draft/alg.adjacent.find">`std::adjacent_find`</a> does not.
+
+For example, the author of <a href="https://eel.is/c++draft/flat.set">`std::flat_set`</a> might write:
+
+<xmp>
+    container_type c;
+    key_compare compare;
+    std::sort(c.begin(), c.end(), compare);
+    c.erase(std::unique(c.begin(), c.end(), std::not_fn(compare)), c.end()); // UB
+    assert(std::is_sorted(c.begin(), c.end(), compare));
+    assert(std::adjacent_find(c.begin(), c.end(), std::not_fn(compare)) == c.end()); // OK
+</xmp>
+
+Both before and after this proposal, the line marked "UB" has undefined behavior (although
+it will generally work in practice). We don't propose to change the precondition
+of `std::unique`. The line marked "OK" has well-defined behavior. we don't propose to
+change the precondition of `std::adjacent_find` either.
+
+After this proposal, the following shorter line will be equivalent to the line marked "OK":
+
+<xmp>
+    assert(std::is_uniqued(c.begin(), c.end(), std::not_fn(compare))); // OK
+</xmp>
+
+That is, the new algorithm `std::is_uniqued` will have the same precondition as the
+existing `std::adjacent_find` algorithm (in terms of which it is defined). This differs
+from the precondition of `std::unique`, which is a little surprising, but we believe
+it's the correct choice.
+
+
+# Implementation experience # {#experience}
+
+Arthur has implemented `is_uniqued` and `ranges::is_uniqued` in his fork of libc++;
+see [commit 490536e](https://github.com/Quuxplusone/llvm-project/commit/490536e4e785f74d30808d64018eaa6b2aed9aec#diff-27911ee2645cfe0947c6efa6200bf908d32b166170cf2e84929c88a569e70131R23).
+This implementation is [available on Godbolt Compiler Explorer](https://godbolt.org/z/EqE36nh51).
+
+
+# Proposed wording relative to C++23 # {#wording}
+
+Add a new section after <a href="https://eel.is/c++draft/alg.adjacent.find">[alg.adjacent.find]</a>.
+
+Note: This wording is copied straight from <a href="https://eel.is/c++draft/is.sorted">[is.sorted]</a>,
+with these mechanical replacements: `is_sorted` becomes `is_uniqued`, `is_sorted_until` becomes `adjacent_find`,
+`Compare comp` becomes `BinaryPredicate pred` (cf. <a href="https://eel.is/c++draft/alg.adjacent.find">[alg.adjacent.find]</a>),
+`indirect_strict_weak_order` becomes `indirect_binary_predicate` (ditto), and `ranges::less` becomes
+`ranges::equal_to` (ditto).
+
+## `is_uniqued` [alg.is.uniqued] ## {#wording-alg.is.uniqued}
+
+<small><blockquote>
+<xmp>
+  template<class ForwardIterator>
+    constexpr bool is_uniqued(ForwardIterator first, ForwardIterator last);
+</xmp>
+
+*Effects:* Equivalent to: `return adjacent_find(first, last) == last;`
+
+<xmp>
+  template<class ExecutionPolicy, class ForwardIterator>
+    bool is_uniqued(ExecutionPolicy&& exec,
+                    ForwardIterator first, ForwardIterator last);
+</xmp>
+
+*Effects:* Equivalent to:
+`return adjacent_find(std::forward<ExecutionPolicy>(exec), first, last) == last;`
+
+<xmp>
+  template<class ForwardIterator, class BinaryPredicate>
+    constexpr bool is_uniqued(ForwardIterator first, ForwardIterator last,
+                              BinaryPredicate pred);
+</xmp>
+
+*Effects:* Equivalent to: `return adjacent_find(first, last, pred) == last;`
+
+<xmp>
+  template<class ExecutionPolicy, class ForwardIterator, class BinaryPredicate>
+    bool is_uniqued(ExecutionPolicy&& exec,
+                    ForwardIterator first, ForwardIterator last,
+                    BinaryPredicate pred);
+</xmp>
+
+*Effects:* Equivalent to:
+`return adjacent_find(std::forward<ExecutionPolicy>(exec), first, last, pred) == last;`
+
+<xmp>
+  template<forward_iterator I, sentinel_for<I> S, class Proj = identity,
+           indirect_binary_predicate<projected<I, Proj>,
+                                     projected<I, Proj>> Pred = ranges::equal_to>
+    constexpr bool ranges::is_uniqued(I first, S last, Pred pred = {}, Proj proj = {});
+  template<forward_range R, class Proj = identity,
+           indirect_binary_predicate<projected<iterator_t<R>, Proj>,
+                                     projected<iterator_t<R>, Proj>> Pred = ranges::equal_to>
+    constexpr bool ranges::is_uniqued(R&& r, Pred pred = {}, Proj proj = {});
+</xmp>
+
+*Effects:* Equivalent to: `return ranges::adjacent_find(first, last, pred, proj) == last;`
+</blockquote></small>
