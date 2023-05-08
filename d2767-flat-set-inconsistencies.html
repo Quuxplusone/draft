@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2767R0: `flat_set`/`flat_map` omnibus</title>
+  <title>D2767R0: flat_map/flat_set omnibus</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -2096,7 +2096,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2767R0<br>`flat_set`/`flat_map` omnibus</h1>
+   <h1 class="p-name no-ref" id="title">D2767R0<br>flat_map/flat_set omnibus</h1>
    <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-05-08">2023-05-08</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
@@ -2107,7 +2107,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>3
+     <dd>4
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2767-flat-set-inconsistencies.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2767-flat-set-inconsistencies.bs</a>
      <dt>Current:
@@ -2136,15 +2136,22 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      </ol>
     <li><a href="#set-insert-range"><span class="secno">4</span> <span class="content">Add move semantics to <code class="highlight"><c- n>flat_set</c-><c- o>::</c-><c- n>insert_range</c-></code></span></a>
     <li><a href="#map-insert-range"><span class="secno">5</span> <span class="content">Add move semantics to <code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>insert_range</c-></code></span></a>
-    <li><a href="#insert-range-sorted-unique"><span class="secno">6</span> <span class="content"><code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>rg</c-><c- p>)</c-></code></span></a>
-    <li><a href="#replace-by-value"><span class="secno">7</span> <span class="content"><code class="highlight"><c- n>replace</c-></code> should take by value</span></a>
     <li>
-     <a href="#issues-for-discussion"><span class="secno">8</span> <span class="content">Issues for discussion</span></a>
+     <a href="#insert-emplace"><span class="secno">6</span> <span class="content"><code class="highlight"><c- n>insert</c-></code> is more primitive than <code class="highlight"><c- n>emplace</c-></code></span></a>
      <ol class="toc">
-      <li><a href="#stable-sorting"><span class="secno">8.1</span> <span class="content">Stable sorting in <code class="highlight"><c- n>insert</c-></code></span></a>
+      <li><a href="#heterogeneous-insert-multiset"><span class="secno">6.1</span> <span class="content">Heterogeneous <code class="highlight"><c- n>multiset</c-><c- o>::</c-><c- n>insert</c-></code></span></a>
+      <li><a href="#emplace-constraint"><span class="secno">6.2</span> <span class="content">Unusual constraints</span></a>
+      <li><a href="#insert-emplace-wording"><span class="secno">6.3</span> <span class="content">Wording</span></a>
      </ol>
-    <li><a href="#experience"><span class="secno">9</span> <span class="content">Implementation experience</span></a>
-    <li><a href="#acknowledgments"><span class="secno">10</span> <span class="content">Acknowledgments</span></a>
+    <li><a href="#insert-range-sorted-unique"><span class="secno">7</span> <span class="content"><code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>rg</c-><c- p>)</c-></code></span></a>
+    <li><a href="#replace-by-value"><span class="secno">8</span> <span class="content"><code class="highlight"><c- n>replace</c-></code> should take by value</span></a>
+    <li>
+     <a href="#issues-for-discussion"><span class="secno">9</span> <span class="content">Issues for discussion</span></a>
+     <ol class="toc">
+      <li><a href="#stable-sorting"><span class="secno">9.1</span> <span class="content">Stable sorting in <code class="highlight"><c- n>insert</c-></code></span></a>
+     </ol>
+    <li><a href="#experience"><span class="secno">10</span> <span class="content">Implementation experience</span></a>
+    <li><a href="#acknowledgments"><span class="secno">11</span> <span class="content">Acknowledgments</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -2163,7 +2170,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      </ul>
    </ul>
    <h2 class="heading settled" data-level="2" id="intro"><span class="secno">2. </span><span class="content">Introduction</span><a class="self-link" href="#intro"></a></h2>
-   <p>Arthur has implemented all of <a data-link-type="biblio" href="#biblio-p0429" title="P0429R9 A Standard flat_map">[P0429]</a> <code class="highlight"><c- n>flat_map</c-></code> and <a data-link-type="biblio" href="#biblio-p1222" title="P1222R4 A Standard flat_set">[P1222]</a> <code class="highlight"><c- n>flat_set</c-></code> for libc++.
+   <p>Arthur has implemented all of <a data-link-type="biblio" href="#biblio-p0429" title="A standard flat_map">[P0429]</a> <code class="highlight"><c- n>flat_map</c-></code> and <a data-link-type="biblio" href="#biblio-p1222" title="A standard flat_set">[P1222]</a> <code class="highlight"><c- n>flat_set</c-></code> for libc++.
 As he implemented them, he and Louis Dionne collected issues that libc++ would like to see resolved
 by LWG. This paper presents all of these issues together in one place, along with Arthur’s proposed
 solutions for each one.</p>
@@ -2712,7 +2719,235 @@ and finally erases the duplicate elements as if by:</p> <pre class="highlight"><
 </pre><ins>Then, sorts the range of newly inserted elements with respect to <code class="highlight"><c- n>value_comp</c-><c- p>()</c-></code>, and
 merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range.</ins> <p><ins>x․ Complexity: N + M log M, where N is <code class="highlight"><c- n>size</c-><c- p>()</c-></code> before the operation and M is <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>distance</c-><c- p>(</c-><c- n>rg</c-><c- p>)</c-></code>.</ins> </p><p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins> </p></small>
    </blockquote>
-   <h2 class="heading settled" data-level="6" id="insert-range-sorted-unique"><span class="secno">6. </span><span class="content"><code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>rg</c-><c- p>)</c-></code></span><a class="self-link" href="#insert-range-sorted-unique"></a></h2>
+   <h2 class="heading settled" data-level="6" id="insert-emplace"><span class="secno">6. </span><span class="content"><code class="highlight"><c- n>insert</c-></code> is more primitive than <code class="highlight"><c- n>emplace</c-></code></span><a class="self-link" href="#insert-emplace"></a></h2>
+<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>set_default_resource</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>null_memory_resource</c-><c- p>());</c->
+<c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>monotonic_buffer_resource</c-> <c- nf>mr</c-><c- p>(</c-><c- mi>1</c->’<c- mo>000</c->’<c- mo>000</c-><c- p>);</c->
+
+<c- k>auto</c-> <c- n>fm</c-> <c- o>=</c-> <c- n>PmrFlatSet</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
+<c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-> <c- n>ps</c-><c- p>(</c-><c- s>"too long to fit in the small string buffer"</c-><c- p>,</c-> <c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
+<c- n>fm</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>ps</c-><c- p>);</c->
+  <c- c1>// Before: runtime abort, cannot default-allocate t</c->
+  <c- c1>// After: OK</c->
+</pre>
+   <p>Whenever we insert or emplace into a set or multiset, we have two tasks:</p>
+   <ul>
+    <li data-md>
+     <p>Construct the new <code class="highlight"><c- n>value_type</c-></code> object.</p>
+    <li data-md>
+     <p>Find the correct insertion point for the new object.</p>
+   </ul>
+   <p><code class="highlight"><c- n>emplace</c-></code> receives a bag of constructor arguments, so it has no choice: it must do
+"construct <code class="highlight"><c- n>t</c-></code>, find insertion point for <code class="highlight"><c- n>t</c-></code>, move-insert <code class="highlight"><c- n>t</c-></code> into the container" exactly as specified above.</p>
+   <p>But <code class="highlight"><c- n>insert</c-></code> receives an already-constructed <code class="highlight"><c- n>value_type</c-></code>! It shouldn’t discard that valuable information;
+it should use the given <code class="highlight"><c- n>value_type</c-></code> to find the appropriate insertion point, and then construct the new object
+directly in place. There is no reason to construct <code class="highlight"><c- n>t</c-></code> on the stack first.</p>
+   <h3 class="heading settled" data-level="6.1" id="heterogeneous-insert-multiset"><span class="secno">6.1. </span><span class="content">Heterogeneous <code class="highlight"><c- n>multiset</c-><c- o>::</c-><c- n>insert</c-></code></span><a class="self-link" href="#heterogeneous-insert-multiset"></a></h3>
+   <p><a data-link-type="biblio" href="#biblio-p2363" title="Extending associative containers with the remaining heterogeneous overloads">[P2363]</a> <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html#ins">explains</a> why the node-based <code class="highlight"><c- n>multiset</c-></code> still lacks a heterogeneous <code class="highlight"><c- n>insert</c-><c- p>(</c-><c- n>K</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code>:</p>
+   <blockquote>
+    <p>Adding heterogeneous <code class="highlight"><c- n>insert</c-></code> overload makes no sense for associative containers with non-unique keys (<code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>multimap</c-></code>, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>multiset</c-></code>, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>unordered_multimap</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>unordered_multiset</c-></code>) because the insertion will be successful in any case and the key would be always
+constructed. All additional overheads introduced by <code class="highlight"><c- n>insert</c-></code> can be mitigated by using <code class="highlight"><c- n>emplace</c-></code>.</p>
+   </blockquote>
+   <p>For <code class="highlight"><c- n>flat_multiset</c-></code>, the last sentence is false; generic <code class="highlight"><c- n>emplace</c-></code> is unusable for PMR allocators, because it
+must first construct <code class="highlight"><c- n>t</c-></code> using the default allocator. Therefore we also propose to add a heterogeneous-comparison
+overload of <code class="highlight"><c- n>flat_multiset</c-><c- o>::</c-><c- n>insert</c-></code>.</p>
+<pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- p>,</c-> <c- n>class</c-> <c- n>C</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>less</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c->
+<c- n>using</c-> <c- n>PmrFlatMultiset</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>flat_multiset</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>C</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c-><c- p>;</c->
+ 
+<c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>monotonic_buffer_resource</c-> <c- nf>mr</c-><c- p>(</c-><c- mi>1</c->’<c- mo>000</c->’<c- mo>000</c-><c- p>);</c->
+<c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>set_default_resource</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>null_memory_resource</c-><c- p>());</c->
+<c- k>const</c-> <c- b>char</c-> <c- n>s</c-><c- p>[]</c-> <c- o>=</c-> <c- s>"too long to fit in the small string buffer"</c-><c- p>;</c->
+
+<c- k>auto</c-> <c- n>m</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>multiset</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
+<c- n>m</c-><c- p>.</c-><c- n>emplace</c-><c- p>(</c-><c- n>s</c-><c- p>);</c-> <c- c1>// OK</c->
+<c- n>m</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>);</c-> <c- c1>// runtime abort, cannot default-allocate x</c->
+
+<c- k>auto</c-> <c- n>fm</c-> <c- o>=</c-> <c- n>PmrFlatMultiset</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
+<c- n>fm</c-><c- p>.</c-><c- n>emplace</c-><c- p>(</c-><c- n>s</c-><c- p>);</c-> <c- c1>// runtime abort, cannot default-allocate t</c->
+<c- n>fm</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>);</c-> <c- c1>// runtime abort, cannot default-allocate x</c->
+
+<c- k>auto</c-> <c- n>m2</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>multiset</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>less</c-><c- o>&lt;>></c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
+<c- n>m2</c-><c- p>.</c-><c- n>emplace</c-><c- p>(</c-><c- n>s</c-><c- p>);</c-> <c- c1>// OK</c->
+<c- n>m2</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>);</c-> <c- c1>// runtime abort, cannot default-allocate x</c->
+
+<c- k>auto</c-> <c- n>fm2</c-> <c- o>=</c-> <c- n>PmrFlatMultiset</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>less</c-><c- o>&lt;>></c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
+<c- n>fm2</c-><c- p>.</c-><c- n>emplace</c-><c- p>(</c-><c- n>s</c-><c- p>);</c-> <c- c1>// runtime abort, cannot default-allocate t</c->
+<c- n>fm2</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>);</c->
+  <c- c1>// Before: runtime abort, cannot default-allocate x</c->
+  <c- c1>// After: OK</c->
+</pre>
+   <p>Notice the asymmetry between <code class="highlight"><c- n>fm2</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>)</c-></code> and <code class="highlight"><c- n>m2</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>)</c-></code>. Arthur thinks it would be
+nice to support heterogeneous <code class="highlight"><c- n>insert</c-></code> for node-based <code class="highlight"><c- n>multiset</c-></code> and <code class="highlight"><c- n>unordered_multiset</c-></code> (<em>contra</em> P2363’s reasoning),
+but that’s out of scope for this particular paper P2767. For P2767’s purposes, we’re satisfied
+once there exists <em>some</em> way of inserting <code class="highlight"><c- n>s</c-></code> into <code class="highlight"><c- n>fm2</c-></code>. We don’t mind that the working approaches
+use different spellings: <code class="highlight"><c- n>m2</c-><c- p>.</c-><c- n>emplace</c-><c- p>(</c-><c- n>s</c-><c- p>)</c-></code> versus <code class="highlight"><c- n>fm2</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>)</c-></code>.</p>
+   <h3 class="heading settled" data-level="6.2" id="emplace-constraint"><span class="secno">6.2. </span><span class="content">Unusual constraints</span><a class="self-link" href="#emplace-constraint"></a></h3>
+   <p>The usual pattern in [containers] is that <code class="highlight"><c- n>x</c-><c- p>.</c-><c- n>emplace</c-><c- p>(</c-><c- n>args</c-><c- p>...)</c-></code> has a precondition (<a href="https://eel.is/c++draft/containers#sequence.reqmts-21">[sequence.reqmts]</a>, <a href="https://eel.is/c++draft/containers#associative.reqmts.general-48">[associative.reqmts.general]</a>)
+but no Constraints element. That is, <code class="highlight"><c- n>emplace</c-></code> is not SFINAE-friendly. And it has only the one overload,
+so it doesn’t need a constraint for purposes of overload resolution.</p>
+   <p>No Constraints on <code class="highlight"><c- n>emplace</c-></code>: <a href="https://eel.is/c++draft/deque.modifiers#lib:deque,emplace"><code class="highlight"><c- n>deque</c-></code></a> <a href="https://eel.is/c++draft/list.modifiers"><code class="highlight"><c- n>list</c-></code></a>, <a href="https://eel.is/c++draft/priqueue.members#lib:priority_queue,emplace"><code class="highlight"><c- n>priority_queue</c-></code></a>, <a href="https://eel.is/c++draft/vector.modifiers"><code class="highlight"><c- n>vector</c-></code></a></p>
+   <p>But these two places have a Constraints element on <code class="highlight"><c- n>emplace</c-></code>: <a href="https://eel.is/c++draft/flat.map.modifiers#lib:flat_map,emplace"><code class="highlight"><c- n>flat_map</c-></code></a>, <a href="https://eel.is/c++draft/flat.multiset.modifiers#lib:flat_multiset,emplace"><code class="highlight"><c- n>flat_multiset</c-></code></a>.</p>
+   <blockquote>
+    <p>Constraints: <code class="highlight"><c- n>is_constructible_v</c-><c- o>&lt;</c-><c- n>pair</c-><c- o>&lt;</c-><c- n>key_type</c-><c- p>,</c-> <c- n>mapped_type</c-><c- o>></c-><c- p>,</c-> <c- n>Arg</c-><c- p>...</c-><c- o>></c-></code> is <code class="highlight">true</code>.</p>
+   </blockquote>
+   <p>I believe this element was accidentally copy-pasted from the spec of <a href="https://eel.is/c++draft/flat.map.modifiers#4"><code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>insert</c-><c- p>(</c-><c- n>P</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code></a> —<wbr>which <em>does</em> need the constraint because it’s part of <code class="highlight"><c- n>insert</c-></code>'s large overload set — to <code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>emplace</c-></code>,
+and then from there to <code class="highlight"><c- n>flat_multiset</c-><c- o>::</c-><c- n>emplace</c-></code>. The constraint is already (correctly) absent
+from <code class="highlight"><c- n>flat_set</c-><c- o>::</c-><c- n>emplace</c-></code>.</p>
+   <p>Therefore, the proposed wording for this section simply deletes those Constraints elements.</p>
+   <h3 class="heading settled" data-level="6.3" id="insert-emplace-wording"><span class="secno">6.3. </span><span class="content">Wording</span><a class="self-link" href="#insert-emplace-wording"></a></h3>
+   <p>Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- c1>// [flat.map.modifiers], modifiers</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c-> <c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>emplace</c-><c- p>(</c-><c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c->
+  <c- n>iterator</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>);</c->
+
+<c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c-></del>
+<c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-> <c- p>}</c-></del>
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>x</c-><c- p>);</c-> <c- p>}</c-></del>
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-> <c- p>}</c-></del>
+
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>P</c-><c- o>></c-> <c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- n>P</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>P</c-><c- o>></c->
+  <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>P</c-><c- o>&amp;&amp;</c-><c- p>);</c->
+</pre></small>
+   </blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.map.modifiers">[flat.map.modifiers]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c-> <c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>emplace</c-><c- p>(</c-><c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>);</c->
+</pre><del>1․ Constraints: <code class="highlight"><c- n>is_constructible_v</c-><c- o>&lt;</c-><c- n>pair</c-><c- o>&lt;</c-><c- n>key_type</c-><c- p>,</c-> <c- n>mapped_type</c-><c- o>></c-><c- p>,</c-> <c- n>Args</c-><c- p>...</c-><c- o>></c-></code> is <code class="highlight">true</code>.</del> <p>2․ Effects: Initializes an object <code class="highlight"><c- n>t</c-></code> of type <code class="highlight"><c- n>pair</c-><c- o>&lt;</c-><c- n>key_type</c-><c- p>,</c-> <c- n>mapped_type</c-><c- o>></c-></code> with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>Args</c-><c- o>></c-><c- p>(</c-><c- n>args</c-><c- p>)...</c-></code>;
+if the map already contains an element whose key is equivalent to <code class="highlight"><c- n>t</c-><c- p>.</c-><c- n>first</c-></code>, <code class="highlight"><c- o>*</c-><c- k>this</c-></code> is unchanged. Otherwise, equivalent to: </p><pre class="highlight"><c- k>auto</c-> <c- n>key_it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>upper_bound</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>,</c-> <c- n>t</c-><c- p>.</c-><c- n>first</c-><c- p>,</c-> <c- n>compare</c-><c- p>);</c->
+<c- k>auto</c-> <c- n>value_it</c-> <c- o>=</c-> <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>distance</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>key_it</c-><c- p>);</c->
+<c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>key_it</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>t</c-><c- p>.</c-><c- n>first</c-><c- p>));</c->
+<c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>value_it</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>t</c-><c- p>.</c-><c- n>second</c-><c- p>));</c->
+</pre> <p>3․ Returns: The <code class="highlight"><c- b>bool</c-></code> component of the returned pair is <code class="highlight">true</code> if and only if the insertion took place,
+and the iterator component of the pair points to the element with key equivalent to <code class="highlight"><c- n>t</c-><c- p>.</c-><c- n>first</c-></code>.</p> <pre class="highlight"><ins><c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+<ins><c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+</pre><ins>x․ Effects: If the map already contains an element whose key is equivalent to <code class="highlight"><c- n>x</c-><c- p>.</c-><c- n>first</c-></code>, <code class="highlight"><c- o>*</c-><c- k>this</c-></code> and <code class="highlight"><c- n>x</c-></code> are unchanged. Otherwise, equivalent to:</ins> <pre class="highlight"><ins><c- k>auto</c-> <c- n>key_it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>upper_bound</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>,</c-> <c- n>x</c-><c- p>.</c-><c- n>first</c-><c- p>,</c-> <c- n>compare</c-><c- p>);</c-></ins>
+<ins><c- k>auto</c-> <c- n>value_it</c-> <c- o>=</c-> <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>distance</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>key_it</c-><c- p>);</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>key_it</c-><c- p>,</c-> <c- n>x</c-><c- p>.</c-><c- n>first</c-><c- p>);</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>value_it</c-><c- p>,</c-> <c- n>x</c-><c- p>.</c-><c- n>second</c-><c- p>);</c-></ins>
+</pre><ins>for the first overload and</ins> <pre class="highlight"><ins><c- k>auto</c-> <c- n>key_it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>upper_bound</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>,</c-> <c- n>x</c-><c- p>.</c-><c- n>first</c-><c- p>,</c-> <c- n>compare</c-><c- p>);</c-></ins>
+<ins><c- k>auto</c-> <c- n>value_it</c-> <c- o>=</c-> <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>distance</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>key_it</c-><c- p>);</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>key_it</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>.</c-><c- n>first</c-><c- p>));</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>value_it</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>.</c-><c- n>second</c-><c- p>));</c-></ins>
+</pre><ins>for the second overload.</ins> <pre class="highlight"><c- k>template</c-><class p> <c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- n>P</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
+<c- k>template</c-><class p> <c- n>iterator</c-> <c- nf>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>P</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
+</class></class></pre><p>4․ Constraints: <code class="highlight"><c- n>is_constructible_v</c-><c- o>&lt;</c-><c- n>pair</c-><c- o>&lt;</c-><c- n>key_type</c-><c- p>,</c-> <c- n>mapped_type</c-><c- o>></c-><c- p>,</c-> <c- n>P</c-><c- o>></c-></code> is <code class="highlight">true</code>.</p> <p>5․ Effects: The first form is equivalent to <code class="highlight"><c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>P</c-><c- o>></c-><c- p>(</c-><c- n>x</c-><c- p>));</c-></code>.
+The second form is equivalent to <code class="highlight"><c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>P</c-><c- o>></c-><c- p>(</c-><c- n>x</c-><c- p>));</c-></code>.</p> </small>
+   </blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- c1>// [flat.multimap.modifiers], modifiers</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c-> <c- n>iterator</c-> <c- n>emplace</c-><c- p>(</c-><c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c->
+  <c- n>iterator</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>);</c->
+
+<c- n>iterator</c-> <c- nf>insert</c-><c- p>(</c-><c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c-></del>
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-> <c- p>}</c-></del>
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>x</c-><c- p>);</c-> <c- p>}</c-></del>
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-> <c- p>}</c-></del>
+
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>P</c-><c- o>></c-> <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>P</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>P</c-><c- o>></c->
+  <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>P</c-><c- o>&amp;&amp;</c-><c- p>);</c->
+</pre></small>
+   </blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- c1>// [flat.multiset.modifiers], modifiers</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c-> <c- n>iterator</c-> <c- n>emplace</c-><c- p>(</c-><c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>)</c-><del><c- p>;</c-></del>
+  <ins><c- p>{</c-> <c- k>return</c-> <c- n>insert</c-><c- p>(</c-><c- n>value_type</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>Args</c-><c- o>></c-><c- p>(</c-><c- n>args</c-><c- p>)...));</c-> <c- p>}</c-></ins>
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c->
+  <c- n>iterator</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>)</c-><del><c- p>;</c-></del>
+    <ins><c- p>{</c-> <c- k>return</c-> <c- n>insert</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>value_type</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>Args</c-><c- o>></c-><c- p>(</c-><c- n>args</c-><c- p>)...));</c-> <c- p>}</c-></ins>
+
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c-></del>
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-> <c- p>}</c-></del>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>K</c-><c- o>></c-> <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>K</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+<c- n>iterator</c-> <c- nf>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>x</c-><c- p>);</c-> <c- p>}</c-></del>
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-> <c- p>}</c-></del>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>K</c-><c- o>></c-> <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>hint</c-><c- p>,</c-> <c- n>K</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+</pre></small>
+   </blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c-> <c- n>iterator</c-> <c- n>emplace</c-><c- p>(</c-><c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>);</c-></del>
+</pre><p><del>1․ Constraints: <code class="highlight"><c- n>is_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- p>,</c-> <c- n>Args</c-><c- p>...</c-><c- o>></c-></code> is <code class="highlight">true</code>.</del> </p><p><del>2․ Effects: First, initializes an object <code class="highlight"><c- n>t</c-></code> of type <code class="highlight"><c- n>value_type</c-></code> with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>Args</c-><c- o>></c-><c- p>(</c-><c- n>args</c-><c- p>)...</c-></code>,
+then inserts <code class="highlight"><c- n>t</c-></code> as if by:</del> </p><pre class="highlight"><del><c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>upper_bound</c-><c- p>(</c-><c- n>c</c-><c- p>,</c-> <c- n>t</c-><c- p>,</c-> <c- n>compare</c-><c- p>);</c-></del>
+<del><c- n>c</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>it</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>t</c-><c- p>));</c-></del>
+</pre><p><del>3․ Returns: An iterator that points to the inserted element.</del> </p><pre class="highlight"><ins><c- n>iterator</c-> <c- nf>insert</c-><c- p>(</c-><c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+<ins><c- n>iterator</c-> <c- nf>insert</c-><c- p>(</c-><c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+</pre><ins>x․ Effects: Inserts a new element as if by:</ins> <pre class="highlight"><ins><c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>upper_bound</c-><c- p>(</c-><c- n>c</c-><c- p>,</c-> <c- n>x</c-><c- p>,</c-> <c- n>compare</c-><c- p>);</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>it</c-><c- p>,</c-> <c- n>x</c-><c- p>);</c-></ins>
+</pre><ins>for the first overload or</ins> <pre class="highlight"><ins><c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>upper_bound</c-><c- p>(</c-><c- n>c</c-><c- p>,</c-> <c- n>x</c-><c- p>,</c-> <c- n>compare</c-><c- p>);</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>it</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-></ins>
+</pre><ins>for the second overload.</ins> <p><ins>x․ Returns: An iterator that points to the inserted element.</ins> </p><pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>K</c-><c- o>></c-> <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>K</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>K</c-><c- o>></c-> <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>hint</c-><c- p>,</c-> <c- n>K</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+</pre><p><ins>x․ Constraints: The <em>qualified-id</em> <code class="highlight"><c- n>Compare</c-><c- o>::</c-><c- n>is_transparent</c-></code> is valid and denotes a type. <code class="highlight"><c- n>is_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- p>,</c-> <c- n>K</c-><c- o>></c-></code> is <code class="highlight">true</code>.</ins> </p><p><ins>x․ Preconditions: The conversion from <code class="highlight"><c- n>x</c-></code> into <code class="highlight"><c- n>value_type</c-></code> constructs an object <code class="highlight"><c- n>u</c-></code>, for which <code class="highlight"><c- n>find</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-> <c- o>==</c-> <c- n>find</c-><c- p>(</c-><c- n>u</c-><c- p>)</c-></code> is <code class="highlight">true</code>.</ins> </p><p><ins>x․ Effects: If the set already contains an element equivalent to <code class="highlight"><c- n>x</c-></code>, <code class="highlight"><c- o>*</c-><c- k>this</c-></code> and <code class="highlight"><c- n>x</c-></code> are unchanged. Otherwise, inserts a new element as if by <code class="highlight"><c- n>emplace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>K</c-><c- o>></c-><c- p>(</c-><c- n>x</c-><c- p>))</c-></code>.</ins> </p><p><ins>x․ Returns: An iterator that points to the inserted element.</ins> </p></small>
+   </blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- c1>// [flat.set.modifiers], modifiers</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c-> <c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>emplace</c-><c- p>(</c-><c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>)</c-><del><c- p>;</c-></del>
+  <ins><c- p>{</c-> <c- k>return</c-> <c- n>insert</c-><c- p>(</c-><c- n>value_type</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>Args</c-><c- o>></c-><c- p>(</c-><c- n>args</c-><c- p>)...));</c-> <c- p>}</c-></ins>
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c->
+  <c- n>iterator</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>)</c-><del><c- p>;</c-></del>
+    <ins><c- p>{</c-> <c- k>return</c-> <c- n>insert</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>value_type</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>Args</c-><c- o>></c-><c- p>(</c-><c- n>args</c-><c- p>)...));</c-> <c- p>}</c-></ins>
+
+<c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>x</c-><c- p>);</c-> <c- p>}</c-></del>
+<c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-> <c- p>}</c-></del>
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>K</c-><c- o>></c-> <c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- n>K</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
+<c- n>iterator</c-> <c- nf>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>x</c-><c- p>);</c-> <c- p>}</c-></del>
+<c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>)</c-><ins><c- p>;</c-></ins>
+  <del><c- p>{</c-> <c- k>return</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>position</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-> <c- p>}</c-></del>
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>K</c-><c- o>></c-> <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>hint</c-><c- p>,</c-> <c- n>K</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
+</pre></small>
+   </blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.set.modifiers">[flat.set.modifiers]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><ins><c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- k>const</c-> <c- n>value_type</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+<ins><c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- n>value_type</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c-></ins>
+</pre><ins>x․ Effects: If the set already contains an element equivalent to <code class="highlight"><c- n>x</c-></code>, <code class="highlight"><c- o>*</c-><c- k>this</c-></code> and <code class="highlight"><c- n>x</c-></code> are unchanged.
+Otherwise, inserts a new element as if by:</ins> <pre class="highlight"><ins><c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>upper_bound</c-><c- p>(</c-><c- n>c</c-><c- p>,</c-> <c- n>x</c-><c- p>,</c-> <c- n>compare</c-><c- p>);</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>it</c-><c- p>,</c-> <c- n>x</c-><c- p>);</c-></ins>
+</pre><ins>for the first overload or</ins> <pre class="highlight"><ins><c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>upper_bound</c-><c- p>(</c-><c- n>c</c-><c- p>,</c-> <c- n>x</c-><c- p>,</c-> <c- n>compare</c-><c- p>);</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>it</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c-></ins>
+</pre><ins>for the second overload.</ins> <p><ins>x․ Returns: The <code class="highlight"><c- b>bool</c-></code> component of the returned pair is <code class="highlight">true</code> if and only if the insertion took place.
+The returned iterator points to the element whose key is equivalent to <code class="highlight"><c- n>x</c-></code>.</ins> </p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>K</c-><c- o>></c-> <c- n>pair</c-><c- o>&lt;</c-><c- n>iterator</c-><c- p>,</c-> <c- b>bool</c-><c- o>></c-> <c- n>insert</c-><c- p>(</c-><c- n>K</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>K</c-><c- o>></c-> <c- n>iterator</c-> <c- n>insert</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>hint</c-><c- p>,</c-> <c- n>K</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>);</c->
+</pre><p>1․ Constraints: The <em>qualified-id</em> <code class="highlight"><c- n>Compare</c-><c- o>::</c-><c- n>is_transparent</c-></code> is valid and denotes a type. <code class="highlight"><c- n>is_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- p>,</c-> <c- n>K</c-><c- o>></c-></code> is <code class="highlight">true</code>.</p> <p>2․ Preconditions: The conversion from <code class="highlight"><c- n>x</c-></code> into <code class="highlight"><c- n>value_type</c-></code> constructs an object <code class="highlight"><c- n>u</c-></code>, for which <code class="highlight"><c- n>find</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-> <c- o>==</c-> <c- n>find</c-><c- p>(</c-><c- n>u</c-><c- p>)</c-></code> is <code class="highlight">true</code>.</p> <p>3․ Effects: If the set already contains an element equivalent to <code class="highlight"><c- n>x</c-></code>, <code class="highlight"><c- o>*</c-><c- k>this</c-></code> and <code class="highlight"><c- n>x</c-></code> are unchanged. Otherwise, inserts a new element as if by</p> <del><code class="highlight"><c- n>emplace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>K</c-><c- o>></c-><c- p>(</c-><c- n>x</c-><c- p>))</c-></code></del> <ins><code class="highlight"><c- n>insert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>K</c-><c- o>></c-><c- p>(</c-><c- n>x</c-><c- p>))</c-></code></ins>. <p>4․ Returns: In the first overload, the <code class="highlight"><c- b>bool</c-></code> component of the returned pair is <code class="highlight">true</code> if and only if the insertion took place.
+The returned iterator points to the element whose key is equivalent to <code class="highlight"><c- n>x</c-></code>.</p> </small>
+   </blockquote>
+   <h2 class="heading settled" data-level="7" id="insert-range-sorted-unique"><span class="secno">7. </span><span class="content"><code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>rg</c-><c- p>)</c-></code></span><a class="self-link" href="#insert-range-sorted-unique"></a></h2>
    <p>The multi-element insertion API consists of these overloads:</p>
 <pre class="language-c++ highlight"><c- n>insert</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>);</c->
 <c- n>insert</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
@@ -2848,7 +3083,7 @@ problem. We could add this overload easily.</p>
   <ins><c- b>void</c-> <c- n>insert_range</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>);</c-></ins>
 </pre> <p><ins>x․ Effects: Equivalent to <code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>))</c-></code>.</ins> </p><p><ins>x․ Complexity: Linear in N, where N is <code class="highlight"><c- n>size</c-><c- p>()</c-></code> after the operation.</ins> </p></small>
    </blockquote>
-   <h2 class="heading settled" data-level="7" id="replace-by-value"><span class="secno">7. </span><span class="content"><code class="highlight"><c- n>replace</c-></code> should take by value</span><a class="self-link" href="#replace-by-value"></a></h2>
+   <h2 class="heading settled" data-level="8" id="replace-by-value"><span class="secno">8. </span><span class="content"><code class="highlight"><c- n>replace</c-></code> should take by value</span><a class="self-link" href="#replace-by-value"></a></h2>
    <p>The current specification for <code class="highlight"><c- n>replace</c-></code> takes the new container(s) by rvalue reference,
 which means you can’t just pass in a container the way you can with the <code class="highlight"><c- n>key_cont</c-></code> constructor;
 instead, you have to manually <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-></code> the container.</p>
@@ -2936,10 +3171,10 @@ and <code class="highlight"><c- n>key_cont</c-></code> contains no equal element
     <small> <pre class="highlight"><c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>container_type</c-><del><c- o>&amp;&amp;</c-></del> <c- n>cont</c-><c- p>);</c->
 </pre> <p>12․ Preconditions: The elements of <code class="highlight"><c- n>cont</c-></code> are sorted with respect to <code class="highlight"><c- n>compare</c-></code>, and <code class="highlight"><c- n>cont</c-></code> contains no equal elements.</p> <p>13․ Effects: Equivalent to: <code class="highlight"><c- n>c</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>cont</c-><c- p>);</c-></code></p> </small>
    </blockquote>
-   <h2 class="heading settled" data-level="8" id="issues-for-discussion"><span class="secno">8. </span><span class="content">Issues for discussion</span><a class="self-link" href="#issues-for-discussion"></a></h2>
+   <h2 class="heading settled" data-level="9" id="issues-for-discussion"><span class="secno">9. </span><span class="content">Issues for discussion</span><a class="self-link" href="#issues-for-discussion"></a></h2>
    <p>The following subsections describe known issues with the flat containers, where Arthur thinks the
 status quo is fine, but Louis Dionne asks for further clarification and/or changes to the wording.</p>
-   <h3 class="heading settled" data-level="8.1" id="stable-sorting"><span class="secno">8.1. </span><span class="content">Stable sorting in <code class="highlight"><c- n>insert</c-></code></span><a class="self-link" href="#stable-sorting"></a></h3>
+   <h3 class="heading settled" data-level="9.1" id="stable-sorting"><span class="secno">9.1. </span><span class="content">Stable sorting in <code class="highlight"><c- n>insert</c-></code></span><a class="self-link" href="#stable-sorting"></a></h3>
    <p>For the tree-based associative containers, <a href="https://eel.is/c++draft/associative.reqmts#general-68.sentence-2">[associative.reqmts.general]</a> defines
 the single-element <code class="highlight"><c- n>foo</c-><c- o>::</c-><c- n>insert</c-><c- p>(</c-><c- n>val</c-><c- p>)</c-></code> to insert in a well-defined order; <a href="https://eel.is/c++draft/associative.reqmts.general#lib:insert,ordered_associative_containers___">[associative.reqmts.general]</a> defines
 the multi-element <code class="highlight"><c- n>foo</c-><c- o>::</c-><c- n>insert</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code> to insert in an unspecified order.
@@ -3022,13 +3257,13 @@ requiring it to also do a stable sort — which allocates memory — might not b
 leave the order of equivalent elements unspecified, and instrument it under libc++'s existing <code class="highlight"><c- n>_LIBCPP_DEBUG_RANDOMIZE_UNSPECIFIED_STABILITY</c-></code> flag (currently used only for <code class="highlight"><c- n>sort</c-></code>, <code class="highlight"><c- n>nth_element</c-></code>, and <code class="highlight"><c- n>partial_sort</c-></code>).
 This would preserve the symmetry between <code class="highlight"><c- n>multiset</c-></code> and <code class="highlight"><c- n>flat_multiset</c-></code>, by making both of them de facto
 randomized order (at least in debug mode).</p>
-   <h2 class="heading settled" data-level="9" id="experience"><span class="secno">9. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
+   <h2 class="heading settled" data-level="10" id="experience"><span class="secno">10. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>I have implemented this proposal as a patch against libc++ trunk; see <span>[Patch]</span>.
 You can experiment with it <a href>on Godbolt Compiler Explorer</a>;
 just use the P1144 branch of Clang, which uses this patched libc++ by default.</p>
    <p>The complete wording diff against <code class="highlight"><c- n>cplusplus</c-><c- o>/</c-><c- n>draft</c-><c- o>:</c-><c- n>main</c-></code> is also available
 on my GitHub; see <span>[Wording]</span>.</p>
-   <h2 class="heading settled" data-level="10" id="acknowledgments"><span class="secno">10. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
+   <h2 class="heading settled" data-level="11" id="acknowledgments"><span class="secno">11. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <ul>
     <li data-md>
      <p>Thanks to Tomasz Kamiński for recommending Arthur write this paper.</p>
@@ -3167,7 +3402,9 @@ on my GitHub; see <span>[Wording]</span>.</p>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
    <dt id="biblio-p0429">[P0429]
-   <dd>Zach Laine. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0429r9.pdf"><cite>P0429R9 A Standard flat_map</cite></a>. June 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0429r9.pdf">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0429r9.pdf</a>
+   <dd>Zach Laine. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0429r9.pdf"><cite>A standard flat_map</cite></a>. June 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0429r9.pdf">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0429r9.pdf</a>
    <dt id="biblio-p1222">[P1222]
-   <dd>Zach Laine. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf"><cite>P1222R4 A Standard flat_set</cite></a>. June 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf</a>
+   <dd>Zach Laine. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf"><cite>A standard flat_set</cite></a>. June 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf</a>
+   <dt id="biblio-p2363">[P2363]
+   <dd>Konstantin Boyarinov; Sergey Vinogradov; Ruslan Arutyunyan. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html"><cite>Extending associative containers with the remaining heterogeneous overloads</cite></a>. February 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html</a>
   </dl>
