@@ -1,8 +1,8 @@
 <pre class='metadata'>
-Title: `flat_set`/`flat_map` omnibus
+Title: flat_map/flat_set omnibus
 Shortname: D2767
 Revision: 0
-!Draft Revision: 3
+!Draft Revision: 4
 Audience: LWG
 Status: D
 Group: WG21
@@ -749,6 +749,343 @@ merges the resulting sorted range and the sorted range of pre-existing elements 
 </blockquote></small>
 
 
+# `insert` is more primitive than `emplace` # {#insert-emplace}
+
+```c++
+    std::pmr::set_default_resource(std::pmr::null_memory_resource());
+    std::pmr::monotonic_buffer_resource mr(1'000'000);
+
+    auto fm = PmrFlatSet<std::pmr::string>(&mr);
+    std::pmr::string ps("too long to fit in the small string buffer", &mr);
+    fm.insert(ps);
+      // Before: runtime abort, cannot default-allocate t
+      // After: OK
+```
+
+Whenever we insert or emplace into a set or multiset, we have two tasks:
+
+- Construct the new `value_type` object.
+
+- Find the correct insertion point for the new object.
+
+`emplace` receives a bag of constructor arguments, so it has no choice: it must do
+"construct `t`, find insertion point for `t`, move-insert `t` into the container" exactly as specified above.
+
+But `insert` receives an already-constructed `value_type`! It shouldn't discard that valuable information;
+it should use the given `value_type` to find the appropriate insertion point, and then construct the new object
+directly in place. There is no reason to construct `t` on the stack first.
+
+## Heterogeneous `multiset::insert` ## {#heterogeneous-insert-multiset}
+
+[[P2363]] <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html#ins">explains</a>
+why the node-based `multiset` still lacks a heterogeneous `insert(K&&)`:
+
+> Adding heterogeneous `insert` overload makes no sense for associative containers with non-unique keys (`std::multimap`, `std::multiset`,
+> `std::unordered_multimap` and `std::unordered_multiset`) because the insertion will be successful in any case and the key would be always
+> constructed. All additional overheads introduced by `insert` can be mitigated by using `emplace`.
+
+For `flat_multiset`, the last sentence is false; generic `emplace` is unusable for PMR allocators, because it
+must first construct `t` using the default allocator. Therefore we also propose to add a heterogeneous-comparison
+overload of `flat_multiset::insert`.
+
+```c++
+    template<class T, class C = std::less<T>>
+    using PmrFlatMultiset = std::flat_multiset<T, C, std::pmr::vector<T>>;
+ 
+    std::pmr::monotonic_buffer_resource mr(1'000'000);
+    std::pmr::set_default_resource(std::pmr::null_memory_resource());
+    const char s[] = "too long to fit in the small string buffer";
+
+    auto m = std::pmr::multiset<std::pmr::string>(&mr);
+    m.emplace(s); // OK
+    m.insert(s); // runtime abort, cannot default-allocate x
+
+    auto fm = PmrFlatMultiset<std::pmr::string>(&mr);
+    fm.emplace(s); // runtime abort, cannot default-allocate t
+    fm.insert(s); // runtime abort, cannot default-allocate x
+
+    auto m2 = std::pmr::multiset<std::pmr::string, std::less<>>(&mr);
+    m2.emplace(s); // OK
+    m2.insert(s); // runtime abort, cannot default-allocate x
+
+    auto fm2 = PmrFlatMultiset<std::pmr::string, std::less<>>(&mr);
+    fm2.emplace(s); // runtime abort, cannot default-allocate t
+    fm2.insert(s);
+      // Before: runtime abort, cannot default-allocate x
+      // After: OK
+```
+
+Notice the asymmetry between `fm2.insert(s)` and `m2.insert(s)`. Arthur thinks it would be
+nice to support heterogeneous `insert` for node-based `multiset` and `unordered_multiset`
+(*contra* P2363's reasoning),
+but that's out of scope for this particular paper P2767. For P2767's purposes, we're satisfied
+once there exists *some* way of inserting `s` into `fm2`. We don't mind that the working approaches
+use different spellings: `m2.emplace(s)` versus `fm2.insert(s)`.
+
+
+## Unusual constraints ## {#emplace-constraint}
+
+The usual pattern in [containers] is that `x.emplace(args...)`
+has a precondition (<a href="https://eel.is/c++draft/containers#sequence.reqmts-21">[sequence.reqmts]</a>,
+<a href="https://eel.is/c++draft/containers#associative.reqmts.general-48">[associative.reqmts.general]</a>)
+but no Constraints element. That is, `emplace` is not SFINAE-friendly. And it has only the one overload,
+so it doesn't need a constraint for purposes of overload resolution.
+
+No Constraints on `emplace`:
+<a href="https://eel.is/c++draft/deque.modifiers#lib:deque,emplace">`deque`</a>
+<a href="https://eel.is/c++draft/list.modifiers">`list`</a>,
+<a href="https://eel.is/c++draft/priqueue.members#lib:priority_queue,emplace">`priority_queue`</a>,
+<a href="https://eel.is/c++draft/vector.modifiers">`vector`</a>
+
+But these two places have a Constraints element on `emplace`:
+<a href="https://eel.is/c++draft/flat.map.modifiers#lib:flat_map,emplace">`flat_map`</a>,
+<a href="https://eel.is/c++draft/flat.multiset.modifiers#lib:flat_multiset,emplace">`flat_multiset`</a>.
+
+> Constraints: `is_constructible_v<pair<key_type, mapped_type>, Arg...>` is `true`.
+
+I believe this element was accidentally copy-pasted from the spec of <a href="https://eel.is/c++draft/flat.map.modifiers#4">`flat_map::insert(P&&)`</a> —
+which *does* need the constraint because it's part of `insert`'s large overload set — to `flat_map::emplace`,
+and then from there to `flat_multiset::emplace`. The constraint is already (correctly) absent
+from `flat_set::emplace`.
+
+Therefore, the proposed wording for this section simply deletes those Constraints elements.
+
+## Wording ## {#insert-emplace-wording}
+
+Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.map.modifiers], modifiers
+    template&lt;class... Args> pair&lt;iterator, bool> emplace(Args&&... args);
+    template&lt;class... Args>
+      iterator emplace_hint(const_iterator position, Args&&... args);
+
+    pair&lt;iterator, bool> insert(const value_type& x)<ins>;</ins>
+      <del>{ return emplace(x); }</del>
+    pair&lt;iterator, bool> insert(value_type&& x)<ins>;</ins>
+      <del>{ return emplace(std::move(x)); }</del>
+    iterator insert(const_iterator position, const value_type& x)<ins>;</ins>
+      <del>{ return emplace_hint(position, x); }</del>
+    iterator insert(const_iterator position, value_type&& x)<ins>;</ins>
+      <del>{ return emplace_hint(position, std::move(x)); }</del>
+
+    template&lt;class P> pair&lt;iterator, bool> insert(P&& x);
+    template&lt;class P>
+      iterator insert(const_iterator position, P&&);
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.map.modifiers">[flat.map.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+template&lt;class... Args> pair&lt;iterator, bool> emplace(Args&&... args);
+</pre>
+<del>1․ Constraints: `is_constructible_v<pair<key_type, mapped_type>, Args...>` is `true`.</del>
+
+<p>2․ Effects: Initializes an object `t` of type `pair<key_type, mapped_type>` with `std::forward<Args>(args)...`;
+if the map already contains an element whose key is equivalent to `t.first`, `*this` is unchanged. Otherwise, equivalent to:
+<pre>
+auto key_it = ranges::upper_bound(c.keys, t.first, compare);
+auto value_it = c.values.begin() + distance(c.keys.begin(), key_it);
+c.keys.insert(key_it, std::move(t.first));
+c.values.insert(value_it, std::move(t.second));
+</pre>
+
+3․ Returns: The `bool` component of the returned pair is `true` if and only if the insertion took place,
+and the iterator component of the pair points to the element with key equivalent to `t.first`.
+
+<pre>
+<ins>pair&lt;iterator, bool> insert(const value_type& x);</ins>
+<ins>pair&lt;iterator, bool> insert(value_type&& x);</ins>
+</pre>
+<ins>x․ Effects: If the map already contains an element whose key is equivalent to `x.first`,
+`*this` and `x` are unchanged. Otherwise, equivalent to:</ins>
+<pre>
+<ins>auto key_it = ranges::upper_bound(c.keys, x.first, compare);</ins>
+<ins>auto value_it = c.values.begin() + distance(c.keys.begin(), key_it);</ins>
+<ins>c.keys.insert(key_it, x.first);</ins>
+<ins>c.values.insert(value_it, x.second);</ins>
+</pre>
+<ins>for the first overload and</ins>
+<pre>
+<ins>auto key_it = ranges::upper_bound(c.keys, x.first, compare);</ins>
+<ins>auto value_it = c.values.begin() + distance(c.keys.begin(), key_it);</ins>
+<ins>c.keys.insert(key_it, std::move(x.first));</ins>
+<ins>c.values.insert(value_it, std::move(x.second));</ins>
+</pre>
+<ins>for the second overload.</ins>
+
+<pre>
+template<class P> pair&lt;iterator, bool> insert(P&& x);
+template<class P> iterator insert(const_iterator position, P&& x);
+</pre>
+4․ Constraints: `is_constructible_v<pair<key_type, mapped_type>, P>` is `true`.
+
+5․ Effects: The first form is equivalent to `return emplace(std::forward<P>(x));`.
+The second form is equivalent to `return emplace_hint(position, std::forward<P>(x));`.
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.multimap.modifiers], modifiers
+    template&lt;class... Args> iterator emplace(Args&&... args);
+    template&lt;class... Args>
+      iterator emplace_hint(const_iterator position, Args&&... args);
+
+    iterator insert(const value_type& x)<ins>;</ins>
+      <del>{ return emplace(x); }</del>
+    iterator insert(value_type&& x)<ins>;</ins>
+      <del>{ return emplace(std::move(x)); }</del>
+    iterator insert(const_iterator position, const value_type& x)<ins>;</ins>
+      <del>{ return emplace_hint(position, x); }</del>
+    iterator insert(const_iterator position, value_type&& x)<ins>;</ins>
+      <del>{ return emplace_hint(position, std::move(x)); }</del>
+
+    template&lt;class P> iterator insert(P&& x);
+    template&lt;class P>
+      iterator insert(const_iterator position, P&&);
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.multiset.modifiers], modifiers
+    template&lt;class... Args> iterator emplace(Args&&... args)<del>;</del>
+      <ins>{ return insert(value_type(std::forward&lt;Args>(args)...)); }</ins>
+    template&lt;class... Args>
+      iterator emplace_hint(const_iterator position, Args&&... args)<del>;</del>
+        <ins>{ return insert(position, value_type(std::forward&lt;Args>(args)...)); }</ins>
+
+    iterator insert(const value_type& x)<ins>;</ins>
+      <del>{ return emplace(x); }</del>
+    iterator insert(value_type&& x)<ins>;</ins>
+      <del>{ return emplace(std::move(x)); }</del>
+    <ins>template&lt;class K> iterator insert(K&& x);</ins>
+    iterator insert(const_iterator position, const value_type& x)<ins>;</ins>
+      <del>{ return emplace_hint(position, x); }</del>
+    iterator insert(const_iterator position, value_type&& x)<ins>;</ins>
+      <del>{ return emplace_hint(position, std::move(x)); }</del>
+    <ins>template&lt;class K> iterator insert(const_iterator hint, K&& x);</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+<del>template&lt;class... Args> iterator emplace(Args&&... args);</del>
+</pre>
+<p><del>1․ Constraints: `is_constructible_v<value_type, Args...>` is `true`.</del>
+<p><del>2․ Effects: First, initializes an object `t` of type `value_type` with `std::forward<Args>(args)...`,
+then inserts `t` as if by:</del>
+<pre>
+<del>auto it = ranges::upper_bound(c, t, compare);</del>
+<del>c.insert(it, std::move(t));</del>
+</pre>
+<p><del>3․ Returns: An iterator that points to the inserted element.</del>
+
+<pre>
+<ins>iterator insert(const value_type& x);</ins>
+<ins>iterator insert(value_type&& x);</ins>
+</pre>
+<ins>x․ Effects: Inserts a new element as if by:</ins>
+<pre>
+<ins>auto it = ranges::upper_bound(c, x, compare);</ins>
+<ins>c.insert(it, x);</ins>
+</pre>
+<ins>for the first overload or</ins>
+<pre>
+<ins>auto it = ranges::upper_bound(c, x, compare);</ins>
+<ins>c.insert(it, std::move(x));</ins>
+</pre>
+<ins>for the second overload.</ins>
+
+<p><ins>x․ Returns: An iterator that points to the inserted element.</ins>
+
+<pre>
+<ins>template&lt;class K> iterator insert(K&& x);</ins>
+<ins>template&lt;class K> iterator insert(const_iterator hint, K&& x);</ins>
+</pre>
+<p><ins>x․ Constraints: The *qualified-id* `Compare::is_transparent` is valid and denotes a type. `is_constructible_v<value_type, K>` is `true`.</ins>
+
+<p><ins>x․ Preconditions: The conversion from `x` into `value_type` constructs an object `u`, for which `find(x) == find(u)` is `true`.</ins>
+
+<p><ins>x․ Effects: If the set already contains an element equivalent to `x`, `*this` and `x` are unchanged. Otherwise, inserts a new element as if by
+`emplace(std::forward<K>(x))`.</ins>
+
+<p><ins>x․ Returns: An iterator that points to the inserted element.</ins>
+
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.set.modifiers], modifiers
+    template&lt;class... Args> pair&lt;iterator, bool> emplace(Args&&... args)<del>;</del>
+      <ins>{ return insert(value_type(std::forward&lt;Args>(args)...)); }</ins>
+    template&lt;class... Args>
+      iterator emplace_hint(const_iterator position, Args&&... args)<del>;</del>
+        <ins>{ return insert(position, value_type(std::forward&lt;Args>(args)...)); }</ins>
+
+    pair&lt;iterator, bool> insert(const value_type& x)<ins>;</ins>
+      <del>{ return emplace(x); }</del>
+    pair&lt;iterator, bool> insert(value_type&& x)<ins>;</ins>
+      <del>{ return emplace(std::move(x)); }</del>
+    template&lt;class K> pair&lt;iterator, bool> insert(K&& x);
+    iterator insert(const_iterator position, const value_type& x)<ins>;</ins>
+      <del>{ return emplace_hint(position, x); }</del>
+    iterator insert(const_iterator position, value_type&& x)<ins>;</ins>
+      <del>{ return emplace_hint(position, std::move(x)); }</del>
+    template&lt;class K> iterator insert(const_iterator hint, K&& x);
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.modifiers">[flat.set.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+<ins>pair&lt;iterator, bool> insert(const value_type& x);</ins>
+<ins>pair&lt;iterator, bool> insert(value_type&& x);</ins>
+</pre>
+<ins>x․ Effects: If the set already contains an element equivalent to `x`, `*this` and `x` are unchanged.
+Otherwise, inserts a new element as if by:</ins>
+<pre>
+<ins>auto it = ranges::upper_bound(c, x, compare);</ins>
+<ins>c.insert(it, x);</ins>
+</pre>
+<ins>for the first overload or</ins>
+<pre>
+<ins>auto it = ranges::upper_bound(c, x, compare);</ins>
+<ins>c.insert(it, std::move(x));</ins>
+</pre>
+<ins>for the second overload.</ins>
+
+<p><ins>x․ Returns: The `bool` component of the returned pair is `true` if and only if the insertion took place.
+The returned iterator points to the element whose key is equivalent to `x`.</ins>
+
+<pre>
+template&lt;class K> pair&lt;iterator, bool> insert(K&& x);
+template&lt;class K> iterator insert(const_iterator hint, K&& x);
+</pre>
+1․ Constraints: The *qualified-id* `Compare::is_transparent` is valid and denotes a type. `is_constructible_v<value_type, K>` is `true`.
+
+2․ Preconditions: The conversion from `x` into `value_type` constructs an object `u`, for which `find(x) == find(u)` is `true`.
+
+3․ Effects: If the set already contains an element equivalent to `x`, `*this` and `x` are unchanged. Otherwise, inserts a new element as if by
+<del>`emplace(std::forward<K>(x))`</del> <ins>`insert(std::forward<K>(x))`</ins>.
+
+4․ Returns: In the first overload, the `bool` component of the returned pair is `true` if and only if the insertion took place.
+The returned iterator points to the element whose key is equivalent to `x`.
+</blockquote></small>
+
+
 # `insert_range(sorted_unique, rg)` # {#insert-range-sorted-unique}
 
 The multi-element insertion API consists of these overloads:
@@ -1037,7 +1374,6 @@ void replace(container_type<del>&&</del> cont);
 </blockquote></small>
 
 
-
 # Issues for discussion # {#issues-for-discussion}
 
 The following subsections describe known issues with the flat containers, where Arthur thinks the
@@ -1158,24 +1494,24 @@ randomized order (at least in debug mode).
 
 <!-- ------
 
-
-- lWhat containers are supported?
-- Why not make .replace() take by value instead of by rvalue-ref?
 - What if the container's `swap` throws an exception? (e.g. static_vector)
-- Rename std::sorted_unique -> std::assume_sorted_unique
 - Complexity requirement of constructor should be the same as the complexity requirement of std::sort / std::stable_sort
-- use stable_sort instead of sort, so that we get consistency with std::set without the portability trap
+- The complexity requirement "Logarithmic" for {flat_,}set.equal_range(ke) is really unfortunate. Suppose my set<string> is slow, so I try to speed it up by using a transparent comparator std::less<void>. Suddenly, my calls to `s.equal_range("foo")` that were taking std::string and doing a single binary search (plus a O(1) check of the next element) are now taking `const char*` and doing two binary searches.  Can we relax the Complexity requirement of `a_tran.equal_range(ke)` to something like "Logarithmic in the size of the container, plus linear in the number of elements returned"?  This will make programmers happier in practice, even though it slows down pathological K types.https://eel.is/c++draft/associative.reqmts#general-174
+
+- The wording doesn't mandate that `iterator` be the same type as `const_iterator`; in fact all the redundant signatures (find + find const, lower_bound + lower_bound const, ...) imply that the iterator types "should" be different. We have the same wording/signatures in `std::set`, and all three vendors agree that `set::{const_,}iterator` are in fact the same type. Should `flat_set` simply guarantee that `flat_set::{const_,}iterator` are the same type?  That way there's no "portability trap" when moving from one implementation to another. (I.e., we should prohibit vendors from making them different just for the heck of it).
+
+- What containers are supported?
+- Rename std::sorted_unique -> std::assume_sorted_unique
 - moving-out-of a flat_set should copy the comparator, not move-out-of the comparator
 
 (4) In general, `flat_set` cannot deal with containers or comparators that throw exceptions. (I discussed this general problem in "Mostly Invalid", CppCon 2019.) If inserting into the underlying container throws an exception, then `flat_set` cannot possibly know what state the underlying container is in — did the insert succeed? fail? half-succeed? — and therefore `flat_set` can't know whether its sortedness invariant still holds. (It can't test the sortedness invariant, either, because the comparator might throw, and we already have one exception in flight at this point.) So, if `insert` throws an exception, `flat_set` will clear itself.
 It's possible that we could do something clever in the case that we know the container is a specialization of `vector` (which we control), and various things are noexcept, so that if insertion throws (e.g. due to `bad_alloc`) then the user doesn't lose all of their data. Should we attempt to special-case `vector` and/or `deque`'s recovery behavior? I propose "no," because I think our attempt would fail anyway and so I don't want to waste time thinking about clever tactics. But if someone wants to propose a specific clever tactic, I'll investigate it and tell you why it didn't work.
 
-- There is an insert_range(R&&) to match insert(It, It). But there's no insert_range(sorted_unique_t, R&&) to match insert(sorted_unique_t, It, It).
 - `swap` is unconditionally noexcept, which is inconsistent with priority_queue and stack and queue (they're conditionally noexcept). We should really be conditionally noexcept, and then "restore the invariant" (i.e. clear both containers) if an exception is thrown. Except: What do we do if swapping the comparators throws? Then we can't do anything at all!  Suggest at least a precondition that swapping the comparators will not throw an exception. Louis suggests stronger: Constraint that is_nothrow_swappable_v<Compare>!  Also, the unconditional noexcept produces worse codegen (try-catch-abort) than a conditional noexcept would produce.
-- The wording doesn't mandate that `iterator` be the same type as `const_iterator`; in fact all the redundant signatures (find + find const, lower_bound + lower_bound const, ...) imply that the iterator types "should" be different. We have the same wording/signatures in `std::set`, and all three vendors agree that `set::{const_,}iterator` are in fact the same type. Should `flat_set` simply guarantee that `flat_set::{const_,}iterator` are the same type?  That way there's no "portability trap" when moving from one implementation to another. (I.e., we should prohibit vendors from making them different just for the heck of it).
-- The complexity requirement "Logarithmic" for {flat_,}set.equal_range(ke) is really unfortunate. Suppose my set<string> is slow, so I try to speed it up by using a transparent comparator std::less<void>. Suddenly, my calls to `s.equal_range("foo")` that were taking std::string and doing a single binary search (plus a O(1) check of the next element) are now taking `const char*` and doing two binary searches.  Can we relax the Complexity requirement of `a_tran.equal_range(ke)` to something like "Logarithmic in the size of the container, plus linear in the number of elements returned"?  This will make programmers happier in practice, even though it slows down pathological K types.https://eel.is/c++draft/associative.reqmts#general-174
-- std::set::insert(K&&) has a transparent-comparator overload. std::multiset::insert does not, presumably because: insertion always succeeds, thus the new node is always created, thus you always have a value_type to look up in the tree, thus you don't benefit from transparent lookup. But this overload set was taken over into the flat containers unchanged: std::flat_set::insert(K&&) is transparent, std::flat_multiset::insert(value_type&&) is not. This means that we have inefficiency: `std::pmr::flat_multiset<std::pmr::string> fms; fms.insert("abc");` is mandated to construct a std::pmr::string on the stack (using the default resource), then find its insertion point, then insert it (copying its data into the pmr::vector's resource). It would be strictly more efficient to use the transparent comparator on `const char*` and then c.emplace("abc") directly, so that the default resource was never involved. We should add this overload.
-- std::flat_map::emplace(Args&&...) has a constraint: https://eel.is/c++draft/container.adaptors#flat.map.modifiers-1But std::flat_set::emplace(Args&&...) does not have that constraint. And it's certainly not needed to disambiguate, since this is the only overload of .emplace that exists. I think it was incorrectly copied from flat_map::insert, where there are multiple overloads and so it is needed to disambiguate. I think the constraint should be removed from `emplace` for both flat_map and flat_multimap.
+
+
+
+
 - std::flat_map's non-explicit constructor from (key_cont, mapped_cont) is deceptive, because if you use it with braced initializers, you'll get different overloads depending on the number of elements in the inner braced initializers.https://godbolt.org/z/Y4bTzdx79
     void print_map(std::flat_map<int, int> fm);
     print_map({ {}, {} });  // i.e. flat_map(initializer_list<pair>): the initializer_list has length 2, and the result after deduplication is {{0,0}}    print_map({ {1}, {10} });  // i.e. flat_map(keys, values): result is {{1,10}}
@@ -1239,7 +1575,7 @@ on my GitHub; see [[Wording]].
     "date": "September 2022"
   },
   "P0429": {
-    "title": "P0429R9 A Standard flat_map",
+    "title": "A standard flat_map",
     "authors": [
       "Zach Laine"
     ],
@@ -1247,12 +1583,22 @@ on my GitHub; see [[Wording]].
     "date": "June 2022"
   },
   "P1222": {
-    "title": "P1222R4 A Standard flat_set",
+    "title": "A standard flat_set",
     "authors": [
       "Zach Laine"
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf",
     "date": "June 2022"
+  },
+  "P2363": {
+    "title": "Extending associative containers with the remaining heterogeneous overloads",
+    "authors": [
+      "Konstantin Boyarinov",
+      "Sergey Vinogradov",
+      "Ruslan Arutyunyan"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html",
+    "date": "February 2023"
   }
 }
 </pre>
