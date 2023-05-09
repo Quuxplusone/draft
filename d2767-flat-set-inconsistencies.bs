@@ -693,6 +693,16 @@ something without `first` and `second` members, the current spec doesn't work at
       // After: OK
 ```
 
+## Wording ## {#map-insert-range-wording}
+
+We don't need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
+because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:
+
+<small><blockquote>
+4․ Except as otherwise noted, operations on `flat_multimap` are equivalent to those of `flat_map`,
+except that `flat_multimap` operations do not remove or replace elements with equal keys.
+</blockquote></small>
+
 Change <a href="https://eel.is/c++draft/flat.map.modifiers#12">[flat.map.modifiers]/12</a> as follows:
 
 <small><blockquote>
@@ -722,30 +732,6 @@ c.values.erase(c.values.begin() + dist, c.values.end());
 13․ Complexity: N + M log M, where N is `size()` before the operation and M is `ranges::distance(rg)`.
 
 14․ Remarks: Since this operation performs an in-place merge, it may allocate memory.
-</blockquote></small>
-
-Add a new section named <a href="https://eel.is/c++draft/flat.multimap#modifiers">[flat.multimap.modifiers]</a>
-explaining the semantics of `flat_multimap::insert_range`.
-
-<small><blockquote>
-<pre>
-<ins>template&lt;<i>container-compatible-range</i>&lt;value_type> R></ins>
-  <ins>void insert_range(R&& rg);</ins>
-</pre>
-
-<p><ins>x․ Effects: Adds elements to `c` as if by:</ins>
-<pre>
-<ins>for (value_type e : rg) {</ins>
-  <ins>c.keys.insert(c.keys.end(), std::move(e.first));</ins>
-  <ins>c.values.insert(c.values.end(), std::move(e.second));</ins>
-<ins>}</ins>
-</pre>
-<ins>Then, sorts the range of newly inserted elements with respect to `value_comp()`, and
-merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range.</ins>
-
-<p><ins>x․ Complexity: N + M log M, where N is `size()` before the operation and M is `ranges::distance(rg)`.</ins>
-
-<p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins>
 </blockquote></small>
 
 
@@ -852,6 +838,14 @@ Therefore, the proposed wording for this section simply deletes those Constraint
 
 ## Wording ## {#insert-emplace-wording}
 
+We don't need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
+because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:
+
+<small><blockquote>
+4․ Except as otherwise noted, operations on `flat_multimap` are equivalent to those of `flat_map`, 
+except that `flat_multimap` operations do not remove or replace elements with equal keys.
+</blockquote></small>
+
 Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
 
 <small><blockquote>
@@ -931,7 +925,7 @@ Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]
 
 <small><blockquote>
 <pre>
-    // [flat.multimap.modifiers], modifiers
+    // modifiers
     template&lt;class... Args> iterator emplace(Args&&... args);
     template&lt;class... Args>
       iterator emplace_hint(const_iterator position, Args&&... args);
@@ -1126,6 +1120,8 @@ There we have a real API-design conflict: Which of `sorted_unique` and `from_ran
 This is enough of a reason to simply give up on that constructor. But `insert_range` has no such API-design
 problem. We could add this overload easily.
 
+## Wording ## {#wording-insert-range-sorted-unique}
+
 Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
 
 <small><blockquote>
@@ -1175,20 +1171,6 @@ Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]
     void insert(sorted_equivalent_t s, initializer_list&lt;value_type> il)
       { insert(s, il.begin(), il.end()); }
 </pre>
-</blockquote></small>
-
-Add a new section named <a href="https://eel.is/c++draft/flat.multimap#modifiers">[flat.multimap.modifiers]</a>
-and add a new entry to it as follows:
-
-<small><blockquote>
-<pre>
-<ins>template&lt;<i>container-compatible-range</i>&lt;value_type> R></ins>
-  <ins>void insert_range(sorted_equivalent_t, R&& rg);</ins>
-</pre>
-
-<p><ins>x․ Effects: Equivalent to `insert_range(std::forward<R>(rg))`.</ins>
-
-<p><ins>x․ Complexity: Linear in N, where N is `size()` after the operation.</ins>
 </blockquote></small>
 
 Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
@@ -1517,8 +1499,6 @@ It's possible that we could do something clever in the case that we know the con
     print_map({ {}, {} });  // i.e. flat_map(initializer_list<pair>): the initializer_list has length 2, and the result after deduplication is {{0,0}}    print_map({ {1}, {10} });  // i.e. flat_map(keys, values): result is {{1,10}}
     print_map({ {1, 2}, {10, 20} });  // i.e. flat_map(initializer_list<pair>): result is {{1,2}, {10,20}}
     print_map({ {1, 2, 3}, {10, 20, 30} });  // i.e. flat_map(keys, values): result is {{1,10}, {2,20}, {3,30}}To solve this problem, I tentatively suggest that the constructor from (keys, values) should be marked `explicit`, so that the 1th and 3th lines here will fail to compile, instead of being an attractive nuisance.
-
-- [flat.map.modifiers] explains the deal with `insert(P&&)` etc.; [flat.multimap.modifiers] does not exist. It should probably exist.
 
 ----- -->
 

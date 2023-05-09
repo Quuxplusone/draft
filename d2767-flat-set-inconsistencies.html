@@ -2135,7 +2135,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#editorial-flat-set-cons-alloc"><span class="secno">3.4</span> <span class="content">[flat.set]</span></a>
      </ol>
     <li><a href="#set-insert-range"><span class="secno">4</span> <span class="content">Add move semantics to <code class="highlight"><c- n>flat_set</c-><c- o>::</c-><c- n>insert_range</c-></code></span></a>
-    <li><a href="#map-insert-range"><span class="secno">5</span> <span class="content">Add move semantics to <code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>insert_range</c-></code></span></a>
+    <li>
+     <a href="#map-insert-range"><span class="secno">5</span> <span class="content">Add move semantics to <code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>insert_range</c-></code></span></a>
+     <ol class="toc">
+      <li><a href="#map-insert-range-wording"><span class="secno">5.1</span> <span class="content">Wording</span></a>
+     </ol>
     <li>
      <a href="#insert-emplace"><span class="secno">6</span> <span class="content"><code class="highlight"><c- n>insert</c-></code> is more primitive than <code class="highlight"><c- n>emplace</c-></code></span></a>
      <ol class="toc">
@@ -2143,7 +2147,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#emplace-constraint"><span class="secno">6.2</span> <span class="content">Unusual constraints</span></a>
       <li><a href="#insert-emplace-wording"><span class="secno">6.3</span> <span class="content">Wording</span></a>
      </ol>
-    <li><a href="#insert-range-sorted-unique"><span class="secno">7</span> <span class="content"><code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>rg</c-><c- p>)</c-></code></span></a>
+    <li>
+     <a href="#insert-range-sorted-unique"><span class="secno">7</span> <span class="content"><code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>rg</c-><c- p>)</c-></code></span></a>
+     <ol class="toc">
+      <li><a href="#wording-insert-range-sorted-unique"><span class="secno">7.1</span> <span class="content">Wording</span></a>
+     </ol>
     <li><a href="#replace-by-value"><span class="secno">8</span> <span class="content"><code class="highlight"><c- n>replace</c-></code> should take by value</span></a>
     <li>
      <a href="#issues-for-discussion"><span class="secno">9</span> <span class="content">Issues for discussion</span></a>
@@ -2687,6 +2695,12 @@ something without <code class="highlight"><c- n>first</c-></code> and <code clas
   <c- c1>// Before: Ill-formed: reference_wrapper has no .first member</c->
   <c- c1>// After: OK</c->
 </pre>
+   <h3 class="heading settled" data-level="5.1" id="map-insert-range-wording"><span class="secno">5.1. </span><span class="content">Wording</span><a class="self-link" href="#map-insert-range-wording"></a></h3>
+   <p>We don’t need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
+because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:</p>
+   <p><small></small></p>
+   <blockquote><small> 4․ Except as otherwise noted, operations on <code class="highlight"><c- n>flat_multimap</c-></code> are equivalent to those of <code class="highlight"><c- n>flat_map</c-></code>,
+except that <code class="highlight"><c- n>flat_multimap</c-></code> operations do not remove or replace elements with equal keys.<p></p> </small></blockquote>
    <p>Change <a href="https://eel.is/c++draft/flat.map.modifiers#12">[flat.map.modifiers]/12</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2705,19 +2719,6 @@ and finally erases the duplicate elements as if by:</p> <pre class="highlight"><
 <c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>dist</c-><c- p>,</c-> <c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>end</c-><c- p>());</c->
 <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>dist</c-><c- p>,</c-> <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>end</c-><c- p>());</c->
 </pre> <p>13․ Complexity: N + M log M, where N is <code class="highlight"><c- n>size</c-><c- p>()</c-></code> before the operation and M is <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>distance</c-><c- p>(</c-><c- n>rg</c-><c- p>)</c-></code>.</p> <p>14․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</p> </small>
-   </blockquote>
-   <p>Add a new section named <a href="https://eel.is/c++draft/flat.multimap#modifiers">[flat.multimap.modifiers]</a> explaining the semantics of <code class="highlight"><c- n>flat_multimap</c-><c- o>::</c-><c- n>insert_range</c-></code>.</p>
-   <p><small></small></p>
-   <blockquote>
-    <p></p>
-    <small> <pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c-></ins>
-  <ins><c- b>void</c-> <c- n>insert_range</c-><c- p>(</c-><c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>);</c-></ins>
-</pre> <p><ins>x․ Effects: Adds elements to <code class="highlight"><c- n>c</c-></code> as if by:</ins> </p><pre class="highlight"><ins><c- k>for</c-> <c- p>(</c-><c- n>value_type</c-> <c- n>e</c-> <c- o>:</c-> <c- n>rg</c-><c- p>)</c-> <c- p>{</c-></ins>
-  <ins><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>end</c-><c- p>(),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>e</c-><c- p>.</c-><c- n>first</c-><c- p>));</c-></ins>
-  <ins><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>insert</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>end</c-><c- p>(),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>e</c-><c- p>.</c-><c- n>second</c-><c- p>));</c-></ins>
-<ins><c- p>}</c-></ins>
-</pre><ins>Then, sorts the range of newly inserted elements with respect to <code class="highlight"><c- n>value_comp</c-><c- p>()</c-></code>, and
-merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range.</ins> <p><ins>x․ Complexity: N + M log M, where N is <code class="highlight"><c- n>size</c-><c- p>()</c-></code> before the operation and M is <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>distance</c-><c- p>(</c-><c- n>rg</c-><c- p>)</c-></code>.</ins> </p><p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins> </p></small>
    </blockquote>
    <h2 class="heading settled" data-level="6" id="insert-emplace"><span class="secno">6. </span><span class="content"><code class="highlight"><c- n>insert</c-></code> is more primitive than <code class="highlight"><c- n>emplace</c-></code></span><a class="self-link" href="#insert-emplace"></a></h2>
 <pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>set_default_resource</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>null_memory_resource</c-><c- p>());</c->
@@ -2794,6 +2795,11 @@ and then from there to <code class="highlight"><c- n>flat_multiset</c-><c- o>::<
 from <code class="highlight"><c- n>flat_set</c-><c- o>::</c-><c- n>emplace</c-></code>.</p>
    <p>Therefore, the proposed wording for this section simply deletes those Constraints elements.</p>
    <h3 class="heading settled" data-level="6.3" id="insert-emplace-wording"><span class="secno">6.3. </span><span class="content">Wording</span><a class="self-link" href="#insert-emplace-wording"></a></h3>
+   <p>We don’t need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
+because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:</p>
+   <p><small></small></p>
+   <blockquote><small> 4․ Except as otherwise noted, operations on <code class="highlight"><c- n>flat_multimap</c-></code> are equivalent to those of <code class="highlight"><c- n>flat_map</c-></code>, 
+except that <code class="highlight"><c- n>flat_multimap</c-></code> operations do not remove or replace elements with equal keys.<p></p> </small></blockquote>
    <p>Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2847,7 +2853,7 @@ The second form is equivalent to <code class="highlight"><c- k>return</c-> <c- n
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <pre class="highlight"><c- c1>// [flat.multimap.modifiers], modifiers</c->
+    <small> <pre class="highlight"><c- c1>// modifiers</c->
 <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c-> <c- n>iterator</c-> <c- n>emplace</c-><c- p>(</c-><c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>);</c->
 <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- p>...</c-> <c- n>Args</c-><c- o>></c->
   <c- n>iterator</c-> <c- n>emplace_hint</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>position</c-><c- p>,</c-> <c- n>Args</c-><c- o>&amp;&amp;</c-><c- p>...</c-> <c- n>args</c-><c- p>);</c->
@@ -2979,6 +2985,7 @@ The returned iterator points to the element whose key is equivalent to <code cla
 There we have a real API-design conflict: Which of <code class="highlight"><c- n>sorted_unique</c-></code> and <code class="highlight"><c- n>from_range</c-></code> should come first?
 This is enough of a reason to simply give up on that constructor. But <code class="highlight"><c- n>insert_range</c-></code> has no such API-design
 problem. We could add this overload easily.</p>
+   <h3 class="heading settled" data-level="7.1" id="wording-insert-range-sorted-unique"><span class="secno">7.1. </span><span class="content">Wording</span><a class="self-link" href="#wording-insert-range-sorted-unique"></a></h3>
    <p>Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -3022,14 +3029,6 @@ problem. We could add this overload easily.</p>
 <c- b>void</c-> <c- nf>insert</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-> <c- n>s</c-><c- p>,</c-> <c- n>initializer_list</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>il</c-><c- p>)</c->
   <c- p>{</c-> <c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>,</c-> <c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>il</c-><c- p>.</c-><c- n>end</c-><c- p>());</c-> <c- p>}</c->
 </pre></small>
-   </blockquote>
-   <p>Add a new section named <a href="https://eel.is/c++draft/flat.multimap#modifiers">[flat.multimap.modifiers]</a> and add a new entry to it as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p></p>
-    <small> <pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c-></ins>
-  <ins><c- b>void</c-> <c- n>insert_range</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>);</c-></ins>
-</pre> <p><ins>x․ Effects: Equivalent to <code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>))</c-></code>.</ins> </p><p><ins>x․ Complexity: Linear in N, where N is <code class="highlight"><c- n>size</c-><c- p>()</c-></code> after the operation.</ins> </p></small>
    </blockquote>
    <p>Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:</p>
    <p><small></small></p>
