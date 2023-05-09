@@ -2,7 +2,7 @@
 Title: flat_map/flat_set omnibus
 Shortname: D2767
 Revision: 0
-!Draft Revision: 4
+!Draft Revision: 5
 Audience: LWG
 Status: D
 Group: WG21
@@ -13,7 +13,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Dummy text
-Date: 2023-05-08
+Date: 2023-05-09
 </pre>
 
 <style>
@@ -50,6 +50,9 @@ the allocator-extended constructors in one place, consistent with <a href="https
 This editorial change was originally submitted as <a href="https://github.com/cplusplus/draft/pull/5923">#5923</a>
 (October 2022). It bit-rotted after the resolutions of LWG 3802/3803. Here is a clean rebased copy, with easier-to-review
 formatting.
+
+This wording merge-conflicts with the resolution of [[LWG3884]]. See [[#clean-copy]]
+for a complete diff of everything proposed in this paper and all outstanding LWG issues.
 
 The only changes happening in this part, and their rationales, are:
 
@@ -413,7 +416,7 @@ with uses-allocator construction ([allocator.uses.construction]).
     <src>template&lt;class Alloc<del>ator</del>></src>
       <src>flat_multimap(sorted_equivalent_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
 
-    <ins>// [flat.map.cons.alloc], constructors with allocators</ins>
+    <ins>// [flat.multimap.cons.alloc], constructors with allocators</ins>
 
     <dst>template&lt;class Alloc></dst>
       <dst>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
@@ -578,12 +581,73 @@ construction ([allocator.uses.construction]).
 
 ## [flat.multiset] ## {#editorial-flat-multiset-cons-alloc}
 
-<small><blockquote>
-</blockquote></small>
+TODO FIXME BUG HACK
 
 ## [flat.set] ## {#editorial-flat-set-cons-alloc}
 
+TODO FIXME BUG HACK
+
+# Accidentally explicit constructor # {#explicit-oops}
+
+STL style is that multi-argument constructors should be non-`explicit`; see [[P1163]].
+This change is non-editorial, but should be non-controversial, unless anyone objects
+to the delegating constructor's doing an extra move of `cont`. In practice, libc++
+doesn't actually move `cont` twice; we consider the delegating constructor merely a tool
+to shorten the spec.
+
+```c++
+    std::vector<int> v;
+    std::flat_set s = { v, std::less(), std::allocator<int>() };
+      // OK
+    std::flat_set s = { v, std::less() };
+      // Before: Ill-formed
+      // After: OK
+```
+
+## Wording ## {#wording-explicit-oops}
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
 <small><blockquote>
+<pre>
+    // [flat.multiset.cons], constructors
+    flat_multiset() : flat_multiset(key_compare()) { }
+
+    <del>explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());</del>
+    <ins>explicit flat_multiset(container_type cont)</ins>
+      <ins>: flat_multiset(std::move(cont), key_compare()) { }</ins>
+    <ins>flat_multiset(container_type cont, const key_compare& comp);</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.cons">[flat.multiset.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+<del>explicit</del> flat_multiset(container_type cont, const key_compare& comp <del>= key_compare()</del>);
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.set.cons], constructors
+    flat_set() : flat_set(key_compare()) { }
+
+    <del>explicit flat_set(container_type cont, const key_compare& comp = key_compare());</del>
+    <ins>explicit flat_set(container_type cont)</ins>
+      <ins>: flat_set(std::move(cont), key_compare()) { }</ins>
+    <ins>flat_set(container_type cont, const key_compare& comp);</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.cons">[flat.set.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+<del>explicit</del> flat_set(container_type cont, const key_compare& comp <del>= key_compare()</del>);
+</pre>
 </blockquote></small>
 
 # Add move semantics to `flat_set::insert_range` # {#set-insert-range}
@@ -601,6 +665,8 @@ construction ([allocator.uses.construction]).
       // Before: Ill-formed.
       // After: Moves the unique_ptrs.
 ```
+
+## Wording ## {#wording-set-insert-range}
 
 Change <a href="https://eel.is/c++draft/flat.set#modifiers-10">[flat.set.modifiers]/10</a> as follows:
 
@@ -693,7 +759,7 @@ something without `first` and `second` members, the current spec doesn't work at
       // After: OK
 ```
 
-## Wording ## {#map-insert-range-wording}
+## Wording ## {#wording-map-insert-range}
 
 We don't need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
 because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:
@@ -836,7 +902,7 @@ from `flat_set::emplace`.
 
 Therefore, the proposed wording for this section simply deletes those Constraints elements.
 
-## Wording ## {#insert-emplace-wording}
+## Wording ## {#wording-insert-emplace}
 
 We don't need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
 because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:
@@ -1237,6 +1303,122 @@ Add a new entry to <a href="https://eel.is/c++draft/flat.set.modifiers">[flat.se
 <p><ins>x․ Complexity: Linear in N, where N is `size()` after the operation.</ins>
 </blockquote></small>
 
+# Sorting complexity # {#sorting-complexity}
+
+Most operations that require sorting come in `sorted_unique` and non-`sorted_unique` flavors;
+the `sorted_unique` flavor is rightly specified not to sort, which means it can be O(N)
+instead of O(N + M log M). That's fine. But some non-`sorted_unique` constructors have
+Complexity clauses that mandate O(N) performance on input that *happens* to be sorted
+at runtime. The vendor has three ways to deal with this:
+
+- Guarantee that `std::sort` (or `std::stable_sort` if [[#stable-sorting]] is adopted) will
+    always run in O(N) time on sorted input. This is not currently mandated by <a href="https://eel.is/c++draft/alg.sort#sort-5">[alg.sort]</a>,
+    so no vendor is likely to know off the top of their heads that they really guarantee this
+    for all possible sorted inputs. libc++ certainly doesn't know this for sure.
+
+- Add a linear-time pass on the front, e.g. `if (!std::is_sorted(first, last)) std::sort(first, last)`.
+    This wastes O(N) cycles in every case: it might improve the asymptotic performance in the
+    rare case that the input happens to be sorted at runtime, but only at the cost of slowing down
+    the expected case where the input is not sorted. libc++ doesn't want to slow down the
+    average caller.
+
+- Ignore the spec's Complexity requirement. libc++ also doesn't want to do this.
+
+Louis Dionne would be happy with a resolution that requires all vendors to implement this
+optimization in `std::sort` itself, for ranges that happen to be sorted. I.e., change
+<a href="https://eel.is/c++draft/alg.sort#sort-5">[sort]/5</a> as follows:
+
+<small><blockquote>
+5․ Complexity: Let N be `last - first`. <ins>If the input is sorted with respect to `comp` and `proj`, O(N) comparisons and projections. Otherwise,</ins>
+O(N log N) comparisons and projections. <ins>In either case, twice as many projections as comparisons.</ins>
+</blockquote></small>
+
+and change <a href="https://eel.is/c++draft/alg.sort#stable.sort-5">[stable.sort]/5</a> as follows:
+
+<small><blockquote>
+5․ Complexity: Let N be `last - first`. <ins>If the input is sorted with respect to `comp` and `proj`, O(N) comparisons.</ins>
+If enough extra memory is available, <ins>O(</ins>N log(N)<ins>)</ins> comparisons.
+Otherwise, <del>at most</del> <ins>O(</ins>N log<sup>2</sup>(N)<ins>)</ins> comparisons.
+In <del>either</del> <ins>any</ins> case, twice as many projections as <del>the number of</del> comparisons.
+</blockquote></small>
+
+If we changed [alg.sort], then we'd get [flat.foo]'s unusual complexity guarantees for free, and
+the following changes in [flat.foo] would be no-ops, just a bit of editorial cleanup.
+However, Louis and Arthur would prefer to leave [alg.sort] alone for now,
+making the following changes in [flat.foo] significant and non-editorial.
+
+## Wording ## {#wording-sorting-complexity}
+
+If these changes are not adopted wholesale, we still propose editorially to replace `zip_view` with `zip`
+and "if the container arguments are already sorted with respect to `value_comp()`" with
+"if `key_cont` is already sorted with respect to `compare`."
+
+Change <a href="https://eel.is/c++draft/flat.map.cons">[flat.map.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
+         const key_compare& comp = key_compare());
+</pre>
+1․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`,
+and `compare` with `comp`; sorts the range [`begin()`, `end()`) with respect to `value_comp()`; and
+finally erases the duplicate elements as if by:
+<pre>
+auto zv = ranges::zip<del>_view</del>(c.keys, c.values);
+auto it = ranges::unique(zv, key_equiv(compare)).begin();
+auto dist = distance(zv.begin(), it);
+c.keys.erase(c.keys.begin() + dist, c.keys.end());
+c.values.erase(c.values.begin() + dist, c.values.end());
+</pre>
+
+<p>2․ Complexity: <del>Linear in N if the container arguments are already sorted with respect to `value_comp()`
+and otherwise N log N, where N is the value of `key_cont.size()` before this call.</del>
+<ins>Same as `ranges::sort(ranges::zip(c.keys, c.values), value_comp())`.</ins>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multimap.cons">[flat.multimap.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
+              const key_compare& comp = key_compare());
+</pre>
+1․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`, 
+and `compare` with `comp`; sorts the range [`begin()`, `end()`) with respect to `value_comp()`.
+
+<p>2․ Complexity: <del>Linear in N if the container arguments are already sorted with respect to `value_comp()`
+and otherwise N log N, where N is the value of `key_cont.size()` before this call.</del>
+<ins>Same as `ranges::sort(ranges::zip(c.keys, c.values), value_comp())`.</ins>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.cons">[flat.multiset.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());
+</pre>
+
+1․ Effects: Initializes <i>`c`</i> with `std::move(cont)` and <i>`compare`</i> with `comp`<del>, and</del> <ins>;</ins>
+sorts the range [`begin()`, `end()`) with respect to <i>`compare`</i>.
+
+2․ Complexity: <del>Linear in N if `cont` is sorted with respect to <i>`compare`</i>
+and otherwise N log N, where N is the value of `cont.size()` before this call.</del> <ins>Same as `ranges::sort(c, compare)`.</ins>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.cons">[flat.set.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+explicit flat_set(container_type cont, const key_compare& comp = key_compare());
+</pre>
+
+1․ Effects: Initializes <i>`c`</i> with `std::move(cont)` and <i>`compare`</i> with `comp`<del>,</del> <ins>;</ins>
+sorts the range [`begin()`, `end()`) with respect to <i>`compare`</i><del>,</del> <ins>;</ins>
+and finally erases all but the first element from each group of consecutive equivalent elements.
+
+2․ Complexity: <del>Linear in N if `cont` is sorted with respect to <i>`compare`</i>
+and otherwise N log N, where N is the value of `cont.size()` before this call.</del> <ins>Same as `ranges::sort(c, compare)`.</ins>
+</blockquote></small>
 
 # `replace` should take by value # {#replace-by-value}
 
@@ -1277,6 +1459,8 @@ the cost of API consistency.
       // Before: Ill-formed
       // After: OK, does 1 expensive copy and 1 expensive move
 ```
+
+## Wording ## {#wording-replace-by-value}
 
 Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
 
@@ -1354,6 +1538,20 @@ void replace(container_type<del>&&</del> cont);
 
 13․ Effects: Equivalent to: `c = std::move(cont);`
 </blockquote></small>
+
+
+# Noexcept `swap` # {#noexcept-swap}
+
+TODO FIXME BUG HACK
+`swap` is unconditionally noexcept, which is inconsistent with priority_queue and stack and queue (they're conditionally noexcept). We should really
+be conditionally noexcept, and then "restore the invariant" (i.e. clear both containers) if an exception is thrown. Except: What do we do if swapping
+the comparators throws? Then we can't do anything at all!  Suggest at least a precondition that swapping the comparators will not throw an exception.
+Louis suggests stronger: Constraint that is_nothrow_swappable_v<Compare>!  Also, the unconditional noexcept produces worse codegen (try-catch-abort)
+than a conditional noexcept would produce.
+
+## Wording ## {#wording-noexcept-swap}
+
+TODO FIXME BUG HACK
 
 
 # Issues for discussion # {#issues-for-discussion}
@@ -1463,8 +1661,8 @@ and finally erases all but the first element from each group of consecutive equi
 7․ Remarks: Since this operation performs an in-place merge, it may allocate memory.
 </blockquote></small>
 
-Note the remark: this operation already requires an in-place merge, which allocates memory, so
-requiring it to also do a stable sort — which allocates memory — might not be considered such a big deal.
+This operation already requires an in-place merge, which allocates memory,
+so requiring it to also do a stable sort — which allocates memory — might not be considered such a big deal.
 
 The alternative here would be for libc++ to lean into the idea that `multiset::insert_range` is supposed to
 leave the order of equivalent elements unspecified, and instrument it under libc++'s existing
@@ -1472,33 +1670,301 @@ leave the order of equivalent elements unspecified, and instrument it under libc
 This would preserve the symmetry between `multiset` and `flat_multiset`, by making both of them de facto
 randomized order (at least in debug mode).
 
+## Non-explicit constructor from two containers ## {#deceptive}
+
+Arthur has observed [in a blog post](https://quuxplusone.github.io/blog/2023/04/28/flat-map-constructors/)
+that `flat_map`'s non-explicit constructor from two containers is deceptive when used with braced initializers.
+
+```c++
+    void print_map(std::flat_multimap<int, int>);
+
+    // Test the two-container constructor... or is it?
+
+    print_map({ {1, 2, 3}, {10, 20, 30} }); // {1,10}, {2,20}, {3,30}
+    print_map({ {1, 2},    {10, 20} });     // {1,2}, {10,20}
+    print_map({ {1},       {10} });         // {1,10}
+    print_map({ {},        {} });           // {0,0}, {0,0}
+```
+
+To address this issue (if we wanted to), we could make one of the relevant constructors `explicit`.
+We obviously can't prevent `vector`'s construction from a braced list
+of elements, nor `pair`'s from a braced list of (exactly two) elements, nor (in practice)
+`pair`'s construction from `{}`; so the only constructor we could explicify to address this
+would be `flat_multimap`'s own constructor from a braced list of (exactly two) containers. That is,
+we'd do this (and likewise in `flat_map`; `flat_set` doesn't need to change):
+
+<small><blockquote>
+<pre>
+    <ins>explicit flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont)</ins>
+      <ins>: flat_multimap(std::move(key_cont), std::move(mapped_cont), key_compare()) {}</ins>
+    flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
+                  const key_compare& comp <del>= key_compare()</del>);
+    template&lt;class Allocator>
+      flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
+                    const Allocator& a);
+    template&lt;class Allocator>
+      flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
+                    const key_compare& comp, const Allocator& a);
+</pre>
+</blockquote></small>
+
+Arthur thinks this change would be appreciated by programmers in practice (or rather, if we *don't*
+make this change, then programmers will only ever notice this issue when it bites them).
+But it would be surprisingly asymmetric to explicify only this one constructor. The small benefit
+probably does not justify the asymmetry.
+
+We recently made some constructors `explicit` in
+<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2711r1.html">P2711 "Making multi-param constructors of views explicit,"</a>
+but that paper's goal was to *increase* uniformity and symmetry, not to decrease it.
+
+## Complexity of `equal_range` ## {#complexity-equal-range}
+
+<a href="https://eel.is/c++draft/associative.reqmts.general#171">[associative.reqmts.general]/171 and /174</a>
+define the complexity of `b.equal_range(k)` and `a_tran.equal_range(ke)` as "Logarithmic."
+This means that we have the following required complexities, for both `foo` and `flat_foo`:
+
+```c++
+    std::set<std::string> s;
+    std::multiset<std::string> ms;
+    std::set<std::string, std::less<>> st;
+    std::multiset<std::string, std::less<>> mst;
+
+    s.equal_range("abc"s);
+      // 171: lower_bound, lower_bound+1; (1 + lg N) operations total
+    ms.equal_range("abc"s);
+      // 171: lower_bound, upper_bound; (2 lg N) operations total
+    st.equal_range("abc");
+      // 174: lower_bound, upper_bound; (2 lg N) operations total
+    mst.equal_range("abc");
+      // 174: lower_bound, upper_bound; (2 lg N) operations total
+```
+
+For `st.equal_range`, <a href="https://eel.is/c++draft/associative.reqmts.general#7.22">[associative.reqmts.general]/7.22</a>
+forces us to consider the possibility that `std::less<>::operator()(key_type, const char*)`
+is a less granular equivalence relation than `std::less<>::operator()(key_type, key_type)`; i.e., even though
+this is a `set`, it might still contain "duplicates" from the point of view of the heterogeneous comparator.
+It would be efficient in practice to find `lower_bound("abc")` in lg N time and then step forward linearly
+until we find an element not equal to `"abc"` — the expected number of duplicates for the average real-world workload
+is small. But the number of duplicates *theoretically* could be O(N); so we're not allowed to do this
+(at least not without an arbitrary cap, e.g. if we don't find the end of the range in 10 probes then fall back
+to `upper_bound` — bookkeeping which would again unnecessarily slow down the average case).
+
+Consider a working programmer who writes
+
+```c++
+    std::flat_set<std::string> s;
+    s.equal_range("abc");
+      // lower_bound, lower_bound+1; (1 + lg N) operations total
+```
+
+and then switches to a heterogeneous comparator in an effort to "speed up" the code
+by avoiding the conversion to `std::string`:
+
+```c++
+    std::flat_set<std::string, std::less<>> st;
+    st.equal_range("abc");
+      // lower_bound, upper_bound; (2 lg N) operations total, cache-unfriendly
+```
+
+libc++ would like to see vendors given a little more freedom to experiment here.
+
+The proposed wording below doesn't require any vendor to change their implementation,
+since an existing implementation in O(log N) certainly also satisfies O(M + log N).
+
+### Wording ### {#wording-complexity-equal-range}
+
+Change <a href="https://eel.is/c++draft/associative.reqmts.general#171">[associative.reqmts.general]</a> as follows:
+
+<small><blockquote>
+<pre>
+a_tran.upper_bound(ku)
+</pre>
+
+166․ Result: `iterator`; `const_iterator` for constant `a_tran`.
+
+167․ Returns: An iterator pointing to the first element with key `r` such that `c(ku, r)`, or `a_tran.end()` if such an element is not found.
+
+168․ Complexity: Logarithmic.
+
+<pre>
+b.equal_range(k)
+</pre>
+
+169․ Result: `pair<iterator, iterator>`; `pair<const_iterator, const_iterator>` for constant `b`.
+
+170․ Effects: Equivalent to: `return make_pair(b.lower_bound(k), b.upper_bound(k));`
+
+171․ Complexity: <del>Logarithmic.</del> <ins>O(M + log N), where N is `b.size()` and M is `distance(b.lower_bound(k), b.upper_bound(k))`.</ins>
+
+<pre>
+a_tran.equal_range(ke)
+</pre>
+
+172․ Result: pair<iterator, iterator>; pair<const_iterator, const_iterator> for constant a_tran.
+
+173․ Effects: Equivalent to: return make_pair(a_tran.lower_bound(ke), a_tran.upper_bound(ke));
+
+174․ Complexity: <del>Logarithmic.</del> <ins>O(M + log N), where N is `a_tran.size()` and M is `distance(a_tran.lower_bound(ke), a_tran.upper_bound(ke))`.</ins>
+</blockquote></small>
+
+
+## Special member functions ## {#special-members}
+
+<a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> currently does not declare
+any special member functions. This implies that they are defaulted, which implicitly specifies
+their constexprness, noexceptness, and triviality.
+
+All three C++20 container adaptors (e.g. <a href="https://eel.is/c++draft/priqueue.overview">[priqueue.overview]</a>)
+follow that approach, too.
+
+All four associative and four unordered containers (e.g. <a href="https://eel.is/c++draft/set.overview">[set.overview]</a>)
+explicitly provide signatures for all five special members, including the destructor, like
+this:
+
+<small><blockquote>
+<pre>
+    set(const set& x);
+    set(set&& x);
+[...]
+    ~set();
+    set& operator=(const set& x);
+    set& operator=(set&& x)
+      noexcept(allocator_traits<Allocator>::is_always_equal::value &&
+               is_nothrow_move_assignable_v<Compare>);
+</pre>
+</blockquote></small>
+
+Should `flat_set`'s spec hew more closely to `std::set`'s or `priority_queue`'s?
+We tentatively think `set`'s is the better model, so that the vendor would be free to
+make the special members non-defaulted. Vendors are still permitted to strengthen the
+noexceptness and/or triviality of declared functions; for example, both libc++ and libstdc++
+make `set(set&&)` conditionally noexcept.
+
+```c++
+    using V = std::experimental::fixed_capacity_vector<int, 100>;
+    static_assert(std::is_trivially_destructible_v<V>);
+    using M = std::flat_set<int, std::less<int>, V>;
+    static_assert(std::is_trivially_destructible_v<M>);
+      // Before: Mandatory.
+      // After: Permitted but not mandatory.
+```
+
+## Moving from the comparator ## {#move-from-comparator}
+
+As shown above, the associative and unordered containers give their move-assignment operator
+a noexcept-spec that strongly implies it must move-from the comparator, never copy it.
+This particularly affects libstdc++, where `set(set&&)` will copy a stateful comparator
+(e.g. `std::function`) instead of moving-from it, but `set::operator=(set&&)` must move
+the comparator, leaving the source object in a "radioactive" state.
+
+This whole area is the subject of [[LWG2227]] "Stateful comparison objects in associative containers,"
+and is certainly beyond the scope of this paper P2767.
+
+```c++
+  struct TestLess : std::less<> {
+    // make this too big to fit in the small buffer
+    char pad_[1000];
+  };
+  using C = std::function<bool(int,int)>;
+  std::set<int, C> s({1,2,3}, C(TestLess()));
+  assert(s.key_comp() != nullptr);
+  auto t = std::move(s);
+  assert(s.key_comp() != nullptr);
+    // libstdc++: Succeeds
+    // libc++: Fails
+  s.clear();
+  s.insert({1,2});
+    // libstdc++: OK
+    // libc++: Throws std::bad_function_call
+  t = std::move(s);
+  s.insert({1,2});
+    // Everyone: Throws std::bad_function_call
+```
+
+If we user-declare `flat_set::operator=(flat_set&&)`,
+we must decide whether to give it a similar noexcept-spec.
+
+### Possible wording ### {#wording-special-members}
+
+(This wording merge-conflicts with the resolution of [[LWG3884]], which in turn merge-conflicts
+with the editorial refactoring at the beginning of this paper P2767. We can polish it later;
+the first question is whether LWG wants to pursue this direction at all.)
+
+For example, change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.map.cons], constructors
+    flat_map() : flat_map(key_compare()) { }
+
+    <ins>flat_map(const flat_map&);</ins>
+    <ins>flat_map(flat_map&&);</ins>
+    <ins>flat_map& operator=(const flat_multimap&);</ins>
+    <ins>flat_map& operator=(flat_multimap&&)</ins>
+      <ins>noexcept(is_nothrow_move_assignable_v&lt;KeyContainer> &&</ins>
+               <ins>is_nothrow_move_assignable_v&lt;MappedContainer> &&</ins>
+               <ins>is_nothrow_move_assignable_v&lt;Compare>);)</ins>
+    <ins>~flat_map();</ins>
+
+    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
+             const key_compare& comp = key_compare());
+</pre>
+</blockquote></small>
+
+## `iterator` and `const_iterator` ## {#iterator-types}
+
+`flat_set::iterator` and `flat_set::const_iterator` are presented as if they could be
+two different types. This is consistent with how we do it in `set` and `unordered_set`.
+But in practice, all three vendors make `set::iterator` and `set::const_iterator` the
+same type. We should consider refactoring the spec of `set`, `unordered_set`, and `flat_set`
+all at once to *mandate* that these iterator types be the same type, the same way we
+already do for [`basic_string_view`](https://eel.is/c++draft/string.view#footnote-207)
+and (since C++23 introduced `std::const_iterator`) [`span<const T>`](https://eel.is/c++draft/span.overview).
+
+This would allow us to remove a lot of redundant overloads from the specification,
+e.g. we don't need both `iterator find(value_type)` and `const_iterator find(value_type) const`
+if those are the same iterator type. Vendors can already do this removal in their implementations
+if they choose to. This is merely a question of our getting to do it in the paper specification too,
+under the banner of "standardizing existing practice."
+
+## Support for non-standard containers ## {#containers}
+
+TODO FIXME BUG HACK
+Vendors are required to support "random-access containers," which means `vector<T>` (except for `vector<bool>`)
+and `deque<T>`. It's unclear if vendors are required to support non-standard containers such as
+`boost::container::vector<T>`; and if so, what public API those containers must provide in order
+to interoperate with `flat_set`.
+
+For example, suppose the underlying container supports `C(first, last)` but not
+`C(from_range, rg)`. Then I would expect that I couldn't initialize a `flat_set<T, Compare, C>`
+with `flat_set(from_range, rg)`; but I should still be able to initialize it with `flat_set(first, last)`,
+right? It would be nice to see what's required and what's encouraged in this area.
+
+libc++ goes very slightly out of its way to support `vector<bool>` as the underlying container,
+even though we believe we're not required to support it.
+
+
 
 
 <!-- ------
 
-- What if the container's `swap` throws an exception? (e.g. static_vector)
-- Complexity requirement of constructor should be the same as the complexity requirement of std::sort / std::stable_sort
-- The complexity requirement "Logarithmic" for {flat_,}set.equal_range(ke) is really unfortunate. Suppose my set<string> is slow, so I try to speed it up by using a transparent comparator std::less<void>. Suddenly, my calls to `s.equal_range("foo")` that were taking std::string and doing a single binary search (plus a O(1) check of the next element) are now taking `const char*` and doing two binary searches.  Can we relax the Complexity requirement of `a_tran.equal_range(ke)` to something like "Logarithmic in the size of the container, plus linear in the number of elements returned"?  This will make programmers happier in practice, even though it slows down pathological K types.https://eel.is/c++draft/associative.reqmts#general-174
-
-- The wording doesn't mandate that `iterator` be the same type as `const_iterator`; in fact all the redundant signatures (find + find const, lower_bound + lower_bound const, ...) imply that the iterator types "should" be different. We have the same wording/signatures in `std::set`, and all three vendors agree that `set::{const_,}iterator` are in fact the same type. Should `flat_set` simply guarantee that `flat_set::{const_,}iterator` are the same type?  That way there's no "portability trap" when moving from one implementation to another. (I.e., we should prohibit vendors from making them different just for the heck of it).
 
 - What containers are supported?
-- Rename std::sorted_unique -> std::assume_sorted_unique
-- moving-out-of a flat_set should copy the comparator, not move-out-of the comparator
 
-(4) In general, `flat_set` cannot deal with containers or comparators that throw exceptions. (I discussed this general problem in "Mostly Invalid", CppCon 2019.) If inserting into the underlying container throws an exception, then `flat_set` cannot possibly know what state the underlying container is in — did the insert succeed? fail? half-succeed? — and therefore `flat_set` can't know whether its sortedness invariant still holds. (It can't test the sortedness invariant, either, because the comparator might throw, and we already have one exception in flight at this point.) So, if `insert` throws an exception, `flat_set` will clear itself.
-It's possible that we could do something clever in the case that we know the container is a specialization of `vector` (which we control), and various things are noexcept, so that if insertion throws (e.g. due to `bad_alloc`) then the user doesn't lose all of their data. Should we attempt to special-case `vector` and/or `deque`'s recovery behavior? I propose "no," because I think our attempt would fail anyway and so I don't want to waste time thinking about clever tactics. But if someone wants to propose a specific clever tactic, I'll investigate it and tell you why it didn't work.
+(4) In general, `flat_set` cannot deal with containers or comparators that throw exceptions. 
+(I discussed this general problem in "Mostly Invalid", CppCon 2019.) If inserting into the underlying container throws an exception,
+ then `flat_set` cannot possibly know what state the underlying container is in — did the insert succeed? fail? half-succeed? — and therefore `flat_set`
+ can't know whether its sortedness invariant still holds. (It can't test the sortedness invariant, either, because the comparator might throw, and we
+ already have one exception in flight at this point.) So, if `insert` throws an exception, `flat_set` will clear itself.
+It's possible that we could do something clever in the case that we know the container is a specialization of `vector` (which we control), and 
+various things are noexcept, so that if insertion throws (e.g. due to `bad_alloc`) then the user doesn't lose all of their data. Should we attempt
+ to special-case `vector` and/or `deque`'s recovery behavior? I propose "no," because I think our attempt would fail anyway and so I don't want to
+ waste time thinking about clever tactics. But if someone wants to propose a specific clever tactic, I'll investigate it and tell you why it didn't work.
 
-- `swap` is unconditionally noexcept, which is inconsistent with priority_queue and stack and queue (they're conditionally noexcept). We should really be conditionally noexcept, and then "restore the invariant" (i.e. clear both containers) if an exception is thrown. Except: What do we do if swapping the comparators throws? Then we can't do anything at all!  Suggest at least a precondition that swapping the comparators will not throw an exception. Louis suggests stronger: Constraint that is_nothrow_swappable_v<Compare>!  Also, the unconditional noexcept produces worse codegen (try-catch-abort) than a conditional noexcept would produce.
 
 
 
 
-- std::flat_map's non-explicit constructor from (key_cont, mapped_cont) is deceptive, because if you use it with braced initializers, you'll get different overloads depending on the number of elements in the inner braced initializers.https://godbolt.org/z/Y4bTzdx79
-    void print_map(std::flat_map<int, int> fm);
-    print_map({ {}, {} });  // i.e. flat_map(initializer_list<pair>): the initializer_list has length 2, and the result after deduplication is {{0,0}}    print_map({ {1}, {10} });  // i.e. flat_map(keys, values): result is {{1,10}}
-    print_map({ {1, 2}, {10, 20} });  // i.e. flat_map(initializer_list<pair>): result is {{1,2}, {10,20}}
-    print_map({ {1, 2, 3}, {10, 20, 30} });  // i.e. flat_map(keys, values): result is {{1,10}, {2,20}, {3,30}}To solve this problem, I tentatively suggest that the constructor from (keys, values) should be marked `explicit`, so that the 1th and 3th lines here will fail to compile, instead of being an attractive nuisance.
 
 ----- -->
 
@@ -1522,6 +1988,22 @@ on my GitHub; see [[Wording]].
 
 <pre class=biblio>
 {
+  "LWG2227": {
+    "title": "Stateful comparison objects in associative containers",
+    "authors": [
+      "Juan Soulie"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue2227",
+    "date": "December 2012"
+  },
+  "LWG3786": {
+    "title": "Flat maps' deduction guide needs to default Allocator to be useful",
+    "authors": [
+      "Johel Ernesto Guerrero Peña"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3786",
+    "date": "September 2022"
+  },
   "LWG3802": {
     "title": "flat_foo allocator-extended constructors lack move semantics",
     "authors": [
@@ -1546,13 +2028,13 @@ on my GitHub; see [[Wording]].
     "href": "https://cplusplus.github.io/LWG/issue3804",
     "date": "October 2022"
   },
-  "LWG3786": {
-    "title": "Flat maps' deduction guide needs to default Allocator to be useful",
+  "LWG3884": {
+    "title": "flat_foo is missing allocator-extended copy/move constructors",
     "authors": [
-      "Johel Ernesto Guerrero Peña"
+      "Arthur O'Dwyer"
     ],
-    "href": "https://cplusplus.github.io/LWG/issue3786",
-    "date": "September 2022"
+    "href": "https://cplusplus.github.io/LWG/issue3884",
+    "date": "February 2023"
   },
   "P0429": {
     "title": "A standard flat_map",
@@ -1561,6 +2043,14 @@ on my GitHub; see [[Wording]].
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0429r9.pdf",
     "date": "June 2022"
+  },
+  "P1163": {
+    "title": "Explicitly implicifying explicit constructors",
+    "authors": [
+      "Nevin Liber"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p1163r0.pdf",
+    "date": "August 2018"
   },
   "P1222": {
     "title": "A standard flat_set",
