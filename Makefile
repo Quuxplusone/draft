@@ -12,7 +12,7 @@ all: \
     d2538-adl-proof-std-projected.html \
     d2596-improve-hive-reshape.html \
     d2752-static-storage-for-braced-initializers.html \
-    d2767-flat-set-inconsistencies.html \
+    d2767-flat-omnibus.html \
     d2848-std-is-uniqued.html
 
 %.html: %.bs
