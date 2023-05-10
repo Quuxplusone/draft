@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 8
-!Draft Revision: 43
+!Draft Revision: 46
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -20,7 +20,7 @@ Abstract:
   that it is trivially relocatable.
   P1144R3 was presented at C++Now 2019 as a 90-minute talk titled
   ["Trivially Relocatable."](https://www.youtube.com/watch?v=SGdfPextuAU)
-Date: 2023-04-05
+Date: 2023-05-10
 </pre>
 
 <style>
@@ -31,11 +31,23 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
+- R8 (Varna 2023):
+
+    - Removed "If a type `T` is declared `trivially_relocatable`, and `T` is either not move-constructible
+            or not destructible, the program is ill-formed" from [[#wording-dcl.attr.trivreloc|dcl.attr.trivreloc]].
+            This should have been removed in R7 along with "move-constructible, destructible."
+
+    - Adjust the precondition of `is_trivially_relocatable_v` to match `is_trivially_copyable_v`.
+
+    - Resolved the [[#open-questions|Appendix E]] question about potentially overlapping subobjects;
+            we have implementation experience now that proves this is not a problem.
+
+    - Removed background §3 "Design goals" (leaving only a note for the interested reader to consult [[P1144R6]]).
+
 - R7 (post-Issaquah 2023):
 
-    - [[P2786R0]] debuted at Issaquah; it raised several
-            open questions (see [[#open-questions]]). The authors of P1144 and P2786
-            plan a joint paper to resolve some of these design issues.
+    - [[P2786R0]] debuted at Issaquah; it raised several open questions (see [[#open-questions]]).
+            The authors of P1144 and P2786 plan a joint paper to resolve some of these design issues.
 
     - Added `std::uninitialized_relocate_backward`, the building block of `vector::insert`.
 
@@ -45,7 +57,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
     - Added [[#applications|table §2.1]] directly comparing this proposal to Folly, BSL, and Qt.
 
     - Added straw poll results from Issaquah; removed much background and discussion
-            (leaving only references for the interested reader to consult [[P1144R6]]).
+            (leaving only notes for the interested reader to consult [[P1144R6]]).
 
     - Removed mentions of EASTL.
 
@@ -117,7 +129,7 @@ nor does it require major work from standard library vendors.
 
 ## Optimizations enabled by trivial relocatability ## {#applications}
 
-The following optimizations are possible according to P1144R7's notion of
+The following optimizations are possible according to P1144R8's notion of
 trivial relocatability. Here's who does these optimizations in practice:
 
 <table>
@@ -128,10 +140,14 @@ trivial relocatability. Here's who does these optimizations in practice:
      <a href="https://github.com/Quuxplusone/llvm-project/blob/d0c5d3639e/libcxx/include/vector#L936-L942">`std::vector`</a> </td><td>
      no </td><td>
      N/A </td><td>
-     not yet </td><td>
-     <a href="https://github.com/Quuxplusone/llvm-project/blob/d0c5d3639e/libcxx/include/vector#L1728-L1744">`std::vector`</a> </td><td>
-     yes, uses `swap` </td><td>
-     <a href="https://github.com/Quuxplusone/llvm-project/blob/d0c5d3639e/libcxx/include/__utility/swap.h#L45-L57">`std::swap`</a> </td>
+     <a href="https://github.com/Quuxplusone/llvm-project/blob/e8b61de07/libcxx/include/vector#L1663-L1669">`std::vector`</a><br>
+         (<a href="https://godbolt.org/z/18hvvxjE4">Godbolt</a>) </td><td>
+     <a href="https://github.com/Quuxplusone/llvm-project/blob/e8b61de07/libcxx/include/vector#L1722-L1732">`std::vector`</a><br>
+         (<a href="https://godbolt.org/z/18hvvxjE4">Godbolt</a>) </td><td>
+     yes, uses `swap_ranges`<br>
+         (<a href="https://godbolt.org/z/onxrEce6G">Godbolt</a>) </td><td>
+     <a href="https://github.com/Quuxplusone/llvm-project/blob/e8b61de07/libcxx/include/__algorithm/swap_ranges.h#L59-L75">`std::swap_ranges`</a><br>
+         (<a href="https://godbolt.org/z/onxrEce6G">Godbolt</a>) </td>
 </tr><tr>
 <td> [[BSL]] `bslmf::IsBitwiseMoveable<T>` </td><td>
      <a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslstl/bslstl_vector.h#L3374-L3398">`bsl::vector`</a> </td><td>
@@ -180,14 +196,14 @@ like `any`, `function`, and `move_only_function`.
 For these types, a *move* of the wrapper object is implemented in terms of a
 *relocation* of the contained object. (See for example
 <a href="https://github.com/llvm-mirror/libcxx/blob/8fdc4918/include/any#L389-L394">libc++'s `std::any`</a>.)
-In general, the *relocate* operation must be uniquely codegenned for each
-different contained type `C`, leading to code bloat. But a single instantiation suffices to relocate every <em>trivially</em>
-relocatable `C` in the program.
+In general, the *relocate* operation must have a different instantiation for each
+different contained type `C`, leading to code bloat. But every trivially relocatable `C`
+of a given size can share the same instantiation.
 
 
 ### Moving fixed-capacity containers like `static_vector` and `small_vector` ### {#benefit-fixed-capacity}
 
-The move-constructor of `fixed_capacity_vector<R,N>`,
+The move-constructor of `fixed_capacity_vector<R,N>`
 can be implemented naïvely as an element-by-element *move*
 (leaving the source vector's elements in their moved-from state),
 or efficiently as an element-by-element *relocate*
@@ -206,11 +222,12 @@ the faster relocation strategy.
 Trivial relocation can be used anywhere we shift a contiguous range left or right,
 such as in `vector::erase` (i.e., destroy the erased elements and "close the window"
 by memmoving left) and `vector::insert` (i.e., "make a window" by memmoving right and
-then construct the new elements in place). [[Folly]]'s `fbvector` is prior art
-for this optimization; see
+then construct the new elements in place). [[Folly]]'s `fbvector` does
+this optimization; see
 <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1273-L1308">`fbvector::make_window`</a>.
+Bloomberg's [[BSL]] also does this optimization.
 
-[[#pmr-concerns]] determines whether this optimization will be possible in Standard C++.
+[[#pmr-concerns]] determines whether this optimization will be possible for `pmr` containers in Standard C++.
 
 
 ### Swap ### {#benefit-swap}
@@ -227,7 +244,7 @@ and see [this Godbolt](https://p1144.godbolt.org/z/PPYhcYd8d).
 [This Quick-Bench](https://quick-bench.com/q/suAss7ElmwgLDbOJQGnlEseheSQ) shows a 25% speedup
 in `std::rotate` when it is allowed to use bitwise swap on a Rule-of-Zero type.
 
-But [[#pmr-concerns]] determines whether this optimization will be possible in Standard C++.
+But [[#pmr-concerns]] determines whether this optimization will be possible for `pmr` containers in Standard C++.
 
 
 ## Assertions, not assumptions ## {#benefit-assertions}
@@ -290,93 +307,7 @@ is the most important benefit to be gained by this proposal.
 
 # Design goals # {#design-goals}
 
-Every C++ type already *is* or *is not* trivially relocatable. This proposal does not require any
-library vendor to make any library type trivially relocatable. (We assume that quality implementations
-will do so on their own.)
-
-The optimizations above are in the domain of library writers. If you're writing
-a vector, and you detect that your element type `T` is trivially relocatable, then
-whether you optimize in that case is up to you.
-This proposal does not require any library vendor to guarantee that any particular optimization
-happens. (We assume that quality implementations will do so on their own.)
-
-What C++ lacks is a standard way for library writers to *detect* the (existing) trivial relocatability
-of a type `T`, so that they can reliably apply their (existing) optimizations.
-All we really need is to add *detection*, and then all the optimizations described above will naturally
-emerge without any further special effort by WG21.
-
-There are three kinds of object types that we want to make sure are correctly detected as
-trivially relocatable. These three cases are important for improving the performance of
-the standard library, and for improving the correctness of libraries such as
-[[Folly]]'s `fbvector`.
-
-
-## Standard library types such as `std::string` ## {#use1}
-
-In order to optimize `std::vector<std::string>::resize`, we must come up with a way to achieve
-```c++
-    #include <string>
-    static_assert(std::is_trivially_relocatable_v< std::string >);
-```
-This could be done unilaterally by the library vendor — via a non-standard attribute
-(`[[clang::trivially_relocatable]]`), or a member typedef with a reserved name,
-or simply a vendor-provided specialization of `std::is_trivially_relocatable<std::string>`.
-
-That is, we can in principle solve §3.1 while confining our "magic" to the headers
-of the implementation itself. The programmer doesn't have to learn anything new, so far.
-
-
-## Program-defined types that follow the Rule of Zero ## {#use2}
-
-In order to optimize the SBO `std::function` in any meaningful sense,
-we must come up with a way to achieve
-```c++
-    #include <string>
-    auto lam2 = [x=std::string("hello")]{};
-    static_assert(std::is_trivially_relocatable_v< decltype(lam2) >);
-```
-Lambdas are not a special case in C++; they are simply class types with all their special members defaulted.
-Therefore, lambdas can use the same solution as
-```c++
-    #include <string>
-    struct A {
-        std::string s;
-    };
-    static_assert(std::is_trivially_relocatable_v< A >);
-```
-Here `struct A` follows the Rule of Zero: its move-constructor and destructor are both defaulted.
-If they were also *trivial*, then we'd be done. In fact they are non-trivial; and yet, because the type's
-bases and members are all of trivially relocatable types, the type as a whole *is* trivially relocatable.
-
-§3.2 asks that we make the `static_assert` succeed without breaking the "Rule of Zero."
-We do not want to require the programmer to annotate `struct A` with a special attribute, or
-a special member typedef, or anything like that. We want it to Just Work.
-This is a harder problem than §3.1; it requires standard support in the core language.
-But it still does not require any new *syntax*.
-
-
-## Program-defined types with non-defaulted special members ## {#use3}
-
-In order to optimize `std::vector<boost::shared_ptr<T>>::resize`,
-we must come up with a way to achieve
-```c++
-    struct B {
-        B(B&&);  // non-trivial
-        ~B();  // non-trivial
-    };
-    static_assert(std::is_trivially_relocatable_v< B >);
-```
-via some standard annotation applied to class type `B` (which in this example is standing in for
-`boost::shared_ptr`).
-We cannot possibly do it without annotation, because there exist
-examples of types that look just like `B` and *are* trivially relocatable
-(e.g. <a href="https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/bits/std_function.h">libstdc++'s `std::function`</a>)
-and there exist types that look just like `B` and are *not* trivially relocatable
-(e.g. <a href="https://github.com/llvm-mirror/libcxx/blob/4e7ffcaa/include/functional#L1719-L1734">libc++'s `std::function`</a>).
-So, without some kind of opt-in annotation, we cannot achieve our goal.
-
-This paper proposes a standard syntax for §3.3, which in turn
-provides a *simple and portable* way for library vendors to implement §3.1.
+For the former contents of this section, see <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r7.html#design-goals">P1144R7 §3</a>.
 
 
 # Proposed wording for C++2b # {#wording}
@@ -645,17 +576,17 @@ Add new entries to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">
 <tr>
 <td>`template<class T> struct is_relocatable;`</td>
 <td>`is_move_constructible_v<T>` is `true` and `is_destructible_v<T>` is `true`</td>
-<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+<td>`T` shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
 </tr>
 <tr>
 <td>`template<class T> struct is_nothrow_relocatable;`</td>
 <td>`is_relocatable_v<T>` is `true` and both the indicated move-constructor and the destructor are known not to throw any exceptions.</td>
-<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+<td>`T` shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
 </tr>
 <tr>
 <td>`template<class T> struct is_trivially_relocatable;`</td>
 <td>`T` is a [$trivially relocatable$] type.</td>
-<td>T shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
+<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
 </tr>
 </table>
 </blockquote></small>
@@ -773,11 +704,15 @@ the former makes `vp[0].get_allocator().resource() == &mr1` and the latter would
 implemented in terms of a single `std::rotate` followed by a call to `~string`, we'd have UB here
 because it is UB to `swap` strings with unequal allocators.
 
-For now, P1144R7's proposed wording implies that `std::pmr::string` must not be marked as trivially relocatable.
+For now, P1144R8's proposed wording implies that `std::pmr::string` must not be marked as trivially relocatable.
 But if we add some blanket wording setting appropriate preconditions on `std::pmr::string`
 (for example, permitting `vector::erase` and `deque::erase` to be implemented in terms of `rotate`,
 or forbidding STL containers from containing PMR types with unequal allocators), then
 vendors could make `std::pmr::string` trivially relocatable.
+
+There is still one tricky bit: `std::allocator_traits<std::pmr::polymorphic_allocator<T>>::construct`
+is user-provided. `std::vector` must be taught that it is safe to treat `polymorphic_allocator`'s
+`construct` the same as `allocator`'s trivial `construct`.
 
 Issue: What new wording is needed to achieve this?
 
@@ -788,14 +723,17 @@ the choice whether to respect POCMA/POCCA/POCS, and also makes the choice
 when to warrant trivial relocatability. These choices are correlated, and so it is natural that
 they should be made by the same person, at the same place in the source code.
 
-## Overlapping base-class subobjects ## {#overlap-concerns}
+## Non-issue: Overlapping base-class subobjects ## {#overlap-concerns}
 
-Note: This section was added in P1144R7.
+Note: This section was added in P1144R7 and resolved in P1144R8.
 
-In the following snippet, `struct Dangerous` fails to be trivially relocatable in practice
-because its assignment operator doesn't overwrite all `sizeof(Dangerous)` bytes of the
-destination object. The tail padding of `Dangerous` is allowed to contain the value of
-`Derived::k`. ([Godbolt.](https://godbolt.org/z/T7rzrY3x9))
+In the following snippet, `struct Dangerous` is trivially copyable
+(and thus trivially relocatable), so we might think that `std::swap(ra, rb)`
+should be allowed to swap the bytes of `ra` with the bytes of `rb`.
+A naïve approach is to swap `sizeof(Dangerous) == 8` bytes, but that's unsafe,
+because the tail padding of `Dangerous` is allowed to contain the value of
+`Derived::k`. If `std::swap` is to do "trivial swapping," it must account
+for potentially overlapping subobjects.
 
 ```c++
 struct Dangerous {
@@ -804,6 +742,7 @@ struct Dangerous {
     short j;
 };
 static_assert(std::is_standard_layout_v<Dangerous>);
+static_assert(std::is_trivially_copyable_v<Dangerous>);
 static_assert(std::is_trivially_relocatable_v<Dangerous>);
 
 struct Derived : Dangerous {
@@ -811,56 +750,34 @@ struct Derived : Dangerous {
     short k;
 };
 static_assert(!std::is_standard_layout_v<Derived>);
-static_assert(!std::is_trivially_relocatable_v<Derived>);
+static_assert(std::is_trivially_copyable_v<Derived>);
+static_assert(std::is_trivially_relocatable_v<Derived>);
 
 int main() {
     Derived a = Derived(1,2,3);
     Derived b = Derived(4,5,6);
     Dangerous &ra = a, &rb = b;
-    std::swap(ra, rb);
+    std::swap(ra, rb);  // must swap only 6 bytes,
+                        // not sizeof(Dangerous) = 8 bytes
     assert(a.k == 3 && b.k == 6);
 }
 ```
 
-[[Subspace]] presented a version of this snippet, which led to the suggestion to consider only
-standard-layout types "naturally" trivially relocatable. Unfortunately, that criterion affects only
-`Derived`, whereas it's `Dangerous` that we can't trivially swap.
+Arthur's libc++ fork implements this solution ("possible solution #4" from P1144R7):
+`std::swap` is allowed to bytewise-swap trivially copyable and/or trivially relocatable types
+only when they are definitely not potentially overlapping subobjects. In practice, this means:
 
-Possible solution #1 is due to [[Subspace]]: Bring the ABI notion of "data size" into standard C++,
-so that we can say that the "data size" of `Dangerous` is less than its "size." Types with "data size"
-less than "size" aren't naturally trivially relocatable. But this is painful, because it makes
-`is_trivially_relocatable_v<Dangerous>` false.
+- `std::swap` can swap bytes as long as the type has no
+    occupied padding. On the Itanium ABI, this means we can swap [`datasizeof(T)`](https://danakj.github.io/2023/01/15/trivially-relocatable.html)
+    bytes: non-tail padding bytes are never occupied. On an unknown ABI, we can still swap `sizeof(T)`
+    bytes if we know that `has_unique_object_representations_v<T>`, because such a `T` cannot have
+    any padding at all. Worst case, we simply treat the type as non-trivial.
 
-Possible solution #2: Don't expose the ABI notion of "data size," but do take ABI into account
-when deciding whether `Dangerous` is naturally trivially relocatable. This makes
-`is_trivially_relocatable_v<Dangerous>` implementation-defined in theory (false in practice) —
-even though it is trivially copyable!
-The difficulty here is crafting the wording.
-
-Possible solution #3: Bring the ABI notion of "data size" into standard C++, and make the trivial
-version of `std::swap(T&, T&)` swap only `datasizeof(T)` bytes of memory instead of `sizeof(T)` bytes.
-This makes it difficult for the vendor to benefit from trivial relocation in `rotate` (because
-just calling `swap` won't swap all the bytes, which makes it impossible for the optimizer
-to coalesce adjacent memcpy operations into one big memcpy).
-This makes `is_trivially_relocatable_v<Dangerous>` true, makes `std::swap(ra, rb)` trivial,
-and makes `std::rotate` non-trivial.
-
-Possible solution #4: Disallow `std::swap(T&, T&)` from using trivial relocation unless
-it can prove that it's operating on complete objects. This would also disallow e.g. `std::rotate`
-from using trivial relocation unless it's operating on complete objects (e.g.
-because it received a contiguous range). This creates fewer surprises, but makes it difficult
-for the vendor to benefit from trivial relocation in `rotate` (because they can't just get
-it for free by calling `swap`; they'd have to create a second entrypoint `__swap_complete_objects`
-and figure out how to call that instead of `swap` from algorithms that would benefit from it).
-This makes `is_trivially_relocatable_v<Dangerous>` true, makes `std::swap(ra, rb)` non-trivial,
-and makes `std::rotate` trivial with heroics.
-
-Possible solution #5 is what [[P1144R6]] implicitly assumed: Put a precondition on `swap(T&, T&)`
-(both the template and user-defined ADL overloads) that says it's UB if either argument refers
-to an overlapping subobject.
-This makes `is_trivially_relocatable_v<Dangerous>` true, makes `std::swap(ra, rb)` undefined behavior,
-and makes `std::rotate` trivial.
-The difficulty here is getting WG21 to accept a new precondition on `swap`.
+- `std::swap_ranges` can swap bytes as long as `distance(first, last) >= 2`.
+    A range of length 1 might be a single object, which might have padding that cannot be swapped.
+    Implementors already must do this logic in `std::copy` etc.
+    (see <a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=108846">libstdc++ bug #108846</a>)
+    so doing it also in `swap_ranges` is no hardship.
 
 
 # Acknowledgements # {#acknowledgements}
@@ -899,6 +816,8 @@ to Alisdair Meredith for our extensive discussions during the February 2023 draf
 to Giuseppe D'Angelo and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]],
 and to Giuseppe D'Angelo for extensive review comments and discussion.
 
+Thanks to Mungo Gill for [[P2786R0]] and [[P2814R0]].
+
 
 Appendix A: Straw polls {#polls}
 =================================
@@ -906,7 +825,7 @@ Appendix A: Straw polls {#polls}
 
 ## Polls taken at EWGI at Issaquah on 2023-02-10 ## {#taken-polls-2023-02-10}
 
-Arthur O'Dwyer presented P1144R6. Alisdair Meredith presented [[P2786R0]] (which proposed a
+Arthur O'Dwyer presented [[P1144R6]]. Alisdair Meredith presented [[P2786R0]] (which proposed a
 `[[maybe_trivially_relocatable]]`-style facility, and expressed it as a contextual keyword instead
 of an attribute). EWGI took the following [straw polls](https://wiki.edg.com/bin/view/Wg21issaquah2023/EWGIP1144R6)
 (as well as polls on attribute syntax and on both papers' readiness for EWG).
@@ -1182,39 +1101,33 @@ few unintentional differences in `__is_trivially_relocatable` mentioned above).
 Appendix E: Open questions {#open-questions}
 =====================================
 
-Issue: P1144R6 `uninitialized_relocate(In, In, Fwd)`'s spec lacks the magic either-direction-overlap-handling of `memmove`.
-Either-direction-overlap-handling is implementable only for contiguous iterators (which can be converted to pointers);
-it is not implementable for arbitrary random-access iterators. Is there ever a case where someone might want to e.g.
-`uninitialized_relocate(rbegin(a), rend(a), begin(b))`? Do we need a separate algorithm?
-[[Qt]] provides both
-<a href="https://github.com/qt/qtbase/blob/4dbd97c/src/corelib/tools/qcontainertools_impl.h#L203-L233">`q_relocate_overlap_n(T*, size_t, T*)`</a>
-with magic overlap handling, and
-<a href="https://github.com/qt/qtbase/blob/4dbd97c/src/corelib/tools/qcontainertools_impl.h#L71-L85">`q_uninitialized_relocate_n(T*, size_t, T*)`</a>
-without.
-[[P2786R0]] proposes only `relocate(T*, T*, T*)` with magic overlap handling.
-[[P1144R6]] proposed only `uninitialized_relocate(In, In, Fwd)` without.
-
-Issue: In P1144R7, types with vptrs are never naturally trivially relocatable.
+Issue: In P1144R8, types with vptrs are never naturally trivially relocatable.
 Arthur claims that types with vptrs should be used only with inheritance, which means they never do value semantics
 (they slice instead), which means relocating one is always a bug, just like assigning or copying one. But [[P2786R0]]
 proposes to make polymorphic types naturally trivially relocatable. Is there any use-case for relocating polymorphic
 types? Is P1144 being too conservative here?
 
-Issue: In P1144R7, `std::vector<std::pmr::vector<int>>::erase(pos)` can use trivial relocation to
+Issue: In P1144R8, `std::vector<std::pmr::vector<int>>::erase(pos)` can use trivial relocation to
 "close up the window" in the vector; this is also done in [[Qt]], [[Folly]], and [[BSL]]. The difference between
 closing-the-window-by-move-assignment and closing-the-window-by-memmove is detectable in a conforming C++ program.
 Therefore [[P2786R0]] proposes that relocation should not be allowed here.
 Is there any implementation experience of P2786R0's conservative position here?
-([[BSL]]'s `bsl::vector` follows P1144R7's liberal position already.)
+([[BSL]]'s `bsl::vector` follows P1144R8's liberal position already.)
 
-Issue: In P1144R6, `std::rotate(a, a+2, a+8)` on an array `std::pmr::vector<int> a[10]` can use trivial relocation to
+Issue: In P1144R8, `std::rotate(a, a+2, a+8)` on an array `std::pmr::vector<int> a[10]` can use trivial relocation to
 swap the elements. The difference between swap-by-move-assignment and swap-by-trivial-relocation is not detectable
 in a conforming C++ program, because swapping `pmr::vector`s with unequal allocators is UB.
 [[P2786R0]] conservatively proposes that relocation should not be allowed here, anyway.
 Is there any usage experience in [[Qt]], [[BSL]], [[Folly]], or elsewhere that bears on this question?
 (Arthur's libc++ fork does relocation here, but doesn't really count as usage experience since he's the only one using it.)
 
-Issue: We need a solution for potentially overlapping subobjects; see [[#overlap-concerns]].
+Issue: If `std::pmr::vector<int>` is considered trivially relocatable, then so would be a Rule-of-Zero type `Widget`
+with a `pmr::vector` data member. This means that we optimize `std::rotate(Widget*, ...)` (<a href="https://godbolt.org/z/4zGPcoejc">Godbolt</a>),
+which is a huge performance win but again is <a href="https://godbolt.org/z/fY1fjs3Mn">observably</a> different behavior
+from the old way — and in this particular case the old behavior is *not* undefined!
+Still, it would be sad to give up this massive performance improvement for `pmr` types.
+Can we modify the preconditions of {`pmr::vector`, `swap`, `swap_ranges`, `rotate`} to make this optimization conforming?
+
 
 <pre class=biblio>
 {
@@ -1316,13 +1229,6 @@ Issue: We need a solution for potentially overlapping subobjects; see [[#overlap
     "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm",
     "date": "September 2002"
   },
-  "N2271": {
-    "authors": [
-      "Paul Pedriana"
-    ],
-    "title": "N2271: EASTL — Electronic Arts Standard Template Library",
-    "href": "http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2271.html#type_traits_extensions"
-  },
   "N2754": {
     "authors": [
       "Rodrigo Castro Campos"
@@ -1367,16 +1273,25 @@ Issue: We need a solution for potentially overlapping subobjects; see [[#overlap
     "authors": [
       "Arthur O'Dwyer"
     ],
-    "title": "P1144R6: Object relocation in terms of move plus destroy",
+    "title": "Object relocation in terms of move plus destroy",
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1144r6.html",
     "date": "June 2022"
+  },
+  "P2814R0": {
+    "authors": [
+      "Mungo Gill",
+      "Alisdair Meredith"
+    ],
+    "title": "Trivial relocatability — comparing P2786 with P1144",
+    "href": "https://wg21.link/p2814r0",
+    "date": "May 2023"
   },
   "P2786R0": {
     "authors": [
       "Mungo Gill",
       "Alisdair Meredith"
     ],
-    "title": "P2786R0: Trivial relocatability options",
+    "title": "Trivial relocatability options",
     "href": "https://wg21.link/p2786r0",
     "date": "February 2023"
   },
