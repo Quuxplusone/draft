@@ -2,7 +2,7 @@
 Title: flat_map/flat_set omnibus
 Shortname: D2767
 Revision: 0
-!Draft Revision: 7
+!Draft Revision: 8
 Audience: LWG
 Status: D
 Group: WG21
@@ -1539,141 +1539,79 @@ void replace(container_type<del>&&</del> cont);
 13․ Effects: Equivalent to: `c = std::move(cont);`
 </blockquote></small>
 
+# Add `flat_set::keys()` # {#keys-method}
 
-# Noexcept `swap` # {#noexcept-swap}
-
-`flat_set::swap` is currently specified as unconditionally noexcept, which is inconsistent both
-with `std::set` and with the pre-existing adaptors.
+`flat_map` and `flat_multimap` both provide `keys()` and `values()` getters:
 
 <small><blockquote>
 <pre>
-    // [flat.set.defn]
-    void swap(flat_set& y) noexcept;
+    <i>// observers</i>
+    key_compare key_comp() const;
+    value_compare value_comp() const;
 
-    // [priqueue.overview]
-    void swap(priority_queue& q) noexcept(is_nothrow_swappable_v&lt;Container> &&
-                                          is_nothrow_swappable_v&lt;Compare>)
-      { using std::swap; swap(c, q.c); swap(comp, q.comp); }
-
-    // [set.overview]
-    void swap(set&)
-      noexcept(allocator_traits&lt;Allocator>::is_always_equal::value &&
-               is_nothrow_swappable_v&lt;Compare>);
+    const key_container_type& keys() const noexcept      { return c.keys; }
+    const mapped_container_type& values() const noexcept { return c.values; }
 </pre>
 </blockquote></small>
 
-Suppose the underlying container has a throwing move-constructor (like MSVC `std::list`), and lacks a custom `swap`;
-then `std::swap<Container>` can throw. Or, suppose the underlying container is `boost::container::static_vector<T>`;
-then its `swap` must swap `T` objects, which can throw.
-
-Louis Dionne observes that the codegen for unconditional `noexcept` is worse than the codegen for conditional `noexcept`,
-because the former requires us to catch and `std::terminate` whereas the latter lets any exceptions from the lower
-level pass through to the upper level (no extra codegen required).
-
-Now, what happens if swapping the containers actually does throw? Then both containers are in an unknown
-state, so we must restore the invariant by clearing both containers. We do the same thing if `insert` or `erase`
-throws, so this is nothing new.
-
-What happens if swapping the comparators throws? Then we cannot recover. Louis suggests adding
-`is_nothrow_swappable_v<Compare>` as a constraint. This seems reasonably ergonomic:
-Almost all comparators are either Rule-of-Zero empty types,
-or library-provided types like `std::function`. Both kinds of comparators are always nothrow swappable.
-And the resulting behavior seems better: In the pathological corner case where `flat_set` cannot safely provide
-swappability, it's better for it not to be swappable at all, than for it to falsely advertise a
-noexcept `swap`.
-
-Should we specify the implementation in terms of `ranges::swap(c, y.c)` etc.? A priori, we think not; the
-semantics of swapping are covered adequately by <a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]</a>,
-and vendors should be able to decide for themselves how to swap comparator objects.
-
-## Wording ## {#wording-noexcept-swap}
-
-Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+`flat_set` and `flat_multiset` do not:
 
 <small><blockquote>
 <pre>
-    <del>void swap(flat_map& y) noexcept;</del>
-    <ins>void swap(flat_map& y)</ins>
-      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
-               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-    void clear() noexcept;
-
-[...]
-
-    <del>friend void swap(flat_map& x, flat_map& y) noexcept { x.swap(y); }</del>
-    <ins>friend void swap(flat_map& x, flat_map& y)</ins>
-      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
-               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-        <ins>{ x.swap(y); }</ins>
+    <i>// observers</i>
+    key_compare key_comp() const;
+    value_compare value_comp() const;
 </pre>
 </blockquote></small>
 
-Change <a href="https://eel.is/c++draft/flat.map.modifiers">[flat.map.modifiers]</a> as follows:
+libc++ has found that `.keys` and `.values` are helpful in unit tests.
+The `.extract` method is a poor replacement.
 
-<small><blockquote>
-<pre>
-<del>void swap(flat_map& y) noexcept;</del>
-</pre>
-<del>13․ Effects: Equivalent to:</del>
-<pre>
-<del>ranges::swap(compare, y.compare);</del>
-<del>ranges::swap(c.keys, y.c.keys);</del>
-<del>ranges::swap(c.values, y.c.values);</del>
-</pre>
-</blockquote></small>
+```c++
+    auto ks = std::vector<int, A>({1,2,3}, A(1));
+    auto vs = std::vector<int, A>({4,5,6}, A(2));
+    auto m = std::flat_map(std::move(ks), std::move(vs));
+    assert(m.keys().get_allocator() == A(1));
+    assert(m.values().get_allocator() == A(2));
+      // convenient
 
-Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
+    auto ks = std::vector<int, A>({1,2,3}, A(1));
+    auto s = std::flat_set(std::move(ks));
+    assert(std::move(s).extract().get_allocator() == A(1));
+      // awkward, and modifies the value of s
+```
 
-<small><blockquote>
-<pre>
-    <del>void swap(flat_multimap& y) noexcept;</del>
-    <ins>void swap(flat_multimap& y)</ins>
-      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
-               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-    void clear() noexcept;
+For a const `flat_set`, there's literally no way to get at the container
+and query its properties, such as capacity, allocator, or even size
+(which is important for unit tests, if not for real programming).
 
-[...]
+```c++
+    using S = std::flat_set<int, std::less<>, std::vector<int, A>>;
+    const S s = {1,2,3};
+    assert(s.keys().size() == 3);
+    assert(s.keys().capacity() >= 3);
+      // Before: Impossible to retrieve this information
+      // After: OK
+```
 
-    <del>friend void swap(flat_multimap& x, flat_multimap& y) noexcept { x.swap(y); }</del>
-    <ins>friend void swap(flat_multimap& x, flat_multimap& y)</ins>
-      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
-               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-        <ins>{ x.swap(y); }</ins>
-</pre>
-</blockquote></small>
+Therefore we suggest adding a getter for the `.keys` of a set, just
+like we already have for the flat map types.
+
+Notice that `flat_map`'s `.values()` getter returns a container of `mapped_type`,
+not a container of `value_type`. `flat_set` doesn't have a `mapped_type`;
+therefore it shouldn't have `.values()` either.
+
+## Wording ## {#wording-keys-method}
 
 Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
 
 <small><blockquote>
 <pre>
-    <del>void swap(flat_multiset& y) noexcept;</del>
-    <ins>void swap(flat_multiset& y) noexcept(is_nothrow_swappable_v&lt;container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-    void clear() noexcept;
+    <i>// observers</i>
+    key_compare key_comp() const;
+    value_compare value_comp() const;
 
-[...]
-
-    <del>friend void swap(flat_multiset& x, flat_multiset& y) noexcept { x.swap(y); }</del>
-    <ins>friend void swap(flat_multiset& x, flat_multiset& y) noexcept(is_nothrow_swappable_v&lt;container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-        <ins>{ x.swap(y); }</ins>
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:
-
-<small><blockquote>
-<pre>
-<del>void swap(flat_multiset& y) noexcept;</del>
-</pre>
-<del>13․ Effects: Equivalent to:</del>
-<pre>
-<del>ranges::swap(compare, y.compare);</del>
-<del>ranges::swap(c, y.c);</del>
+    <ins>const container_type& keys() const noexcept { return <i>c</i>; }</ins>
 </pre>
 </blockquote></small>
 
@@ -1681,38 +1619,22 @@ Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as fo
 
 <small><blockquote>
 <pre>
-    <del>void swap(flat_set& y) noexcept;</del>
-    <ins>void swap(flat_set& y) noexcept(is_nothrow_swappable_v&lt;container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-    void clear() noexcept;
+    <i>// observers</i>
+    key_compare key_comp() const;
+    value_compare value_comp() const;
 
-[...]
-
-    <del>friend void swap(flat_set& x, flat_set& y) noexcept { x.swap(y); }</del>
-    <ins>friend void swap(flat_set& x, flat_set& y) noexcept(is_nothrow_swappable_v&lt;container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-        <ins>{ x.swap(y); }</ins>
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.set.modifiers">[flat.set.modifiers]</a> as follows:
-
-<small><blockquote>
-<pre>
-<del>void swap(flat_set& y) noexcept;</del>
-</pre>
-<del>13․ Effects: Equivalent to:</del>
-<pre>
-<del>ranges::swap(<i>compare</i>, y.<i>compare</i>);</del>
-<del>ranges::swap(<i>c</i>, y.<i>c</i>);</del>
+    <ins>const container_type& keys() const noexcept { return <i>c</i>; }</ins>
 </pre>
 </blockquote></small>
 
 
 # Issues for discussion # {#issues-for-discussion}
 
-The following subsections describe known issues with the flat containers, where Arthur thinks the
-status quo is fine, but Louis Dionne asks for further clarification and/or changes to the wording.
+The following subsections describe known issues with the flat containers where we
+don't (yet) strongly propose a change. In some cases Louis Dionne asks for further
+clarification and/or changes to the wording. In some cases we're just reporting
+implementation experience. In some cases it seems like a change is warranted, but
+it's confusing enough that we don't have a good wording patch yet.
 
 ## Stable sorting in `insert` ## {#stable-sorting}
 
@@ -1984,8 +1906,8 @@ this:
     ~set();
     set& operator=(const set& x);
     set& operator=(set&& x)
-      noexcept(allocator_traits<Allocator>::is_always_equal::value &&
-               is_nothrow_move_assignable_v<Compare>);
+      noexcept(allocator_traits&lt;Allocator>::is_always_equal::value &&
+               is_nothrow_move_assignable_v&lt;Compare>);
 </pre>
 </blockquote></small>
 
@@ -2066,6 +1988,75 @@ For example, change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.de
 </pre>
 </blockquote></small>
 
+## "Qualifies as a container" ## {#qualifies-container}
+
+Arthur's libc++ implements an alternative resolution to [[LWG3803]]. This resolution applies
+generally to all container adaptors, and has the advantage of not ad-hoc relying on a
+complicated type trait (`is_invocable`) but being a little more consistent with the
+pre-existing spec.
+
+The choice of `C::const_iterator` is simply because `T::value_type` is already present
+for allocators, and `T::iterator` is already present for many iterators (those that inherit
+from `std::iterator`, for example). We could just as well choose a criterion like
+"The expression `declval<C&>().size()` is well-formed when treated as an unevaluated operand."
+
+### Wording ### {#wording-qualifies-container}
+
+Arthur's preferred resolution is shown in <ins>this color</ins>.
+Parts of the current C++23 Working Draft that were introduced by the adopted
+resolution of LWG3803, but would be removed by this change, are shown in <src>this color</src>.
+
+Change <a href="https://eel.is/c++draft/container.requirements#container.reqmts-69">[container.reqmts]/69</a> as follows:
+
+<small><blockquote>
+69․ The behavior of certain container member functions and deduction guides depends on whether types qualify as
+input iterators<ins>, containers,</ins> or allocators.
+
+<p><ins>x․</ins> The extent to which an implementation determines that a type cannot be an input iterator is unspecified,
+except that as a minimum integral types shall not qualify as input iterators.
+
+<p><ins>x․</ins> <del>Likewise, the</del> <ins>The</ins> extent to which an implementation determines that a type cannot be an allocator is unspecified,
+except that as a minimum a type `A` shall not qualify as an allocator unless it meets both of the following conditions:
+
+* (69.1) The qualified-id `A::value_type` is valid and denotes a type ([temp.deduct]).
+* (69.2) The expression `declval<A&>().allocate(size_t{})` is well-formed when treated as an unevaluated operand.
+
+<p><ins>x․ The extent to which an implementation determines that a type cannot be a container
+is unspecified, except that as a minimum a type C shall not qualify as a container
+unless the qualified-id `C::const_iterator` is valid and denotes a type.</ins>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/container.adaptors.general">[container.adaptors.general]/6</a> as follows:
+
+<small><blockquote>
+6․ A deduction guide for a container adaptor shall not participate in overload resolution if any of the following are true:
+
+* (6.1) It has an `InputIterator` template parameter and a type that does not qualify as an input iterator is deduced for that parameter.
+
+* (6.2) It has a `Compare` template parameter and a type that qualifies as an allocator is deduced for that parameter.
+
+* (6.3) It has a `Container`, `KeyContainer`, or `MappedContainer` template parameter
+     and a type that <del>qualifies as an allocator</del> <ins>does not qualify as a container</ins> is deduced for that parameter.
+
+* (6.4) It has no `Container`, `KeyContainer`, or `MappedContainer` template parameter,
+     and it has an `Allocator` template parameter, and a type that does not qualify as an allocator is deduced for that parameter.
+
+* (6.5) It has both `Container` and `Allocator` template parameters, and `uses_allocator_v<Container, Allocator>` is `false`.
+
+* (6.6) It has both `KeyContainer` and `Allocator` template parameters, and `uses_allocator_v<KeyContainer, Allocator>` is `false`.
+
+* <src>(6.7) It has both `KeyContainer` and `Compare` template parameters, and</src>
+    <pre>
+        <src>is_invocable_v&lt;const Compare&,</src>
+                      <src>const typename KeyContainer::value_type&,</src>
+                      <src>const typename KeyContainer::value_type&></src>
+    </pre>
+    <src>is not a valid expression or is `false`.</src>
+
+* (6.8) It has both `MappedContainer` and `Allocator` template parameters, and `uses_allocator_v<MappedContainer, Allocator>` is `false`.
+
+</blockquote></small>
+
 ## `iterator` and `const_iterator` ## {#iterator-types}
 
 `flat_set::iterator` and `flat_set::const_iterator` are presented as if they could be
@@ -2073,8 +2064,8 @@ two different types. This is consistent with how we do it in `set` and `unordere
 But in practice, all three vendors make `set::iterator` and `set::const_iterator` the
 same type. We should consider refactoring the spec of `set`, `unordered_set`, and `flat_set`
 all at once to *mandate* that these iterator types be the same type, the same way we
-already do for [`basic_string_view`](https://eel.is/c++draft/string.view#footnote-207)
-and (since C++23 introduced `std::const_iterator`) [`span<const T>`](https://eel.is/c++draft/span.overview).
+already do for <a href="https://eel.is/c++draft/string.view#footnote-207">`basic_string_view`</a>
+and (since C++23 introduced `std::const_iterator`) <a href="https://eel.is/c++draft/span.overview">`span<const T>`</a>.
 
 This would allow us to remove a lot of redundant overloads from the specification,
 e.g. we don't need both `iterator find(value_type)` and `const_iterator find(value_type) const`
@@ -2131,6 +2122,93 @@ if LWG is interested.
 
 Vice versa, should we tweak [flat.multimap]'s wording to address the two "doesn't bother" points above?
 Should we tweak it to say "equivalent keys" or "duplicate keys" instead of "equal keys"?
+
+## Noexcept `swap` ## {#noexcept-swap}
+
+This area seems to have been tweaked quite a bit at Batavia 2018.
+See <a href="https://wiki.edg.com/bin/view/LWGBatavia2018/WednesdayAMMinutes">the minutes</a>.
+
+`flat_set::swap` is currently specified as unconditionally noexcept, which is inconsistent both
+with `std::set` and with the pre-existing adaptors.
+
+<small><blockquote>
+<pre>
+    // [flat.set.defn]
+    void swap(flat_set& y) noexcept;
+
+    // [priqueue.overview]
+    void swap(priority_queue& q) noexcept(is_nothrow_swappable_v&lt;Container> &&
+                                          is_nothrow_swappable_v&lt;Compare>)
+      { using std::swap; swap(c, q.c); swap(comp, q.comp); }
+
+    // [set.overview]
+    void swap(set&)
+      noexcept(allocator_traits&lt;Allocator>::is_always_equal::value &&
+               is_nothrow_swappable_v&lt;Compare>);
+</pre>
+<a href="https://eel.is/c++draft/associative.reqmts#except-3">[associative.reqmts.except]/3</a>:
+For associative containers, no `swap` function throws an exception unless that exception
+is thrown by the swap of the container's `Compare` object (if any).
+</blockquote></small>
+
+Suppose the underlying container has a throwing move-constructor (like MSVC `std::list`), and lacks a custom `swap`;
+then `std::swap<Container>` can throw. Or, suppose the underlying container is `boost::container::static_vector<T>`;
+then its `swap` must swap `T` objects, which can throw.
+
+Now, what happens if swapping the containers actually does throw? Then both containers are in an unknown
+state, so we must restore the invariant by clearing both containers. We do the same thing if `insert` or `erase`
+throws, so this is nothing new.
+
+What happens if swapping the comparators throws? Then we cannot recover. Louis suggests adding
+`is_nothrow_swappable_v<Compare>` as a constraint. The intent is nicely ergonomic:
+Almost all comparators are nothrow swappable (including `std::function`, if we want to support that: [[LWG2227]]).
+And the resulting behavior seems better: In the pathological corner case where `flat_set` cannot safely provide
+swappability, it's better for it not to be swappable at all, than for it to falsely advertise a
+noexcept `swap`. But, if we constrain away `flat_set`'s hidden-friend `swap`, `swap(fs, fs)` will still
+compile; it'll just fall back to `std::swap<T> [with T=flat_set]`. We could actually `=delete`
+the `swap` function, like this:
+
+<small><blockquote>
+<pre>
+    <del>void swap(flat_map& y) noexcept;</del>
+    <ins>void swap(flat_map& y)</ins>
+      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
+               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+    void clear() noexcept;
+
+[...]
+
+    <del>friend void swap(flat_map& x, flat_map& y) noexcept { x.swap(y); }</del>
+    <ins>friend void swap(flat_map& x, flat_map& y)</ins>
+      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
+               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+        <ins>{ x.swap(y); }</ins>
+    <ins>friend void swap(flat_map& x, flat_map& y)</ins>
+      <ins>requires (!is_nothrow_swappable_v&lt;key_compare>) = delete;</ins>
+</pre>
+</blockquote></small>
+
+but even then `ranges::swap(fs, fs)` would still compile; it would just fall back to the
+three-step move-and-assign.
+
+### Specified in terms of `ranges::swap` ### {#ranges-swap}
+
+Orthogonally: It surprises us that [flat.map.modifiers] specifies `swap`'s
+implementation in terms of `ranges::swap(c, y.c)` etc. This feels overspecified;
+<a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]</a> adequately covers the semantics of swapping,
+and vendors should be able to decide for themselves how to swap comparator objects, just like
+we do in `std::set`. Arguably the tight specification helps programmers providing their own
+underlying containers: they know they just need to provide an ADL `swap` or the requirements
+of <a href="https://eel.is/c++draft/concept.swappable#2.3.sentence-1">[concept.swappable]/2.3</a>.
+But one might point out to those programmers that their underlying container
+must provide the API required in <a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]/49–51</a>,
+so the vendor can use ADL `swap(c, y.c)` or `c.swap(y.c)` if they want to.
+
+libc++'s implementation currently uses ADL `swap(c, y.c)`, which is equivalent to `ranges::swap`
+for all containers satisfying <a href="https://eel.is/c++draft/container.reqmts#51">[container.reqmts]/51</a>;
+but the difference between `swap(compare, y.compare)` and `ranges::swap(compare, y.compare)` is probably observable.
 
 ## Allocator-extended constructors lack move semantics ## {#lwg-3802}
 
