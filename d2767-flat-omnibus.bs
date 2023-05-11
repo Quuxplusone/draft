@@ -2,7 +2,7 @@
 Title: flat_map/flat_set omnibus
 Shortname: D2767
 Revision: 0
-!Draft Revision: 6
+!Draft Revision: 7
 Audience: LWG
 Status: D
 Group: WG21
@@ -13,7 +13,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Dummy text
-Date: 2023-05-09
+Date: 2023-05-11
 </pre>
 
 <style>
@@ -51,8 +51,8 @@ This editorial change was originally submitted as <a href="https://github.com/cp
 (October 2022). It bit-rotted after the resolutions of LWG 3802/3803. Here is a clean rebased copy, with easier-to-review
 formatting.
 
-This wording merge-conflicts with the resolution of [[LWG3884]]. See [[#clean-copy]]
-for a complete diff of everything proposed in this paper and all outstanding LWG issues.
+This wording trivially merge-conflicts with the resolution of [[LWG3884]] (which adds new
+allocator-extended constructors). I'm happy to rebase LWG3884 on top of this, or vice versa.
 
 The only changes happening in this part, and their rationales, are:
 
@@ -1542,16 +1542,171 @@ void replace(container_type<del>&&</del> cont);
 
 # Noexcept `swap` # {#noexcept-swap}
 
-TODO FIXME BUG HACK
-`swap` is unconditionally noexcept, which is inconsistent with priority_queue and stack and queue (they're conditionally noexcept). We should really
-be conditionally noexcept, and then "restore the invariant" (i.e. clear both containers) if an exception is thrown. Except: What do we do if swapping
-the comparators throws? Then we can't do anything at all!  Suggest at least a precondition that swapping the comparators will not throw an exception.
-Louis suggests stronger: Constraint that is_nothrow_swappable_v<Compare>!  Also, the unconditional noexcept produces worse codegen (try-catch-abort)
-than a conditional noexcept would produce.
+`flat_set::swap` is currently specified as unconditionally noexcept, which is inconsistent both
+with `std::set` and with the pre-existing adaptors.
+
+<small><blockquote>
+<pre>
+    // [flat.set.defn]
+    void swap(flat_set& y) noexcept;
+
+    // [priqueue.overview]
+    void swap(priority_queue& q) noexcept(is_nothrow_swappable_v&lt;Container> &&
+                                          is_nothrow_swappable_v&lt;Compare>)
+      { using std::swap; swap(c, q.c); swap(comp, q.comp); }
+
+    // [set.overview]
+    void swap(set&)
+      noexcept(allocator_traits&lt;Allocator>::is_always_equal::value &&
+               is_nothrow_swappable_v&lt;Compare>);
+</pre>
+</blockquote></small>
+
+Suppose the underlying container has a throwing move-constructor (like MSVC `std::list`), and lacks a custom `swap`;
+then `std::swap<Container>` can throw. Or, suppose the underlying container is `boost::container::static_vector<T>`;
+then its `swap` must swap `T` objects, which can throw.
+
+Louis Dionne observes that the codegen for unconditional `noexcept` is worse than the codegen for conditional `noexcept`,
+because the former requires us to catch and `std::terminate` whereas the latter lets any exceptions from the lower
+level pass through to the upper level (no extra codegen required).
+
+Now, what happens if swapping the containers actually does throw? Then both containers are in an unknown
+state, so we must restore the invariant by clearing both containers. We do the same thing if `insert` or `erase`
+throws, so this is nothing new.
+
+What happens if swapping the comparators throws? Then we cannot recover. Louis suggests adding
+`is_nothrow_swappable_v<Compare>` as a constraint. This seems reasonably ergonomic:
+Almost all comparators are either Rule-of-Zero empty types,
+or library-provided types like `std::function`. Both kinds of comparators are always nothrow swappable.
+And the resulting behavior seems better: In the pathological corner case where `flat_set` cannot safely provide
+swappability, it's better for it not to be swappable at all, than for it to falsely advertise a
+noexcept `swap`.
+
+Should we specify the implementation in terms of `ranges::swap(c, y.c)` etc.? A priori, we think not; the
+semantics of swapping are covered adequately by <a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]</a>,
+and vendors should be able to decide for themselves how to swap comparator objects.
 
 ## Wording ## {#wording-noexcept-swap}
 
-TODO FIXME BUG HACK
+Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    <del>void swap(flat_map& y) noexcept;</del>
+    <ins>void swap(flat_map& y)</ins>
+      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
+               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+    void clear() noexcept;
+
+[...]
+
+    <del>friend void swap(flat_map& x, flat_map& y) noexcept { x.swap(y); }</del>
+    <ins>friend void swap(flat_map& x, flat_map& y)</ins>
+      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
+               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+        <ins>{ x.swap(y); }</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.map.modifiers">[flat.map.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+<del>void swap(flat_map& y) noexcept;</del>
+</pre>
+<del>13․ Effects: Equivalent to:</del>
+<pre>
+<del>ranges::swap(compare, y.compare);</del>
+<del>ranges::swap(c.keys, y.c.keys);</del>
+<del>ranges::swap(c.values, y.c.values);</del>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    <del>void swap(flat_multimap& y) noexcept;</del>
+    <ins>void swap(flat_multimap& y)</ins>
+      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
+               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+    void clear() noexcept;
+
+[...]
+
+    <del>friend void swap(flat_multimap& x, flat_multimap& y) noexcept { x.swap(y); }</del>
+    <ins>friend void swap(flat_multimap& x, flat_multimap& y)</ins>
+      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
+               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+        <ins>{ x.swap(y); }</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    <del>void swap(flat_multiset& y) noexcept;</del>
+    <ins>void swap(flat_multiset& y) noexcept(is_nothrow_swappable_v&lt;container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+    void clear() noexcept;
+
+[...]
+
+    <del>friend void swap(flat_multiset& x, flat_multiset& y) noexcept { x.swap(y); }</del>
+    <ins>friend void swap(flat_multiset& x, flat_multiset& y) noexcept(is_nothrow_swappable_v&lt;container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+        <ins>{ x.swap(y); }</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+<del>void swap(flat_multiset& y) noexcept;</del>
+</pre>
+<del>13․ Effects: Equivalent to:</del>
+<pre>
+<del>ranges::swap(compare, y.compare);</del>
+<del>ranges::swap(c, y.c);</del>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    <del>void swap(flat_set& y) noexcept;</del>
+    <ins>void swap(flat_set& y) noexcept(is_nothrow_swappable_v&lt;container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+    void clear() noexcept;
+
+[...]
+
+    <del>friend void swap(flat_set& x, flat_set& y) noexcept { x.swap(y); }</del>
+    <ins>friend void swap(flat_set& x, flat_set& y) noexcept(is_nothrow_swappable_v&lt;container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+        <ins>{ x.swap(y); }</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.modifiers">[flat.set.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+<del>void swap(flat_set& y) noexcept;</del>
+</pre>
+<del>13․ Effects: Equivalent to:</del>
+<pre>
+<del>ranges::swap(<i>compare</i>, y.<i>compare</i>);</del>
+<del>ranges::swap(<i>c</i>, y.<i>c</i>);</del>
+</pre>
+</blockquote></small>
 
 
 # Issues for discussion # {#issues-for-discussion}
@@ -1800,9 +1955,9 @@ b.equal_range(k)
 a_tran.equal_range(ke)
 </pre>
 
-172․ Result: pair<iterator, iterator>; pair<const_iterator, const_iterator> for constant a_tran.
+172․ Result: `pair<iterator, iterator>`; `pair<const_iterator, const_iterator>` for constant `a_tran`.
 
-173․ Effects: Equivalent to: return make_pair(a_tran.lower_bound(ke), a_tran.upper_bound(ke));
+173․ Effects: Equivalent to: `return make_pair(a_tran.lower_bound(ke), a_tran.upper_bound(ke));`
 
 174․ Complexity: <del>Logarithmic.</del> <ins>O(M + log N), where N is `a_tran.size()` and M is `distance(a_tran.lower_bound(ke), a_tran.upper_bound(ke))`.</ins>
 </blockquote></small>
@@ -1929,7 +2084,6 @@ under the banner of "standardizing existing practice."
 
 ## Support for non-standard containers ## {#containers}
 
-TODO FIXME BUG HACK
 Vendors are required to support "random-access containers," which means `vector<T>` (except for `vector<bool>`)
 and `deque<T>`. It's unclear if vendors are required to support non-standard containers such as
 `boost::container::vector<T>`; and if so, what public API those containers must provide in order
@@ -1943,47 +2097,139 @@ right? It would be nice to see what's required and what's encouraged in this are
 libc++ goes very slightly out of its way to support `vector<bool>` as the underlying container,
 even though we believe we're not required to support it.
 
+## Inconsistent handling of redundancy in [flat.multiset] and [flat.multimap] ## {#redundancy}
 
+See <a href="https://github.com/cplusplus/draft/pull/6246#issuecomment-1539789693">#6246</a>.
 
+<a href="https://eel.is/c++draft/flat.multiset#overview-4">[flat.multiset.overview/4]</a> uses
+the same boilerplate as `vector`, `set`, `flat_set`, and `flat_map`:
 
-<!-- ------
+<small><blockquote>
+Descriptions are provided here only for operations on `flat_multiset` that are not described
+in one of the general sections or for operations where there is additional semantic information.
+</blockquote></small>
 
+<a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview/4]</a> uses
+different boilerplate:
 
-- What containers are supported?
+<small><blockquote>
+Except as otherwise noted, operations on `flat_multimap` are equivalent to those of `flat_map`,
+except that `flat_multimap` operations do not remove or replace elements with equal keys.
 
-(4) In general, `flat_set` cannot deal with containers or comparators that throw exceptions. 
-(I discussed this general problem in "Mostly Invalid", CppCon 2019.) If inserting into the underlying container throws an exception,
- then `flat_set` cannot possibly know what state the underlying container is in — did the insert succeed? fail? half-succeed? — and therefore `flat_set`
- can't know whether its sortedness invariant still holds. (It can't test the sortedness invariant, either, because the comparator might throw, and we
- already have one exception in flight at this point.) So, if `insert` throws an exception, `flat_set` will clear itself.
-It's possible that we could do something clever in the case that we know the container is a specialization of `vector` (which we control), and 
-various things are noexcept, so that if insertion throws (e.g. due to `bad_alloc`) then the user doesn't lose all of their data. Should we attempt
- to special-case `vector` and/or `deque`'s recovery behavior? I propose "no," because I think our attempt would fail anyway and so I don't want to
- waste time thinking about clever tactics. But if someone wants to propose a specific clever tactic, I'll investigate it and tell you why it didn't work.
+[Example 1: `flat_multimap` constructors and emplace do not erase non-unique elements after sorting them. —end example]
+</blockquote></small>
 
+That's a little handwavey: It doesn't bother to explain that
+`flat_multimap::insert(sorted_equivalent_t, initializer_list)` is "equivalent to"
+`flat_map::insert(sorted_unique_t, initializer_list)`. It doesn't bother to explain how
+the `iterator` return value of `flat_multimap::insert(value_type&&)` is derived from the
+`pair<iterator, bool>` return value of `flat_map::insert(value_type&&)`.  
 
+But it does make the spec a lot shorter! Should we apply the same technique to [flat.multiset]
+that we already apply to [flat.multimap]? I haven't written wording for this yet, but can do so
+if LWG is interested.
 
+Vice versa, should we tweak [flat.multimap]'s wording to address the two "doesn't bother" points above?
+Should we tweak it to say "equivalent keys" or "duplicate keys" instead of "equal keys"?
 
+## Allocator-extended constructors lack move semantics ## {#lwg-3802}
 
+libc++ has implemented move-aware allocator-extended constructors for all four flat containers
+(<a href="https://godbolt.org/z/We7K1K6bE">Godbolt</a>).
 
------ -->
+```c++
+    template<class T, class C = std::less<T>>
+    using PmrFlatSet = std::flat_set<T, C, std::pmr::vector<T>>;
 
+    std::pmr::monotonic_buffer_resource mr;
+    auto sets = std::pmr::vector<PmrFlatSet<int>>(&mr);
+    auto cont1 = std::pmr::vector<int>({1,2,3}, &mr);
+    sets.emplace_back(std::move(cont1));
+      // Before: Makes copies of all the data
+      // After: Takes ownership of the existing data
 
+    auto cont2 = std::pmr::vector<std::unique_ptr<int>>();
+    auto fs = std::flat_set(std::move(cont2));
+      // Before: Ill-formed
+      // After: OK
+```
 
+This is [[LWG3802]]. The wording patch for this (based on top of P2767's editorial refactoring)
+would look something like this. I haven't written wording for this yet, but can do so,
+if LWG is interested, after P2767's editorial refactoring is merged.
+
+<small><blockquote>
+<pre>
+    // [flat.map.cons.alloc], constructors with allocators
+
+    template&lt;class Alloc>
+      flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
+               const Alloc& a);
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(const key_container_type& key_cont, mapped_container_type&& mapped_cont,</ins>
+               <ins>const Alloc& a);</ins>
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(key_container_type&& key_cont, const mapped_container_type& mapped_cont,</ins>
+               <ins>const Alloc& a);</ins>
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(key_container_type&& key_cont, mapped_container_type&& mapped_cont,</ins>
+               <ins>const Alloc& a);</ins>
+    template&lt;class Alloc>
+      flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
+               const key_compare& comp, const Alloc& a);
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(const key_container_type& key_cont, mapped_container_type&& mapped_cont,</ins>
+               <ins>const key_compare& comp, const Alloc& a);</ins>
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(key_container_type&& key_cont, const mapped_container_type& mapped_cont,</ins>
+               <ins>const key_compare& comp, const Alloc& a);</ins>
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(key_container_type&& key_cont, mapped_container_type&& mapped_cont,</ins>
+               <ins>const key_compare& comp, const Alloc& a);</ins>
+    template&lt;class Alloc>
+      flat_map(sorted_unique_t, const key_container_type& key_cont,
+               const mapped_container_type& mapped_cont, const Alloc& a);
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(sorted_unique_t, const key_container_type& key_cont,</ins>
+               <ins>mapped_container_type&& mapped_cont, const Alloc& a);</ins>
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(sorted_unique_t, key_container_type&& key_cont,</ins>
+               <ins>const mapped_container_type& mapped_cont, const Alloc& a);</ins>
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(sorted_unique_t, key_container_type&& key_cont,</ins>
+               <ins>mapped_container_type&& mapped_cont, const Alloc& a);</ins>
+    template&lt;class Alloc>
+      flat_map(sorted_unique_t, const key_container_type& key_cont,
+               const mapped_container_type& mapped_cont,
+               const key_compare& comp, const Alloc& a);
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(sorted_unique_t, const key_container_type& key_cont,</ins>
+               <ins>mapped_container_type&& mapped_cont,</ins>
+               <ins>const key_compare& comp, const Alloc& a);</ins>
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(sorted_unique_t, key_container_type&& key_cont,</ins>
+               <ins>const mapped_container_type& mapped_cont,</ins>
+               <ins>const key_compare& comp, const Alloc& a);</ins>
+    <ins>template&lt;class Alloc></ins>
+      <ins>flat_map(sorted_unique_t, key_container_type&& key_cont,</ins>
+               <ins>mapped_container_type&& mapped_cont,</ins>
+               <ins>const key_compare& comp, const Alloc& a);</ins>
+</pre>
+</blockquote></small>
 
 # Implementation experience # {#experience}
 
-I have implemented this proposal as a patch against libc++ trunk; see [[Patch]].
-You can experiment with it [on Godbolt Compiler Explorer]();
+I have implemented all of [[P0429]]/[[P1222]] and all of this proposal
+as a series of patches against libc++ trunk; see [[Patch]].
+You can experiment with it <a href="https://godbolt.org/z/Trneaj4Mo">on Godbolt Compiler Explorer</a>;
 just use the P1144 branch of Clang, which uses this patched libc++ by default.
-
-The complete wording diff against `cplusplus/draft:main` is also available
-on my GitHub; see [[Wording]].
 
 
 # Acknowledgments # {#acknowledgments}
 
 - Thanks to Tomasz Kamiński for recommending Arthur write this paper.
+
+- Thanks to Louis Dionne for his code review of libc++'s `flat_set` implementation.
 
 
 <pre class=biblio>
@@ -2069,6 +2315,14 @@ on my GitHub; see [[Wording]].
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html",
     "date": "February 2023"
+  },
+  "Patch": {
+    "title": "[libc++] trivially_relocatable branch",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://github.com/Quuxplusone/llvm-project/compare/main...trivially-relocatable",
+    "date": "May 2023"
   }
 }
 </pre>
