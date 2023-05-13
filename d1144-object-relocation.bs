@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 8
-!Draft Revision: 48
+!Draft Revision: 49
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -31,13 +31,17 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R8 (Varna 2023):
+- R8 (pre-Varna 2023):
 
     - [[#wording-dcl.attr.trivreloc|dcl.attr.trivreloc]]: Removed "If a type `T` is declared `trivially_relocatable`,
             and `T` is either not move-constructible or not destructible, the program is ill-formed."
             This should have been removed in R7 along with "move-constructible, destructible."
 
-    - [[#wording-meta.unary.prop|meta.unary.prop]]: Adjust the precondition of `is_trivially_relocatable_v` to match `is_trivially_copyable_v`.
+    - [[#wording-meta.unary.prop|meta.unary.prop]]: Adjusted the precondition of `is_trivially_relocatable_v` to match `is_trivially_copyable_v`.
+            Removed `is_relocatable_v`, `is_nothrow_relocatable_v` for insufficient motivation (but kept
+            `concept relocatable` because it expresses semantic requirements).
+
+    - Marked `std::relocate` as `[[nodiscard]]`; changed its return type to `remove_cv_t<T>`.
 
     - Resolved the [[#open-questions|Appendix E]] question about potentially overlapping subobjects;
             we have implementation experience now that proves this is not a problem. Expanded discussion
@@ -412,14 +416,14 @@ associated with the relocation of the value of `*source` might not happen.
 
 <xmp>
   template<class T>
-  T relocate(T* source);
+  [[nodiscard]] remove_cv_t<T> relocate(T* source);
 </xmp>
 
 *Mandates:* `T` is a complete non-array object type.
 
 *Effects:* Equivalent to:
 <xmp>
-  T t = std::move(source);
+  remove_cv_t<T> t = std::move(source);
   destroy_at(source);
   return t;
 </xmp>
@@ -430,7 +434,7 @@ associated with the relocation of the object's value might not happen.
 Note:
 These functions have both been implemented in my libc++ fork; for `relocate`, see [godbolt.org/z/cqPP4oeE9](https://p1144.godbolt.org/z/cqPP4oeE9)
 and [[StdRelocateIsCute]]. My implementation of their "as-if-by-memcpy" codepaths relies on
-Clang's `__builtin_memcpy`; vendors can use any vendor-specific means to implement them.
+Clang's `__builtin_memmove`; vendors can use any vendor-specific means to implement them.
 The wording also deliberately permits a low-quality implementation with no such codepath at all.
 See [@45:23–48:39](https://www.youtube.com/watch?v=SGdfPextuAU&t=45m23s) in my C++Now 2019 talk.
 
@@ -556,7 +560,7 @@ An object type `T` is a <dfn dfn-type="abstract-op">trivially relocatable</dfn> 
     - all of whose base classes are of trivially relocatable type.
 
 [*Note:* For a trivially relocatable type, the [$relocation operation$] (as performed by,
-for example, the library functions `std::swap` and `std::vector::resize`) is tantamount
+for example, `std::swap_ranges` or `std::vector::reserve`) is tantamount
 to a simple copy of the underlying bytes. *—end note*]
 
 [*Note:* It is intended that most standard library types be trivially relocatable types. *—end note*]
@@ -594,23 +598,13 @@ observable side-effects of its relocation other than a copy of the underlying by
 </blockquote></small>
 
 
-## Type traits `is_relocatable` etc. [meta.unary.prop] ## {#wording-meta.unary.prop}
+## Type trait `is_trivially_relocatable` [meta.unary.prop] ## {#wording-meta.unary.prop}
 
-Add new entries to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
+Add a new entry to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
 
 <small><blockquote>
 <table>
 <tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr>
-<tr>
-<td>`template<class T> struct is_relocatable;`</td>
-<td>`is_move_constructible_v<T>` is `true` and `is_destructible_v<T>` is `true`</td>
-<td>`T` shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
-</tr>
-<tr>
-<td>`template<class T> struct is_nothrow_relocatable;`</td>
-<td>`is_relocatable_v<T>` is `true` and both the indicated move-constructor and the destructor are known not to throw any exceptions.</td>
-<td>`T` shall be a complete type, <i>cv</i> `void`, or an array of unknown bound.</td>
-</tr>
 <tr>
 <td>`template<class T> struct is_trivially_relocatable;`</td>
 <td>`T` is a [$trivially relocatable$] type.</td>
@@ -730,18 +724,24 @@ care about it now. (This position might be debatable, but it's definitely part o
 led to P1144's specific proposed semantics, so it's good to have this background in mind.)
 
 P1144 wants to be able to optimize not just vector reserve, but also vector insert and erase
-(see [[#applications]]). Vector insert and erase use move-assignment, not construct-and-destroy.
-For some types, assignment is naturally tantamount to construct-and-destroy. For `pmr` types
-and polymorphic types, assignment is *not* naturally tantamount to construct-and-destroy, except
+(see [[#applications|table §2.1]]). Today, vector insert and erase use move-assignment, not relocation.
+(In fact, <a href="https://eel.is/c++draft/vector#modifiers-5">[vector.modifiers]/5</a> specifies
+the exact number of times "the assignment operator of `T` is called." We might want to fix that,
+but that's out of scope for this paper.)
+We can optimize vector insert to use (trivial) relocation for element types that model `relocatable`
+([[#wording-concept.relocatable|[concept.relocatable]]]).
+
+Some types invariably model `relocatable`; that is, their assignment is naturally tantamount to construct-and-destroy.
+But for `pmr` types and polymorphic types, assignment is *not* tantamount to construct-and-destroy, *except*
 under certain conditions. For `pmr` types, the condition is "both objects have the same
 allocator." For polymorphic types, the condition is "both objects have the same dynamic type."
 
 ```c++
-    std::vector<Derived> dv;
+    std::vector<Derived> dv = { ~~~ };
     dv.erase(dv.begin());
       // Every object in the vector certainly has the same dynamic type.
 
-    std::pmr::vector<std::pmr::string> pv;
+    std::pmr::vector<std::pmr::string> pv = { ~~~ };
     pv.erase(pv.begin());
       // Every string in the vector certainly has the same allocator.
 
@@ -753,9 +753,6 @@ allocator." For polymorphic types, the condition is "both objects have the same 
     std::rotate(pa, pa+2, pa+5);
       // Objects in the contiguous range might have different allocators?
 ```
-
-TODO FIXME BUG HACK
-
 
 P1144 aims to permit efficient insertion and erasure in `std::vector`.
 [Example:](https://p1144.godbolt.org/z/vv5q69q44)
@@ -769,66 +766,51 @@ This `erase` requires us to shift down 500 `std::string` objects, which can be d
 by 500 calls to `string::operator=` followed by one call to `~string`, or by
 one call to `~string` followed by a `memmove` (as seen for example in [[Folly]] and BSL;
 see [[#applications|table §2.1]]). We want to permit BSL's implementation.
-That's why since P1144R5, the definition of `concept relocatable` in [[#wording-concept.relocatable|§4.4]]
+That's why since P1144R5, the definition of `concept relocatable` in [[#wording-concept.relocatable|§4.8]]
 places semantic requirements on `T`'s assignment operators (if they exist) as well as on
 `T`'s constructors and destructors.
 
-`std::pmr::polymorphic_allocator<int>` is a trivially relocatable type:
+If `pmr::string` is considered trivially relocatable, this will trickle down into all Rule-of-Zero
+types with a `pmr::string` member. ([Godbolt.](https://godbolt.org/z/nhf38n33G))
 
 ```c++
-    std::vector<std::pmr::polymorphic_allocator<int>> va;
-    va.emplace_back(&mr1);
-    va.emplace_back(&mr2);
-    va.emplace_back(&mr3);
-    va.erase(va.begin());  // A
+    static_assert(std::is_trivially_relocatable_v<std::pmr::string>);
+      // Before: not true, of course
+      // After: suppose this is true
+    struct A {
+      std::pmr::string ps;
+    };
+    static_assert(std::is_trivially_relocatable_v<A>);
+      // After: then this will also be true, by the Rule of Zero
+    std::vector<A> v;
+    v.push_back({std::pmr::string("one", &mr1)});
+    v.push_back({std::pmr::string("two", &mr2)});
+    v.erase(v.begin());
+      // Before: Well-defined behavior, acts as-if by assignment
+      // After: Do we somehow make this a precondition violation?
+    assert(v[0].ps.get_allocator().resource() == &mr1);
+      // Before: Succeeds
+      // After: Might fail (and on a quality implementation, *will* fail)
 ```
 
-Line "A" can use trivial relocation (`memmove`) because it is fast and correct:
-after line "A" we will have `vv[0].resource() == &mr2`.
-But an STL container *using* a `polymorphic_allocator` suddenly becomes problematic:
-
-```c++
-    std::vector<std::pmr::string> vp;
-    vv.emplace_back("1", &mr1);
-    vv.emplace_back("2", &mr2);
-    vv.emplace_back("3", &mr3);
-    vv.reserve(1000);  // B
-    vv.erase(vv.begin());  // C
-```
-
-Line "B" can certainly use trivial relocation (`memcpy`) because it is fast and correct.
-But on line "C", the difference between `pmr::string::operator=` and `memmove` is detectable:
-the former makes `vp[0].get_allocator().resource() == &mr1` and the latter would make
-`vp[0].get_allocator().resource() == &mr2`. Finally, hypothetically, if `vector::erase` were
-implemented in terms of a single `std::rotate` followed by a call to `~string`, we'd have UB here
-because it is UB to `swap` strings with unequal allocators.
-
-For now, P1144R8's proposed wording implies that `std::pmr::string` must not be marked as trivially relocatable.
-But if we add some blanket wording setting appropriate preconditions on `std::pmr::string`
-(for example, permitting `vector::erase` and `deque::erase` to be implemented in terms of `rotate`,
-or forbidding STL containers from containing PMR types with unequal allocators), then
-vendors could make `std::pmr::string` trivially relocatable.
-
-There is still one tricky bit: `std::allocator_traits<std::pmr::polymorphic_allocator<T>>::construct`
-is user-provided. `std::vector` must be taught that it is safe to treat `polymorphic_allocator`'s
-`construct` the same as `allocator`'s trivial `construct`.
+If we (1) advertise `pmr::string` as `is_trivially_relocatable`; (2) propagate
+trivial relocatability in the core language as both P1144 and P2786 propose to do; and
+(3) optimize vector insert and erase for trivially relocatable types; then we inevitably
+arrive here. Arthur's solution is to impose preconditions on user-defined types
+used within certain parts of the STL: Just as their destructors are forbidden to (dynamically)
+throw exceptions, and their copy constructors are forbidden to (dynamically) make things that aren't copies,
+their assignment operators ought to be forbidden to (dynamically) violate
+`concept relocatable`'s semantic requirements.
 
 Issue: What new wording is needed to achieve this?
 
-Note: Regardless, `std::pmr::polymorphic_allocator<int>` itself is trivially relocatable.
-The problem above arises from `propagate_on_move_assignment` etc., which affect the behavior of
-the *container's* `operator=`. The author of the container makes
-the choice whether to respect POCMA/POCCA/POCS, and also makes the choice
-when to warrant trivial relocatability. These choices are correlated, and so it is natural that
-they should be made by the same person, at the same place in the source code.
 
 ## Non-issue: Overlapping base-class subobjects ## {#overlap-concerns}
 
 Note: This section was added in P1144R7 and resolved in P1144R8.
 
-In the following snippet, `struct Dangerous` is trivially copyable
-(and thus trivially relocatable), so we might think that `std::swap(ra, rb)`
-should be allowed to swap the bytes of `ra` with the bytes of `rb`.
+In the following snippet, `struct Dangerous` is trivially copyable, so we
+might think that `std::swap(ra, rb)` should be allowed to swap the bytes of `ra` with the bytes of `rb`.
 A naïve approach is to swap `sizeof(Dangerous) == 8` bytes, but that's unsafe,
 because the tail padding of `Dangerous` is allowed to contain the value of
 `Derived::k`. If `std::swap` is to do "trivial swapping," it must account
@@ -862,12 +844,13 @@ int main() {
 }
 ```
 
-Arthur's libc++ fork implements this solution ("possible solution #4" from P1144R7):
+Arthur's libc++ fork implements this solution (P1144R7's "possible solution #4"):
 `std::swap` is allowed to bytewise-swap trivially copyable and/or trivially relocatable types
 only when they are definitely not potentially overlapping subobjects. In practice, this means:
 
 - `std::swap` can swap bytes as long as the type has no
-    occupied padding. On the Itanium ABI, this means we can swap [`datasizeof(T)`](https://danakj.github.io/2023/01/15/trivially-relocatable.html)
+    occupied padding. On the Itanium ABI, this means we can swap
+    <a href="https://danakj.github.io/2023/01/15/trivially-relocatable.html">`datasizeof(T)`</a>
     bytes: non-tail padding bytes are never occupied. On an unknown ABI, we can still swap `sizeof(T)`
     bytes if we know that `has_unique_object_representations_v<T>`, because such a `T` cannot have
     any padding at all. Worst case, we simply treat the type as non-trivial.
@@ -915,7 +898,7 @@ to Alisdair Meredith for our extensive discussions during the February 2023 draf
 to Giuseppe D'Angelo and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]],
 and to Giuseppe D'Angelo for extensive review comments and discussion.
 
-Thanks to Mungo Gill for [[P2786R0]] and [[P2814R0]].
+Thanks to Mungo Gill and Alisdair Meredith for [[P2786R0]] and [[P2814R0]].
 
 
 Appendix A: Straw polls {#polls}
@@ -1182,7 +1165,7 @@ As of November 2018, libstdc++ performs the `vector::resize` optimization
 for any type which has manually specialized `std::__is_bitwise_relocatable`.
 (See [this Godbolt](https://godbolt.org/z/f7971hEcG).)
 Manual specialization is also the approach used by [[Qt]], [[Folly]], and [[BSL]].
-As of 2023-02-12, the only libstdc++ library type for which `__is_bitwise_relocatable` has
+As of May 2023, the only libstdc++ library type for which `__is_bitwise_relocatable` has
 been specialized is `deque`; see [[Deque]].
 
 Clang trunk provides a compiler builtin type trait `__is_trivially_relocatable(T)`
@@ -1192,7 +1175,7 @@ as trivially relocatable, whereas P1144 does not. I'm not aware that any of Clan
 Clang trunk has no equivalent of the `[[trivially_relocatable]]`
 attribute, so `__is_trivially_relocatable(T)` is true only for
 trivially copyable types and types marked with the `[[clang::trivial_abi]]`
-attribute. As of 2023-02-12, Clang trunk has no conception of a type which is non-trivial for purposes of calls
+attribute. As of May 2023, Clang trunk has no conception of a type which is non-trivial for purposes of calls
 and yet is trivially relocatable. But Clang's current status is compatible with P1144 (modulo the
 few unintentional differences in `__is_trivially_relocatable` mentioned above).
 
