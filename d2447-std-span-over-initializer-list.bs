@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: <code>std::span</code> over an initializer list
 Shortname: D2447
-Revision: 3
-!Draft Revision: 4
+Revision: 4
+!Draft Revision: 5
 Audience: LEWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   can replace <code>const string&amp;</code>. While <code>"abc"</code> binds to a <code>string_view</code>
   function parameter, <code>{1,2,3}</code> fails to bind to a <code>span&lt;const int&gt;</code> function parameter.
   We show why this gap is undesirable, and propose to close it, ideally as a DR.
-Date: 2023-03-11
+Date: 2023-05-13
 </pre>
 
 <style>
@@ -29,6 +29,10 @@ td {font-size: smaller;}
 </style>
 
 # Changelog # {#changelog}
+
+- R4 (pre-Varna 2023):
+
+    - Reorganize references to [[P2752]] and fix HTML goofs in proposed wording.
 
 - R3:
 
@@ -173,18 +177,6 @@ std::span<const int> v = {1,2,3};            // dangles
 </xmp></td></tr>
 </table>
 
-## Relation to P2752 Static storage for braced initializers ## {#p2752}
-
-[[P2752R1]] (<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2752r0.html">R0</a>)
-proposes to permit a constant `initializer_list` like `{1,2,3}` to refer to
-a backing array in static storage, rather than forcing all backing arrays onto the stack.
-At least for now, this doesn't change anything dangling-wise: referring to the backing array
-of an `initializer_list` outside the lifetime of that `initializer_list` remains undefined behavior.
-```c++
-std::string_view s = "abc";            // OK, no dangling
-std::span<const int> v1 = {1,2,3};     // dangles, even after P2752
-```
-
 ## Why not just double the braces? ## {#braces}
 
 Since we can already write
@@ -205,15 +197,25 @@ preferred style for C arrays, pairs, tuples, etc.)
 So I prefer to turn the question around and say: Since we can already implicitly treat `{{1,2,3}}`
 as a `span`, how could there be any additional harm in treating `{1,2,3}` as a `span`?
 
-This also relates to [[P2752R1]]: Today, `{{1,2,3}}` converts to `span` by materializing
-a temporary of type `const int[3]` on the stack. Tomorrow, if P2447 is adopted, `{1,2,3}` will convert to `span`
-via an `initializer_list` that refers to a backing array also allocated on the stack.
-[[P2752R1]] proposes to performance-optimize the latter case (permitting the backing array to occupy
-static storage) but not the former case (keeping the status quo for materialized array temporaries).
-In other words, tomorrow's (single-braced or double-braced) `initializer_list` constructor is
-"more optimizable" than today's double-braced array-temporary constructor.
+### Better performance via synergy with P2752 ### {#p2752}
 
-The following program (<a href="https://godbolt.org/z/7a5zGnx5s">Godbolt</a>) shows how
+[[P2752]], sent to EWG for Varna, proposes to let a constant `initializer_list` like `{1,2,3}`
+refer to a backing array in static storage, rather than forcing all backing arrays onto the stack.
+This doesn't change anything dangling-wise: referring to the backing array of an
+`initializer_list` outside that `initializer_list`'s lifetime remains undefined behavior.
+```c++
+std::string_view s = "abc";            // OK, no dangling
+std::span<const int> v1 = {1,2,3};     // dangles, even after P2752
+```
+
+Today, `{{1,2,3}}` converts to `span` by materializing a temporary `const int[3]` on the stack.
+Tomorrow, if P2447 is adopted, `{1,2,3}` will convert to `span` via an `initializer_list` that
+refers to a backing array on the stack. P2752 proposes to performance-optimize the latter
+(let the backing array occupy static storage) but not the former (keep the status quo for
+materialized array temporaries). In other words, the `initializer_list` constructor we propose
+here in P2447 is "more optimizer-friendly" than today's array-temporary constructor.
+
+This example (<a href="https://godbolt.org/z/7a5zGnx5s">Godbolt</a>) shows how
 P2447 lets us benefit from P2752's optimization:
 ```c++
 int perf(std::span<const int>);
@@ -230,6 +232,10 @@ int test() {
 <tr><th>P2447 only</th><td>IL on stack</td><td>IL on stack</td></tr>
 <tr><th>P2447+P2752</th><td>IL in rodata, tail-call</td><td>IL in rodata, tail-call</td></tr>
 </table>
+
+In each row, there's no performance difference between the single-braced or double-braced form.
+But the only way to reach the bottom row (tail-call, no stack usage) is to adopt both P2447
+and P2752; which by a happy coincidence also permits the single-braced form.
 
 # Annex C examples # {#annex-c}
 
@@ -264,7 +270,7 @@ void test() { one({1,2}); }
 ```
 <b>Before:</b> Calls `one(pair<int, int>)`.<br/>
 <b>After P2447:</b> Ambiguous.<br/>
-<b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to `pair`.
+<b>To fix:</b> Eliminate the ambiguous overloading, or replace `{1,2}` with `std::pair{1,2}`.
 
 ## The `initializer_list` ctor has high precedence ## {#annex-c-2}
 
@@ -291,7 +297,7 @@ int x = three({a, 0});
 ```
 <b>Before:</b> Selects `span(void**, int)`; `x` is 0.<br/>
 <b>After P2447:</b> Selects `span(initializer_list<void*>)`; `x` is 2.<br/>
-<b>To fix:</b> Replace `{a, 0}` with `span(a, 0)`.
+<b>To fix:</b> Replace `{a, 0}` with `span(a, 0)` or `span(a, a)`.
 
 ```c++
 int four(span<const any> v) { return v.size(); }
@@ -301,7 +307,6 @@ int y = four({a, a+10});
 <b>Before:</b> Selects `span(any*, any*)`; `y` is 10.<br/>
 <b>After P2447:</b> Selects `span(initializer_list<any>)`; `y` is 2.<br/>
 <b>To fix:</b> Replace `{a, a+10}` with `span(a, a+10)`.
-
 
 # Proposed wording # {#wording}
 
@@ -321,7 +326,7 @@ Modify <a href="https://eel.is/c++draft/span.overview">[span.overview]</a> as fo
     constexpr span(const array&lt;T, N>&amp; arr) noexcept;
   template&lt;class R>
     constexpr explicit(extent != dynamic_extent) span(R&amp;&amp; r);
-  <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list<value_type> il) noexcept;</ins>
+  <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list&lt;value_type> il) noexcept;</ins>
   constexpr span(const span&amp; other) noexcept = default;
   template&lt;class OtherElementType, size_t OtherExtent>
     constexpr explicit(<i>see below</i>) span(const span&lt;OtherElementType, OtherExtent>&amp; s) noexcept;
@@ -329,10 +334,11 @@ Modify <a href="https://eel.is/c++draft/span.overview">[span.overview]</a> as fo
 
 Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:
 
-<blockquote><small><pre>
-   <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list<value_type> il) noexcept;</ins>
-</pre></small>
-<br><ins><i>Constraints:</i> `is_const_v<element_type>` is `true`.</ins>
+<small><blockquote>
+<pre>
+  <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list&lt;value_type> il) noexcept;</ins>
+</pre>
+<p><ins><i>Constraints:</i> `is_const_v<element_type>` is `true`.</ins>
 <p><ins><i>Preconditions:</i> If `extent` is not equal to `dynamic_extent`, then `il.size()` is equal to `extent`.</ins>
 <p><ins><i>Effects:</i> Initializes <i>`data_`</i> with `il.begin()` and <i>`size_`</i> with `il.size()`.</ins>
 </blockquote></small>
@@ -352,13 +358,13 @@ Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1425r4.pdf",
     "date": "March 2021"
   },
-  "P2752R1": {
+  "P2752": {
     "title": "Static storage for braced initializers",
     "authors": [
       "Arthur O'Dwyer"
     ],
-    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2752r1.html",
-    "date": "March 2023"
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2752r2.html",
+    "date": "May 2023"
   },
   "Patch": {
     "title": "Implement P2447 std::span convertible from std::initializer_list",
