@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Static storage for braced initializers
 Shortname: D2752
-Revision: 1
-!Draft Revision: 7
+Revision: 2
+!Draft Revision: 8
 Audience: EWG
 Status: D
 Group: WG21
@@ -14,10 +14,10 @@ Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Initializing a vector from a <i>braced-initializer-list</i> like <code>{1,2,3}</code>
   copies the data from static storage to a backing array on the stack,
-  and thence into the vector. This wastes CPU cycles; more importantly, it wastes stack space.
-  We propose to eliminate the waste by letting a <code>std::initializer_list&lt;T&gt;</code>'s
+  and thence into the vector. This wastes CPU cycles, and it wastes stack space.
+  Eliminate the waste by letting a <code>std::initializer_list&lt;T&gt;</code>'s
   backing array occupy static storage.
-Date: 2023-03-10
+Date: 2023-05-13
 </pre>
 
 <style>
@@ -28,9 +28,13 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R1:
+- R2 (pre-Varna 2023):
 
-    - Remove discussion of mangling (it's not a problem). Add discussion of GCC's `-fmerge-all-constants`.
+    - Add discussion of unspecified behavior in constexpr evaluation.
+
+- R1 (post-Issaquah 2023):
+
+    - Remove discussion of mangling; it's not a problem. Add discussion of GCC's `-fmerge-all-constants`.
 
     - Proposed wording reviewed by Jens Maurer.
 
@@ -39,7 +43,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 <a href="https://eel.is/c++draft/dcl.init.list#5">[dcl.init.list]/5–6</a> says:
 
-<blockquote>
+<small><blockquote>
 An object of type `std::initializer_list<E>` is constructed from an initializer list
 as if the implementation generated and materialized a prvalue of type “array of *N* `const E`”,
 where *N* is the number of elements in the initializer list. Each element of that array
@@ -59,7 +63,7 @@ and the `std::initializer_list<E>` object is constructed to refer to that array.
 
 <b>[<i>Note 6: The implementation is free to allocate the array in read-only memory
 if an explicit array with the same initializer can be so allocated. —end note</i>]</b>
-</blockquote>
+</blockquote></small>
 
 In December 2022, Jason Merrill observed ([[CoreReflector]]) that this note isn't saying much.
 Consider the following translation unit:
@@ -120,13 +124,13 @@ Suppose "2mb-image.png" contains 2MB of data. Then the function that initializes
 here will create a temporary backing array of size 2MB. That is, we're adding 2MB to
 the stack frame of that function.
 Suddenly your function's stack frame is 2MB larger than you expected!
-And this applies even if the "function" in question is the compiler-generated
+This applies even if the "function" in question is the compiler-generated
 initialization routine for a dynamically initialized global variable `v`.
 You might not even control the function whose stack frame is blowing up.
 
 This kind of thing was always possible pre-P1967, but was hard to hit in human-generated code,
 because braced initializer lists were generally short. But post-P1967, this is easy
-to hit. I think this stack-frame blowup is going to become a well-known problem unless we solve it first.
+to hit. I think this stack-frame blowup will become a well-known problem unless we solve it first.
 
 ## Workarounds ## {#workarounds}
 
@@ -187,7 +191,7 @@ will take advantage of this permission anyway.
 
 We want to permit tomorrow's compilers to share backing arrays with elements in common, just like
 today's compilers can share string literals. High-quality implementations might take advantage
-of this permission, even though mainstream compilers probably won't bother.
+of this permission; mainstream compilers probably won't bother.
 ```c++
     const char *p1 = "hello world";
     const char *p2 = "world";
@@ -199,24 +203,14 @@ of this permission, even though mainstream compilers probably won't bother.
 ```
 
 We even intend to permit tomorrow's compilers to share backing arrays between static
-and dynamic initializer lists. It would take a really smart compiler to exploit this
-new permission, but we have no reason to forbid it. For example:
-```c++
-    void f3(int argc, std::initializer_list<int> ia,
-                      std::initializer_list<int> ib) {
-        if (argc != 2) {
-            assert(ia.begin() != ib.begin());
-        } else {
-            PERMIT(ia.begin() == ib.begin());
-        }
-    }
-    int main(int argc, char **argv) {
-        f3(argc, {1,2,3}, {1,argc,3});
-    }
-```
+and dynamic initializer lists, if they can prove it's safe.
 
-We do not intend to permit accessing a backing array outside of its lifetime,
-even when it happens to be stored in static storage.
+The lifetime of the backing array remains tied to its original `initializer_list`.
+Accessing the backing array outside its lifetime (as in `f4`) remains UB.
+<a href="https://eel.is/c++draft/class.base.init#11">[class.base.init]/11</a>,
+which makes it ill-formed to bind a reference member to a temporary (as in `C5`), is also unaffected.
+(As of December 2022, Clang diagnoses `C5`; GCC doesn't; MSVC gives a possibly unrelated error message.)
+
 ```c++
     const int *f4(std::initializer_list<int> i4) {
         return i4.begin();
@@ -225,23 +219,19 @@ even when it happens to be stored in static storage.
         const int *p = f4({1,2,3});
         std::cout << *p;  // still UB, not OK
     }
-```
 
-We do not intend to interfere with <a href="https://eel.is/c++draft/class.base.init#11">[class.base.init]/11</a>,
-which makes it not just UB but actually ill-formed to bind a reference member to a temporary.
-([CWG 1696](https://cplusplus.github.io/CWG/issues/1696.html), from 2014, seems to be related.
-As of December 2022, Clang diagnoses this example; GCC doesn't; MSVC gives a possibly unrelated error message.)
-```c++
     struct C5 {
         C5() : i5 {1,2,3} {}  // still ill-formed, not OK
         std::initializer_list<int> i5;
     };
 ```
 
-We do not intend to permit tomorrow's compiler to defer or omit the side effects of
-constructor or destructor calls involved with the creation of a backing array.
-In practice, we expect compilers to "static-fy" backing arrays of
-types that are trivially destructible, and not to "static-fy" anything else.
+We do not permit deferring, combining, or omitting the side effects of
+constructors or destructors related to the backing array.
+In practice, compilers will "static-fy" backing arrays of
+types that are constinit-constructible and trivially destructible,
+and not "static-fy" anything else.
+
 ```c++
     struct C6 {
         constexpr C6(int i) {}
@@ -254,36 +244,65 @@ types that are trivially destructible, and not to "static-fy" anything else.
     }
 ```
 
-We do not intend to cause any new race conditions when `initializer_list` is
-mixed with `thread_local`. Since the contents of a backing array are never
-modified, I don't see any way that static-fying a backing array could interfere
-with multithreading; but I mention it specifically here in case someone sees
-a problem that I don't.
+# Constexpr evaluation # {#constexpr-evaluation}
+
+Note: This section is new in R2. Thanks to Lénárd Szolnoki for the tip.
+
+Lénárd Szolnoki points out that P2752 introduces a new way for a pointer comparison
+to be "unspecified." This is fine, but it is also observable.
+
 ```c++
-    void f7() {
-        thread_local std::vector<int> v = {1,2,3};  // still OK
+    constexpr bool f9(const int *p) {
+        std::initializer_list<int> il = {1,2,3};
+        return p ? (p == il.begin()) : f9(il.begin());
     }
+
+    inline constexpr bool b9 = f9(nullptr);
 ```
 
-We do not intend to describe backing arrays as "variables" or permit anything
-new in terms of constexpr evaluation. For example, this code is ill-formed today
-and will remain ill-formed tomorrow. Now, if it ever *became* legal, we'd have to
-accept that it would be unspecified whether `c8a` and `c8b` had the same type or not.
-But this is not new: the situation with `c8c` and `c8d` is exactly analogous.
+Here the compile-time value of `b9` depends on whether `{1,2,3}`'s backing array
+is on the stack or not. Today, this program is well-formed and `b9` is `false`.
+P2752 makes this program ill-formed, because we make the result of `p == il.begin()`
+unspecified, and therefore
+(<a href="https://eel.is/c++draft/expr.const#5.24">[expr.const]/5.24</a>)
+not a core constant expression.
+
+Remove the `constexpr` from that program, and it becomes well-formed, but the
+programmer might notice that the initialization of inline variable `b9` is no
+longer being done statically; instead it's initialized dynamically, so that we
+can ensure that every TU gets the same value for it.
+
+Here's one more example:
+
 ```c++
-    template<const char *P> struct C8 {};
-    C8<std::begin({1,2,3})> c8a;  // still ill-formed, P must address a variable
-    C8<std::begin({1,2,3})> c8b;  // still ill-formed, P must address a variable
-    C8<"abc"> c8c;                // still ill-formed, P must address a variable
-    C8<"abc"> c8d;                // still ill-formed, P must address a variable
+    template<class T>
+    constexpr bool f10(T s, T t) {
+        return s.begin() == t.begin();
+    }
+
+    constexpr bool b10a = f10<std::string_view>("abc", "abc");
+        // Today: Ill-formed because of unspecified comparison
+        // Clang rejects; GCC and MSVC say true
+
+    constexpr bool b10b = f10<std::string_view>("abc", "def");
+        // Today: Well-formed false
+        // Clang rejects; GCC and MSVC say false
+
+    constexpr bool b10c = f10<std::initializer_list<int>>({1,2,3}, {1,2,3});
+        // Today: Well-formed false (all vendors agree)
+        // Tomorrow: Ill-formed because of unspecified comparison
+        //   (but expect vendor divergence as above)
+
+    constexpr bool b10d = f10<std::initializer_list<int>>({1,2,3}, {4,5,6});
+        // Today: Well-formed false (all vendors agree)
+        // Tomorrow: Well-formed false
+        //   (but expect vendor divergence as above)
 ```
-
-
 
 # Implementation experience # {#experience}
 
 I have an experimental patch against Clang trunk; see [[Patch]].
-It is likely incomplete, and (as of this writing) certainly buggy; it has not received attention from anyone but myself.
+It is incomplete, and (as of this writing) buggy; it has not received attention from anyone but myself.
 You can experiment with it [on Godbolt Compiler Explorer](https://godbolt.org/z/cxvdWcKbd);
 just use the P1144 branch of Clang, with the `-fstatic-init-lists` command-line switch.
 
@@ -305,7 +324,7 @@ the rest disabled by default).
 
 Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init.list#5">[dcl.init.list]/5–6</a> as follows:
 
-<blockquote>
+<small><blockquote>
 An object of type `std::initializer_list<E>` is constructed from an initializer list
 as if the implementation generated <del>and materialized a prvalue</del> <ins>an object</ins> of type “array of *N* `const E`”,
 where *N* is the number of elements in the initializer list<ins>; this is called the initializer list's *backing array*</ins>.
@@ -383,7 +402,7 @@ program is ill-formed. *—end example*]
 <p>
 <del>[*Note 6: The implementation is free to allocate the array in read-only memory
 if an explicit array with the same initializer can be so allocated. —end note*]</del>
-</blockquote>
+</blockquote></small>
 
 
 ## Addition to Annex C ## {#wording-annexc}
@@ -398,6 +417,8 @@ expect anyone to notice. Their code should just silently get faster.
 - Thanks to Jason Merrill for the original issue, and to Andrew Tomazos for recommending Arthur write this paper.
 
 - Thanks to Jens Maurer for reviewing P2752R1's proposed wording.
+
+- Thanks to Lénárd Szolnoki for pointing out the ramifications for constexpr.
 
 <pre class=biblio>
 {
