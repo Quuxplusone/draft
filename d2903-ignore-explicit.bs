@@ -1,0 +1,565 @@
+<pre class='metadata'>
+Title: Make implicit conversions ignore explicit constructors
+Shortname: D2903
+Revision: 0
+!Draft Revision: 2
+Audience: EWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2903-ignore-explicit.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2903-ignore-explicit.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2903-ignore-explicit.html">rawgit.com/Quuxplusone/draft/gh-pages/d2903-ignore-explicit.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Implicit conversions, even from braced initializer lists, shouldn't consider
+  <code>explicit</code> constructors as if they were viable candidates.
+Date: 2023-05-27
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial revision.
+
+TODO: Read P2828R1 Copy elision for direct-initialization with a conversion function (Core issue 2327) (Brian Bi)
+
+
+# Motivation # {#motivation}
+
+Consider the following two types:
+
+```c++
+struct Fish {
+  explicit Fish(int, int) {}
+};
+
+struct Fowl {
+  Fowl(int, int) {}
+};
+
+void foo(Fish); // #1
+void foo(Fowl); // #2
+
+int main() {
+    foo({1,2}); // Uh-oh!
+}
+```
+
+With Clang and EDG, the `Uh-oh!` line is considered to unambiguously call `foo` #2.
+With GCC and MSVC, it's considered ambiguous. The Clang+EDG behavior is preferred
+by working programmers in practice, but it is non-conforming.
+The GCC+MSVC behavior is conforming, but often reported as a bug
+(GCC
+<a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60027">#60027</a>,
+<a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=97220">#97220</a>,
+<a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=102247">#102247</a>,
+<a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=107958">#107958</a>).
+
+The reason this code is actually ill-formed is because, as [[CWG1228]]
+identified back in 2010, the Standard uses different logic in
+<a href="https://eel.is/c++draft/over.match.list#1.sentence-2">[over.match.list]</a>
+versus <a href="https://eel.is/c++draft/over.match.copy#1.1.sentence-1">[over.match.copy]</a>.
+[[CWG1228]] was resolved "NAD," as in "The inconsistency, sadly, matches the current design.
+Any design change in this area requires a paper." This P2903 is intended to be that paper.
+
+Worse, consider this pathological type:
+
+```c++
+struct Evil {
+  explicit Evil(int, int=0); // #1
+  Evil(long, long=0);        // #2
+};
+Evil ea = 1;     // OK, calls #2
+Evil eb = {1};   // ill-formed, doesn't just call #2
+Evil ec = {1,2}; // ill-formed, doesn't just call #2
+```
+
+This behavior is (since 2012-ish) faithfully implemented by all vendors, but its
+non-intuitiveness caused some vendor annoyance (Clang
+<a href="https://github.com/llvm/llvm-project/issues/12492#issuecomment-980904681">#12492</a>).
+
+
+
+# Historical background # {#historical-background}
+
+The paper that proposed uniform initialization (TODO FIXME BUG HACK: find it? [[N2477]]?)
+gave several motivating examples for the current rules. The basic shape of the arguments
+seems to be:
+
+- C++98 has the Most Vexing Parse. Copy-initialization looks like `T t = U()` and is fine;
+    direct-initialization looks like `T t(U())` and is vexing. We fix that by changing parens to braces.
+    Simultaneously, we add uniform initialization to support `pair<int,int> p = {1,2}`.
+    Now copy-initialization looks like `T t = {U()}` and direct-initialization looks like `T t{U()}`.
+
+- We're familiar with the idea that explicit constructors can be more dangerous than
+    converting constructors. Consider `list<int> t = (1)` (ill-formed C++98) versus
+    `list<int> t (1)` (well-formed C++98, runtime behavior likely unintended).
+
+- Suppose copy-initialization ignored explicit constructors. Then a single-character change,
+    from `T t = {U()}` to `T t {U()}`, would change the meaning of the code from "pick the
+    best of the *non-explicit* constructors" to "pick the best of *all* the constructors,"
+    changing the meaning of the code for the worse (the "more dangerous").
+
+That is, *if* copy-initialization ignored explicit constructors, then two snippets that differ
+by one `=` character could both be well-formed and yet choose completely different constructors.
+In C++11, this was a relatively surprising idea. In C++98, you could certainly craft types
+with that behavior:
+
+```c++
+    struct S {
+      S(long);
+      explicit S(int);
+    };
+
+    S s = (1); // OK, calls S(long)
+    S t(1);    // OK, calls S(int)
+```
+
+But that quirk doesn't seem to have been widely known.
+
+
+## "Rewarding" non-explicit constructors ## {#anthropomorphization}
+
+In [[N2477]] §3 (written in 2007 while the uniform-initialization rules were still
+evolving) Bjarne Stroustrup wrote:
+
+> Can the explicit/implicit constructor distinction affect `{...}` initialization?
+> For example, can `f({v})`, where `f` is declared `void f(X)`, give a different `X`
+> than `X{v}`? The proposed answer is “no, the `X` produced as an argument in `f({v})`
+> and `X{v}` will always be the same value.”
+>
+> `{...}` provides an alternative solution to the problems that `explicit` was designed to solve. 
+
+He gives this example:
+
+```c++
+    struct String1 { explicit String1(const char*); }
+    struct String2 { String2(const char*); }
+    
+    void f1(String1);
+    void f2(String2);
+    void f(String1);
+    void f(String2);
+
+    int main() {
+      f1("asdf"); // error
+      f2("asdf"); // OK
+      f("asdf");  // OK, calls f(String2)
+    } 
+```
+
+> The real advantage of `explicit` is that it renders `f1("asdf")` an error.
+> A problem is that overload resolution “prefers” non-`explicit` constructors,
+> so that `f("asdf")` calls `f(String2)`. I consider the resolution of `f("asdf")`
+> less than ideal, because the writer of `String2` [the "bad" type] probably didn’t mean to resolve
+> ambiguities in favor of `String2` (at least not in every case where explicit and
+> non-explicit constructors occur like this) and the writer of `String1` [the "good" type]
+> certainly didn’t. The rule favors “sloppy programmers” who don’t use `explicit`.
+
+Stroustrup implicitly treats functions anthropomorphically: Functions *want* to be called.
+To be called (especially in preference to another function) is a favorable outcome — a reward.
+The fact that that reward goes to "sloppy programmers" is fundamentally *unfair* and
+ought to be fixed.
+
+Now, I agree that well-behaved programmers should make most of their constructors `explicit`.
+[I've even blogged about it.](https://quuxplusone.github.io/blog/2023/04/08/most-ctors-should-be-explicit/)
+But I don't think of a function call as a reward for good behavior. If I must anthropomorphize,
+I'll actually prefer to anthropomorphize the *argument*, and say that it wants to be
+passed to *appropriate* functions. `"asdf"` clearly and unambiguously *can* be a `String2`
+and *can't* be a `String1`, so it makes perfect sense to me that `f("asdf")` calls `f(String2)`:
+that seems like exactly what it should "want." Vice versa, we must assume that the author of
+library type `String2` knew what they were doing when they made `String2` implicitly convertible
+from a string literal. Maybe they were just "sloppy," but as the client programmer (and in the year 2023
+rather than 2007), I don't think that should be our default assumption.
+
+Stroustrup's example is precisely isomorphic to this one:
+
+```c++
+    void f1(std::reverse_iterator<const char*>);
+    void f2(std::string_view);
+    void f(std::reverse_iterator<const char*>);
+    void f(std::string_view);
+
+    int main() {
+      f1("asdf"); // error
+      f2("asdf"); // OK
+      f("asdf");  // OK, calls f(std::string_view)
+    }
+```
+
+Issue: This part
+
+Now consider the multi-argument version... ooh, but this is much harder to formulate
+with STL types, because the STL is exactly Bjarne's "sloppy programmer." It's hard to find
+any STL type with an explicit multi-argument constructor. So for example we have:
+
+```c++
+    using Pair = std::pair<int, std::string>;
+    using Vector = std::vector<std::string>;
+    using SharedPtr = std::shared_ptr<int>;
+
+    void f(Vector); // #1
+    void f(Pair); // #2
+    f({42, "abc"});  // ill-formed, ambiguous
+
+    void g(SharedPtr); // #1
+    void g(std::pair<SharedPtr, SharedPtr>); // #2
+    SharedPtr p;
+    g({p, nullptr});  // ill-formed, ambiguous
+```
+
+In a perfect world, both of these would unambiguously call #2,
+because `vector`'s constructor from `{42, "abc"}`
+and `shared_ptr`'s constructor from `{p, nullptr}` would both be `explicit`.
+But that's not our current world, and likely never will be.
+
+In fact, someone might counter-argue that `vector` right now matches the `Evil`
+case above: it has so many converting constructors that it may easily(?) happen
+that `{a,b,c}` converts using a converting constructor, and then if we made P2903's
+proposed change, nothing would break immediately; but later, if we made that
+chosen constructor properly `explicit`, it would silently start choosing some
+different constructor!
+
+```c++
+struct SloppySpan {
+    SloppySpan(const char *, int); // #1
+    SloppySpan(const char *, const char *); // #2
+};
+void f(SloppySpan);
+f({"abc", 0}); // Today: Calls #1
+               // Today if #1 is explicified: Ill-formed
+               // After P2903: Still calls #1
+               // After, if #1 is explicified: Calls #2!
+```
+
+This explains Bjarne's view of `explicit` as basically a poor man's version
+of `=delete`: it doesn't (usually) make things *drop out* of overload resolution,
+but simply makes them ill-formed if it is the best match. Unfortunately this gives
+`explicit` two competing motivations: "Make this constructor not a conversion"
+and "Make this converting constructor `=delete`'d." Ideally, we should use `=delete` when we mean
+the latter. But then we'd need some way to overload a non-converting constructor
+with a deleted conversion. This doesn't work today:
+
+```c++
+struct EvolvedSpan {
+    explicit EvolvedSpan(const char *, int); // #1 non-converting ctor
+    EvolvedSpan(const char *, int) = delete; // #1 deleted conversion
+    EvolvedSpan(const char *, const char *); // #2 OK conversion
+};
+```
+
+Today this is an invalid redeclaration, because `explicit` is not part of the name-mangling.
+(And we shouldn't propose to *make* it part of the mangling, because that would be a huge
+ABI break. I'm not interested in pursuing that direction.)
+
+
+## `tuple t = {1}` ## {#tuple-note}
+
+A popular gripe with C++11's copy-list-initialization was that it didn't seem to "work right" with
+`tuple`. That's because, until C++14, `std::tuple` had only an `explicit` elementwise constructor.
+
+```c++
+    std::tuple<int> t1 = {1};       // ill-formed before N3680
+    std::tuple<int,int> t2 = {2,2}; // ill-formed before N3680
+```
+
+This was fixed by [[N3680]], which made `tuple`'s constructor conditionally `explicit`,
+so that both of the above lines compile fine since C++14.
+
+## Conditional explicit ## {#conditional-explicit}
+
+Issue: this part
+
+We might already have a problem. Since C++20, constructors can be conditionally explicit,
+based on their template parameters, which we'll know only after deduction. How can we
+"ignore" an explicit candidate, when we don't even find out that it's explicit until
+after deduction? Is this a problem for P2903?
+
+I don't think it's a problem, because we can already handle the C++98 version
+(<a href="https://godbolt.org/z/cvEzTroY3">Godbolt</a>).
+
+```c++
+    struct E {
+      E(long); // #1
+      template<class T> explicit(sizeof(T)==4) E(T); // #2
+    };
+    E e1 = 42;  // OK, calls #1 because #2 is explicit
+    E e2 = 'x'; // OK, calls #2 as the best match
+```
+
+
+# Current wording # {#current-wording}
+
+First, note two terms of art: <i>converting constructor</i> and <i>initializer-list constructor</i>.
+
+<a href="https://eel.is/c++draft/class.conv.ctor#def:constructor,converting">[class.conv.ctor]</a> says:
+
+<small><blockquote>
+A constructor that is not explicit specifies a conversion from the types of its parameters (if any)
+to the type of its class. Such a constructor is called a <i>converting constructor</i>.
+</blockquote></small>
+
+<a href="https://eel.is/c++draft/dcl.init.list#def:initializer-list_constructor">[dcl.init.list]</a> says:
+
+<small><blockquote>
+A constructor is an <i>initializer-list constructor</i> if its first parameter is of type
+`std::initializer_list<E>` or reference to *cv* `std::initializer_list<E>` for some type `E`,
+and either there are no other parameters or else all other parameters have default arguments.
+
+[*Note:* Initializer-list constructors are favored over other constructors in list-initialization.
+Passing an initializer list <i>[that is, a braced initializer list]</i> as the argument to the
+constructor template `template<class T> C(T)` of a class `C` does not create an initializer-list
+constructor, because an initializer list argument causes the corresponding parameter to be a
+non-deduced context <i>[that is, `T` can't be deduced in that case]</i>. — end note]
+</blockquote></small>
+
+<a href="https://eel.is/c++draft/over.match.copy#1.1.sentence-1">[over.match.copy]</a> says:
+
+<small><blockquote>
+Assuming that “*cv1* `T`” is the type of the object being <i>[copy-]</i> initialized, with `T` a class type,
+the candidate functions are selected as follows:
+
+- The converting constructors of T are candidate functions.
+
+- When the type of the initializer expression is a class type “*cv* `S`”, conversion functions are considered.
+    The permissible types for non-explicit conversion functions are `T` and any class derived from `T`.
+    When initializing a temporary object to be bound to the first parameter of a constructor where the
+    parameter is of type “reference to *cv2* `T`” and the constructor is called with a single argument
+    in the context of direct-initialization of an object of type “*cv3* `T`”, the permissible types for
+    explicit conversion functions are the same; otherwise there are none.
+
+</blockquote></small>
+
+On the other hand, <a href="https://eel.is/c++draft/over.match.list#1.sentence-2">[over.match.list]</a> says:
+
+<small><blockquote>
+When objects of non-aggregate class type `T` are list-initialized [...],
+overload resolution selects the constructor in two phases:
+
+- If the initializer list is not empty or `T` has no default constructor,
+    overload resolution is first performed where the candidate functions are the
+    <a href="https://eel.is/c++draft/dcl.init.list#def:initializer-list_constructor">initializer-list constructors</a>
+    of the class `T` and the argument list consists of the initializer list as a single argument.
+
+- Otherwise, or if no viable initializer-list constructor is found, overload resolution is performed again,
+    where the candidate functions are all the constructors of the class `T`
+    and the argument list consists of the elements of the initializer list.
+
+In copy-list-initialization, if an explicit constructor is chosen, the initialization is ill-formed.
+
+[*Note:* This differs from other situations ([over.match.ctor], [over.match.copy]),
+where only converting constructors are considered for copy-initialization.
+This restriction only applies if this initialization is part of the final result of overload resolution. *—end note*]
+</blockquote></small>
+
+1․ The current wording specifies two consecutive overload resolutions, which has all the same potential for
+vendor divergence as we reported in [[P2266]]. For example (cf. [[P2266]] example `fourteen`):
+
+```c++
+struct A {
+  A(int);
+  A(std::initializer_list<short>);
+  A(std::initializer_list<long>);
+};
+A one = {42};
+```
+
+Here the first pass finds both of `A`'s initializer-list constructors, which are equally good matches.
+This means the first resolution has failed (<a href="https://eel.is/c++draft/over.match.general#3">[over.match.general]/3</a>);
+but [over.match.list] specifies that the second resolution should be performed only if the first resolution
+finds *no viable candidates,* which is different. EDG, GCC, and Clang are conforming;
+MSVC goes on to perform the second resolution.
+
+<b>Error from ambiguity in the first pass:</b> EDG; GCC; Clang
+
+<b>Non-conforming fallback to `A(int)`:</b> MSVC
+
+2․ For an empty initializer list, we do the first pass only if "`T` has no default constructor";
+this is prone to vendor divergence. For example, *having a default constructor* is orthogonal to
+*being default constructible.*
+
+```c++
+struct B {
+  B();
+  B(int = 0);
+  B(std::initializer_list<int>);
+};
+B two = {};
+```
+
+<b>Error from ambiguity in the first pass:</b> EDG; GCC; MSVC
+
+<b>Non-conforming call to `B(std::initializer_list<int>)`:</b> Clang
+
+3․ Whether "no viable initializer-list constructor is found" in the first pass critically depends on
+what counts as an initializer-list constructor. For example:
+
+```c++
+template<class T>
+using Alias = std::initializer_list<T>;
+
+struct C {
+  template<class T> C(Alias<T>);
+};
+C three = {42};
+```
+
+Here the first pass finds `C(Alias<T>) [with T=int]` if and only if that constructor template
+is considered to be an "initializer-list constructor" per
+<a href="https://eel.is/c++draft/dcl.init.list#def:initializer-list_constructor">[dcl.init.list]/2</a>.
+Clang's behavior here is probably non-conforming.
+
+<b>Yes, well-formed:</b> EDG; GCC; MSVC
+
+<b>No, ill-formed:</b> Clang
+
+
+
+## Prior proposal
+
+Johannes Schaub reports that he proposed the following change, back in 2010,
+but it was not accepted. (c++std-core-18536, c++std-core-18537, 21836)
+
+<small><blockquote>
+When objects of non-aggregate class type `T` are list-initialized
+such that [dcl.init.list] specifies that overload resolution is performed according to the rules in this subclause
+or when forming a list-initialization sequence according to [over.ics.list],
+overload resolution selects the constructor in two phases:
+
+- If the initializer list is not empty or `T` has no default constructor,
+    overload resolution is first performed where the candidate functions are the
+    <a href="https://eel.is/c++draft/dcl.init.list#def:initializer-list_constructor">initializer-list constructors</a>
+    of the class `T` and the argument list consists of the initializer list as a single argument.
+
+- Otherwise, or if no viable initializer-list constructor is found, overload resolution is performed again,
+    where the candidate functions are all the constructors of the class `T`
+    and the argument list consists of the elements of the initializer list.
+
+<del>In</del> <ins>When forming a list-initialization sequence, only converting constructors
+are considered. Otherwise, in</ins> copy-list-initialization,
+if an explicit constructor is chosen, the initialization is ill-formed.
+
+<del>[*Note:* This differs from other situations ([over.match.ctor], [over.match.copy]),
+where only converting constructors are considered for copy-initialization.
+This restriction only applies if this initialization is part of the final result of overload resolution. *—end note*]</del>
+</blockquote></small>
+
+But I don't think this goes far enough. I think what we need to say, roughly, is:
+
+- For copy-list-initialization, for copy-initialization, and for forming implicit conversion sequences,
+    consider only converting constructors (don't consider explicit constructors at all). Throw all the
+    converting constructors together into the candidate set.
+
+- During direct-list-initialization and copy-list-initialization, force initializer-list constructors
+    to be strictly better matches than non–initializer-list constructors. Don't do overload resolution twice;
+    just do it once, where some of the candidates are going to be much better matches than the others.
+
+- <a href="https://eel.is/c++draft/over.match.best#over.ics.rank-3.1">[over.ics.rank]</a>
+    already says that "List-initialization sequence `L1` is a better conversion sequence
+    than list-initialization sequence `L2` if `L1` converts to `std::initializer_list<X>` for some `X`
+    and `L2` does not." But what we need is to say that a conversion of a braced initializer list to
+    `std::initializer_list<X>` should be preferred over the conversion of that braced initializer list
+    to *a collection of other things.* I can imagine that that's unwieldy.
+
+- I suspect a proper solution would probably allow us to eliminate
+    <a href="https://eel.is/c++draft/over.match.best#over.best.ics.general-4">[over.best.ics.general]/4</a>.
+
+For example, today when we see...
+
+```c++
+struct Alpha {
+    Alpha(Beta);
+};
+struct Beta {
+    operator Alpha() const;
+};
+Alpha a = Beta();
+```
+
+...we throw the constructor of `Alpha` and the conversion function of `Beta` together into an overload set
+and pick the best match. So we have *some* way today of comparing the rank of candidates or ICSes that aren't
+directly isomorphic. But I do admit that whatever way we have today, seems to be just as much a source of
+vendor divergence as anything we're replacing:
+
+```c++
+struct Alpha { Alpha(const Beta&); };
+struct Beta { operator Alpha() const; };
+Alpha a = Beta();  // EDG+GCC call the ctor; Clang+MSVC reject
+
+struct Alpha { Alpha(const Beta&); };
+struct Beta { operator Alpha() const&; };
+Alpha a = Beta();  // EDG calls the ctor; GCC+Clang+MSVC reject
+```
+
+
+
+# Implementation experience # {#experience}
+
+None. Looking for someone to help with a Clang patch.
+
+
+# Proposed wording relative to C++23 # {#wording}
+
+None yet.
+
+
+<pre class=biblio>
+{
+  "CWG1228": {
+    "authors": [
+      "Daniel Krügler"
+    ],
+    "title": "Copy-list-initialization and explicit constructors",
+    "href": "https://cplusplus.github.io/CWG/issues/1228.html",
+    "date": "December 2010"
+  },
+  "CWG2137": {
+    "authors": [
+      "Richard Smith"
+    ],
+    "title": "List-initialization from object of same type",
+    "href": "https://cplusplus.github.io/CWG/issues/2137.html",
+    "date": "June 2015"
+  },
+  "CWG2735": {
+    "authors": [
+      "Jason Merrill"
+    ],
+    "title": "List-initialization and conversions in overload resolution",
+    "href": "https://cplusplus.github.io/CWG/issues/2735.html",
+    "date": "March 2023"
+  },
+  "N2477": {
+    "authors": [
+      "Bjarne Stroustrup"
+    ],
+    "title": "Uniform initialization design choices",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2477.pdf",
+    "date": "November 2007"
+  },
+  "N3680": {
+    "authors": [
+      "Daniel Krügler"
+    ],
+    "title": "Improving pair and tuple",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3680.html",
+    "date": "April 2013"
+  },
+  "P2266": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "Simpler implicit move",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2266r3.html",
+    "date": "March 2022"
+  }
+}
+</pre>
