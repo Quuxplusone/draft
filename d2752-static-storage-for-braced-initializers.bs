@@ -1,9 +1,9 @@
 <pre class='metadata'>
 Title: Static storage for braced initializers
 Shortname: D2752
-Revision: 2
-!Draft Revision: 8
-Audience: EWG
+Revision: 3
+!Draft Revision: 15
+Audience: CWG
 Status: D
 Group: WG21
 URL:
@@ -17,7 +17,7 @@ Abstract:
   and thence into the vector. This wastes CPU cycles, and it wastes stack space.
   Eliminate the waste by letting a <code>std::initializer_list&lt;T&gt;</code>'s
   backing array occupy static storage.
-Date: 2023-05-13
+Date: 2023-06-14
 </pre>
 
 <style>
@@ -27,6 +27,17 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R3 (mid-Varna 2023):
+
+    - Add that this proposal is already [DR'ed in GCC trunk](https://godbolt.org/z/havqf5cPT).
+
+    - EWG polled "Forward to CWG for C++26 with the addition of an Annex C entry and discussion of no-intent to change storage duration," 6–23–1–0–0.
+
+    - After EWG: Add Annex C entry. Add the words "and with the understanding that `__b` does not outlive the call to `f`" in Example 12.
+
+    - After CWG: Add discussion of `mutable` members, and Example 12's subexample `r`. Add the constexpr [[#however]] section.
+          Headed to the straw-polls page.
 
 - R2 (pre-Varna 2023):
 
@@ -244,9 +255,45 @@ and not "static-fy" anything else.
     }
 ```
 
+# Mutable members # {#mutable-members}
+
+Note: This section is new in R3. Thanks to Hubert Tong and CWG for the tip.
+
+Types with `mutable` data members can prevent the optimization from occurring.
+That is, vendors must make the following example succeed and not throw.
+
+```c++
+    struct S {
+      constexpr S(int i) : i(i) {}
+      mutable int i;
+    };
+
+    void f(std::initializer_list<S> il) {
+      if (il.begin()->i != 1) throw;
+      il.begin()->i = 4;
+    }
+
+    int main() {
+      for (int i = 0; i < 2; ++i) {
+        f({1,2,3});
+      }
+    }
+```
+
+The first call to `f` receives an `il` backed by `{1,2,3}`, and modifies it to `{4,2,3}`.
+The second call to `f` must receive an `il` again backed by `{1,2,3}`.
+The implementation is not permitted to give the second call an `il` backed by `{4,2,3}`;
+that would simply be a wrong-codegen bug in the implementation.
+
+(GCC's initial implementation had this bug, but a fix is in the works.)
+
+Vendors are expected to deal with this by simply disabling their promote-to-shared-storage
+optimization when the element type (recursively) contains any mutable bits.
+
+
 # Constexpr evaluation # {#constexpr-evaluation}
 
-Note: This section is new in R2. Thanks to Lénárd Szolnoki for the tip.
+Note: This section is new in R2 and updated in R3.
 
 Lénárd Szolnoki points out that P2752 introduces a new way for a pointer comparison
 to be "unspecified." This is fine, but it is also observable.
@@ -262,8 +309,8 @@ to be "unspecified." This is fine, but it is also observable.
 
 Here the compile-time value of `b9` depends on whether `{1,2,3}`'s backing array
 is on the stack or not. Today, this program is well-formed and `b9` is `false`.
-P2752 makes this program ill-formed, because we make the result of `p == il.begin()`
-unspecified, and therefore
+*According to one vendor's interpretation,* P2752 makes this program ill-formed,
+because we make the result of `p == il.begin()` unspecified, and therefore
 (<a href="https://eel.is/c++draft/expr.const#5.24">[expr.const]/5.24</a>)
 not a core constant expression.
 
@@ -282,11 +329,11 @@ Here's one more example:
 
     constexpr bool b10a = f10<std::string_view>("abc", "abc");
         // Today: Ill-formed because of unspecified comparison
-        // Clang rejects; GCC and MSVC say true
+        // Clang rejects; GCC, MSVC, EDG say true
 
     constexpr bool b10b = f10<std::string_view>("abc", "def");
         // Today: Well-formed false
-        // Clang rejects; GCC and MSVC say false
+        // Clang rejects; GCC, MSVC, EDG say false
 
     constexpr bool b10c = f10<std::initializer_list<int>>({1,2,3}, {1,2,3});
         // Today: Well-formed false (all vendors agree)
@@ -299,6 +346,68 @@ Here's one more example:
         //   (but expect vendor divergence as above)
 ```
 
+## However... ## {#however}
+
+CWG discussion revealed complexity here. Right now, empirically, Clang interprets
+<a href="https://eel.is/c++draft/expr.const#5.24">[expr.const]/5.24</a>
+as meaning that any pointer comparison whose result *happens to be* unspecified necessarily
+is not a core constant. The GCC implementor in the room initially felt the same way (i.e. that the above
+behavior was a GCC bug). But another CWG participant put forth the interpretation
+that [expr.const] intended to classify only a very narrow subset of expressions as "[pointer
+comparisons] where the result is unspecified," i.e., those covered specifically by
+<a href="https://eel.is/c++draft/expr.eq#3.1.sentence-1">[expr.eq]/3.1</a>.
+Under that interpretation, "unspecified-ness" is a point property, not something that needs
+to be tracked by dataflow analysis during constexpr evaluation.
+
+```c++
+    constexpr const char *a = "abc";
+    constexpr const char *b = "abc";
+    constexpr bool f11() { return a == b; }
+    static_assert(f11() || !f11());
+        // Clang rejects; GCC, MSVC, EDG accept
+```
+
+Here it is unspecified whether `a` and `b` share storage, so `a == b`'s result is unspecified
+(either true or false). Clang diagnoses `f11` as ill-formed, because it claims that `a == b`
+is a pointer comparison with an unspecified result (<a href="https://eel.is/c++draft/expr.const#5.24">[expr.const]/5.24</a>).
+
+According to the non-Clang interpretation, the constexpr-evaluator is supposed to decide
+early on whether `a` and `b` share storage or not. The result of that decision is unspecified.
+But after that point, comparisons such as `a == b` are well-defined true or well-defined false;
+the only kind of "equality operator where the result is unspecified" according to
+<a href="https://eel.is/c++draft/expr.eq#3.1.sentence-1">[expr.eq]/3.1</a> (and thus
+not a core constant expression by <a href="https://eel.is/c++draft/expr.const#5.24">[expr.const]/5.24</a>)
+would be a one-past-the-end comparison. We're not doing that here.
+
+Clang's interpretation leads to a reductio ad absurdam:
+
+```c++
+    int a[10];
+    constexpr int inc(int& i) { return (i += 1); }
+    constexpr int twox(int& i) { return (i *= 2); }
+    constexpr int f(int i) { return inc(i) + twox(i); }
+    constexpr bool g() { return &a[f(1)] == &a[6]; }
+    constexpr bool b11 = g();
+        // Today: "Ill-formed" according to Clang's interpretation
+        //   But Clang, GCC, MSVC, EDG all report "true"
+```
+ 
+Here `f(1)`'s result is unspecified (either 6 or 8 depending on order of evaluation), so
+the pointer equality comparison `&a[f(1)] == &a[6]` produces an unspecified answer (either
+true or false depending on `f(1)`); and yet, not even Clang diagnoses the use of `g()`
+as a core constant expression. That is, Clang's draconian interpretation
+of <a href="https://eel.is/c++draft/expr.const#5.24">[expr.const]/5.24</a> cannot be sustained
+even by Clang itself.
+
+As a result of this discussion, CWG decided to strike the part of the Annex C entry
+dealing with constexpr evaluation. The Annex C entry now mentions only that some well-defined
+results have become unspecified, and doesn't imply that anything might become ill-formed.
+
+Note: [[#however]] was written after the CWG discussion, but the proposed wording below is
+exactly as CWG approved it; those Annex C diffs were made live in the CWG meeting and approved
+as they were made.
+
+
 # Implementation experience # {#experience}
 
 I have an experimental patch against Clang trunk; see [[Patch]].
@@ -306,19 +415,9 @@ It is incomplete, and (as of this writing) buggy; it has not received attention 
 You can experiment with it [on Godbolt Compiler Explorer](https://godbolt.org/z/cxvdWcKbd);
 just use the P1144 branch of Clang, with the `-fstatic-init-lists` command-line switch.
 
-## GCC `-fmerge-all-constants` ## {#fmerge-all-constants}
-
-See [this blog post](https://quuxplusone.github.io/blog/2023/02/17/issaquah-status/#static-storage-for-braced-initializers):
-GCC has for a long time implemented a non-conforming mode `-fmerge-all-constants` in which all constants
-are merged, even constants that C++ requires to have different addresses, such as
-```c++
-    const int a[] = {1,2,3};
-    const int b[] = {1,2,3};
-```
-This is a superset of P2752's proposed behavior. When P2752 is adopted, GCC can probably reuse
-some of that machinery to enable the optimization specifically for initializer lists (while leaving
-the rest disabled by default).
-
+In June 2023, Jason Merrill implemented this proposal in GCC trunk (the rising GCC 14),
+as a DR in all language modes.
+Compare the behavior of [GCC 13 against GCC trunk](https://godbolt.org/z/havqf5cPT).
 
 # Proposed wording relative to the current C++23 draft # {#wording}
 
@@ -326,7 +425,7 @@ Modify <a href="https://timsong-cpp.github.io/cppwp/n4861/dcl.init.list#5">[dcl.
 
 <small><blockquote>
 An object of type `std::initializer_list<E>` is constructed from an initializer list
-as if the implementation generated <del>and materialized a prvalue</del> <ins>an object</ins> of type “array of *N* `const E`”,
+as if the implementation generated and materialized a prvalue of type “array of *N* `const E`”,
 where *N* is the number of elements in the initializer list<ins>; this is called the initializer list's *backing array*</ins>.
 Each element of <del>that array</del> <ins>the backing array</ins> is copy-initialized with the corresponding element of the initializer list,
 and the `std::initializer_list<E>` object is constructed to refer to that array.
@@ -348,10 +447,10 @@ and the `std::initializer_list<E>` object is constructed to refer to that array.
 *—end example*]</del>
 
 <p>
-<ins>Whether two backing arrays with the same contents are distinct (that is,
-are stored in nonoverlapping objects) is unspecified.</ins>
+<ins>Whether all backing arrays are distinct (that is,
+are stored in non-overlapping objects) is unspecified.</ins>
 
-The <ins>backing</ins> array has the same lifetime as <del>any other</del> <ins>a</ins> temporary object, except that initializing
+The <ins>backing</ins> array has the same lifetime as any other temporary object, except that initializing
 an `initializer_list` object from the array extends the lifetime of the array exactly like
 binding a reference to a temporary.
 
@@ -364,8 +463,16 @@ binding a reference to a temporary.
     <ins>void h() {</ins>
       <ins>f({1, 2, 3});</ins>
     <ins>}</ins>
+
+    <ins>struct A {</ins>
+      <ins>mutable int i;</ins>
+    <ins>};</ins>
+    <ins>void q(std::initializer_list&lt;A&gt;);</ins>
+    <ins>void r() {</ins>
+      <ins>q({A{1}, A{2}, A{3}});</ins>
+    <ins>}</ins>
 </pre></small>
-<ins>The initialization will be implemented in a way roughly equivalent to this:</ins>
+<ins>The initializations can be implemented in a way roughly equivalent to this:</ins>
 <small><pre>
     <ins>void g(float x) {</ins>
       <ins>const double __a[3] = {double{1}, double{x}, double{3}}; // backing array</ins>
@@ -375,8 +482,13 @@ binding a reference to a temporary.
       <ins>static constexpr double __b[3] = {double{1}, double{2}, double{3}}; // backing array</ins>
       <ins>f(std::initializer_list&lt;double&gt;(__b, __b+3));</ins>
     <ins>}</ins>
+    <ins>void r() {</ins>
+      <ins>const A __c[3] = {A{1}, A{2}, A{3}}; // backing array</ins>
+      <ins>q(std::initializer_list&lt;A&gt;(__c, __c+3));</ins>
+    <ins>}</ins>
 </pre></small>
-<ins>assuming that the implementation can construct an `initializer_list` object with a pair of pointers.
+<ins>assuming that the implementation can construct an `initializer_list` object with a pair of pointers,
+and with the understanding that `__b` does not outlive the call to `f`.
 *—end example*]</ins>
 
 [*Example 13:*
@@ -407,9 +519,21 @@ if an explicit array with the same initializer can be so allocated. —end note*
 
 ## Addition to Annex C ## {#wording-annexc}
 
-We might want to add something to Annex C <a href="https://eel.is/c++draft/diff.cpp20.expr">[diff.cpp20.expr]</a>,
-since technically this is a breaking change; but on the other hand we don't actually
-expect anyone to notice. Their code should just silently get faster.
+Modify Annex C <a href="https://eel.is/c++draft/diff.cpp20.expr">[diff.cpp20.expr]</a> as follows:
+
+<small><blockquote>
+<ins><b>Affected subclause:</b> [dcl.init.list]</ins><br>
+<ins><b>Change:</b> Pointer comparisons between `initializer_list` objects' backing arrays are unspecified.</ins><br>
+<ins><b>Rationale:</b> Permit the implementation to store backing arrays in static read-only memory.</ins><br>
+<ins><b>Effect on original feature:</b> Valid C++ 2023 code that relies on the result of pointer comparison between backing arrays
+may change behavior. For example:</ins><br>
+<pre>
+<ins>bool ne(std::initializer_list&lt;int> a, std::initializer_list&lt;int> b) {</ins>
+  <ins>return a.begin() != b.begin() + 1;</ins>
+<ins>}</ins>
+<ins>bool b = ne({2,3}, {1,2,3}); // unspecified result; previously false</ins>
+</pre>
+</blockquote></small>
 
 
 # Acknowledgments # {#acknowledgments}
