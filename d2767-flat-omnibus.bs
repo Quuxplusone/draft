@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: flat_map/flat_set omnibus
 Shortname: D2767
-Revision: 0
-!Draft Revision: 9
+Revision: 1
+!Draft Revision: 11
 Audience: LWG
 Status: D
 Group: WG21
@@ -14,7 +14,7 @@ Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Issues and resolutions in C++23 <code>flat_set</code>
   and <code>flat_map</code>, based on libc++'s implementation experience.
-Date: 2023-05-14
+Date: 2023-06-18
 </pre>
 
 <style>
@@ -26,6 +26,15 @@ dst  {background-color: #CCFFEE; text-decoration: underline;}
 </style>
 
 # Changelog # {#changelog}
+
+- R1 (post-Varna 2023):
+
+    - LWG approved §3 as editorial.
+
+    - LWG reviewed §4,5,6,7. Update those sections' rationales and proposed wordings.
+
+    - Split [[#heterogeneous-insert-multiset-redirect]] away from the rest of §7; it is now
+          [[#heterogeneous-insert-multiset]], and requires discussion by LEWG.
 
 - R0 (pre-Varna 2023):
 
@@ -42,958 +51,19 @@ Some of the proposed solutions are LEWG-level design changes. Contrariwise, some
 here don't have "solutions" at all, but are recorded merely For Your Information (for other vendors/implementors)
 to document the design choices libc++ has made.
 
-Arthur also proposes a major editorial change to the presentation order of [flat.foo.cons], to collect
-the allocator-extended constructors in one place, consistent with <a href="https://eel.is/c++draft/priority.queue#priqueue.cons.alloc">[priqueue.cons.alloc]</a>,
-<a href="https://eel.is/c++draft/queue#cons.alloc">[queue.cons.alloc]</a>, and <a href="https://eel.is/c++draft/stack#cons.alloc">[stack.cons.alloc]</a>.
+# Editorial (merged in R0) # {#editorial-cons-alloc}
 
-# Editorial introduction of [flat.foo.cons.alloc] # {#editorial-cons-alloc}
+P2767R0's editorial change was reviewed by LWG in Varna (2023-06-16) and approved;
+it is submitted as <a href="https://github.com/cplusplus/draft/pull/6274">#6274</a>.
 
-This editorial change was originally submitted as <a href="https://github.com/cplusplus/draft/pull/5923">#5923</a>
-(October 2022). It bit-rotted after the resolutions of LWG 3802/3803. Here is a clean rebased copy, with easier-to-review
-formatting.
-
-This wording trivially merge-conflicts with the resolution of [[LWG3884]] (which adds new
-allocator-extended constructors). I'm happy to rebase LWG3884 on top of this, or vice versa.
-
-The only changes happening in this part, and their rationales, are:
-
-- Move all of the allocator-extended constructors down to the end of [flat.foo.cons].
-    - Ease of reading.
-    - Consistency with `priority_queue`, `queue`, `stack`.
-
-- Introduce a new subsection, [flat.foo.cons.alloc], to hold just those constructors.
-    - Consistency with [priqueue.cons.alloc], [queue.cons.alloc], [stack.cons.alloc].
-
-- Rename the template parameter `Allocator` to `Alloc`, in every case.
-    - Consistency with `priority_queue`, `queue`, `stack`; all of which use the name `Alloc`.
-    - This parameter could be an allocator (e.g. `std::pmr::polymorphic_allocator<int>`,
-        or it could be a non-allocator (e.g. `std::pmr::memory_resource*`) which is nevertheless
-        convertible to an allocator type. The `uses_allocator_v` constraint makes this work.
-    - No blanket wording is activated nor deactivated by this name change.
-
-Text is marked as <del>deleted</del>, <ins>inserted</ins>, or <src>moved</src> <dst>moved</dst>.
-
-## [flat.map] ## {#editorial-flat-map-cons-alloc}
-
-Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
-
-<small><blockquote>
-<b>24.6.9.2 Definition [flat.map.defn]</b>
-
-<pre>
-[...]
-    struct containers {
-      key_container_type keys;
-      mapped_container_type values;
-    };
-
-    // [flat.map.cons], <del>construct/copy/destroy</del> <ins>constructors</ins>
-    flat_map() : flat_map(key_compare()) { }
-
-    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
-             const key_compare& comp = key_compare());
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</src>
-               <src>const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,
-             const key_compare& comp = key_compare());
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(sorted_unique_t, const key_container_type& key_cont,</src>
-               <src>const mapped_container_type& mapped_cont, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(sorted_unique_t, const key_container_type& key_cont,</src>
-               <src>const mapped_container_type& mapped_cont,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    explicit flat_map(const key_compare& comp)
-      : c(), compare(comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>explicit flat_map(const Alloc<del>ator</del>& a);</src>
-
-    template&lt;class InputIterator>
-      flat_map(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
-        : c(), compare(comp) { insert(first, last); }
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_map(InputIterator first, InputIterator last,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_map(InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);</src>
-
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_map(from_range_t fr, R&& rg)
-        : flat_map(fr, std::forward&lt;R>(rg), key_compare()) { }
-    <src>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>></src>
-      <src>flat_map(from_range_t, R&& rg, const Alloc<del>ator</del>& a);</src>
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_map(from_range_t, R&& rg, const key_compare& comp)
-        : flat_map(comp) { insert_range(std::forward&lt;R>(rg)); }
-    <src>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>></src>
-      <src>flat_map(from_range_t, R&& rg, const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    template&lt;class InputIterator>
-      flat_map(sorted_unique_t s, InputIterator first, InputIterator last,
-               const key_compare& comp = key_compare())
-        : c(), compare(comp) { insert(s, first, last); }
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_map(sorted_unique_t, InputIterator first, InputIterator last,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_map(sorted_unique_t, InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);</src>
-
-    flat_map(initializer_list&lt;value_type> il, const key_compare& comp = key_compare())
-        : flat_map(il.begin(), il.end(), comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(initializer_list&lt;value_type> il, const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
-
-    flat_map(sorted_unique_t s, initializer_list&lt;value_type> il,
-             const key_compare& comp = key_compare())
-        : flat_map(s, il.begin(), il.end(), comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(sorted_unique_t, initializer_list&lt;value_type> il,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_map(sorted_unique_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
-
-    <ins>// [flat.map.cons.alloc], constructors with allocators</ins>
-
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
-               <dst>const Alloc& a);</dst>  
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(sorted_unique_t, const key_container_type& key_cont,</dst>
-               <dst>const mapped_container_type& mapped_cont, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(sorted_unique_t, const key_container_type& key_cont,</dst>
-               <dst>const mapped_container_type& mapped_cont,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>explicit flat_map(const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_map(InputIterator first, InputIterator last,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_map(InputIterator first, InputIterator last, const Alloc& a);</dst>
-    <dst>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc></dst>
-      <dst>flat_map(from_range_t, R&& rg, const Alloc& a);</dst>
-    <dst>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc></dst>
-      <dst>flat_map(from_range_t, R&& rg, const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_map(sorted_unique_t, InputIterator first, InputIterator last,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_map(sorted_unique_t, InputIterator first, InputIterator last, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(initializer_list&lt;value_type> il, const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(initializer_list&lt;value_type> il, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(sorted_unique_t, initializer_list&lt;value_type> il,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_map(sorted_unique_t, initializer_list&lt;value_type> il, const Alloc& a);</dst>
-
-    flat_map& operator=(initializer_list&lt;value_type> <del>il</del>);
-
-    // iterators
-[...]
-</pre>
-
-<b>24.6.9.3 Constructors [flat.map.cons]</b>
-
-<pre>
-flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
-         const key_compare& comp = key_compare());
-</pre>
-
-1․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`, and `compare` with `comp`;
-sorts the range [`begin()`, `end()`) with respect to `value_comp()`; and finally erases the duplicate elements as if by:
-<pre>
-auto zv = ranges::zip_view(c.keys, c.values);
-auto it = ranges::unique(zv, key_equiv(compare)).begin();
-auto dist = distance(zv.begin(), it);
-c.keys.erase(c.keys.begin() + dist, c.keys.end());
-c.values.erase(c.values.begin() + dist, c.values.end());
-</pre>
-
-2․ Complexity: Linear in N if the container arguments are already sorted with respect to `value_comp()` and otherwise N log N,
-where N is the value of `key_cont.size()` before this call.
-
-<pre>
-<src>template&lt;class Alloc<del>ator</del>></src>
-  <src>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</src>
-           <src>const Alloc<del>ator</del>& a);</src>
-<src>template&lt;class Alloc<del>ator</del>></src>
-  <src>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</src>
-           <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-</pre>
-
-<del>3․ Constraints: `uses_allocator_v<key_container_type, Allocator>` is `true` and `uses_allocator_v<mapped_container_type, Allocator>` is `true`.</del>
-
-<p><src>4․ Effects: Equivalent to `flat_map(key_cont, mapped_cont)` and `flat_map(key_cont, mapped_cont, comp)`, respectively,
-except that `c.keys` and `c.values` are constructed with uses-allocator construction ([allocator.uses.construction]).</src>
-
-<p><src>5․ Complexity: Same as `flat_map(key_cont, mapped_cont)` and `flat_map(key_cont, mapped_cont, comp)`, respectively.</src>
-
-<pre>
-flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,
-         const key_compare& comp = key_compare());
-</pre>
-
-6․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`, and `compare` with `comp`.
-
-7․ Complexity: Constant.
-
-<ins><b>24.6.9.x Constructors with allocators [flat.map.cons.alloc]</b></ins>
-
-<p><ins>x․ The constructors in this subclause shall not participate in overload resolution unless
-`uses_allocator_v<key_container_type, Alloc>` is `true` and `uses_allocator_v<mapped_container_type, Alloc>` is `true`.</ins>
-
-<pre>
-<dst>template&lt;class Alloc></dst>
-  <dst>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
-           <dst>const Alloc& a);</dst>
-<dst>template&lt;class Alloc></dst>
-  <dst>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
-           <dst>const key_compare& comp, const Alloc& a);</dst>
-</pre>
-
-<p><dst>4․ Effects: Equivalent to `flat_map(key_cont, mapped_cont)` and `flat_map(key_cont, mapped_cont, comp)`, respectively,
-except that `c.keys` and `c.values` are constructed with uses-allocator construction ([allocator.uses.construction]).</dst>
-
-<p><dst>5․ Complexity: Same as `flat_map(key_cont, mapped_cont)` and `flat_map(key_cont, mapped_cont, comp)`, respectively.</dst>
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_map(sorted_unique_t s, const key_container_type& key_cont,
-           const mapped_container_type& mapped_cont, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_map(sorted_unique_t s, const key_container_type& key_cont,
-           const mapped_container_type& mapped_cont, const key_compare& comp,
-           const Alloc<del>ator</del>& a);
-</pre>
-
-<del>8․ Constraints: `uses_allocator_v<key_container_type, Allocator>` is `true` and `uses_allocator_v<mapped_container_type, Allocator>` is `true`.</del>
-
-9․ Effects: Equivalent to `flat_map(s, key_cont, mapped_cont)` and `flat_map(s, key_cont, mapped_cont, comp)`, respectively,
-except that `c.keys` and `c.values` are constructed with uses-allocator construction ([allocator.uses.construction]).
-
-10․ Complexity: Linear.
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_map(const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  explicit flat_map(const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_map(InputIterator first, InputIterator last, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_map(InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);
-template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>>
-  flat_map(from_range_t, R&& rg, const Alloc<del>ator</del>& a);
-template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>>
-  flat_map(from_range_t, R&& rg, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_map(sorted_unique_t, InputIterator first, InputIterator last,
-           const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_map(sorted_unique_t, InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_map(initializer_list&lt;value_type> il, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_map(initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_map(sorted_unique_t, initializer_list&lt;value_type> il,
-           const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_map(sorted_unique_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);
-</pre>
-
-<del>11․ Constraints: `uses_allocator_v<key_container_type, Allocator>` is `true` and `uses_allocator_v<mapped_container_type, Allocator>` is `true`.</del>
-
-12․ Effects: Equivalent to the corresponding non-allocator constructors except that `c.keys` and `c.values` are constructed
-with uses-allocator construction ([allocator.uses.construction]).
-</blockquote></small>
-
-## [flat.multimap] ## {#editorial-flat-multimap-cons-alloc}
-
-Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
-
-<small><blockquote>
-<b>24.6.10.2 Definition [flat.multimap.defn]</b>
-
-<pre>
-[...]
-    struct containers {
-      key_container_type keys;
-      mapped_container_type values;
-    };
-
-    // [flat.multimap.cons], <del>construct/copy/destroy</del> <ins>constructors</ins>
-    flat_multimap() : flat_multimap(key_compare()) { }
-
-    flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
-                  const key_compare& comp = key_compare());
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</src>
-                    <src>const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    flat_multimap(sorted_equivalent_t,
-                  key_container_type key_cont, mapped_container_type mapped_cont,
-                  const key_compare& comp = key_compare());
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,</src>
-                    <src>const mapped_container_type& mapped_cont, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,</src>
-                    <src>const mapped_container_type& mapped_cont,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    explicit flat_multimap(const key_compare& comp)
-      : c(), compare(comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>explicit flat_multimap(const Alloc<del>ator</del>& a);</src>
-
-    template&lt;class InputIterator>
-      flat_multimap(InputIterator first, InputIterator last,
-                    const key_compare& comp = key_compare())
-        : c(), compare(comp)
-        { insert(first, last); }
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_multimap(InputIterator first, InputIterator last,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_multimap(InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);</src>
-
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_multimap(from_range_t fr, R&& rg)
-        : flat_multimap(fr, std::forward&lt;R>(rg), key_compare()) { }
-    <src>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>></src>
-      <src>flat_multimap(from_range_t, R&& rg, const Alloc<del>ator</del>& a);</src>
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_multimap(from_range_t, R&& rg, const key_compare& comp)
-        : flat_multimap(comp) { insert_range(std::forward&lt;R>(rg)); }
-    <src>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>></src>
-      <src>flat_multimap(from_range_t, R&& rg, const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    template&lt;class InputIterator>
-      flat_multimap(sorted_equivalent_t s, InputIterator first, InputIterator last,
-                    const key_compare& comp = key_compare())
-        : c(), compare(comp) { insert(s, first, last); }
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_multimap(sorted_equivalent_t, InputIterator first, InputIterator last,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_multimap(sorted_equivalent_t, InputIterator first, InputIterator last,</src>
-                    <src>const Alloc<del>ator</del>& a);</src>
-
-    flat_multimap(initializer_list&lt;value_type> il, const key_compare& comp = key_compare())
-        : flat_multimap(il.begin(), il.end(), comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(initializer_list&lt;value_type> il, const key_compare& comp,</src>
-                    <src>const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
-
-    flat_multimap(sorted_equivalent_t s, initializer_list&lt;value_type> il,
-                  const key_compare& comp = key_compare())
-        : flat_multimap(s, il.begin(), il.end(), comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(sorted_equivalent_t, initializer_list&lt;value_type> il,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multimap(sorted_equivalent_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
-
-    <ins>// [flat.multimap.cons.alloc], constructors with allocators</ins>
-
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
-                    <dst>const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,</dst>
-                    <dst>const mapped_container_type& mapped_cont, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,</dst>
-                    <dst>const mapped_container_type& mapped_cont,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>explicit flat_multimap(const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_multimap(InputIterator first, InputIterator last,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_multimap(InputIterator first, InputIterator last, const Alloc& a);</dst>
-    <dst>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc></dst>
-      <dst>flat_multimap(from_range_t, R&& rg, const Alloc& a);</dst>
-    <dst>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc></dst>
-      <dst>flat_multimap(from_range_t, R&& rg, const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_multimap(sorted_equivalent_t, InputIterator first, InputIterator last,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_multimap(sorted_equivalent_t, InputIterator first, InputIterator last,</dst>
-                    <dst>const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(initializer_list&lt;value_type> il, const key_compare& comp,</dst>
-                    <dst>const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(initializer_list&lt;value_type> il, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(sorted_equivalent_t, initializer_list&lt;value_type> il,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multimap(sorted_equivalent_t, initializer_list&lt;value_type> il, const Alloc& a);</dst>
-
-    flat_multimap& operator=(initializer_list&lt;value_type> <del>il</del>);
-
-    // iterators
-[...]
-</pre>
-
-<b>24.6.10.3 Constructors [flat.multimap.cons]</b>
-
-<pre>
-flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
-              const key_compare& comp = key_compare());
-</pre>
-
-1․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`,
-and `compare` with `comp`; sorts the range [`begin()`, `end()`) with respect to `value_comp()`.
-
-2․ Complexity: Linear in N if the container arguments are already sorted with respect to `value_comp()` and otherwise N log N,
-where N is the value of `key_cont.size()` before this call.
-
-<pre>
-<src>template&lt;class Alloc<del>ator</del>></src>
-  <src>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</src>
-                <src>const Alloc<del>ator</del>& a);</src>
-<src>template&lt;class Alloc<del>ator</del>></src>
-  <src>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</src>
-                <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-</pre>
-
-<del>3․ Constraints: `uses_allocator_v<key_container_type, Allocator>` is `true` and `uses_allocator_v<mapped_container_type, Allocator>` is `true`.</del>
-
-<p><src>4․ Effects: Equivalent to `flat_multimap(key_cont, mapped_cont)` and `flat_multimap(key_cont, mapped_cont, comp)`, respectively,
-except that `c.keys` and `c.values` are constructed with uses-allocator construction ([allocator.uses.construction]).</src>
-
-<p><src>5․ Complexity: Same as `flat_multimap(key_cont, mapped_cont)` and `flat_multimap(key_cont, mapped_cont, comp)`, respectively.</src>
-
-<pre>
-flat_multimap(sorted_equivalent_t, key_container_type key_cont, mapped_container_type mapped_cont,
-              const key_compare& comp = key_compare());
-</pre>
-
-6․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`, and `compare` with `comp`.
-
-7․ Complexity: Constant.
-
-<ins><b>24.6.10.x Constructors with allocators [flat.multimap.cons.alloc]</b></ins>
-
-<p><ins>x․ The constructors in this subclause shall not participate in overload resolution unless
-`uses_allocator_v<key_container_type, Alloc>` is `true` and `uses_allocator_v<mapped_container_type, Alloc>` is `true`.</ins>
-
-<pre>
-<dst>template&lt;class Alloc></dst>
-  <dst>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
-           <dst>const Alloc& a);</dst>
-<dst>template&lt;class Alloc></dst>
-  <dst>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</dst>
-           <dst>const key_compare& comp, const Alloc& a);</dst>
-</pre>
-
-<p><dst>4․ Effects: Equivalent to `flat_multimap(key_cont, mapped_cont)` and `flat_multimap(key_cont, mapped_cont, comp)`, respectively,
-except that `c.keys` and `c.values` are constructed with uses-allocator construction ([allocator.uses.construction]).</dst>
-
-<p><dst>5․ Complexity: Same as `flat_multimap(key_cont, mapped_cont)` and `flat_multimap(key_cont, mapped_cont, comp)`, respectively.</dst>
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_multimap(sorted_equivalent_t s, const key_container_type& key_cont,
-                const mapped_container_type& mapped_cont, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multimap(sorted_equivalent_t s, const key_container_type& key_cont,
-                const mapped_container_type& mapped_cont, const key_compare& comp,
-                const Alloc<del>ator</del>& a);
-</pre>
-
-<del>8․ Constraints: `uses_allocator_v<key_container_type, Allocator>` is `true` and `uses_allocator_v<mapped_container_type, Allocator>` is `true`.</del>
-
-<p>9․ Effects: Equivalent to `flat_multimap(s, key_cont, mapped_cont)` and `flat_multimap(s, key_cont, mapped_cont, comp)`, respectively,
-except that `c.keys` and `c.values` are constructed with uses-allocator construction ([allocator.uses.construction]).
-
-<p>10․ Complexity: Linear.
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_multimap(const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  explicit flat_multimap(const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_multimap(InputIterator first, InputIterator last, const key_compare& comp,
-                const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_multimap(InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);
-template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>>
-  flat_multimap(from_range_t, R&& rg, const Alloc<del>ator</del>& a);
-template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>>
-  flat_multimap(from_range_t, R&& rg, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_multimap(sorted_equivalent_t, InputIterator first, InputIterator last,
-                const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_multimap(sorted_equivalent_t, InputIterator first, InputIterator last,
-                const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multimap(initializer_list&lt;value_type> il, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multimap(initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multimap(sorted_equivalent_t, initializer_list&lt;value_type> il,
-                const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multimap(sorted_equivalent_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);
-</pre>
-
-<del>11․ Constraints: `uses_allocator_v<key_container_type, Allocator>` is `true` and `uses_allocator_v<mapped_container_type, Allocator>` is `true`.</del>
-
-<p>12․ Effects: Equivalent to the corresponding non-allocator constructors except that `c.keys` and `c.values` are constructed with uses-allocator
-construction ([allocator.uses.construction]).
-</blockquote></small>
-
-
-## [flat.multiset] ## {#editorial-flat-multiset-cons-alloc}
-
-Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
-
-<small><blockquote>
-<b>24.6.12.2 Definition [flat.multiset.defn]</b>
-
-<pre>
-[...]
-using container_type            = KeyContainer;
-
-    // [flat.multiset.cons], constructors
-    flat_multiset() : flat_multiset(key_compare()) { }
-
-    explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(const container_type& cont, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(const container_type& cont, const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    flat_multiset(sorted_equivalent_t, container_type cont,
-                  const key_compare& comp = key_compare())
-      : c(std::move(cont)), compare(comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(sorted_equivalent_t, const container_type&, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(sorted_equivalent_t, const container_type& cont,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    explicit flat_multiset(const key_compare& comp)
-      : c(), compare(comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>explicit flat_multiset(const Alloc<del>ator</del>& a);</src>
-
-    template&lt;class InputIterator>
-      flat_multiset(InputIterator first, InputIterator last,
-                    const key_compare& comp = key_compare())
-        : c(), compare(comp)
-        { insert(first, last); }
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_multiset(InputIterator first, InputIterator last,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_multiset(InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);</src>
-
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_multiset(from_range_t fr, R&& rg)
-        : flat_multiset(fr, std::forward&lt;R>(rg), key_compare()) { }
-    <src>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>></src>
-      <src>flat_multiset(from_range_t, R&& rg, const Alloc<del>ator</del>& a);</src>
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_multiset(from_range_t, R&& rg, const key_compare& comp)
-        : flat_multiset(comp)
-        { insert_range(std::forward&lt;R>(rg)); }
-    <src>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>></src>
-      <src>flat_multiset(from_range_t, R&& rg, const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    template&lt;class InputIterator>
-      flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
-                    const key_compare& comp = key_compare())
-        : c(first, last), compare(comp) { }
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,</src>
-                    <src>const Alloc<del>ator</del>& a);</src>
-
-    flat_multiset(initializer_list&lt;value_type> il, const key_compare& comp = key_compare())
-      : flat_multiset(il.begin(), il.end(), comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(initializer_list&lt;value_type> il, const key_compare& comp,</src>
-                    <src>const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
-
-    flat_multiset(sorted_equivalent_t s, initializer_list&lt;value_type> il,
-                  const key_compare& comp = key_compare())
-        : flat_multiset(s, il.begin(), il.end(), comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(sorted_equivalent_t, initializer_list&lt;value_type> il,</src>
-                    <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_multiset(sorted_equivalent_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
-
-    <ins>// [flat.multiset.cons.alloc], constructors with allocators</ins>
-
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(const container_type& cont, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(const container_type& cont, const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(sorted_equivalent_t, const container_type&, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(sorted_equivalent_t, const container_type& cont,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>explicit flat_multiset(const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_multiset(InputIterator first, InputIterator last,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_multiset(InputIterator first, InputIterator last, const Alloc& a);</dst>
-    <dst>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc></dst>
-      <dst>flat_multiset(from_range_t, R&& rg, const Alloc& a);</dst>
-    <dst>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc></dst>
-      <dst>flat_multiset(from_range_t, R&& rg, const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,</dst>
-                    <dst>const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(initializer_list&lt;value_type> il, const key_compare& comp,</dst>
-                    <dst>const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(initializer_list&lt;value_type> il, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(sorted_equivalent_t, initializer_list&lt;value_type> il,</dst>
-                    <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_multiset(sorted_equivalent_t, initializer_list&lt;value_type> il, const Alloc& a);</dst>
-
-    flat_multiset& operator=(initializer_list&lt;value_type>);
-
-    // iterators
-[...]
-</pre>
-
-<b>24.6.12.3 Constructors [flat.multiset.cons]</b>
-
-<pre>
-explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());
-</pre>
-
-1․ Effects: Initializes <i>`c`</i> with `std::move(cont)` and <i>`compare`</i> with `comp`, and sorts the range [`begin()`, `end()`) with respect to <i>`compare`</i>.
-
-2․ Complexity: Linear in N if `cont` is <ins>already</ins> sorted with respect to <i>`compare`</i> and otherwise N log N, where N is the value of `cont.size()` before this call.
-
-<ins><b>24.6.12.x Constructors with allocators [flat.multiset.cons.alloc]</b></ins>
-
-<p><ins>x․ The constructors in this subclause shall not participate in overload resolution unless
-`uses_allocator_v<container_type, Alloc>` is `true`.</ins>
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(const container_type& cont, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(const container_type& cont, const key_compare& comp, const Alloc<del>ator</del>& a);
-</pre>
-<p><del>3․ Constraints: `uses_allocator_v<container_type, Allocator>` is `true`.</del>
-<p>4․ Effects: Equivalent to `flat_multiset(cont)` and `flat_multiset(cont, comp)`, respectively, except that c is constructed with uses-allocator construction ([allocator.uses.construction]).
-<p>5․ Complexity: Same as `flat_multiset(cont)` and `flat_multiset(cont, comp)`, respectively.
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(sorted_equivalent_t s, const container_type& cont, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(sorted_equivalent_t s, const container_type& cont,
-                const key_compare& comp, const Alloc<del>ator</del>& a);
-</pre>
-<p><del>6․ Constraints: `uses_allocator_v<container_type, Allocator>` is `true`.</del>
-<p>7․ Effects: Equivalent to `flat_multiset(s, cont)` and `flat_multiset(s, cont, comp)`, respectively, except that <i>`c`</i> is
-constructed with uses-allocator construction ([allocator.uses.construction]).
-<p>8․ Complexity: Linear.
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  explicit flat_multiset(const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_multiset(InputIterator first, InputIterator last,
-                const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_multiset(InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);
-template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>>
-  flat_multiset(from_range_t, R&& rg, const Alloc<del>ator</del>& a);
-template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>>
-  flat_multiset(from_range_t, R&& rg, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
-                const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(initializer_list&lt;value_type> il, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(sorted_equivalent_t, initializer_list&lt;value_type> il,
-                const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_multiset(sorted_equivalent_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);
-</pre>
-<p><del>9․ Constraints: `uses_allocator_v<container_type, Allocator>` is `true`.</del>
-<p>10․ Effects: Equivalent to the corresponding non-allocator constructors except that <i>`c`</i> is
-constructed with uses-allocator construction ([allocator.uses.construction]).
-</blockquote></small>
-
-## [flat.set] ## {#editorial-flat-set-cons-alloc}
-
-Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
-
-<small><blockquote>
-<b>24.6.11.2 Definition [flat.set.defn]</b>
-
-<pre>
-[...]
-    using container_type            = KeyContainer;
-
-    // [flat.set.cons], constructors
-    flat_set() : flat_set(key_compare()) { }
-
-    explicit flat_set(container_type cont, const key_compare& comp = key_compare());
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(const container_type& cont, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(const container_type& cont, const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    flat_set(sorted_unique_t, container_type cont, const key_compare& comp = key_compare())
-      : <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(sorted_unique_t, const container_type& cont, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(sorted_unique_t, const container_type& cont,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    explicit flat_set(const key_compare& comp)
-      : <i>c</i>(), <i>compare</i>(comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>explicit flat_set(const Alloc<del>ator</del>& a);</src>
-
-    template&lt;class InputIterator>
-      flat_set(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
-        : <i>c</i>(), <i>compare</i>(comp)
-        { insert(first, last); }
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_set(InputIterator first, InputIterator last,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_set(InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);</src>
-
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_set(from_range_t fr, R&& rg)
-        : flat_set(fr, std::forward&lt;R>(rg), key_compare()) { }
-    <src>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>></src>
-      <src>flat_set(from_range_t, R&& rg, const Alloc<del>ator</del>& a);</src>
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_set(from_range_t, R&& rg, const key_compare& comp)
-        : flat_set(comp)
-        { insert_range(std::forward&lt;R>(rg)); }
-    <src>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc<del>ator</del>></src>
-       <src>flat_set(from_range_t, R&& rg, const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-
-    template&lt;class InputIterator>
-      flat_set(sorted_unique_t, InputIterator first, InputIterator last,
-               const key_compare& comp = key_compare())
-        : <i>c</i>(first, last), <i>compare</i>(comp) { }
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_set(sorted_unique_t, InputIterator first, InputIterator last,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class InputIterator, class Alloc<del>ator</del>></src>
-      <src>flat_set(sorted_unique_t, InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);</src>
-
-    flat_set(initializer_list&lt;value_type> il, const key_compare& comp = key_compare())
-        : flat_set(il.begin(), il.end(), comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(initializer_list&lt;value_type> il, const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
-
-    flat_set(sorted_unique_t s, initializer_list&lt;value_type> il,
-             const key_compare& comp = key_compare())
-        : flat_set(s, il.begin(), il.end(), comp) { }
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(sorted_unique_t, initializer_list&lt;value_type> il,</src>
-               <src>const key_compare& comp, const Alloc<del>ator</del>& a);</src>
-    <src>template&lt;class Alloc<del>ator</del>></src>
-      <src>flat_set(sorted_unique_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);</src>
-
-    <ins>// [flat.set.cons.alloc], constructors with allocators</ins>
-
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(const container_type& cont, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(const container_type& cont, const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(sorted_unique_t, const container_type& cont, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(sorted_unique_t, const container_type& cont,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>explicit flat_set(const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_set(InputIterator first, InputIterator last,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_set(InputIterator first, InputIterator last, const Alloc& a);</dst>
-    <dst>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc></dst>
-      <dst>flat_set(from_range_t, R&& rg, const Alloc& a);</dst>
-    <dst>template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc></dst>
-       <dst>flat_set(from_range_t, R&& rg, const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_set(sorted_unique_t, InputIterator first, InputIterator last,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class InputIterator, class Alloc></dst>
-      <dst>flat_set(sorted_unique_t, InputIterator first, InputIterator last, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(initializer_list&lt;value_type> il, const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(initializer_list&lt;value_type> il, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(sorted_unique_t, initializer_list&lt;value_type> il,</dst>
-               <dst>const key_compare& comp, const Alloc& a);</dst>
-    <dst>template&lt;class Alloc></dst>
-      <dst>flat_set(sorted_unique_t, initializer_list&lt;value_type> il, const Alloc& a);</dst>
-
-    flat_set& operator=(initializer_list&lt;value_type>);
-
-    // iterators
-[...]
-</pre>
-
-<b>24.6.11.3 Constructors [flat.set.cons]</b>
-
-<pre>
-explicit flat_set(container_type cont, const key_compare& comp = key_compare());
-</pre>
-
-1․ Effects: Initializes <i>`c`</i> with `std::move(cont)` and <i>`compare`</i> with `comp`, sorts the range [`begin()`, `end()`) with respect to <i>`compare`</i>,
-and finally erases all but the first element from each group of consecutive equivalent elements.
-
-2․ Complexity: Linear in N if `cont` is <ins>already</ins> sorted with respect to <i>`compare`</i> and otherwise N log N, where N is the value of `cont.size()` before this call.
-
-<ins><b>24.6.11.x Constructors with allocators [flat.set.cons.alloc]</b></ins>
-
-<p><ins>x․ The constructors in this subclause shall not participate in overload resolution unless
-`uses_allocator_v<container_type, Alloc>` is `true`.</ins>
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_set(const container_type& cont, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_set(const container_type& cont, const key_compare& comp, const Alloc<del>ator</del>& a);
-</pre>
-<p><del>3․ Constraints: `uses_allocator_v<container_type, Allocator>` is `true`.</del>
-<p>4․ Effects: Equivalent to `flat_set(cont)` and `flat_set(cont, comp)`, respectively, except that <i>`c`</i> is
-constructed with uses-allocator construction ([allocator.uses.construction]).
-<p>5․ Complexity: Same as `flat_set(cont)` and `flat_set(cont, comp)`, respectively.
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_set(sorted_unique_t s, const container_type& cont, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_set(sorted_unique_t s, const container_type& cont,
-           const key_compare& comp, const Alloc<del>ator</del>& a);
-</pre>
-<p><del>6․ Constraints: `uses_allocator_v<container_type, Allocator>` is `true`.</del>
-<p>7․ Effects: Equivalent to `flat_set(s, cont)` and `flat_set(s, cont, comp)`, respectively, except that <i>`c`</i> is constructed with uses-allocator construction ([allocator.uses.construction]).
-<p>8․ Complexity: Linear.
-
-<pre>
-template&lt;class Alloc<del>ator</del>>
-  flat_set(const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  explicit flat_set(const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_set(InputIterator first, InputIterator last, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_set(InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);
-template&lt;container-compatible-range&lt;value_type> R, class Alloc<del>ator</del>>
-  flat_set(from_range_t, R&& rg, const Alloc<del>ator</del>& a);
-template&lt;container-compatible-range&lt;value_type> R, class Alloc<del>ator</del>>
-  flat_set(from_range_t, R&& rg, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_set(sorted_unique_t, InputIterator first, InputIterator last,
-           const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class InputIterator, class Alloc<del>ator</del>>
-  flat_set(sorted_unique_t, InputIterator first, InputIterator last, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_set(initializer_list&lt;value_type> il, const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_set(initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_set(sorted_unique_t, initializer_list&lt;value_type> il,
-           const key_compare& comp, const Alloc<del>ator</del>& a);
-template&lt;class Alloc<del>ator</del>>
-  flat_set(sorted_unique_t, initializer_list&lt;value_type> il, const Alloc<del>ator</del>& a);
-</pre>
-<p><del>9․ Constraints: `uses_allocator_v<container_type, Allocator>` is `true`.</del>
-<p>10․ Effects: Equivalent to the corresponding non-allocator constructors except that <i>`c`</i> is constructed with uses-allocator construction ([allocator.uses.construction]).
-</blockquote></small>
+#6274 trivially merge-conflicts with the resolution of [[LWG3884]] (which adds new
+allocator-extended constructors). I propose to rebase LWG3884's resolution on top of #6274
+as soon as #6274 is merged to trunk.
 
 # Accidentally explicit constructor # {#explicit-oops}
 
 STL style is that multi-argument constructors should be non-`explicit`; see [[P1163]].
-This change is non-editorial, but should be non-controversial, unless anyone objects
-to the delegating constructor's doing an extra move of `cont`. In practice, libc++
-doesn't actually move `cont` twice; we consider the delegating constructor merely a tool
-to shorten the spec.
+This change is non-editorial, but should be non-controversial.
 
 ```c++
     std::vector<int> v;
@@ -1006,6 +76,10 @@ to shorten the spec.
 
 ## Wording ## {#wording-explicit-oops}
 
+Note: This section was updated in R1 following LWG's preferred direction.
+Thanks to Zhihao Yuan for finding the precedent for "Let `comp` be..." in
+<a href="https://eel.is/c++draft/list.ops#20">`list::unique`</a>.
+
 Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
 
 <small><blockquote>
@@ -1013,10 +87,16 @@ Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]
     // [flat.multiset.cons], constructors
     flat_multiset() : flat_multiset(key_compare()) { }
 
+    explicit flat_multiset(const key_compare& comp)
+      : c(), compare(comp) { }
+
     <del>explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());</del>
-    <ins>explicit flat_multiset(container_type cont)</ins>
-      <ins>: flat_multiset(std::move(cont), key_compare()) { }</ins>
+    <ins>explicit flat_multiset(container_type cont);</ins>
     <ins>flat_multiset(container_type cont, const key_compare& comp);</ins>
+
+    flat_multiset(sorted_equivalent_t, container_type cont,
+                  const key_compare& comp = key_compare())
+      : c(std::move(cont)), compare(comp) { }
 </pre>
 </blockquote></small>
 
@@ -1024,8 +104,18 @@ Change <a href="https://eel.is/c++draft/flat.multiset.cons">[flat.multiset.cons]
 
 <small><blockquote>
 <pre>
-<del>explicit</del> flat_multiset(container_type cont, const key_compare& comp <del>= key_compare()</del>);
+<del>explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());</del>
+<ins>explicit flat_multiset(container_type cont);</ins>
+<ins>flat_multiset(container_type cont, const key_compare& comp);</ins>
 </pre>
+
+<ins>x․ Let `comp` be `key_compare()` for the first overload.</ins>
+
+1․ Effects: Initializes <i>`c`</i> with `std::move(cont)` and <i>`compare`</i> with `comp`,
+and sorts the range [`begin()`, `end()`) with respect to <i>`compare`</i>.
+
+2․ Complexity: Linear in <i>N</i> if `cont` is already sorted with respect to <i>`compare`</i>
+and otherwise <i>N</i> log <i>N</i>, where <i>N</i> is the value of `cont.size()` before this call.
 </blockquote></small>
 
 Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
@@ -1035,10 +125,15 @@ Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as fo
     // [flat.set.cons], constructors
     flat_set() : flat_set(key_compare()) { }
 
+    explicit flat_set(const key_compare& comp)
+      : c(), compare(comp) { }
+
     <del>explicit flat_set(container_type cont, const key_compare& comp = key_compare());</del>
-    <ins>explicit flat_set(container_type cont)</ins>
-      <ins>: flat_set(std::move(cont), key_compare()) { }</ins>
+    <ins>explicit flat_set(container_type cont);</ins>
     <ins>flat_set(container_type cont, const key_compare& comp);</ins>
+
+    flat_set(sorted_unique_t, container_type cont, const key_compare& comp = key_compare())
+      : c(std::move(cont)), compare(comp) { }
 </pre>
 </blockquote></small>
 
@@ -1046,8 +141,19 @@ Change <a href="https://eel.is/c++draft/flat.set.cons">[flat.set.cons]</a> as fo
 
 <small><blockquote>
 <pre>
-<del>explicit</del> flat_set(container_type cont, const key_compare& comp <del>= key_compare()</del>);
+<del>explicit flat_set(container_type cont, const key_compare& comp = key_compare());</del>
+<ins>explicit flat_set(container_type cont);</ins>
+<ins>flat_set(container_type cont, const key_compare& comp);</ins>
 </pre>
+
+<ins>x․ Let `comp` be `key_compare()` for the first overload.</ins>
+
+1․ Effects: Initializes <i>`c`</i> with `std::move(cont)` and <i>`compare`</i> with `comp`,
+sorts the range [`begin()`, `end()`) with respect to <i>`compare`</i>,
+and finally erases all but the first element from each group of consecutive equivalent elements.
+
+2․ Complexity: Linear in <i>N</i> if `cont` is already sorted with respect to <i>`compare`</i>
+and otherwise <i>N</i> log <i>N</i>, where <i>N</i> is the value of `cont.size()` before this call.
 </blockquote></small>
 
 # Add move semantics to `flat_set::insert_range` # {#set-insert-range}
@@ -1066,7 +172,20 @@ Change <a href="https://eel.is/c++draft/flat.set.cons">[flat.set.cons]</a> as fo
       // After: Moves the unique_ptrs.
 ```
 
+Compare the current wording for
+<a href="https://eel.is/c++draft/flat.set#lib:insert_range,flat_set">`flat_set.insert_range`</a> (added by
+<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf">P1222</a>) versus
+<a href="https://eel.is/c++draft/priority.queue#lib:push_range,priority_queue">`priority_queue.push_range`</a>
+(added in <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1206r5.pdf">P1206R5</a> and tweaked in R6).
+`priority_queue`'s wording is not only more robustly Rangified, but also more performant.
+
+Arthur doesn't know why P1206R5/R6 chose to pass `forward<R>(rg)` to `append_range` but plain old lvalue `rg`
+to `ranges::copy`; it seems like it should have forwarded in both places or else forwarded in neither place.
+Arthur is trying to find out from P1206's authors. For now, by default, let's just be consistent with P1206.
+
 ## Wording ## {#wording-set-insert-range}
+
+Note: This section was updated in R1 following LWG's preferred direction; see rationale above.
 
 Change <a href="https://eel.is/c++draft/flat.set#modifiers-10">[flat.set.modifiers]/10</a> as follows:
 
@@ -1076,17 +195,19 @@ template&lt;<i>container-compatible-range</i>&lt;value_type> R>
   void insert_range(R&& rg);
 </pre>
 
-10․ Effects: Adds elements to `c` as if by:
+10․ Effects: <del>Adds elements to <i>`c`</i> as if by:</del>
 <pre>
-for (<del>const auto&</del> <ins>auto&&</ins> e : rg) {
-  c.insert(c.end(), <ins>std::forward&lt;decltype(e)>(</ins>e<ins>)</ins>);
-}
+<del>for (const auto& e : rg) {</del>
+  <del>c.insert(c.end(), e);</del>
+<del>}</del>
 </pre>
-Then, sorts the range of newly inserted elements with respect to <i>`compare`</i>;
+<ins>Adds all elements of `rg` to <i>`c`</i> via `c.append_range(std::forward<R>(rg))`
+if that is a valid expression, or `ranges::copy(rg, back_inserter(c))` otherwise.</ins> Then,
+sorts the range of newly inserted elements with respect to <i>`compare`</i>;
 merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range;
 and finally erases all but the first element from each group of consecutive equivalent elements.
 
-11․ Complexity: N + M log M, where N is `size()` before the operation and M is `ranges::distance(rg)`.
+11․ Complexity: <i>N</i> + <i>M</i> log <i>M</i>, where <i>N</i> is `size()` before the operation and <i>M</i> is `ranges::distance(rg)`.
 
 12․ Remarks: Since this operation performs an in-place merge, it may allocate memory.
 </blockquote></small>
@@ -1100,20 +221,15 @@ explaining the semantics of `flat_multiset::insert_range`.
   <ins>void insert_range(R&& rg);</ins>
 </pre>
 
-<p><ins>x․ Effects: Adds elements to `c` as if by:</ins>
-<pre>
-<ins>for (auto&& e : rg) {</ins>
-  <ins>c.insert(c.end(), std::forward&lt;decltype(e)>(e));</ins>
-<ins>}</ins>
-</pre>
-<ins>Then, sorts the range of newly inserted elements with respect to <i>`compare`</i>, and
+<p><ins>x․ Effects: Adds all elements of `rg` to <i>`c`</i> via `c.append_range(std::forward<R>(rg))`
+if that is a valid expression, or `ranges::copy(rg, back_inserter(c))` otherwise.
+Then, sorts the range of newly inserted elements with respect to <i>`compare`</i>, and
 merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range.
 
-<p><ins>x․ Complexity: N + M log M, where N is `size()` before the operation and M is `ranges::distance(rg)`.</ins>
+<p><ins>x․ Complexity: <i>N</i> + <i>M</i> log <i>M</i>, where <i>N</i> is `size()` before the operation and <i>M</i> is `ranges::distance(rg)`.
 
 <p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins>
 </blockquote></small>
-
 
 
 # Add move semantics to `flat_map::insert_range` # {#map-insert-range}
@@ -1126,21 +242,6 @@ merges the resulting sorted range and the sorted range of pre-existing elements 
     fs2.insert_range(std::views::as_rvalue(v2));
       // Before: Ill-formed.
       // After: Moves the unique_ptrs.
-```
-
-However, libc++'s implementation of `flat_map` and `flat_multimap` didn't need
-to change — we already "accidentally" support move semantics in the maps' `insert_range` methods,
-because we factor out a helper method `__append_pairs` that is used by all three of
-`insert(first, last)`, `insert(sorted_unique, first, last)`, and `insert_range(rg)`.
-It looks very similar to the specification proposed below.
-
-The current specification says:
-
-```c++
-  for (const auto& e : rg) {
-    c.keys.insert(c.keys.end(), e.first);
-    c.values.insert(c.values.end(), e.second);
-  }
 ```
 
 The `insert_range` method is constrained on <i>`container-compatible-range`</i>`<value_type>`,
@@ -1159,7 +260,23 @@ something without `first` and `second` members, the current spec doesn't work at
       // After: OK
 ```
 
+The wording below implicitly converts `range_reference_t<R>` to `value_type e`, and then
+move-constructs from `e.first` and `e.second` into the map's containers. Note that
+`e.first` and `e.second` are never reference types, so `std::move` is correct.
+
+LWG in Varna briefly feinted in the direction of trying to metaprogram away the extra move-construct
+(e.g. by changing the lambda's parameter type to something like
+`conditional_t<same_as<decay_t<range_reference_t<R>>, value_type>, range_reference_t<R>, value_type>`),
+but I felt strongly that the chance of getting that correct on the first try was near-nil.
+Besides, we realized that we were trying to save O(M) move operations along a codepath
+whose very next step was to do an O(M log M) sort and an O(N) `inplace_merge`.
+
+If any library vendor actually wants to try that kind of metaprogramming,
+they are welcome to do so under the As-If Rule. libc++ will not do it.
+
 ## Wording ## {#wording-map-insert-range}
+
+Note: This section was updated in R1 following LWG's preferred direction; see rationale above.
 
 We don't need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
 because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:
@@ -1179,10 +296,11 @@ template&lt;<i>container-compatible-range</i>&lt;value_type> R>
 
 12․ Effects: Adds elements to `c` as if by:
 <pre>
-for (<del>const auto&</del> <ins>value_type</ins> e : rg) {
+<del>for (const auto& e : rg)</del>
+<ins>ranges::for_each(rg, [&c](value_type e)</ins> {
   c.keys.insert(c.keys.end(), <ins>std::move(</ins>e.first<ins>)</ins>);
   c.values.insert(c.values.end(), <ins>std::move(</ins>e.second<ins>)</ins>);
-}
+}<ins>);</ins>
 </pre>
 Then, sorts the range of newly inserted elements with respect to `value_comp()`;
 merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range;
@@ -1227,71 +345,30 @@ But `insert` receives an already-constructed `value_type`! It shouldn't discard 
 it should use the given `value_type` to find the appropriate insertion point, and then construct the new object
 directly in place. There is no reason to construct `t` on the stack first.
 
-## Heterogeneous `multiset::insert` ## {#heterogeneous-insert-multiset}
+The current definition of `emplace` is not expressed in terms of `insert(value_type(...))`. P2767R0 proposed
+not to change it, simply to keep the diff small. But LWG in Varna asked to make that simplification.
+libc++'s implementation already implements `emplace` in terms of `insert`, so there doesn't seem to be
+any sneaky subtlety in that area; we can just do it. So P2767R1 does it.
 
-[[P2363]] <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html#ins">explains</a>
-why the node-based `multiset` still lacks a heterogeneous `insert(K&&)`:
+## Heterogeneous `insert` (to LEWG) ## {#heterogeneous-insert-multiset-redirect}
 
-> Adding heterogeneous `insert` overload makes no sense for associative containers with non-unique keys (`std::multimap`, `std::multiset`,
-> `std::unordered_multimap` and `std::unordered_multiset`) because the insertion will be successful in any case and the key would be always
-> constructed. All additional overheads introduced by `insert` can be mitigated by using `emplace`.
-
-For `flat_multiset`, the last sentence is false; generic `emplace` is unusable for PMR allocators, because it
-must first construct `t` using the default allocator. Therefore we also propose to add a heterogeneous-comparison
-overload of `flat_multiset::insert`.
-
-```c++
-    template<class T, class C = std::less<T>>
-    using PmrFlatMultiset = std::flat_multiset<T, C, std::pmr::vector<T>>;
- 
-    std::pmr::monotonic_buffer_resource mr(1'000'000);
-    std::pmr::set_default_resource(std::pmr::null_memory_resource());
-    const char s[] = "too long to fit in the small string buffer";
-
-    auto m = std::pmr::multiset<std::pmr::string>(&mr);
-    m.emplace(s); // OK
-    m.insert(s); // runtime abort, cannot default-allocate x
-
-    auto fm = PmrFlatMultiset<std::pmr::string>(&mr);
-    fm.emplace(s); // runtime abort, cannot default-allocate t
-    fm.insert(s); // runtime abort, cannot default-allocate x
-
-    auto m2 = std::pmr::multiset<std::pmr::string, std::less<>>(&mr);
-    m2.emplace(s); // OK
-    m2.insert(s); // runtime abort, cannot default-allocate x
-
-    auto fm2 = PmrFlatMultiset<std::pmr::string, std::less<>>(&mr);
-    fm2.emplace(s); // runtime abort, cannot default-allocate t
-    fm2.insert(s);
-      // Before: runtime abort, cannot default-allocate x
-      // After: OK
-```
-
-Notice the asymmetry between `fm2.insert(s)` and `m2.insert(s)`. Arthur thinks it would be
-nice to support heterogeneous `insert` for node-based `multiset` and `unordered_multiset`
-(*contra* P2363's reasoning),
-but that's out of scope for this particular paper P2767. For P2767's purposes, we're satisfied
-once there exists *some* way of inserting `s` into `fm2`. We don't mind that the working approaches
-use different spellings: `m2.emplace(s)` versus `fm2.insert(s)`.
+Note: LWG in Varna raised an objection to adding heterogeneous `flat_multiset::insert(K&&)`
+without LEWG input. On the other hand, §7.2,3,4 were acceptable LWG business. Therefore,
+the rationale and wording for P2767R0's §7.1 have moved to [[#heterogeneous-insert-multiset]],
+and P2767R1's [[#wording-insert-emplace]] no longer includes the `insert(K&&)` overload.
 
 ## "Initializes" phrasing ## {#emplace-phrasing}
 
-The proposed wording below changes <a href="https://eel.is/c++draft/flat.map.modifiers#2">[flat.map.modifiers]/2</a> as follows,
-in line with e.g. <a href="https://eel.is/c++draft/variant#ctor-21">[variant.ctor]/21</a> and <a href="https://eel.is/c++draft/forward.list#modifiers-23">[forward.list.modifiers]/23</a>:
+The proposed wording below brings <a href="https://eel.is/c++draft/flat.map.modifiers#2">[flat.map.modifiers]/2</a>
+into line with e.g. <a href="https://eel.is/c++draft/variant#ctor-21">[variant.ctor]/21</a> and
+<a href="https://eel.is/c++draft/forward.list#modifiers-23">[forward.list.modifiers]/23</a>:
 
 <small><blockquote>
 2․ Effects: <del>Initializes</del> <ins>Direct-non-list-initializes</ins> an object `t` of type `pair<key_type, mapped_type>` with `std::forward<Args>(args)...`;
 if the map already contains an element whose key is equivalent to `t.first`, `*this` is unchanged. [...]
 </blockquote></small>
 
-However, could we eliminate the jargon entirely by doing something like this instead? As written I don't think this is proper standardese,
-but maybe LWG can fix it up:
-
-<small><blockquote>
-2․ Effects: <del>Initializes an object `t` of type `pair<key_type, mapped_type>` with `std::forward<Args>(args)...`; if</del> <ins>Let
-`t` be `pair<key_type, mapped_type>(std::forward<Args>(args)...)`. If</ins> the
-map already contains an element whose key is equivalent to `t.first`, `*this` is unchanged. [...]
-</blockquote></small>
+P2767R0 asked whether LWG had appetite to invent something less jargony. No, LWG did not.
 
 ## Unusual constraints ## {#emplace-constraint}
 
@@ -1325,6 +402,13 @@ from `flat_set::emplace`.
 
 Therefore, the proposed wording for this section simply deletes those Constraints elements.
 
+With the Constraints elements gone, and `emplace(x...)` always implemented as `insert(value_type(x...))`,
+there is no longer any need for an English description of `emplace`. It is now specified by code only.
+
+The rewrite of `emplace_hint(pos, x...)` into `insert(pos, value_type(x...))` is frightening, because of
+the very large overload set of `insert`; but I think it's safe: it should always be a perfect match for
+`insert(const_iterator, value_type&&)` and never a viable match for any other overload at all.
+
 ## Ambiguity with `insert(first, last)` ## {#insert-ambiguity}
 
 ```c++
@@ -1345,7 +429,70 @@ We simply need to copy the usual wording "Constraints: For the second overload, 
 This is a problem only for the sets, where `const_iterator` can be convertible to `value_type`.
 It's not a problem for the maps, so they don't need to change.
 
+## `flat_multiset::emplace` by rotation ## {#multiset-emplace}
+
+```c++
+    template<class T, class C = std::less<T>>
+    using PmrFlatMultiset = std::flat_multiset<T, C, std::pmr::vector<T>>;
+    auto fms = PmrFlatMultiset<std::pmr::string>(&mr);
+    fms.emplace("hello world");
+```
+
+The C++23 status quo is that we "initialize an object `t` of type `value_type`" with `"hello world"`,
+and then insert it into `c`. The initial construction of `t` uses the wrong allocator.
+
+P2767R1 proposes to simplify the specification of `flat_multiset::emplace` in terms of `flat_multiset::insert`;
+but does not propose to change this behavior. We'll still be constructing a temporary with the wrong
+allocator.
+
+Tim Song has observed that we could specify `flat_multiset::emplace` as follows, instead:
+
+<small><blockquote>
+<pre>
+template&lt;class... Args> iterator emplace(Args&&... args);
+</pre>
+<p><del>1․ Constraints: `is_constructible_v<value_type, Args...>` is `true`.</del>
+<p>2․ Effects: <del>First, initializes an object `t` of type `value_type` with `std::forward<Args>(args)...`,
+then inserts `t`</del> <ins>Adds an element to <i>`c`</i></ins> as if by:
+<pre>
+<del>auto it = ranges::upper_bound(c, t, compare);</del>
+<del>c.insert(it, std::move(t));</del>
+<ins>auto n = ranges::upper_bound(c, t, compare) - c.begin();</ins>
+<ins>c.emplace_back(std::forward<Args>(args)...);</ins>
+<ins>ranges::rotate(c.begin() + n, c.end() - 1, c.end());</ins>
+</pre>
+<p>3․ Returns: An iterator that points to the inserted element.
+</blockquote></small>
+
+This would ensure that the new object never gets constructed with the wrong allocator.
+However, this benefit comes with at least three downsides:
+
+* A user-provided random-access container (e.g. one based on a
+    <a href="https://en.wikipedia.org/wiki/Skip_list">skip list</a>) might have a way to
+    insert in the middle of the container without moving any other elements at all, or moving only O(1)
+    elements instead of O(n) elements.
+
+* Even for `vector` it seems more expensive to rotate the elements than to
+    do the right-shift that `c.insert` would do. Is the cost worth the benefit?
+
+* The proposal applies to `flat_multiset::emplace` but not to `flat_set::emplace`
+    (because we don't want to insert a duplicate and then have to erase it again)
+    and not to `flat_multimap::emplace` (because we don't have a container of `pair`s
+    to emplace into, in that case).
+
+We could mitigate the first two downsides by leaving `emplace` alone, and doing the
+rotate-based version only for `emplace_hint`. There, if the caller gives us an accurate hint,
+we won't need to rotate anything at all; and when we do rotate, it can only be because
+the caller gave us an inaccurate hint (i.e. it's "their fault"). But this would still
+suffer the third downside (i.e. inconsistency), and it would be more complicated to teach.
+Arthur thinks that it is best *not* to use `rotate` at all. The proposed wording below
+does not use `rotate`.
+
+
 ## Wording ## {#wording-insert-emplace}
+
+Note: This section was updated in R1 following LWG’s preferred direction; see rationale above.
+We no longer add `insert(K&&)` to `flat_multiset`; that wording has moved to [[#heterogeneous-insert-multiset]].
 
 We don't need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
 because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:
@@ -1360,9 +507,11 @@ Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as fo
 <small><blockquote>
 <pre>
     // [flat.map.modifiers], modifiers
-    template&lt;class... Args> pair&lt;iterator, bool> emplace(Args&&... args);
+    template&lt;class... Args> pair&lt;iterator, bool> emplace(Args&&... args)<del>;</del>
+      <ins>{ return insert(value_type(std::forward<Args>(args)...)); }</ins>
     template&lt;class... Args>
-      iterator emplace_hint(const_iterator position, Args&&... args);
+      iterator emplace_hint(const_iterator position, Args&&... args)<del>;</del>
+        <ins>{ return insert(position, value_type(std::forward<Args>(args)...)); }</ins>
 
     pair&lt;iterator, bool> insert(const value_type& x)<ins>;</ins>
       <del>{ return emplace(x); }</del>
@@ -1383,21 +532,21 @@ Change <a href="https://eel.is/c++draft/flat.map.modifiers">[flat.map.modifiers]
 
 <small><blockquote>
 <pre>
-template&lt;class... Args> pair&lt;iterator, bool> emplace(Args&&... args);
+<del>template&lt;class... Args> pair&lt;iterator, bool> emplace(Args&&... args);</del>
 </pre>
 <del>1․ Constraints: `is_constructible_v<pair<key_type, mapped_type>, Args...>` is `true`.</del>
 
-<p>2․ Effects: <del>Initializes</del> <ins>Direct-non-list-initializes</ins> an object `t` of type `pair<key_type, mapped_type>` with `std::forward<Args>(args)...`;
-if the map already contains an element whose key is equivalent to `t.first`, `*this` is unchanged. Otherwise, equivalent to:
+<p><del>2․ Effects: Initializes an object `t` of type `pair<key_type, mapped_type>` with `std::forward<Args>(args)...`;
+if the map already contains an element whose key is equivalent to `t.first`, `*this` is unchanged. Otherwise, equivalent to:</del>
 <pre>
-auto key_it = ranges::upper_bound(c.keys, t.first, compare);
-auto value_it = c.values.begin() + distance(c.keys.begin(), key_it);
-c.keys.insert(key_it, std::move(t.first));
-c.values.insert(value_it, std::move(t.second));
+<del>auto key_it = ranges::upper_bound(c.keys, t.first, compare);</del>
+<del>auto value_it = c.values.begin() + distance(c.keys.begin(), key_it);</del>
+<del>c.keys.insert(key_it, std::move(t.first));</del>
+<del>c.values.insert(value_it, std::move(t.second));</del>
 </pre>
 
-3․ Returns: The `bool` component of the returned pair is `true` if and only if the insertion took place,
-and the iterator component of the pair points to the element with key equivalent to `t.first`.
+<del>3․ Returns: The `bool` component of the returned pair is `true` if and only if the insertion took place,
+and the iterator component of the pair points to the element with key equivalent to `t.first`.</del>
 
 <pre>
 <ins>pair&lt;iterator, bool> insert(const value_type& x);</ins>
@@ -1420,6 +569,9 @@ and the iterator component of the pair points to the element with key equivalent
 </pre>
 <ins>for the second overload.</ins>
 
+<p><ins>3․ Returns: The `bool` component of the returned pair is `true` if and only if the insertion took place,
+and the iterator component of the pair points to the element with key equivalent to `x.first`.</ins>
+
 <pre>
 template<class P> pair&lt;iterator, bool> insert(P&& x);
 template<class P> iterator insert(const_iterator position, P&& x);
@@ -1437,9 +589,11 @@ Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]
 <small><blockquote>
 <pre>
     // modifiers
-    template&lt;class... Args> iterator emplace(Args&&... args);
+    template&lt;class... Args> iterator emplace(Args&&... args)<del>;</del>
+      <ins>{ return insert(value_type(std::forward<Args>(args)...)); }</ins>
     template&lt;class... Args>
-      iterator emplace_hint(const_iterator position, Args&&... args);
+      iterator emplace_hint(const_iterator position, Args&&... args)<del>;</del>
+        <ins>{ return insert(position, value_type(std::forward<Args>(args)...)); }</ins>
 
     iterator insert(const value_type& x)<ins>;</ins>
       <del>{ return emplace(x); }</del>
@@ -1471,12 +625,10 @@ Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]
       <del>{ return emplace(x); }</del>
     iterator insert(value_type&& x)<ins>;</ins>
       <del>{ return emplace(std::move(x)); }</del>
-    <ins>template&lt;class K> iterator insert(K&& x);</ins>
     iterator insert(const_iterator position, const value_type& x)<ins>;</ins>
       <del>{ return emplace_hint(position, x); }</del>
     iterator insert(const_iterator position, value_type&& x)<ins>;</ins>
       <del>{ return emplace_hint(position, std::move(x)); }</del>
-    <ins>template&lt;class K> iterator insert(const_iterator hint, K&& x);</ins>
 </pre>
 </blockquote></small>
 
@@ -1512,21 +664,6 @@ then inserts `t` as if by:</del>
 <ins>for the second overload.</ins>
 
 <p><ins>x․ Returns: An iterator that points to the inserted element.</ins>
-
-<pre>
-<ins>template&lt;class K> iterator insert(K&& x);</ins>
-<ins>template&lt;class K> iterator insert(const_iterator hint, K&& x);</ins>
-</pre>
-<p><ins>x․ Constraints: The *qualified-id* `Compare::is_transparent` is valid and denotes a type. `is_constructible_v<value_type, K>` is `true`.
-For the second overload, `is_convertible_v<K&&, const_iterator>` and `is_convertible_v<K&&, iterator>` are both `false`.</ins>
-
-<p><ins>x․ Preconditions: The conversion from `x` into `value_type` constructs an object `u` for which `find(x) == find(u)` is `true`.</ins>
-
-<p><ins>x․ Effects: If the set already contains an element equivalent to `x`, `*this` and `x` are unchanged. Otherwise, inserts a new element as if by
-`emplace(std::forward<K>(x))`.</ins>
-
-<p><ins>x․ Returns: An iterator that points to the inserted element.</ins>
-
 </blockquote></small>
 
 Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
@@ -1574,7 +711,7 @@ Otherwise, inserts a new element as if by:</ins>
 <ins>for the second overload.</ins>
 
 <p><ins>x․ Returns: The `bool` component of the returned pair is `true` if and only if the insertion took place.
-The returned iterator points to the element whose key is equivalent to `x`.</ins>
+The returned iterator points to the element equivalent to `x`.</ins>
 
 <pre>
 template&lt;class K> pair&lt;iterator, bool> insert(K&& x);
@@ -1589,7 +726,7 @@ the second overload, `is_convertible_v<K&&, const_iterator>` and `is_convertible
 by `emplace(std::forward<K>(x))`.
 
 4․ Returns: In the first overload, the `bool` component of the returned pair is `true` if and only if the insertion took place.
-The returned iterator points to the element whose key is equivalent to `x`.
+The returned iterator points to the element <del>whose key is</del> equivalent to `x`.
 </blockquote></small>
 
 
@@ -1631,7 +768,7 @@ An overload of `insert_range(sorted_unique, rg)` is conspicuously missing.
 Now, we're also conspicuously missing a constructor overload `flat_set(sorted_unique, from_range, rg)`.
 There we have a real API-design conflict: Which of `sorted_unique` and `from_range` should come first?
 This is enough of a reason to simply give up on that constructor. But `insert_range` has no such API-design
-problem. We could add this overload easily.
+problem. We can easily add this overload.
 
 ## Wording ## {#wording-insert-range-sorted-unique}
 
@@ -1658,13 +795,21 @@ Add a new entry to <a href="https://eel.is/c++draft/flat.map.modifiers">[flat.ma
 
 <small><blockquote>
 <pre>
+template&lt;class InputIterator>
+  void insert(sorted_equivalent_t, InputIterator first, InputIterator last);
+</pre>
+<p>7․ Effects: Equivalent to `insert(first, last)`.
+<p>8․ Complexity: Linear.
+xxxxxxx
+
+<pre>
 <ins>template&lt;<i>container-compatible-range</i>&lt;value_type> R></ins>
   <ins>void insert_range(sorted_unique_t, R&& rg);</ins>
 </pre>
 
 <p><ins>x․ Effects: Equivalent to `insert_range(std::forward<R>(rg))`.</ins>
 
-<p><ins>x․ Complexity: Linear in N, where N is `size()` after the operation.</ins>
+<p><ins>x․ Complexity: Linear in <i>N</i>, where <i>N</i> is `size()` after the operation.</ins>
 </blockquote></small>
 
 Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
@@ -1709,6 +854,13 @@ Add a new entry to <a href="https://eel.is/c++draft/flat.multiset.modifiers">[fl
 
 <small><blockquote>
 <pre>
+template&lt;class InputIterator>
+  void insert(sorted_equivalent_t, InputIterator first, InputIterator last);
+</pre>
+<p>7․ Effects: Equivalent to `insert(first, last)`.
+<p>8․ Complexity: Linear.
+
+<pre>
 <ins>template&lt;<i>container-compatible-range</i>&lt;value_type> R></ins>
   <ins>void insert_range(sorted_equivalent_t, R&& rg);</ins>
 </pre>
@@ -1741,13 +893,35 @@ Add a new entry to <a href="https://eel.is/c++draft/flat.set.modifiers">[flat.se
 
 <small><blockquote>
 <pre>
+template&lt;class InputIterator>
+  void insert(sorted_unique_t, InputIterator first, InputIterator last);
+</pre>
+<p>8․ Effects: Equivalent to `insert(first, last)`.
+<p>9․ Complexity: Linear.
+
+<pre>
+template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+  void insert_range(R&& rg);
+</pre>
+<p>10․ Effects: Adds elements to <i>`c`</i> as if by:
+<pre>
+for (const auto& e : rg) {
+  c.insert(c.end(), e);
+}
+</pre>
+Then, sorts the range of newly inserted elements with respect to <i>`compare`</i>;
+merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range;
+and finally erases all but the first element from each group of consecutive equivalent elements.
+<p>11․ Complexity: <i>N</i> + <i>M</i> log <i>M</i>, where <i>N</i> is `size()` before the operation and <i>M</i> is `ranges::distance(rg)`.
+<p>12․ Remarks: Since this operation performs an in-place merge, it may allocate memory.
+
+<pre>
 <ins>template&lt;<i>container-compatible-range</i>&lt;value_type> R></ins>
   <ins>void insert_range(sorted_unique_t, R&& rg);</ins>
 </pre>
-
 <p><ins>x․ Effects: Equivalent to `insert_range(std::forward<R>(rg))`.</ins>
-
-<p><ins>x․ Complexity: Linear in N, where N is `size()` after the operation.</ins>
+<p><ins>x․ Complexity: Linear in <i>N</i>, where <i>N</i> is `size()` after the operation.</ins>
+<p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins>
 </blockquote></small>
 
 # Sorting complexity # {#sorting-complexity}
@@ -2818,6 +1992,118 @@ if LWG is interested, after P2767's editorial refactoring is merged.
                <ins>const key_compare& comp, const Alloc& a);</ins>
 </pre>
 </blockquote></small>
+
+# Heterogeneous `multiset::insert` # {#heterogeneous-insert-multiset}
+
+[[P2363]] <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html#ins">explains</a>
+why the node-based `multiset` still lacks a heterogeneous `insert(K&&)`:
+
+> Adding heterogeneous `insert` overload makes no sense for associative containers with non-unique keys (`std::multimap`, `std::multiset`,
+> `std::unordered_multimap` and `std::unordered_multiset`) because the insertion will be successful in any case and the key would be always
+> constructed. All additional overheads introduced by `insert` can be mitigated by using `emplace`.
+
+For `flat_multiset`, the last sentence is false; generic `emplace` is unusable for PMR allocators, because it
+must first construct `t` using the default allocator. Therefore we also propose to add a heterogeneous-comparison
+overload of `flat_multiset::insert`.
+
+```c++
+    template<class T, class C = std::less<T>>
+    using PmrFlatMultiset = std::flat_multiset<T, C, std::pmr::vector<T>>;
+
+    std::pmr::monotonic_buffer_resource mr(1'000'000);
+    std::pmr::set_default_resource(std::pmr::null_memory_resource());
+    const char s[] = "too long to fit in the small string buffer";
+
+    auto m = std::pmr::multiset<std::pmr::string>(&mr);
+    m.emplace(s); // OK
+    m.insert(s); // runtime abort, cannot default-allocate x
+
+    auto fm = PmrFlatMultiset<std::pmr::string>(&mr);
+    fm.emplace(s); // runtime abort, cannot default-allocate t
+    fm.insert(s); // runtime abort, cannot default-allocate x
+
+    auto m2 = std::pmr::multiset<std::pmr::string, std::less<>>(&mr);
+    m2.emplace(s); // OK
+    m2.insert(s); // runtime abort, cannot default-allocate x
+
+    auto fm2 = PmrFlatMultiset<std::pmr::string, std::less<>>(&mr);
+    fm2.emplace(s); // runtime abort, cannot default-allocate t
+    fm2.insert(s);
+      // Before: runtime abort, cannot default-allocate x
+      // After: OK
+```
+
+Notice the asymmetry between `fm2.insert(s)` and `m2.insert(s)`. Arthur thinks it would be
+nice to support heterogeneous `insert` for node-based `multiset` and `unordered_multiset`
+(*contra* P2363's reasoning),
+but that's out of scope for this particular paper P2767. For P2767's purposes, we're satisfied
+once there exists *some* way of inserting `s` into `fm2`. We don't mind that the working approaches
+use different spellings: `m2.emplace(s)` versus `fm2.insert(s)`.
+
+## Wording ## {#wording-heterogeneous-insert-multiset}
+
+Note: This diff assumes [[#wording-insert-emplace]] as the starting point.
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.multiset.modifiers], modifiers
+    template<class... Args> iterator emplace(Args&&... args)
+      { return insert(value_type(std::forward<Args>(args)...)); }
+    template<class... Args>
+      iterator emplace_hint(const_iterator position, Args&&... args)
+        { return insert(position, value_type(std::forward<Args>(args)...)); }
+
+    iterator insert(const value_type& x);
+    iterator insert(value_type&& x);
+    <ins>template&lt;class K> iterator insert(K&& x);</ins>
+    iterator insert(const_iterator position, const value_type& x);
+    iterator insert(const_iterator position, value_type&& x);
+    <ins>template&lt;class K> iterator insert(const_iterator hint, K&& x);</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+iterator insert(const value_type& x);
+iterator insert(value_type&& x);
+</pre>
+x․ Effects: Inserts a new element as if by:
+<pre>
+auto it = ranges::upper_bound(c, x, compare);
+c.insert(it, x);
+</pre>
+for the first overload or
+<pre>
+auto it = ranges::upper_bound(c, x, compare);
+c.insert(it, std::move(x));
+</pre>
+for the second overload.
+
+<p>x․ Returns: An iterator that points to the inserted element.
+
+<pre>
+<ins>template&lt;class K> iterator insert(K&& x);</ins>
+</pre>
+
+<ins>x․ Constraints: The *qualified-id* `Compare::is_transparent` is valid and denotes a type.
+`is_constructible_v<value_type, K>` is `true`.
+For the second overload, `is_convertible_v<K&&, const_iterator>` and `is_convertible_v<K&&, iterator>` are both `false`.</ins>
+
+<p><ins>x․ Preconditions: The conversion from `x` into `value_type` constructs an object `u` for which `upper_bound(x) == upper_bound(u)` is `true`.</ins>
+
+<p><ins>x․ Effects: Inserts a new element as if by</ins>
+<pre>
+<ins>auto it = ranges::upper_bound(<i>c</i>, x, <i>compare</i>);</ins>
+<ins>c.emplace(it, std::forward&lt;K>(x));</ins>
+</pre>
+
+<p><ins>x․ Returns: An iterator that points to the inserted element.</ins>
+</blockquote></small>
+
 
 # Implementation experience # {#experience}
 
