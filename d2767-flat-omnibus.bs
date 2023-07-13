@@ -2,7 +2,7 @@
 Title: flat_map/flat_set omnibus
 Shortname: D2767
 Revision: 1
-!Draft Revision: 11
+!Draft Revision: 12
 Audience: LWG
 Status: D
 Group: WG21
@@ -14,7 +14,7 @@ Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Issues and resolutions in C++23 <code>flat_set</code>
   and <code>flat_map</code>, based on libc++'s implementation experience.
-Date: 2023-06-18
+Date: 2023-07-13
 </pre>
 
 <style>
@@ -33,8 +33,11 @@ dst  {background-color: #CCFFEE; text-decoration: underline;}
 
     - LWG reviewed §4,5,6,7. Update those sections' rationales and proposed wordings.
 
-    - Split [[#heterogeneous-insert-multiset-redirect]] away from the rest of §7; it is now
-          [[#heterogeneous-insert-multiset]], and requires discussion by LEWG.
+    - Split [[#heterogeneous-insert-multiset-redirect]] away from the rest of §7, because it (alone) requires LEWG input;
+          it is now [[#heterogeneous-insert-multiset]].
+
+    - Split [[#deceptive-redirect]] away from the rest of §12, to draw attention;
+          it is now [[#deceptive]].
 
 - R0 (pre-Varna 2023):
 
@@ -924,7 +927,9 @@ and finally erases all but the first element from each group of consecutive equi
 <p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins>
 </blockquote></small>
 
-# Sorting complexity # {#sorting-complexity}
+# Complexity clauses of container constructors # {#sorting-complexity}
+
+(This whole section would be mooted by [[#deceptive-remove]].)
 
 Most operations that require sorting come in `sorted_unique` and non-`sorted_unique` flavors;
 the `sorted_unique` flavor is rightly specified not to sort, which means it can be O(N)
@@ -1004,7 +1009,7 @@ Change <a href="https://eel.is/c++draft/flat.multimap.cons">[flat.multimap.cons]
 flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
               const key_compare& comp = key_compare());
 </pre>
-1․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`, 
+1․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`,
 and `compare` with `comp`; sorts the range [`begin()`, `end()`) with respect to `value_comp()`.
 
 <p>2․ Complexity: <del>Linear in N if the container arguments are already sorted with respect to `value_comp()`
@@ -1368,117 +1373,9 @@ leave the order of equivalent elements unspecified, and instrument it under libc
 This would preserve the symmetry between `multiset` and `flat_multiset`, by making both of them de facto
 randomized order (at least in debug mode).
 
-## Non-explicit constructor from two containers ## {#deceptive}
+## Non-explicit container constructor ## {#deceptive-redirect}
 
-Arthur has observed [in a blog post](https://quuxplusone.github.io/blog/2023/04/28/flat-map-constructors/)
-that `flat_map`'s non-explicit constructor from two containers is deceptive when used with braced initializers.
-
-```c++
-    void print_map(std::flat_multimap<int, int>);
-
-    // Test the two-container constructor... or is it?
-
-    print_map({ {1, 2, 3}, {10, 20, 30} }); // {1,10}, {2,20}, {3,30}
-    print_map({ {1, 2},    {10, 20} });     // {1,2}, {10,20}
-    print_map({ {1},       {10} });         // {1,10}
-    print_map({ {},        {} });           // {0,0}, {0,0}
-```
-
-To address this issue (if we wanted to), we could make one of the relevant constructors `explicit`.
-We obviously can't prevent `vector`'s construction from a braced list
-of elements, nor `pair`'s from a braced list of (exactly two) elements, nor (in practice)
-`pair`'s construction from `{}`; so the only constructor we could explicify to address this
-would be `flat_multimap`'s own constructor from a braced list of (exactly two) containers. That is,
-we'd do this (and likewise in `flat_map`; `flat_set` doesn't need to change):
-
-<small><blockquote>
-<pre>
-    <ins>explicit flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont)</ins>
-      <ins>: flat_multimap(std::move(key_cont), std::move(mapped_cont), key_compare()) {}</ins>
-    flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
-                  const key_compare& comp <del>= key_compare()</del>);
-    template&lt;class Allocator>
-      flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
-                    const Allocator& a);
-    template&lt;class Allocator>
-      flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
-                    const key_compare& comp, const Allocator& a);
-</pre>
-</blockquote></small>
-
-Arthur thinks this change would be appreciated by programmers in practice (or rather, if we *don't*
-make this change, then programmers will only ever notice this issue when it bites them).
-But it would be surprisingly asymmetric to explicify only this one constructor. The small benefit
-probably does not justify the asymmetry.
-
-We recently made some constructors `explicit` in
-<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2711r1.html">P2711 "Making multi-param constructors of views explicit,"</a>
-but that paper's goal was to *increase* uniformity and symmetry, not to decrease it.
-
-### Remove the container constructors? ### {#deceptive-remove}
-
-A more ambitious alternative would be to eliminate the container constructors entirely,
-and say that the only way to move containers into a flat container at all is via `.replace`,
-after the initial construction has already happened. This would be analogous to `vector::reserve`
-or `unordered_map::max_load_factor` — a feature with no associated constructor, just a setter
-after the fact. This would be really bold; but if we eliminated them, then we would also solve
-[[LWG3802]] ([[#lwg-3802]]) in one fell swoop, and reduce the size of the constructor overload
-set from 38 constructors down to 20.
-
-Another reason to think about eliminating the container constructors — at least the non-`sorted_unique` ones —
-is that right now the less convenient syntax `flat_set(sorted_unique, ks)` is faster than the more
-convenient syntax `flat_set(ks)`; this might be a pitfall for the average programmer.
-
-```c++
-    auto ks = std::pmr::vector<int>({1,2,3}, &mr1);
-    auto vs = std::pmr::vector<int>({1,2,3}, &mr2);
-
-    using FS = std::flat_set<int, std::less<>, decltype(ks)>;
-    // Before:
-    FS fs1 = FS(std::sorted_unique, std::move(ks));
-    // After:
-    FS fs1 = FS(ks.get_allocator());
-    fs1.replace(std::move(ks));
-
-    using FM = std::flat_map<int, int, std::less<>, decltype(ks), decltype(vs)>;
-    // Before:
-    FM fm1 = FM(std::sorted_unique, std::move(ks), std::move(vs));
-      // Two different allocators in the same adaptor.
-      // Almost certainly there is no valid reason to do this.
-    // After:
-    FM fm2 = FM(ks.get_allocator());
-    fm2.replace({ std::move(ks), std::move(vs) });
-      // The data from vs is copied into arena mr1.
-      // This is less performant, but more sane.
-      // It is physically impossible to create the equivalent of fm1 above.
-```
-
-A downside is that it's tedious for the programmer to reproduce the effect of the
-non-`sorted_unique` container constructors:
-
-```c++
-    // Before:
-    FS fs2 = FS(std::move(ks));
-
-    // After:
-    FS fs2 = FS(ks.get_allocator());
-    std::ranges::sort(ks);
-    ks.erase(std::ranges::unique(ks).begin(), ks.end());
-    fs2.replace(std::move(ks));
-
-    // After, if you can afford one extra allocation:
-    FS fs2 = FS(std::from_range, ks | std::views::as_rvalue, ks.get_allocator());
-```
-
-We could boldly address this by making `fs.replace(ks)` always sort, and then if you know
-your data is already sorted, you would call `fs.replace(sorted_unique, ks)`. That would
-make the interface much more symmetric, too, because the sortedness
-precondition would be 100% always indicated by the presence of `sorted_unique_t` in the signature.
-
-It is very late in the game to be doing design work; but this particular redesign
-does seem to have a lot of varied benefits for vendors and programmers, with only
-procedural downsides. I haven't written wording for this yet, but can do so
-if LWG is interested.
+Note: This section of P2767R0 has moved in P2767R1 to [[#deceptive]].
 
 ## Complexity of `equal_range` ## {#complexity-equal-range}
 
@@ -1649,9 +1546,9 @@ we must decide whether to give it a similar noexcept-spec.
 
 ### Possible wording ### {#wording-special-members}
 
-(This wording merge-conflicts with the resolution of [[LWG3884]], which in turn merge-conflicts
-with the editorial refactoring at the beginning of this paper P2767. We can polish it later;
-the first question is whether LWG wants to pursue this direction at all.)
+Note: This wording merge-conflicts with the resolution of [[LWG3884]], which in turn merge-conflicts
+with the editorial refactoring in §3. We can polish it later;
+the first question is whether LWG wants to pursue this direction at all.
 
 For example, change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
 
@@ -2103,6 +2000,619 @@ For the second overload, `is_convertible_v<K&&, const_iterator>` and `is_convert
 
 <p><ins>x․ Returns: An iterator that points to the inserted element.</ins>
 </blockquote></small>
+
+# Non-explicit constructor from two containers # {#deceptive}
+
+Arthur has observed [in a blog post](https://quuxplusone.github.io/blog/2023/04/28/flat-map-constructors/)
+that `flat_map`'s non-explicit constructor from two containers is deceptive when used with braced initializers.
+
+```c++
+    void print_map(std::flat_multimap<int, int>);
+
+    // Test the two-container constructor... or is it?
+
+    print_map({ {1, 2, 3}, {10, 20, 30} }); // {1,10}, {2,20}, {3,30}
+    print_map({ {1, 2},    {10, 20} });     // {1,2}, {10,20}
+    print_map({ {1},       {10} });         // {1,10}
+    print_map({ {},        {} });           // {0,0}, {0,0}
+```
+
+## Make the container constructors explicit? ## {#deceptive-explicit}
+
+To address this issue (if we wanted to), we could make one of the relevant constructors `explicit`.
+We obviously can't prevent `vector`'s construction from a braced list
+of elements, nor `pair`'s from a braced list of (exactly two) elements, nor (in practice)
+`pair`'s construction from `{}`; so the only constructor we could explicify to address this
+would be `flat_multimap`'s own constructor from a braced list of (exactly two) containers.
+
+`flat_set` and `flat_multiset`'s container constructors don't suffer from deceptiveness,
+so they wouldn't be changed by this modest patch.
+
+Arthur thinks this change would be appreciated by programmers in practice (or rather, if we *don't*
+make this change, then programmers will only ever notice this overload set unfavorably, when it bites them,
+and never favorably).
+
+We recently made some constructors `explicit` in
+<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2711r1.html">P2711 "Making multi-param constructors of views explicit,"</a>
+but that paper's goal was to *increase* uniformity and symmetry, not to decrease it.
+
+It would be surprisingly asymmetric to explicify only this one constructor. The small benefit
+probably does not justify the asymmetry. Go on to the next section to see Arthur's preferred
+solution, which is much more ambitious.
+
+### Wording for explicit ### {#wording-deceptive-explicit}
+
+Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    <ins>explicit flat_map(key_container_type key_cont, mapped_container_type mapped_cont)</ins>
+      <ins>: flat_map(std::move(key_cont), std::move(mapped_cont), key_compare()) {}</ins>
+    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
+             const key_compare& comp <del>= key_compare()</del>);
+    flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,
+             const key_compare& comp = key_compare());
+[...]
+    template&lt;class Allocator>
+      flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
+               const Allocator& a);
+    template&lt;class Allocator>
+      flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
+               const key_compare& comp, const Allocator& a);
+    template&lt;class Allocator>
+      flat_map(sorted_unique_t, const key_container_type& key_cont,
+               const mapped_container_type& mapped_cont, const Allocator& a);
+    template&lt;class Allocator>
+      flat_map(sorted_unique_t, const key_container_type& key_cont,
+               const mapped_container_type& mapped_cont,
+               const key_compare& comp, const Allocator& a);
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    <ins>explicit flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont)</ins>
+      <ins>: flat_multimap(std::move(key_cont), std::move(mapped_cont), key_compare()) {}</ins>
+    flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
+                  const key_compare& comp <del>= key_compare()</del>);
+    flat_multimap(sorted_equivalent_t,
+                  key_container_type key_cont, mapped_container_type mapped_cont,
+                  const key_compare& comp = key_compare());
+[...]
+    template&lt;class Allocator>
+      flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
+                    const Allocator& a);
+    template&lt;class Allocator>
+      flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
+                    const key_compare& comp, const Allocator& a);
+    template&lt;class Allocator>
+      flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,
+                    const mapped_container_type& mapped_cont, const Allocator& a);
+    template&lt;class Allocator>
+      flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,
+                    const mapped_container_type& mapped_cont,
+                    const key_compare& comp, const Allocator& a);
+</pre>
+</blockquote></small>
+
+## Remove the container constructors; make `replace` sort by default ## {#deceptive-remove}
+
+A more ambitious alternative would be to eliminate the container constructors entirely,
+and say that the only way to move containers into a flat container at all is via `.replace`,
+after the initial construction has already happened. This would be analogous to `vector::reserve`
+or `unordered_map::max_load_factor` — a feature with no associated constructor, just a setter
+after the fact. This would be really bold. But eliminating these constructors would solve
+[[LWG3802]] ([[#lwg-3802]]) in one fell swoop, and reduce `flat_map`'s constructor overload
+set from 38 constructors down to 20.
+
+Another reason to think about eliminating the container constructors — at least the untagged ones —
+is that right now the less convenient syntax `flat_set(sorted_unique, ks)` is faster than the more
+convenient syntax `flat_set(ks)`. The average programmer might write the shorter form assuming
+that it will be as fast as today's `fs.replace(ks)`, instead of realizing that the untagged constructor
+(unlike today's untagged `replace`) always sorts the container.
+
+But removing the container constructors introduces a new problem:
+It becomes tedious for the programmer to reproduce the effect
+of the untagged container constructors!
+
+```c++
+    // Before:
+    FS fs2 = FS(std::move(ks));
+
+    // After:
+    FS fs2 = FS(ks.get_allocator());
+    std::ranges::sort(ks);
+    ks.erase(std::ranges::unique(ks).begin(), ks.end());
+    fs2.replace(std::move(ks));
+
+    // After, if you can afford one extra allocation:
+    FS fs2 = FS(std::from_range, ks | std::views::as_rvalue, ks.get_allocator());
+```
+
+We boldly address this by giving `replace` tagged and untagged overloads: `fs.replace(ks)` will now sort
+the input, and `fs.replace(sorted_unique, ks)` will have a narrow contract. This makes the interface
+more symmetric, too, because the sortedness precondition is 100% always indicated by the presence
+of `sorted_unique_t` in the signature.
+
+```c++
+    auto ks = std::pmr::vector<int>({1,2,3}, &mr1);
+    auto vs = std::pmr::vector<int>({1,2,3}, &mr2);
+
+    using FS = std::flat_set<int, std::less<>, decltype(ks)>;
+    // Before:
+    FS fs1 = FS(std::move(ks)); // sorts
+    // After:
+    FS fs1 = FS(ks.get_allocator());
+    fs1.replace(std::move(ks)); // sorts
+
+    using FM = std::flat_map<int, int, std::less<>, decltype(ks), decltype(vs)>;
+    // Before:
+    FM fm1 = FM(std::sorted_unique, std::move(ks), std::move(vs));
+      // Two different allocators in the same adaptor.
+      // Almost certainly there is no valid reason to do this.
+    // After:
+    FM fm2 = FM(ks.get_allocator());
+    fm2.replace(std::sorted_unique, { std::move(ks), std::move(vs) });
+      // The data from vs is copied into arena mr1.
+      // This is less performant, but more sane.
+      // It becomes physically impossible to create the equivalent of fm1 above.
+```
+
+It is very late in the game to be doing design work; but this particular redesign
+does seem to have a lot of varied benefits for vendors and programmers, with only
+procedural downsides.
+
+### Wording for tagged `replace` ### {#wording-deceptive-remove}
+
+Note: This wording is based on top of the editorial refactoring from §3.
+
+Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.map.cons], constructors
+    flat_map() : flat_map(key_compare()) { }
+    explicit flat_map(const key_compare& comp)
+      : c(), compare(comp) { }
+    <del>flat_map(key_container_type key_cont, mapped_container_type mapped_cont,</del>
+             <del>const key_compare& comp = key_compare());</del>
+    <del>flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,</del>
+             <del>const key_compare& comp = key_compare());</del>
+    template&lt;class InputIterator>
+      flat_map(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
+        : c(), compare(comp) { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_map(sorted_unique_t s, InputIterator first, InputIterator last,
+               const key_compare& comp = key_compare())
+        : c(), compare(comp) { insert(s, first, last); }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_map(from_range_t fr, R&& rg)
+        : flat_map(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_map(from_range_t, R&& rg, const key_compare& comp)
+        : flat_map(comp) { insert_range(std::forward&lt;R>(rg)); }
+
+[...]
+
+    // [flat.map.cons.alloc], constructors with allocators
+
+    template&lt;class Alloc>
+      explicit flat_map(const Alloc& a);
+    template&lt;class Alloc>
+      flat_map(const key_compare& comp, const Alloc& a);
+    <del>template&lt;class Alloc></del>
+      <del>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</del>
+               <del>const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</del>
+               <del>const key_compare& comp, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_map(sorted_unique_t, const key_container_type& key_cont,</del>
+               <del>const mapped_container_type& mapped_cont, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_map(sorted_unique_t, const key_container_type& key_cont,</del>
+               <del>const mapped_container_type& mapped_cont,</del>
+               <del>const key_compare& comp, const Alloc& a);</del>
+    template&lt;class InputIterator, class Alloc>
+      flat_map(InputIterator first, InputIterator last, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_map(InputIterator first, InputIterator last,
+               const key_compare& comp, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_map(sorted_unique_t, InputIterator first, InputIterator last, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_map(sorted_unique_t, InputIterator first, InputIterator last,
+               const key_compare& comp, const Alloc& a);
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc>
+      flat_map(from_range_t, R&& rg, const Alloc& a);
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc>
+      flat_map(from_range_t, R&& rg, const key_compare& comp, const Alloc& a);
+
+[...]
+
+    containers extract() &&;
+    void replace(key_container_type<del>&&</del> key_cont, mapped_container_type<del>&&</del> mapped_cont);
+    <ins>void replace(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont);</ins>
+</pre>
+</blockquote></small>
+
+Remove the whole contents of <a href="https://eel.is/c++draft/flat.map.cons">[flat.map.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+<del>flat_map(key_container_type key_cont, mapped_container_type mapped_cont,</del>
+         <del>const key_compare& comp = key_compare());</del>
+</pre>
+<p><del>1․ <i>Effects:</i> Initializes `c.keys` with `std::move(key_cont)`,
+`c.values` with `std::move(mapped_cont)`, and `compare` with `comp`;
+sorts the range [`begin()`, `end()`) with respect to `value_comp()`; and
+finally erases the duplicate elements as if by:</del>
+<pre>
+<del>auto zv = views::zip(c.keys, c.values);</del>
+<del>auto it = ranges::unique(zv, key_equiv(compare)).begin();</del>
+<del>auto dist = distance(zv.begin(), it);</del>
+<del>c.keys.erase(c.keys.begin() + dist, c.keys.end());</del>
+<del>c.values.erase(c.values.begin() + dist, c.values.end());</del>
+</pre>
+<p><del>2․ <i>Complexity:</i> Linear in <i>N</i> if the container arguments are already sorted
+with respect to `value_comp()` and otherwise <i>N</i> log <i>N</i>,
+where <i>N</i> is the value of `key_cont.size()` before this call.</del>
+
+<p><pre>
+<del>flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,</del>
+         <del>const key_compare& comp = key_compare());</del>
+</pre>
+<p><del>3․ <i>Effects:</i> Initializes `c.keys` with `std::move(key_cont)`,
+`c.values` with `std::move(mapped_cont)`, and `compare` with `comp`.</del>
+
+<p><del>4․ <i>Complexity:</i> Constant.</del>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.map.cons.alloc">[flat.map.cons.alloc]</a> as follows:
+
+<small><blockquote>
+1․ The constructors in this subclause shall not participate in overload resolution
+unless `uses_allocator_v<key_container_type, Alloc>` is `true`
+and `uses_allocator_v<mapped_container_type, Alloc>` is `true`.
+
+<p><pre>
+<del>template&lt;class Alloc></del>
+  <del>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</del>
+           <del>const Alloc& a);</del>
+<del>template&lt;class Alloc></del>
+  <del>flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</del>
+           <del>const key_compare& comp, const Alloc& a);</del>
+</pre>
+<p><del>2․ <i>Effects:</i> Equivalent to `flat_map(key_cont, mapped_cont)` and `flat_map(key_cont, mapped_cont, comp)`, respectively,
+except that `c.keys` and `c.values` are constructed with uses-allocator construction ([allocator.uses.construction]).</del>
+<p><del>3․ <i>Complexity:</i> Same as `flat_map(key_cont, mapped_cont)` and `flat_map(key_cont, mapped_cont, comp)`, respectively.</del>
+
+<p><pre>
+<del>template&lt;class Alloc></del>
+  <del>flat_map(sorted_unique_t s, const key_container_type& key_cont,</del>
+           <del>const mapped_container_type& mapped_cont, const Alloc& a);</del>
+<del>template&lt;class Alloc></del>
+  <del>flat_map(sorted_unique_t s, const key_container_type& key_cont,</del>
+           <del>const mapped_container_type& mapped_cont, const key_compare& comp,</del>
+           <del>const Alloc& a);</del>
+</pre>
+<p><del>4․ <i>Effects:</i> Equivalent to `flat_map(s, key_cont, mapped_cont)` and `flat_map(s, key_cont, mapped_cont, comp)`, respectively,
+except that `c.keys` and `c.values` are constructed with uses-allocator construction ([allocator.uses.construction]).</del>
+<p><del>5․ <i>Complexity:</i> Linear.</del>
+<p>[...]
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.map.modifiers">[flat.map.modifiers]</a> as follows:
+
+<small><blockquote>
+[...]
+<p><pre>
+containers extract() &&;
+</pre>
+<p>34․ <i>Postconditions:</i> `*this` is emptied, even if the function exits via an exception.
+<p>35․ <i>Returns:</i> `std::move(c)`.
+
+<p><pre>
+void replace(key_container_type<del>&&</del> key_cont, mapped_container_type<del>&&</del> mapped_cont);
+</pre>
+<p><ins>x․ <i>Preconditions:</i> `key_cont.size() == mapped_cont.size()` is `true`.</ins>
+<p><ins>x․ <i>Effects:</i> Replaces `c.keys` with `key_cont` and `c.values` with `mapped_cont`;
+sorts the range [`begin()`, `end()`) with respect to `value_comp()`; and
+finally erases the duplicate elements as if by:</ins>
+<pre>
+<ins>auto zv = views::zip(c.keys, c.values);</ins>
+<ins>auto it = ranges::unique(zv, key_equiv(compare)).begin();</ins>
+<ins>auto dist = distance(zv.begin(), it);</ins>
+<ins>c.keys.erase(c.keys.begin() + dist, c.keys.end());</ins>
+<ins>c.values.erase(c.values.begin() + dist, c.values.end());</ins>
+</pre>
+
+<p><pre>
+<ins>void replace(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont);</ins>
+</pre>
+<p>36․ <i>Preconditions:</i> `key_cont.size() == mapped_cont.size()` is `true`, the elements of
+`key_cont` are sorted with respect to `compare`, and `key_cont` contains no equal elements.
+<p>37․ <i>Effects:</i> Equivalent to:
+<pre>
+c.keys = std::move(key_cont);
+c.values = std::move(mapped_cont);
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.multimap.cons], constructors
+    flat_multimap() : flat_multimap(key_compare()) { }
+    explicit flat_multimap(const key_compare& comp)
+      : c(), compare(comp) { }
+    <del>flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,</del>
+                  <del>const key_compare& comp = key_compare());</del>
+    <del>flat_multimap(sorted_equivalent_t, key_container_type key_cont, mapped_container_type mapped_cont,</del>
+                  <del>const key_compare& comp = key_compare());</del>
+    template&lt;class InputIterator>
+      flat_multimap(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
+        : c(), compare(comp) { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_multimap(sorted_equivalent_t s, InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : c(), compare(comp) { insert(s, first, last); }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multimap(from_range_t fr, R&& rg)
+        : flat_multimap(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multimap(from_range_t, R&& rg, const key_compare& comp)
+        : flat_multimap(comp) { insert_range(std::forward&lt;R>(rg)); }
+
+[...]
+
+    // [flat.multimap.cons.alloc], constructors with allocators
+
+    template&lt;class Alloc>
+      explicit flat_multimap(const Alloc& a);
+    template&lt;class Alloc>
+      flat_multimap(const key_compare& comp, const Alloc& a);
+    <del>template&lt;class Alloc></del>
+      <del>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</del>
+                    <del>const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,</del>
+                    <del>const key_compare& comp, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,</del>
+                    <del>const mapped_container_type& mapped_cont, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,</del>
+                    <del>const mapped_container_type& mapped_cont,</del>
+                    <del>const key_compare& comp, const Alloc& a);</del>
+    template&lt;class InputIterator, class Alloc>
+      flat_multimap(InputIterator first, InputIterator last, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_multimap(InputIterator first, InputIterator last,
+                    const key_compare& comp, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_multimap(sorted_equivalent_t, InputIterator first, InputIterator last,
+                    const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_multimap(sorted_equivalent_t, InputIterator first, InputIterator last,
+                    const key_compare& comp, const Alloc& a);
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc>
+      flat_multimap(from_range_t, R&& rg, const Alloc& a);
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc>
+      flat_multimap(from_range_t, R&& rg, const key_compare& comp, const Alloc& a);
+
+[...]
+
+    containers extract() &&;
+    void replace(key_container_type<del>&&</del> key_cont, mapped_container_type<del>&&</del> mapped_cont);
+    <ins>void replace(sorted_equivalent_t, key_container_type key_cont, mapped_container_type mapped_cont);</ins>
+</pre>
+</blockquote></small>
+
+Remove the whole contents of <a href="https://eel.is/c++draft/flat.multimap.cons">[flat.multimap.cons]</a> as follows:
+
+(TODO)
+
+Change <a href="https://eel.is/c++draft/flat.multimap.cons.alloc">[flat.multimap.cons.alloc]</a> as follows:
+
+(TODO)
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.multiset.cons], constructors
+    flat_multiset() : flat_multiset(key_compare()) { }
+    explicit flat_multiset(const key_compare& comp)
+      : c(), compare(comp) { }
+    <del>explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());</del>
+    <del>flat_multiset(sorted_equivalent_t, container_type cont,</del>
+                  <del>const key_compare& comp = key_compare())</del>
+      <del>: <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }</del>
+    template&lt;class InputIterator>
+      flat_multiset(InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <i>c</i>(), <i>compare</i>(comp)
+        { insert(first, last); }
+    template<class InputIterator>
+      flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <i>c</i>(first, last), <i>compare</i>(comp) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multiset(from_range_t fr, R&& rg)
+        : flat_multiset(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multiset(from_range_t, R&& rg, const key_compare& comp)
+        : flat_multiset(comp)
+        { insert_range(std::forward&lt;R>(rg)); }
+
+[...]
+
+    // [flat.multiset.cons.alloc], constructors with allocators
+
+    template&lt;class Alloc>
+      explicit flat_multiset(const Alloc& a);
+    template&lt;class Alloc>
+      flat_multiset(const key_compare& comp, const Alloc& a);
+    <del>template&lt;class Alloc></del>
+      <del>flat_multiset(const container_type& cont, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_multiset(const container_type& cont, const key_compare& comp, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_multiset(sorted_equivalent_t, const container_type&, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_multiset(sorted_equivalent_t, const container_type& cont,</del>
+                    <del>const key_compare& comp, const Alloc& a);</del>
+    template&lt;class InputIterator, class Alloc>
+      flat_multiset(InputIterator first, InputIterator last, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_multiset(InputIterator first, InputIterator last,
+                    const key_compare& comp, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
+                    const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
+                    const key_compare& comp, const Alloc& a);
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc>
+      flat_multiset(from_range_t, R&& rg, const Alloc& a);
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc>
+      flat_multiset(from_range_t, R&& rg, const key_compare& comp, const Alloc& a);
+
+[...]
+
+    container_type extract() &&;
+    void replace(container_type<del>&&</del>);
+    <ins>void replace(sorted_equivalent_t, container_type<del>&&</del>);</ins>
+</pre>
+</blockquote></small>
+
+Remove the whole contents of <a href="https://eel.is/c++draft/flat.multiset.cons">[flat.multiset.cons]</a> as follows:
+
+(TODO)
+
+Change <a href="https://eel.is/c++draft/flat.multiset.cons.alloc">[flat.multiset.cons.alloc]</a> as follows:
+
+<small><blockquote>
+x. The constructors in this subclause shall not participate in overload resolution
+unless `uses_allocator_v<container_type, Alloc>` is `true`.
+
+<p><pre>
+<del>template&lt;class Alloc></del>
+  <del>flat_multiset(const container_type& cont, const Alloc& a);</del>
+<del>template&lt;class Alloc></del>
+  <del>flat_multiset(const container_type& cont, const key_compare& comp, const Alloc& a);</del>
+</pre>
+<p><del>x. <i>Effects:</i> Equivalent to `flat_multiset(cont)` and `flat_multiset(cont, comp)`, respectively,
+except that `c` is constructed with uses-allocator construction ([allocator.uses.construction]).</del>
+<p><del>x. <i>Complexity:</i> Same as `flat_multiset(cont)` and `flat_multiset(cont, comp)`, respectively.</del>
+
+<p><pre>
+<del>template&lt;class Alloc></del>
+  <del>flat_multiset(sorted_equivalent_t s, const container_type& cont, const Alloc& a);</del>
+<del>template&lt;class Alloc></del>
+  <del>flat_multiset(sorted_equivalent_t s, const container_type& cont,</del>
+                <del>const key_compare& comp, const Allocator& a);</del>
+</pre>
+<p><del>x. <i>Effects:</i> Equivalent to `flat_multiset(s, cont)` and `flat_multiset(s, cont, comp)`, respectively,
+except that `c` is constructed with uses-allocator construction ([allocator.uses.construction]).</del>
+<p><del>x. <i>Complexity:</i> Linear.</del>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:
+
+(TODO)
+
+Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.set.cons], constructors
+    flat_set() : flat_set(key_compare()) { }
+
+    explicit flat_set(const key_compare& comp)
+      : c(), compare(comp) { }
+
+    <del>explicit flat_set(container_type cont, const key_compare& comp = key_compare());</del>
+
+    <del>flat_set(sorted_unique_t, container_type cont,</del>
+                  <del>const key_compare& comp = key_compare())</del>
+      <del>: <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }</del>
+
+    template&lt;class InputIterator>
+      flat_set(InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <i>c</i>(), <i>compare</i>(comp)
+        { insert(first, last); }
+
+    template<class InputIterator>
+      flat_set(sorted_unique_t, InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <i>c</i>(first, last), <i>compare</i>(comp) { }
+
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_set(from_range_t fr, R&& rg)
+        : flat_set(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_set(from_range_t, R&& rg, const key_compare& comp)
+        : flat_set(comp)
+        { insert_range(std::forward&lt;R>(rg)); }
+
+[...]
+
+    // [flat.set.cons.alloc], constructors with allocators
+
+    template&lt;class Alloc>
+      explicit flat_set(const Alloc& a);
+    template&lt;class Alloc>
+      flat_set(const key_compare& comp, const Alloc& a);
+    <del>template&lt;class Alloc></del>
+      <del>flat_set(const container_type& cont, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_set(const container_type& cont, const key_compare& comp, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_set(sorted_unique_t, const container_type&, const Alloc& a);</del>
+    <del>template&lt;class Alloc></del>
+      <del>flat_set(sorted_unique_t, const container_type& cont,</del>
+               <del>const key_compare& comp, const Alloc& a);</del>
+    template&lt;class InputIterator, class Alloc>
+      flat_set(InputIterator first, InputIterator last, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_set(InputIterator first, InputIterator last,
+               const key_compare& comp, const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_set(sorted_unique_t, InputIterator first, InputIterator last,
+               const Alloc& a);
+    template&lt;class InputIterator, class Alloc>
+      flat_set(sorted_unique_t, InputIterator first, InputIterator last,
+               const key_compare& comp, const Alloc& a);
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc>
+      flat_set(from_range_t, R&& rg, const Alloc& a);
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R, class Alloc>
+      flat_set(from_range_t, R&& rg, const key_compare& comp, const Alloc& a);
+
+[...]
+
+    container_type extract() &&;
+    void replace(container_type<del>&&</del>);
+    <ins>void replace(sorted_unique_t, container_type<del>&&</del>);</ins>
+</pre>
+</blockquote></small>
+
+Remove the whole contents of <a href="https://eel.is/c++draft/flat.set.cons">[flat.set.cons]</a> as follows:
+
+(TODO)
+
+Change <a href="https://eel.is/c++draft/flat.set.cons.alloc">[flat.set.cons.alloc]</a> as follows:
+
+(TODO)
+
+Change <a href="https://eel.is/c++draft/flat.set.modifiers">[flat.set.modifiers]</a> as follows:
+
+(TODO)
 
 
 # Implementation experience # {#experience}

@@ -1561,7 +1561,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version 5fcd28d6d, updated Tue May 30 13:12:11 2023 -0700" name="generator">
+  <meta content="Bikeshed version b06c00b8e, updated Tue Jul 11 13:41:16 2023 -0700" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
@@ -2097,7 +2097,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2767R1<br>flat_map/flat_set omnibus</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-06-18">2023-06-18</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-07-13">2023-07-13</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2107,7 +2107,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>11
+     <dd>12
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2767-flat-omnibus.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2767-flat-omnibus.bs</a>
      <dt>Current:
@@ -2158,7 +2158,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#wording-insert-range-sorted-unique"><span class="secno">8.1</span> <span class="content">Wording</span></a>
      </ol>
     <li>
-     <a href="#sorting-complexity"><span class="secno">9</span> <span class="content">Sorting complexity</span></a>
+     <a href="#sorting-complexity"><span class="secno">9</span> <span class="content">Complexity clauses of container constructors</span></a>
      <ol class="toc">
       <li><a href="#wording-sorting-complexity"><span class="secno">9.1</span> <span class="content">Wording</span></a>
      </ol>
@@ -2176,11 +2176,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <a href="#issues-for-discussion"><span class="secno">12</span> <span class="content">Issues for discussion</span></a>
      <ol class="toc">
       <li><a href="#stable-sorting"><span class="secno">12.1</span> <span class="content">Stable sorting in <code class="highlight"><c- n>insert</c-></code></span></a>
-      <li>
-       <a href="#deceptive"><span class="secno">12.2</span> <span class="content">Non-explicit constructor from two containers</span></a>
-       <ol class="toc">
-        <li><a href="#deceptive-remove"><span class="secno">12.2.1</span> <span class="content">Remove the container constructors?</span></a>
-       </ol>
+      <li><a href="#deceptive-redirect"><span class="secno">12.2</span> <span class="content">Non-explicit container constructor</span></a>
       <li>
        <a href="#complexity-equal-range"><span class="secno">12.3</span> <span class="content">Complexity of <code class="highlight"><c- n>equal_range</c-></code></span></a>
        <ol class="toc">
@@ -2212,8 +2208,22 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <ol class="toc">
       <li><a href="#wording-heterogeneous-insert-multiset"><span class="secno">13.1</span> <span class="content">Wording</span></a>
      </ol>
-    <li><a href="#experience"><span class="secno">14</span> <span class="content">Implementation experience</span></a>
-    <li><a href="#acknowledgments"><span class="secno">15</span> <span class="content">Acknowledgments</span></a>
+    <li>
+     <a href="#deceptive"><span class="secno">14</span> <span class="content">Non-explicit constructor from two containers</span></a>
+     <ol class="toc">
+      <li>
+       <a href="#deceptive-explicit"><span class="secno">14.1</span> <span class="content">Make the container constructors explicit?</span></a>
+       <ol class="toc">
+        <li><a href="#wording-deceptive-explicit"><span class="secno">14.1.1</span> <span class="content">Wording for explicit</span></a>
+       </ol>
+      <li>
+       <a href="#deceptive-remove"><span class="secno">14.2</span> <span class="content">Remove the container constructors; make <code class="highlight"><c- n>replace</c-></code> sort by default</span></a>
+       <ol class="toc">
+        <li><a href="#wording-deceptive-remove"><span class="secno">14.2.1</span> <span class="content">Wording for tagged <code class="highlight"><c- n>replace</c-></code></span></a>
+       </ol>
+     </ol>
+    <li><a href="#experience"><span class="secno">15</span> <span class="content">Implementation experience</span></a>
+    <li><a href="#acknowledgments"><span class="secno">16</span> <span class="content">Acknowledgments</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -2232,7 +2242,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li data-md>
        <p>LWG reviewed §4,5,6,7. Update those sections' rationales and proposed wordings.</p>
       <li data-md>
-       <p>Split <a href="#heterogeneous-insert-multiset-redirect">§ 7.1 Heterogeneous insert (to LEWG)</a> away from the rest of §7; it is now <a href="#heterogeneous-insert-multiset">§ 13 Heterogeneous multiset::insert</a>, and requires discussion by LEWG.</p>
+       <p>Split <a href="#heterogeneous-insert-multiset-redirect">§ 7.1 Heterogeneous insert (to LEWG)</a> away from the rest of §7, because it (alone) requires LEWG input;
+  it is now <a href="#heterogeneous-insert-multiset">§ 13 Heterogeneous multiset::insert</a>.</p>
+      <li data-md>
+       <p>Split <a href="#deceptive-redirect">§ 12.2 Non-explicit container constructor</a> away from the rest of §12, to draw attention;
+  it is now <a href="#deceptive">§ 14 Non-explicit constructor from two containers</a>.</p>
      </ul>
     <li data-md>
      <p>R0 (pre-Varna 2023):</p>
@@ -2339,7 +2353,7 @@ and finally erases all but the first element from each group of consecutive equi
   <c- c1>// Before: Ill-formed.</c->
   <c- c1>// After: Moves the unique_ptrs.</c->
 </pre>
-   <p>Compare the current wording for <a href="https://eel.is/c++draft/flat.set#lib:insert_range,flat_set"><code class="highlight"><c- n>flat_set</c-><c- p>.</c-><c- n>insert_range</c-></code></a> (added by <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf">P1222</a>) versus <a href="https://eel.is/c++draft/priority.queue#lib:push_range,priority_queue"><code class="highlight"><c- n>priority_queue</c-><c- p>.</c-><c- n>push_range</c-></code></a> (added in <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1206r5.pdf">P1206R5</a> and tweaked in R6). <code class="highlight"><c- n>priority_queue</c-></code>'s wording is not only more robustly Rangified, but also more performant.</p>
+   <p>Compare the current wording for <a href="https://eel.is/c++draft/flat.set#lib:insert_range,flat_set"><code class="highlight"><c- n>flat_set</c-><c- p>.</c-><c- n>insert_range</c-></code></a> (added by <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1222r4.pdf">P1222</a>) versus <a href="https://eel.is/c++draft/priority.queue#lib:push_range,priority_queue"><code class="highlight"><c- n>priority_queue</c-><c- p>.</c-><c- n>push_range</c-></code></a> (added in <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p1206r5.pdf">P1206R5</a> and tweaked in R6). <code class="highlight"><c- n>priority_queue</c-></code>’s wording is not only more robustly Rangified, but also more performant.</p>
    <p>Arthur doesn’t know why P1206R5/R6 chose to pass <code class="highlight"><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>)</c-></code> to <code class="highlight"><c- n>append_range</c-></code> but plain old lvalue <code class="highlight"><c- n>rg</c-></code> to <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>copy</c-></code>; it seems like it should have forwarded in both places or else forwarded in neither place.
 Arthur is trying to find out from P1206’s authors. For now, by default, let’s just be consistent with P1206.</p>
    <h3 class="heading settled" data-level="5.1" id="wording-set-insert-range"><span class="secno">5.1. </span><span class="content">Wording</span><a class="self-link" href="#wording-set-insert-range"></a></h3>
@@ -2369,7 +2383,7 @@ Then, sorts the range of newly inserted elements with respect to <i><code class=
 merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range. </ins></p><p><ins>x․ Complexity: <i>N</i> + <i>M</i> log <i>M</i>, where <i>N</i> is <code class="highlight"><c- n>size</c-><c- p>()</c-></code> before the operation and <i>M</i> is <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>distance</c-><c- p>(</c-><c- n>rg</c-><c- p>)</c-></code>. </ins></p><p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins> </p></small>
    </blockquote>
    <h2 class="heading settled" data-level="6" id="map-insert-range"><span class="secno">6. </span><span class="content">Add move semantics to <code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>insert_range</c-></code></span><a class="self-link" href="#map-insert-range"></a></h2>
-   <p><code class="highlight"><c- n>flat_map</c-></code>'s <code class="highlight"><c- n>insert_range</c-></code> has the same issue as <code class="highlight"><c- n>flat_set</c-></code>'s, at least on paper.</p>
+   <p><code class="highlight"><c- n>flat_map</c-></code>’s <code class="highlight"><c- n>insert_range</c-></code> has the same issue as <code class="highlight"><c- n>flat_set</c-></code>’s, at least on paper.</p>
 <pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>flat_map</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-> <c- n>fs2</c-><c- p>;</c->
 <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pair</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>>></c-> <c- n>v2</c-><c- p>;</c->
 <c- n>fs2</c-><c- p>.</c-><c- n>insert_range</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>views</c-><c- o>::</c-><c- n>as_rvalue</c-><c- p>(</c-><c- n>v2</c-><c- p>));</c->
@@ -2466,7 +2480,7 @@ but no Constraints element. That is, <code class="highlight"><c- n>emplace</c-><
 so it doesn’t need a constraint for purposes of overload resolution.</p>
    <p>No Constraints on <code class="highlight"><c- n>emplace</c-></code>: <a href="https://eel.is/c++draft/deque.modifiers#lib:deque,emplace"><code class="highlight"><c- n>deque</c-></code></a>, <a href="https://eel.is/c++draft/list.modifiers"><code class="highlight"><c- n>list</c-></code></a>, <a href="https://eel.is/c++draft/vector.modifiers"><code class="highlight"><c- n>vector</c-></code></a>, <a href="https://eel.is/c++draft/sequence.reqmts#lib:emplace,containers">containers</a>, <a href="https://eel.is/c++draft/associative.reqmts.general#lib:emplace,ordered_associative_containers">associative containers</a>, <a href="https://eel.is/c++draft/unord.req.general#lib:emplace,unordered_associative_containers">unordered containers</a>, <a href="https://eel.is/c++draft/priqueue.members#lib:priority_queue,emplace"><code class="highlight"><c- n>priority_queue</c-></code></a>, <a href="https://eel.is/c++draft/optional.assign#lib:emplace,optional"><code class="highlight"><c- n>optional</c-></code></a>.</p>
    <p>Constraints on <code class="highlight"><c- n>emplace</c-></code>: <a href="https://eel.is/c++draft/flat.map.modifiers#lib:flat_map,emplace"><code class="highlight"><c- n>flat_map</c-></code></a>, <a href="https://eel.is/c++draft/flat.multiset.modifiers#lib:flat_multiset,emplace"><code class="highlight"><c- n>flat_multiset</c-></code></a>, <a href="https://eel.is/c++draft/any.modifiers#lib:emplace,any"><code class="highlight"><c- n>any</c-></code></a>, <a href="https://eel.is/c++draft/expected.object.assign#lib:emplace,expected"><code class="highlight"><c- n>expected</c-></code></a>, <a href="https://eel.is/c++draft/variant.mod#lib:emplace,variant"><code class="highlight"><c- n>variant</c-></code></a>.</p>
-   <p>I believe a Constraints element was accidentally copy-pasted from the spec of <a href="https://eel.is/c++draft/flat.map.modifiers#4"><code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>insert</c-><c- p>(</c-><c- n>P</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code></a> —<wbr>which <em>does</em> need the constraint because it’s part of <code class="highlight"><c- n>insert</c-></code>'s large overload set — to <code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>emplace</c-></code>,
+   <p>I believe a Constraints element was accidentally copy-pasted from the spec of <a href="https://eel.is/c++draft/flat.map.modifiers#4"><code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>insert</c-><c- p>(</c-><c- n>P</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code></a> —<wbr>which <em>does</em> need the constraint because it’s part of <code class="highlight"><c- n>insert</c-></code>’s large overload set — to <code class="highlight"><c- n>flat_map</c-><c- o>::</c-><c- n>emplace</c-></code>,
 and then from there to <code class="highlight"><c- n>flat_multiset</c-><c- o>::</c-><c- n>emplace</c-></code>. The constraint is already (correctly) absent
 from <code class="highlight"><c- n>flat_set</c-><c- o>::</c-><c- n>emplace</c-></code>.</p>
    <p>Therefore, the proposed wording for this section simply deletes those Constraints elements.</p>
@@ -2842,7 +2856,8 @@ and finally erases all but the first element from each group of consecutive equi
   <ins><c- b>void</c-> <c- n>insert_range</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>);</c-></ins>
 </pre><p><ins>x․ Effects: Equivalent to <code class="highlight"><c- n>insert_range</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>))</c-></code>.</ins> </p><p><ins>x․ Complexity: Linear in <i>N</i>, where <i>N</i> is <code class="highlight"><c- n>size</c-><c- p>()</c-></code> after the operation.</ins> </p><p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins> </p></small>
    </blockquote>
-   <h2 class="heading settled" data-level="9" id="sorting-complexity"><span class="secno">9. </span><span class="content">Sorting complexity</span><a class="self-link" href="#sorting-complexity"></a></h2>
+   <h2 class="heading settled" data-level="9" id="sorting-complexity"><span class="secno">9. </span><span class="content">Complexity clauses of container constructors</span><a class="self-link" href="#sorting-complexity"></a></h2>
+   <p>(This whole section would be mooted by <a href="#deceptive-remove">§ 14.2 Remove the container constructors; make replace sort by default</a>.)</p>
    <p>Most operations that require sorting come in <code class="highlight"><c- n>sorted_unique</c-></code> and non-<code class="highlight"><c- n>sorted_unique</c-></code> flavors;
 the <code class="highlight"><c- n>sorted_unique</c-></code> flavor is rightly specified not to sort, which means it can be O(N)
 instead of O(N + M log M). That’s fine. But some non-<code class="highlight"><c- n>sorted_unique</c-></code> constructors have
@@ -3054,7 +3069,7 @@ and query its properties, such as capacity, allocator, or even size
 </pre>
    <p>Therefore we suggest adding a getter for the <code class="highlight"><c- p>.</c-><c- n>keys</c-></code> of a set, just
 like we already have for the flat map types.</p>
-   <p>Notice that <code class="highlight"><c- n>flat_map</c-></code>'s <code class="highlight"><c- p>.</c-><c- n>values</c-><c- p>()</c-></code> getter returns a container of <code class="highlight"><c- n>mapped_type</c-></code>,
+   <p>Notice that <code class="highlight"><c- n>flat_map</c-></code>’s <code class="highlight"><c- p>.</c-><c- n>values</c-><c- p>()</c-></code> getter returns a container of <code class="highlight"><c- n>mapped_type</c-></code>,
 not a container of <code class="highlight"><c- n>value_type</c-></code>. <code class="highlight"><c- n>flat_set</c-></code> doesn’t have a <code class="highlight"><c- n>mapped_type</c-></code>;
 therefore it shouldn’t have <code class="highlight"><c- p>.</c-><c- n>values</c-><c- p>()</c-></code> either.</p>
    <h3 class="heading settled" data-level="11.1" id="wording-keys-method"><span class="secno">11.1. </span><span class="content">Wording</span><a class="self-link" href="#wording-keys-method"></a></h3>
@@ -3169,93 +3184,8 @@ so requiring it to also do a stable sort — which allocates memory — might no
 leave the order of equivalent elements unspecified, and instrument it under libc++'s existing <code class="highlight"><c- n>_LIBCPP_DEBUG_RANDOMIZE_UNSPECIFIED_STABILITY</c-></code> flag (currently used only for <code class="highlight"><c- n>sort</c-></code>, <code class="highlight"><c- n>nth_element</c-></code>, and <code class="highlight"><c- n>partial_sort</c-></code>).
 This would preserve the symmetry between <code class="highlight"><c- n>multiset</c-></code> and <code class="highlight"><c- n>flat_multiset</c-></code>, by making both of them de facto
 randomized order (at least in debug mode).</p>
-   <h3 class="heading settled" data-level="12.2" id="deceptive"><span class="secno">12.2. </span><span class="content">Non-explicit constructor from two containers</span><a class="self-link" href="#deceptive"></a></h3>
-   <p>Arthur has observed <a href="https://quuxplusone.github.io/blog/2023/04/28/flat-map-constructors/">in a blog post</a> that <code class="highlight"><c- n>flat_map</c-></code>'s non-explicit constructor from two containers is deceptive when used with braced initializers.</p>
-<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>print_map</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>flat_multimap</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-><c- p>);</c->
-
-<c- c1>// Test the two-container constructor... or is it?</c->
-
-<c- n>print_map</c-><c- p>({</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-> <c- mi>2</c-><c- p>,</c-> <c- mi>3</c-><c- p>},</c-> <c- p>{</c-><c- mi>10</c-><c- p>,</c-> <c- mi>20</c-><c- p>,</c-> <c- mi>30</c-><c- p>}</c-> <c- p>});</c-> <c- c1>// {1,10}, {2,20}, {3,30}</c->
-<c- n>print_map</c-><c- p>({</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-> <c- mi>2</c-><c- p>},</c->    <c- p>{</c-><c- mi>10</c-><c- p>,</c-> <c- mi>20</c-><c- p>}</c-> <c- p>});</c->     <c- c1>// {1,2}, {10,20}</c->
-<c- n>print_map</c-><c- p>({</c-> <c- p>{</c-><c- mi>1</c-><c- p>},</c->       <c- p>{</c-><c- mi>10</c-><c- p>}</c-> <c- p>});</c->         <c- c1>// {1,10}</c->
-<c- n>print_map</c-><c- p>({</c-> <c- p>{},</c->        <c- p>{}</c-> <c- p>});</c->           <c- c1>// {0,0}, {0,0}</c->
-</pre>
-   <p>To address this issue (if we wanted to), we could make one of the relevant constructors <code class="highlight"><c- k>explicit</c-></code>.
-We obviously can’t prevent <code class="highlight"><c- n>vector</c-></code>'s construction from a braced list
-of elements, nor <code class="highlight"><c- n>pair</c-></code>'s from a braced list of (exactly two) elements, nor (in practice) <code class="highlight"><c- n>pair</c-></code>'s construction from <code class="highlight"><c- p>{}</c-></code>; so the only constructor we could explicify to address this
-would be <code class="highlight"><c- n>flat_multimap</c-></code>'s own constructor from a braced list of (exactly two) containers. That is,
-we’d do this (and likewise in <code class="highlight"><c- n>flat_map</c-></code>; <code class="highlight"><c- n>flat_set</c-></code> doesn’t need to change):</p>
-   <p><small></small></p>
-   <blockquote>
-    <p></p>
-    <small> <pre class="highlight"><ins><c- k>explicit</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>)</c-></ins>
-  <ins><c- o>:</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>key_cont</c-><c- p>),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>mapped_cont</c-><c- p>),</c-> <c- n>key_compare</c-><c- p>())</c-> <c- p>{}</c-></ins>
-<c- n>flat_multimap</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c->
-              <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <del><c- o>=</c-> <c- n>key_compare</c-><c- p>()</c-></del><c- p>);</c->
-<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
-  <c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c->
-                <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
-<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
-  <c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c->
-                <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
-</pre></small>
-   </blockquote>
-   <p>Arthur thinks this change would be appreciated by programmers in practice (or rather, if we <em>don’t</em> make this change, then programmers will only ever notice this issue when it bites them).
-But it would be surprisingly asymmetric to explicify only this one constructor. The small benefit
-probably does not justify the asymmetry.</p>
-   <p>We recently made some constructors <code class="highlight"><c- k>explicit</c-></code> in <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2711r1.html">P2711 "Making multi-param constructors of views explicit,"</a> but that paper’s goal was to <em>increase</em> uniformity and symmetry, not to decrease it.</p>
-   <h4 class="heading settled" data-level="12.2.1" id="deceptive-remove"><span class="secno">12.2.1. </span><span class="content">Remove the container constructors?</span><a class="self-link" href="#deceptive-remove"></a></h4>
-   <p>A more ambitious alternative would be to eliminate the container constructors entirely,
-and say that the only way to move containers into a flat container at all is via <code class="highlight"><c- p>.</c-><c- n>replace</c-></code>,
-after the initial construction has already happened. This would be analogous to <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>reserve</c-></code> or <code class="highlight"><c- n>unordered_map</c-><c- o>::</c-><c- n>max_load_factor</c-></code> — a feature with no associated constructor, just a setter
-after the fact. This would be really bold; but if we eliminated them, then we would also solve <a data-link-type="biblio" href="#biblio-lwg3802" title="flat_foo allocator-extended constructors lack move semantics">[LWG3802]</a> (<a href="#lwg-3802">§ 12.11 Allocator-extended container constructors lack move semantics</a>) in one fell swoop, and reduce the size of the constructor overload
-set from 38 constructors down to 20.</p>
-   <p>Another reason to think about eliminating the container constructors — at least the non-<code class="highlight"><c- n>sorted_unique</c-></code> ones —<wbr>is that right now the less convenient syntax <code class="highlight"><c- n>flat_set</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>ks</c-><c- p>)</c-></code> is faster than the more
-convenient syntax <code class="highlight"><c- n>flat_set</c-><c- p>(</c-><c- n>ks</c-><c- p>)</c-></code>; this might be a pitfall for the average programmer.</p>
-<pre class="language-c++ highlight"><c- k>auto</c-> <c- n>ks</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>},</c-> <c- o>&amp;</c-><c- n>mr1</c-><c- p>);</c->
-<c- k>auto</c-> <c- n>vs</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>},</c-> <c- o>&amp;</c-><c- n>mr2</c-><c- p>);</c->
-
-<c- n>using</c-> <c- n>FS</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>flat_set</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>less</c-><c- o>&lt;></c-><c- p>,</c-> <c- n>decltype</c-><c- p>(</c-><c- n>ks</c-><c- p>)</c-><c- o>></c-><c- p>;</c->
-<c- c1>// Before:</c->
-<c- n>FS</c-> <c- n>fs1</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>));</c->
-<c- c1>// After:</c->
-<c- n>FS</c-> <c- n>fs1</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>ks</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>());</c->
-<c- n>fs1</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>));</c->
-
-<c- n>using</c-> <c- n>FM</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>flat_map</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>less</c-><c- o>&lt;></c-><c- p>,</c-> <c- n>decltype</c-><c- p>(</c-><c- n>ks</c-><c- p>),</c-> <c- n>decltype</c-><c- p>(</c-><c- n>vs</c-><c- p>)</c-><c- o>></c-><c- p>;</c->
-<c- c1>// Before:</c->
-<c- n>FM</c-> <c- n>fm1</c-> <c- o>=</c-> <c- n>FM</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>vs</c-><c- p>));</c->
-  <c- c1>// Two different allocators in the same adaptor.</c->
-  <c- c1>// Almost certainly there is no valid reason to do this.</c->
-<c- c1>// After:</c->
-<c- n>FM</c-> <c- n>fm2</c-> <c- o>=</c-> <c- n>FM</c-><c- p>(</c-><c- n>ks</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>());</c->
-<c- n>fm2</c-><c- p>.</c-><c- n>replace</c-><c- p>({</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>vs</c-><c- p>)</c-> <c- p>});</c->
-  <c- c1>// The data from vs is copied into arena mr1.</c->
-  <c- c1>// This is less performant, but more sane.</c->
-  <c- c1>// It is physically impossible to create the equivalent of fm1 above.</c->
-</pre>
-   <p>A downside is that it’s tedious for the programmer to reproduce the effect of the
-non-<code class="highlight"><c- n>sorted_unique</c-></code> container constructors:</p>
-<pre class="language-c++ highlight"><c- c1>// Before:</c->
-<c- n>FS</c-> <c- n>fs2</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>));</c->
-
-<c- c1>// After:</c->
-<c- n>FS</c-> <c- n>fs2</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>ks</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>());</c->
-<c- n>std</c-><c- o>::</c-><c- n>ranges</c-><c- o>::</c-><c- n>sort</c-><c- p>(</c-><c- n>ks</c-><c- p>);</c->
-<c- n>ks</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>ranges</c-><c- o>::</c-><c- n>unique</c-><c- p>(</c-><c- n>ks</c-><c- p>).</c-><c- n>begin</c-><c- p>(),</c-> <c- n>ks</c-><c- p>.</c-><c- n>end</c-><c- p>());</c->
-<c- n>fs2</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>));</c->
-
-<c- c1>// After, if you can afford one extra allocation:</c->
-<c- n>FS</c-> <c- n>fs2</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>from_range</c-><c- p>,</c-> <c- n>ks</c-> <c- o>|</c-> <c- n>std</c-><c- o>::</c-><c- n>views</c-><c- o>::</c-><c- n>as_rvalue</c-><c- p>,</c-> <c- n>ks</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>());</c->
-</pre>
-   <p>We could boldly address this by making <code class="highlight"><c- n>fs</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>ks</c-><c- p>)</c-></code> always sort, and then if you know
-your data is already sorted, you would call <code class="highlight"><c- n>fs</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>ks</c-><c- p>)</c-></code>. That would
-make the interface much more symmetric, too, because the sortedness
-precondition would be 100% always indicated by the presence of <code class="highlight"><c- n>sorted_unique_t</c-></code> in the signature.</p>
-   <p>It is very late in the game to be doing design work; but this particular redesign
-does seem to have a lot of varied benefits for vendors and programmers, with only
-procedural downsides. I haven’t written wording for this yet, but can do so
-if LWG is interested.</p>
+   <h3 class="heading settled" data-level="12.2" id="deceptive-redirect"><span class="secno">12.2. </span><span class="content">Non-explicit container constructor</span><a class="self-link" href="#deceptive-redirect"></a></h3>
+   <p class="note" role="note"><span class="marker">Note:</span> This section of P2767R0 has moved in P2767R1 to <a href="#deceptive">§ 14 Non-explicit constructor from two containers</a>.</p>
    <h3 class="heading settled" data-level="12.3" id="complexity-equal-range"><span class="secno">12.3. </span><span class="content">Complexity of <code class="highlight"><c- n>equal_range</c-></code></span><a class="self-link" href="#complexity-equal-range"></a></h3>
    <p><a href="https://eel.is/c++draft/associative.reqmts.general#171">[associative.reqmts.general]/171 and /174</a> define the complexity of <code class="highlight"><c- n>b</c-><c- p>.</c-><c- n>equal_range</c-><c- p>(</c-><c- n>k</c-><c- p>)</c-></code> and <code class="highlight"><c- n>a_tran</c-><c- p>.</c-><c- n>equal_range</c-><c- p>(</c-><c- n>ke</c-><c- p>)</c-></code> as "Logarithmic."
 This means that we have the following required complexities, for both <code class="highlight"><c- n>foo</c-></code> and <code class="highlight"><c- n>flat_foo</c-></code>:</p>
@@ -3326,8 +3256,8 @@ this:</p>
                <c- n>is_nothrow_move_assignable_v</c-><c- o>&lt;</c-><c- n>Compare</c-><c- o>></c-><c- p>);</c->
 </pre></small>
    </blockquote>
-   <p>Should <code class="highlight"><c- n>flat_set</c-></code>'s spec hew more closely to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>set</c-></code>'s or <code class="highlight"><c- n>priority_queue</c-></code>'s?
-We tentatively think <code class="highlight"><c- n>set</c-></code>'s is the better model, so that the vendor would be free to
+   <p>Should <code class="highlight"><c- n>flat_set</c-></code>’s spec hew more closely to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>set</c-></code>’s or <code class="highlight"><c- n>priority_queue</c-></code>’s?
+We tentatively think <code class="highlight"><c- n>set</c-></code>’s is the better model, so that the vendor would be free to
 make the special members non-defaulted. Vendors are still permitted to strengthen the
 noexceptness and/or triviality of declared functions; for example, both libc++ and libstdc++
 make <code class="highlight"><c- n>set</c-><c- p>(</c-><c- n>set</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code> conditionally noexcept.</p>
@@ -3368,9 +3298,9 @@ and is certainly beyond the scope of this paper P2767.</p>
    <p>If we user-declare <code class="highlight"><c- n>flat_set</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>flat_set</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code>,
 we must decide whether to give it a similar noexcept-spec.</p>
    <h4 class="heading settled" data-level="12.5.1" id="wording-special-members"><span class="secno">12.5.1. </span><span class="content">Possible wording</span><a class="self-link" href="#wording-special-members"></a></h4>
-   <p>(This wording merge-conflicts with the resolution of <a data-link-type="biblio" href="#biblio-lwg3884" title="flat_foo is missing allocator-extended copy/move constructors">[LWG3884]</a>, which in turn merge-conflicts
-with the editorial refactoring at the beginning of this paper P2767. We can polish it later;
-the first question is whether LWG wants to pursue this direction at all.)</p>
+   <p class="note" role="note"><span class="marker">Note:</span> This wording merge-conflicts with the resolution of <a data-link-type="biblio" href="#biblio-lwg3884" title="flat_foo is missing allocator-extended copy/move constructors">[LWG3884]</a>, which in turn merge-conflicts
+with the editorial refactoring in §3. We can polish it later;
+the first question is whether LWG wants to pursue this direction at all.</p>
    <p>For example, change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -3496,7 +3426,7 @@ state, so we must restore the invariant by clearing both containers. We do the s
 Almost all comparators are nothrow swappable (including <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>function</c-></code>, if we want to support that: <a data-link-type="biblio" href="#biblio-lwg2227" title="Stateful comparison objects in associative containers">[LWG2227]</a>).
 And the resulting behavior seems better: In the pathological corner case where <code class="highlight"><c- n>flat_set</c-></code> cannot safely provide
 swappability, it’s better for it not to be swappable at all, than for it to falsely advertise a
-noexcept <code class="highlight"><c- n>swap</c-></code>. But, if we constrain away <code class="highlight"><c- n>flat_set</c-></code>'s hidden-friend <code class="highlight"><c- n>swap</c-></code>, <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>fs</c-><c- p>,</c-> <c- n>fs</c-><c- p>)</c-></code> will still
+noexcept <code class="highlight"><c- n>swap</c-></code>. But, if we constrain away <code class="highlight"><c- n>flat_set</c-></code>’s hidden-friend <code class="highlight"><c- n>swap</c-></code>, <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>fs</c-><c- p>,</c-> <c- n>fs</c-><c- p>)</c-></code> will still
 compile; it’ll just fall back to <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- p>[</c-><c- n>with</c-> <c- n>T</c-><c- o>=</c-><c- n>flat_set</c-><c- p>]</c-></code>. We could actually <code class="highlight"><c- o>=</c-><c- k>delete</c-></code> the <code class="highlight"><c- n>swap</c-></code> function, like this:</p>
    <p><small></small></p>
    <blockquote>
@@ -3528,13 +3458,13 @@ three-step move-and-assign.</p>
      <p>Keep the status quo (unconditional <code class="highlight"><c- k>noexcept</c-></code>) and terminate the program if swapping containers throws</p>
     <li data-md>
      <p>Conditional <code class="highlight"><c- k>noexcept</c-></code> like in [priqueue.overview], and don’t care if swapping throws
-(i.e. match <code class="highlight"><c- n>priority_queue</c-></code>'s status quo)</p>
+(i.e. match <code class="highlight"><c- n>priority_queue</c-></code>’s status quo)</p>
     <li data-md>
      <p>Conditional <code class="highlight"><c- k>noexcept</c-></code> like in [priqueue.overview], and clear both containers if swapping throws
 (but this won’t prevent radioactivity, if <code class="highlight"><c- n>swap</c-></code> left the comparator in a bad state)</p>
    </ul>
    <h4 class="heading settled" data-level="12.10.1" id="ranges-swap"><span class="secno">12.10.1. </span><span class="content">Specified in terms of <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>swap</c-></code></span><a class="self-link" href="#ranges-swap"></a></h4>
-   <p>Orthogonally: It surprises us that [flat.map.modifiers] specifies <code class="highlight"><c- n>swap</c-></code>'s
+   <p>Orthogonally: It surprises us that [flat.map.modifiers] specifies <code class="highlight"><c- n>swap</c-></code>’s
 implementation in terms of <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>c</c-><c- p>,</c-> <c- n>y</c-><c- p>.</c-><c- n>c</c-><c- p>)</c-></code> etc. This feels overspecified; <a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]</a> adequately covers the semantics of swapping,
 and vendors should be able to decide for themselves how to swap comparator objects, just like
 we do in <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>set</c-></code>. Arguably the tight specification helps programmers providing their own
@@ -3546,7 +3476,7 @@ so the vendor can use ADL <code class="highlight"><c- n>swap</c-><c- p>(</c-><c-
    <p>libc++'s implementation currently uses ADL <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>c</c-><c- p>,</c-> <c- n>y</c-><c- p>.</c-><c- n>c</c-><c- p>)</c-></code>, which is equivalent to <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>swap</c-></code> for all containers satisfying <a href="https://eel.is/c++draft/container.reqmts#51">[container.reqmts]/51</a>;
 but the difference between <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>compare</c-><c- p>,</c-> <c- n>y</c-><c- p>.</c-><c- n>compare</c-><c- p>)</c-></code> and <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>compare</c-><c- p>,</c-> <c- n>y</c-><c- p>.</c-><c- n>compare</c-><c- p>)</c-></code> is probably observable.</p>
    <h3 class="heading settled" data-level="12.11" id="lwg-3802"><span class="secno">12.11. </span><span class="content">Allocator-extended container constructors lack move semantics</span><a class="self-link" href="#lwg-3802"></a></h3>
-   <p>(This whole section would be mooted by <a href="#deceptive-remove">§ 12.2.1 Remove the container constructors?</a>.)</p>
+   <p>(This whole section would be mooted by <a href="#deceptive-remove">§ 14.2 Remove the container constructors; make replace sort by default</a>.)</p>
    <p>libc++ has implemented move-semantic allocator-extended constructors for all four flat containers
 (<a href="https://godbolt.org/z/We7K1K6bE">Godbolt</a>). This is <a data-link-type="biblio" href="#biblio-lwg3802" title="flat_foo allocator-extended constructors lack move semantics">[LWG3802]</a>.</p>
 <pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- p>,</c-> <c- n>class</c-> <c- n>C</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>less</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c->
@@ -3702,12 +3632,511 @@ For the second overload, <code class="highlight"><c- n>is_convertible_v</c-><c- 
 <ins><c- n>c</c-><c- p>.</c-><c- n>emplace</c-><c- p>(</c-><c- n>it</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>K</c-><c- o>></c-><c- p>(</c-><c- n>x</c-><c- p>));</c-></ins>
 </pre> <p><ins>x․ Returns: An iterator that points to the inserted element.</ins> </p></small>
    </blockquote>
-   <h2 class="heading settled" data-level="14" id="experience"><span class="secno">14. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
+   <h2 class="heading settled" data-level="14" id="deceptive"><span class="secno">14. </span><span class="content">Non-explicit constructor from two containers</span><a class="self-link" href="#deceptive"></a></h2>
+   <p>Arthur has observed <a href="https://quuxplusone.github.io/blog/2023/04/28/flat-map-constructors/">in a blog post</a> that <code class="highlight"><c- n>flat_map</c-></code>’s non-explicit constructor from two containers is deceptive when used with braced initializers.</p>
+<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>print_map</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>flat_multimap</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-><c- p>);</c->
+
+<c- c1>// Test the two-container constructor... or is it?</c->
+
+<c- n>print_map</c-><c- p>({</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-> <c- mi>2</c-><c- p>,</c-> <c- mi>3</c-><c- p>},</c-> <c- p>{</c-><c- mi>10</c-><c- p>,</c-> <c- mi>20</c-><c- p>,</c-> <c- mi>30</c-><c- p>}</c-> <c- p>});</c-> <c- c1>// {1,10}, {2,20}, {3,30}</c->
+<c- n>print_map</c-><c- p>({</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-> <c- mi>2</c-><c- p>},</c->    <c- p>{</c-><c- mi>10</c-><c- p>,</c-> <c- mi>20</c-><c- p>}</c-> <c- p>});</c->     <c- c1>// {1,2}, {10,20}</c->
+<c- n>print_map</c-><c- p>({</c-> <c- p>{</c-><c- mi>1</c-><c- p>},</c->       <c- p>{</c-><c- mi>10</c-><c- p>}</c-> <c- p>});</c->         <c- c1>// {1,10}</c->
+<c- n>print_map</c-><c- p>({</c-> <c- p>{},</c->        <c- p>{}</c-> <c- p>});</c->           <c- c1>// {0,0}, {0,0}</c->
+</pre>
+   <h3 class="heading settled" data-level="14.1" id="deceptive-explicit"><span class="secno">14.1. </span><span class="content">Make the container constructors explicit?</span><a class="self-link" href="#deceptive-explicit"></a></h3>
+   <p>To address this issue (if we wanted to), we could make one of the relevant constructors <code class="highlight"><c- k>explicit</c-></code>.
+We obviously can’t prevent <code class="highlight"><c- n>vector</c-></code>’s construction from a braced list
+of elements, nor <code class="highlight"><c- n>pair</c-></code>’s from a braced list of (exactly two) elements, nor (in practice) <code class="highlight"><c- n>pair</c-></code>’s construction from <code class="highlight"><c- p>{}</c-></code>; so the only constructor we could explicify to address this
+would be <code class="highlight"><c- n>flat_multimap</c-></code>’s own constructor from a braced list of (exactly two) containers.</p>
+   <p><code class="highlight"><c- n>flat_set</c-></code> and <code class="highlight"><c- n>flat_multiset</c-></code>’s container constructors don’t suffer from deceptiveness,
+so they wouldn’t be changed by this modest patch.</p>
+   <p>Arthur thinks this change would be appreciated by programmers in practice (or rather, if we <em>don’t</em> make this change, then programmers will only ever notice this overload set unfavorably, when it bites them,
+and never favorably).</p>
+   <p>We recently made some constructors <code class="highlight"><c- k>explicit</c-></code> in <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2711r1.html">P2711 "Making multi-param constructors of views explicit,"</a> but that paper’s goal was to <em>increase</em> uniformity and symmetry, not to decrease it.</p>
+   <p>It would be surprisingly asymmetric to explicify only this one constructor. The small benefit
+probably does not justify the asymmetry. Go on to the next section to see Arthur’s preferred
+solution, which is much more ambitious.</p>
+   <h4 class="heading settled" data-level="14.1.1" id="wording-deceptive-explicit"><span class="secno">14.1.1. </span><span class="content">Wording for explicit</span><a class="self-link" href="#wording-deceptive-explicit"></a></h4>
+   <p>Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight">    <ins><c- k>explicit</c-> <c- n>flat_map</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>)</c-></ins>
+      <ins><c- o>:</c-> <c- n>flat_map</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>key_cont</c-><c- p>),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>mapped_cont</c-><c- p>),</c-> <c- n>key_compare</c-><c- p>())</c-> <c- p>{}</c-></ins>
+    <c- n>flat_map</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c->
+             <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <del><c- o>=</c-> <c- n>key_compare</c-><c- p>()</c-></del><c- p>);</c->
+    <c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c->
+             <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c->
+<c- p>[...]</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+</pre></small>
+   </blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight">    <ins><c- k>explicit</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>)</c-></ins>
+      <ins><c- o>:</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>key_cont</c-><c- p>),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>mapped_cont</c-><c- p>),</c-> <c- n>key_compare</c-><c- p>())</c-> <c- p>{}</c-></ins>
+    <c- n>flat_multimap</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c->
+                  <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <del><c- o>=</c-> <c- n>key_compare</c-><c- p>()</c-></del><c- p>);</c->
+    <c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c->
+                  <c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c->
+                  <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c->
+<c- p>[...]</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+</pre></small>
+   </blockquote>
+   <h3 class="heading settled" data-level="14.2" id="deceptive-remove"><span class="secno">14.2. </span><span class="content">Remove the container constructors; make <code class="highlight"><c- n>replace</c-></code> sort by default</span><a class="self-link" href="#deceptive-remove"></a></h3>
+   <p>A more ambitious alternative would be to eliminate the container constructors entirely,
+and say that the only way to move containers into a flat container at all is via <code class="highlight"><c- p>.</c-><c- n>replace</c-></code>,
+after the initial construction has already happened. This would be analogous to <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>reserve</c-></code> or <code class="highlight"><c- n>unordered_map</c-><c- o>::</c-><c- n>max_load_factor</c-></code> — a feature with no associated constructor, just a setter
+after the fact. This would be really bold. But eliminating these constructors would solve <a data-link-type="biblio" href="#biblio-lwg3802" title="flat_foo allocator-extended constructors lack move semantics">[LWG3802]</a> (<a href="#lwg-3802">§ 12.11 Allocator-extended container constructors lack move semantics</a>) in one fell swoop, and reduce <code class="highlight"><c- n>flat_map</c-></code>’s constructor overload
+set from 38 constructors down to 20.</p>
+   <p>Another reason to think about eliminating the container constructors — at least the untagged ones —<wbr>is that right now the less convenient syntax <code class="highlight"><c- n>flat_set</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>ks</c-><c- p>)</c-></code> is faster than the more
+convenient syntax <code class="highlight"><c- n>flat_set</c-><c- p>(</c-><c- n>ks</c-><c- p>)</c-></code>. The average programmer might write the shorter form assuming
+that it will be as fast as today’s <code class="highlight"><c- n>fs</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>ks</c-><c- p>)</c-></code>, instead of realizing that the untagged constructor
+(unlike today’s untagged <code class="highlight"><c- n>replace</c-></code>) always sorts the container.</p>
+   <p>But removing the container constructors introduces a new problem:
+It becomes tedious for the programmer to reproduce the effect
+of the untagged container constructors!</p>
+<pre class="language-c++ highlight"><c- c1>// Before:</c->
+<c- n>FS</c-> <c- n>fs2</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>));</c->
+
+<c- c1>// After:</c->
+<c- n>FS</c-> <c- n>fs2</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>ks</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>());</c->
+<c- n>std</c-><c- o>::</c-><c- n>ranges</c-><c- o>::</c-><c- n>sort</c-><c- p>(</c-><c- n>ks</c-><c- p>);</c->
+<c- n>ks</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>ranges</c-><c- o>::</c-><c- n>unique</c-><c- p>(</c-><c- n>ks</c-><c- p>).</c-><c- n>begin</c-><c- p>(),</c-> <c- n>ks</c-><c- p>.</c-><c- n>end</c-><c- p>());</c->
+<c- n>fs2</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>));</c->
+
+<c- c1>// After, if you can afford one extra allocation:</c->
+<c- n>FS</c-> <c- n>fs2</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>from_range</c-><c- p>,</c-> <c- n>ks</c-> <c- o>|</c-> <c- n>std</c-><c- o>::</c-><c- n>views</c-><c- o>::</c-><c- n>as_rvalue</c-><c- p>,</c-> <c- n>ks</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>());</c->
+</pre>
+   <p>We boldly address this by giving <code class="highlight"><c- n>replace</c-></code> tagged and untagged overloads: <code class="highlight"><c- n>fs</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>ks</c-><c- p>)</c-></code> will now sort
+the input, and <code class="highlight"><c- n>fs</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>ks</c-><c- p>)</c-></code> will have a narrow contract. This makes the interface
+more symmetric, too, because the sortedness precondition is 100% always indicated by the presence
+of <code class="highlight"><c- n>sorted_unique_t</c-></code> in the signature.</p>
+<pre class="language-c++ highlight"><c- k>auto</c-> <c- n>ks</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>},</c-> <c- o>&amp;</c-><c- n>mr1</c-><c- p>);</c->
+<c- k>auto</c-> <c- n>vs</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>},</c-> <c- o>&amp;</c-><c- n>mr2</c-><c- p>);</c->
+
+<c- n>using</c-> <c- n>FS</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>flat_set</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>less</c-><c- o>&lt;></c-><c- p>,</c-> <c- n>decltype</c-><c- p>(</c-><c- n>ks</c-><c- p>)</c-><c- o>></c-><c- p>;</c->
+<c- c1>// Before:</c->
+<c- n>FS</c-> <c- n>fs1</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>));</c-> <c- c1>// sorts</c->
+<c- c1>// After:</c->
+<c- n>FS</c-> <c- n>fs1</c-> <c- o>=</c-> <c- n>FS</c-><c- p>(</c-><c- n>ks</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>());</c->
+<c- n>fs1</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>));</c-> <c- c1>// sorts</c->
+
+<c- n>using</c-> <c- n>FM</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>flat_map</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>less</c-><c- o>&lt;></c-><c- p>,</c-> <c- n>decltype</c-><c- p>(</c-><c- n>ks</c-><c- p>),</c-> <c- n>decltype</c-><c- p>(</c-><c- n>vs</c-><c- p>)</c-><c- o>></c-><c- p>;</c->
+<c- c1>// Before:</c->
+<c- n>FM</c-> <c- n>fm1</c-> <c- o>=</c-> <c- n>FM</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>vs</c-><c- p>));</c->
+  <c- c1>// Two different allocators in the same adaptor.</c->
+  <c- c1>// Almost certainly there is no valid reason to do this.</c->
+<c- c1>// After:</c->
+<c- n>FM</c-> <c- n>fm2</c-> <c- o>=</c-> <c- n>FM</c-><c- p>(</c-><c- n>ks</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>());</c->
+<c- n>fm2</c-><c- p>.</c-><c- n>replace</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>sorted_unique</c-><c- p>,</c-> <c- p>{</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>ks</c-><c- p>),</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>vs</c-><c- p>)</c-> <c- p>});</c->
+  <c- c1>// The data from vs is copied into arena mr1.</c->
+  <c- c1>// This is less performant, but more sane.</c->
+  <c- c1>// It becomes physically impossible to create the equivalent of fm1 above.</c->
+</pre>
+   <p>It is very late in the game to be doing design work; but this particular redesign
+does seem to have a lot of varied benefits for vendors and programmers, with only
+procedural downsides.</p>
+   <h4 class="heading settled" data-level="14.2.1" id="wording-deceptive-remove"><span class="secno">14.2.1. </span><span class="content">Wording for tagged <code class="highlight"><c- n>replace</c-></code></span><a class="self-link" href="#wording-deceptive-remove"></a></h4>
+   <p class="note" role="note"><span class="marker">Note:</span> This wording is based on top of the editorial refactoring from §3.</p>
+   <p>Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight">    <c- c1>// [flat.map.cons], constructors</c->
+    <c- n>flat_map</c-><c- p>()</c-> <c- o>:</c-> <c- n>flat_map</c-><c- p>(</c-><c- n>key_compare</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c->
+    <c- k>explicit</c-> <c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>)</c->
+      <c- o>:</c-> <c- n>c</c-><c- p>(),</c-> <c- n>compare</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- p>}</c->
+    <del><c- n>flat_map</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+             <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c-></del>
+    <del><c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+             <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c-></del>
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c->
+        <c- o>:</c-> <c- n>c</c-><c- p>(),</c-> <c- n>compare</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- n>insert</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>);</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-> <c- n>s</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c->
+        <c- o>:</c-> <c- n>c</c-><c- p>(),</c-> <c- n>compare</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>,</c-> <c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>);</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>from_range_t</c-> <c- n>fr</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>)</c->
+        <c- o>:</c-> <c- n>flat_map</c-><c- p>(</c-><c- n>fr</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>),</c-> <c- n>key_compare</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>)</c->
+        <c- o>:</c-> <c- n>flat_map</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- n>insert_range</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>));</c-> <c- p>}</c->
+
+<c- p>[...]</c->
+
+    <c- c1>// [flat.map.cons.alloc], constructors with allocators</c->
+
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- k>explicit</c-> <c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+               <del><c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+               <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-></del>
+               <del><c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-></del>
+               <del><c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+               <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_map</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+
+<c- p>[...]</c->
+
+    <c- n>containers</c-> <c- n>extract</c-><c- p>()</c-> <c- o>&amp;&amp;</c-><c- p>;</c->
+    <c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>key_container_type</c-><del><c- o>&amp;&amp;</c-></del> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-><del><c- o>&amp;&amp;</c-></del> <c- n>mapped_cont</c-><c- p>);</c->
+    <ins><c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>);</c-></ins>
+</pre></small>
+   </blockquote>
+   <p>Remove the whole contents of <a href="https://eel.is/c++draft/flat.map.cons">[flat.map.cons]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><del><c- n>flat_map</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+         <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c-></del>
+</pre><p><del>1․ <i>Effects:</i> Initializes <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>keys</c-></code> with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>key_cont</c-><c- p>)</c-></code>, <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>values</c-></code> with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>mapped_cont</c-><c- p>)</c-></code>, and <code class="highlight"><c- n>compare</c-></code> with <code class="highlight"><c- n>comp</c-></code>;
+sorts the range [<code class="highlight"><c- n>begin</c-><c- p>()</c-></code>, <code class="highlight"><c- n>end</c-><c- p>()</c-></code>) with respect to <code class="highlight"><c- n>value_comp</c-><c- p>()</c-></code>; and
+finally erases the duplicate elements as if by:</del> </p><pre class="highlight"><del><c- k>auto</c-> <c- n>zv</c-> <c- o>=</c-> <c- n>views</c-><c- o>::</c-><c- n>zip</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>,</c-> <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>);</c-></del>
+<del><c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>unique</c-><c- p>(</c-><c- n>zv</c-><c- p>,</c-> <c- n>key_equiv</c-><c- p>(</c-><c- n>compare</c-><c- p>)).</c-><c- n>begin</c-><c- p>();</c-></del>
+<del><c- k>auto</c-> <c- n>dist</c-> <c- o>=</c-> <c- n>distance</c-><c- p>(</c-><c- n>zv</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>it</c-><c- p>);</c-></del>
+<del><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>dist</c-><c- p>,</c-> <c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>end</c-><c- p>());</c-></del>
+<del><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>dist</c-><c- p>,</c-> <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>end</c-><c- p>());</c-></del>
+</pre><p><del>2․ <i>Complexity:</i> Linear in <i>N</i> if the container arguments are already sorted
+with respect to <code class="highlight"><c- n>value_comp</c-><c- p>()</c-></code> and otherwise <i>N</i> log <i>N</i>,
+where <i>N</i> is the value of <code class="highlight"><c- n>key_cont</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> before this call.</del> </p><p></p><pre class="highlight"><del><c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+         <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c-></del>
+</pre> <p><del>3․ <i>Effects:</i> Initializes <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>keys</c-></code> with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>key_cont</c-><c- p>)</c-></code>, <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>values</c-></code> with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>mapped_cont</c-><c- p>)</c-></code>, and <code class="highlight"><c- n>compare</c-></code> with <code class="highlight"><c- n>comp</c-></code>.</del> </p><p><del>4․ <i>Complexity:</i> Constant.</del> </p></small>
+   </blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.map.cons.alloc">[flat.map.cons.alloc]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote><small> 1․ The constructors in this subclause shall not participate in overload resolution
+unless <code class="highlight"><c- n>uses_allocator_v</c-><c- o>&lt;</c-><c- n>key_container_type</c-><c- p>,</c-> <c- n>Alloc</c-><c- o>></c-></code> is <code class="highlight">true</code> and <code class="highlight"><c- n>uses_allocator_v</c-><c- o>&lt;</c-><c- n>mapped_container_type</c-><c- p>,</c-> <c- n>Alloc</c-><c- o>></c-></code> is <code class="highlight">true</code>.<p></p> <p></p><pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+  <del><c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+           <del><c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+<del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+  <del><c- n>flat_map</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+           <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+</pre> <p><del>2․ <i>Effects:</i> Equivalent to <code class="highlight"><c- n>flat_map</c-><c- p>(</c-><c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_cont</c-><c- p>)</c-></code> and <code class="highlight"><c- n>flat_map</c-><c- p>(</c-><c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- n>comp</c-><c- p>)</c-></code>, respectively,
+except that <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>keys</c-></code> and <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>values</c-></code> are constructed with uses-allocator construction ([allocator.uses.construction]).</del> </p><p><del>3․ <i>Complexity:</i> Same as <code class="highlight"><c- n>flat_map</c-><c- p>(</c-><c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_cont</c-><c- p>)</c-></code> and <code class="highlight"><c- n>flat_map</c-><c- p>(</c-><c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- n>comp</c-><c- p>)</c-></code>, respectively.</del> </p><p></p><pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+  <del><c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-> <c- n>s</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-></del>
+           <del><c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+<del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+  <del><c- n>flat_map</c-><c- p>(</c-><c- n>sorted_unique_t</c-> <c- n>s</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-></del>
+           <del><c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-></del>
+           <del><c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+</pre> <p><del>4․ <i>Effects:</i> Equivalent to <code class="highlight"><c- n>flat_map</c-><c- p>(</c-><c- n>s</c-><c- p>,</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_cont</c-><c- p>)</c-></code> and <code class="highlight"><c- n>flat_map</c-><c- p>(</c-><c- n>s</c-><c- p>,</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- n>comp</c-><c- p>)</c-></code>, respectively,
+except that <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>keys</c-></code> and <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>values</c-></code> are constructed with uses-allocator construction ([allocator.uses.construction]).</del> </p><p><del>5․ <i>Complexity:</i> Linear.</del> </p><p>[...] </p></small></blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.map.modifiers">[flat.map.modifiers]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote><small> [...]<p></p> <p></p><pre class="highlight"><c- n>containers</c-> <c- nf>extract</c-><c- p>()</c-> <c- o>&amp;&amp;</c-><c- p>;</c->
+</pre> <p>34․ <i>Postconditions:</i> <code class="highlight"><c- o>*</c-><c- k>this</c-></code> is emptied, even if the function exits via an exception. </p><p>35․ <i>Returns:</i> <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>c</c-><c- p>)</c-></code>. </p><p></p><pre class="highlight"><c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>key_container_type</c-><del><c- o>&amp;&amp;</c-></del> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-><del><c- o>&amp;&amp;</c-></del> <c- n>mapped_cont</c-><c- p>);</c->
+</pre> <p><ins>x․ <i>Preconditions:</i> <code class="highlight"><c- n>key_cont</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-> <c- o>==</c-> <c- n>mapped_cont</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> is <code class="highlight">true</code>.</ins> </p><p><ins>x․ <i>Effects:</i> Replaces <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>keys</c-></code> with <code class="highlight"><c- n>key_cont</c-></code> and <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>values</c-></code> with <code class="highlight"><c- n>mapped_cont</c-></code>;
+sorts the range [<code class="highlight"><c- n>begin</c-><c- p>()</c-></code>, <code class="highlight"><c- n>end</c-><c- p>()</c-></code>) with respect to <code class="highlight"><c- n>value_comp</c-><c- p>()</c-></code>; and
+finally erases the duplicate elements as if by:</ins> </p><pre class="highlight"><ins><c- k>auto</c-> <c- n>zv</c-> <c- o>=</c-> <c- n>views</c-><c- o>::</c-><c- n>zip</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>,</c-> <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>);</c-></ins>
+<ins><c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>ranges</c-><c- o>::</c-><c- n>unique</c-><c- p>(</c-><c- n>zv</c-><c- p>,</c-> <c- n>key_equiv</c-><c- p>(</c-><c- n>compare</c-><c- p>)).</c-><c- n>begin</c-><c- p>();</c-></ins>
+<ins><c- k>auto</c-> <c- n>dist</c-> <c- o>=</c-> <c- n>distance</c-><c- p>(</c-><c- n>zv</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>it</c-><c- p>);</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>dist</c-><c- p>,</c-> <c- n>c</c-><c- p>.</c-><c- n>keys</c-><c- p>.</c-><c- n>end</c-><c- p>());</c-></ins>
+<ins><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-> <c- o>+</c-> <c- n>dist</c-><c- p>,</c-> <c- n>c</c-><c- p>.</c-><c- n>values</c-><c- p>.</c-><c- n>end</c-><c- p>());</c-></ins>
+</pre> <p></p><pre class="highlight"><ins><c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>);</c-></ins>
+</pre> <p>36․ <i>Preconditions:</i> <code class="highlight"><c- n>key_cont</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-> <c- o>==</c-> <c- n>mapped_cont</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> is <code class="highlight">true</code>, the elements of <code class="highlight"><c- n>key_cont</c-></code> are sorted with respect to <code class="highlight"><c- n>compare</c-></code>, and <code class="highlight"><c- n>key_cont</c-></code> contains no equal elements. </p><p>37․ <i>Effects:</i> Equivalent to: </p><pre class="highlight"><c- n>c</c-><c- p>.</c-><c- n>keys</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>key_cont</c-><c- p>);</c->
+<c- n>c</c-><c- p>.</c-><c- n>values</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>mapped_cont</c-><c- p>);</c->
+</pre></small></blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight">    <c- c1>// [flat.multimap.cons], constructors</c->
+    <c- n>flat_multimap</c-><c- p>()</c-> <c- o>:</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- n>key_compare</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c->
+    <c- k>explicit</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>)</c->
+      <c- o>:</c-> <c- n>c</c-><c- p>(),</c-> <c- n>compare</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- p>}</c->
+    <del><c- n>flat_multimap</c-><c- p>(</c-><c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+                  <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c-></del>
+    <del><c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+                  <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c-></del>
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c->
+        <c- o>:</c-> <c- n>c</c-><c- p>(),</c-> <c- n>compare</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- n>insert</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>);</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-> <c- n>s</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c->
+        <c- o>:</c-> <c- n>c</c-><c- p>(),</c-> <c- n>compare</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- n>insert</c-><c- p>(</c-><c- n>s</c-><c- p>,</c-> <c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>);</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>from_range_t</c-> <c- n>fr</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>)</c->
+        <c- o>:</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- n>fr</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>),</c-> <c- n>key_compare</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>)</c->
+        <c- o>:</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- n>insert_range</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>));</c-> <c- p>}</c->
+
+<c- p>[...]</c->
+
+    <c- c1>// [flat.multimap.cons.alloc], constructors with allocators</c->
+
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- k>explicit</c-> <c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+                    <del><c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_multimap</c-><c- p>(</c-><c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+                    <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-></del>
+                    <del><c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_container_type</c-><c- o>&amp;</c-> <c- n>key_cont</c-><c- p>,</c-></del>
+                    <del><c- k>const</c-> <c- n>mapped_container_type</c-><c- o>&amp;</c-> <c- n>mapped_cont</c-><c- p>,</c-></del>
+                    <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multimap</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+
+<c- p>[...]</c->
+
+    <c- n>containers</c-> <c- n>extract</c-><c- p>()</c-> <c- o>&amp;&amp;</c-><c- p>;</c->
+    <c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>key_container_type</c-><del><c- o>&amp;&amp;</c-></del> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-><del><c- o>&amp;&amp;</c-></del> <c- n>mapped_cont</c-><c- p>);</c->
+    <ins><c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>key_container_type</c-> <c- n>key_cont</c-><c- p>,</c-> <c- n>mapped_container_type</c-> <c- n>mapped_cont</c-><c- p>);</c-></ins>
+</pre></small>
+   </blockquote>
+   <p>Remove the whole contents of <a href="https://eel.is/c++draft/flat.multimap.cons">[flat.multimap.cons]</a> as follows:</p>
+   <p>(TODO)</p>
+   <p>Change <a href="https://eel.is/c++draft/flat.multimap.cons.alloc">[flat.multimap.cons.alloc]</a> as follows:</p>
+   <p>(TODO)</p>
+   <p>Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight">    <c- c1>// [flat.multiset.cons], constructors</c->
+    <c- n>flat_multiset</c-><c- p>()</c-> <c- o>:</c-> <c- n>flat_multiset</c-><c- p>(</c-><c- n>key_compare</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c->
+    <c- k>explicit</c-> <c- n>flat_multiset</c-><c- p>(</c-><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>)</c->
+      <c- o>:</c-> <c- n>c</c-><c- p>(),</c-> <c- n>compare</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- p>}</c->
+    <del><c- k>explicit</c-> <c- n>flat_multiset</c-><c- p>(</c-><c- n>container_type</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c-></del>
+    <del><c- n>flat_multiset</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>container_type</c-> <c- n>cont</c-><c- p>,</c-></del>
+                  <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c-></del>
+      <del><c- o>:</c-> <i><c- n>c</c-></i><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>cont</c-><c- p>)),</c-> <i><c- n>compare</c-></i><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- p>}</c-></del>
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c->
+        <c- o>:</c-> <i><c- n>c</c-></i><c- p>(),</c-> <i><c- n>compare</c-></i><c- p>(</c-><c- n>comp</c-><c- p>)</c->
+        <c- p>{</c-> <c- n>insert</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>);</c-> <c- p>}</c->
+    <c- k>template</c-><class inputiterator>
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c->
+        <c- o>:</c-> <i><c- n>c</c-></i><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>),</c-> <i><c- n>compare</c-></i><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>from_range_t</c-> <c- n>fr</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>)</c->
+        <c- o>:</c-> <c- n>flat_multiset</c-><c- p>(</c-><c- n>fr</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>),</c-> <c- n>key_compare</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>)</c->
+        <c- o>:</c-> <c- n>flat_multiset</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c->
+        <c- p>{</c-> <c- n>insert_range</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>));</c-> <c- p>}</c->
+
+<c- p>[...]</c->
+
+    <c- c1>// [flat.multiset.cons.alloc], constructors with allocators</c->
+
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- k>explicit</c-> <c- n>flat_multiset</c-><c- p>(</c-><c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_multiset</c-><c- p>(</c-><c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_multiset</c-><c- p>(</c-><c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_multiset</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_multiset</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-></del>
+                    <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_multiset</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+
+<c- p>[...]</c->
+
+    <c- n>container_type</c-> <c- n>extract</c-><c- p>()</c-> <c- o>&amp;&amp;</c-><c- p>;</c->
+    <c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>container_type</c-><del><c- o>&amp;&amp;</c-></del><c- p>);</c->
+    <ins><c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-><c- p>,</c-> <c- n>container_type</c-><del><c- o>&amp;&amp;</c-></del><c- p>);</c-></ins>
+</class></pre></small>
+   </blockquote>
+   <p>Remove the whole contents of <a href="https://eel.is/c++draft/flat.multiset.cons">[flat.multiset.cons]</a> as follows:</p>
+   <p>(TODO)</p>
+   <p>Change <a href="https://eel.is/c++draft/flat.multiset.cons.alloc">[flat.multiset.cons.alloc]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote><small> x. The constructors in this subclause shall not participate in overload resolution
+unless <code class="highlight"><c- n>uses_allocator_v</c-><c- o>&lt;</c-><c- n>container_type</c-><c- p>,</c-> <c- n>Alloc</c-><c- o>></c-></code> is <code class="highlight">true</code>.<p></p> <p></p><pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+  <del><c- n>flat_multiset</c-><c- p>(</c-><c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+<del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+  <del><c- n>flat_multiset</c-><c- p>(</c-><c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+</pre> <p><del>x. <i>Effects:</i> Equivalent to <code class="highlight"><c- n>flat_multiset</c-><c- p>(</c-><c- n>cont</c-><c- p>)</c-></code> and <code class="highlight"><c- n>flat_multiset</c-><c- p>(</c-><c- n>cont</c-><c- p>,</c-> <c- n>comp</c-><c- p>)</c-></code>, respectively,
+except that <code class="highlight"><c- n>c</c-></code> is constructed with uses-allocator construction ([allocator.uses.construction]).</del> </p><p><del>x. <i>Complexity:</i> Same as <code class="highlight"><c- n>flat_multiset</c-><c- p>(</c-><c- n>cont</c-><c- p>)</c-></code> and <code class="highlight"><c- n>flat_multiset</c-><c- p>(</c-><c- n>cont</c-><c- p>,</c-> <c- n>comp</c-><c- p>)</c-></code>, respectively.</del> </p><p></p><pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+  <del><c- n>flat_multiset</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-> <c- n>s</c-><c- p>,</c-> <c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+<del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+  <del><c- n>flat_multiset</c-><c- p>(</c-><c- n>sorted_equivalent_t</c-> <c- n>s</c-><c- p>,</c-> <c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-></del>
+                <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+</pre> <p><del>x. <i>Effects:</i> Equivalent to <code class="highlight"><c- n>flat_multiset</c-><c- p>(</c-><c- n>s</c-><c- p>,</c-> <c- n>cont</c-><c- p>)</c-></code> and <code class="highlight"><c- n>flat_multiset</c-><c- p>(</c-><c- n>s</c-><c- p>,</c-> <c- n>cont</c-><c- p>,</c-> <c- n>comp</c-><c- p>)</c-></code>, respectively,
+except that <code class="highlight"><c- n>c</c-></code> is constructed with uses-allocator construction ([allocator.uses.construction]).</del> </p><p><del>x. <i>Complexity:</i> Linear.</del> </p></small></blockquote>
+   <p>Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:</p>
+   <p>(TODO)</p>
+   <p>Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight">    <c- c1>// [flat.set.cons], constructors</c->
+    <c- n>flat_set</c-><c- p>()</c-> <c- o>:</c-> <c- n>flat_set</c-><c- p>(</c-><c- n>key_compare</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c->
+
+    <c- k>explicit</c-> <c- n>flat_set</c-><c- p>(</c-><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>)</c->
+      <c- o>:</c-> <c- n>c</c-><c- p>(),</c-> <c- n>compare</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- p>}</c->
+
+    <del><c- k>explicit</c-> <c- n>flat_set</c-><c- p>(</c-><c- n>container_type</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>());</c-></del>
+
+    <del><c- n>flat_set</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>container_type</c-> <c- n>cont</c-><c- p>,</c-></del>
+                  <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c-></del>
+      <del><c- o>:</c-> <i><c- n>c</c-></i><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>cont</c-><c- p>)),</c-> <i><c- n>compare</c-></i><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- p>}</c-></del>
+
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c->
+        <c- o>:</c-> <i><c- n>c</c-></i><c- p>(),</c-> <i><c- n>compare</c-></i><c- p>(</c-><c- n>comp</c-><c- p>)</c->
+        <c- p>{</c-> <c- n>insert</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>);</c-> <c- p>}</c->
+
+    <c- k>template</c-><class inputiterator>
+      <c- n>flat_set</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+                    <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-> <c- o>=</c-> <c- n>key_compare</c-><c- p>())</c->
+        <c- o>:</c-> <i><c- n>c</c-></i><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>),</c-> <i><c- n>compare</c-></i><c- p>(</c-><c- n>comp</c-><c- p>)</c-> <c- p>{</c-> <c- p>}</c->
+
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>from_range_t</c-> <c- n>fr</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>)</c->
+        <c- o>:</c-> <c- n>flat_set</c-><c- p>(</c-><c- n>fr</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>),</c-> <c- n>key_compare</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>)</c->
+        <c- o>:</c-> <c- n>flat_set</c-><c- p>(</c-><c- n>comp</c-><c- p>)</c->
+        <c- p>{</c-> <c- n>insert_range</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>forward</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-><c- n>rg</c-><c- p>));</c-> <c- p>}</c->
+
+<c- p>[...]</c->
+
+    <c- c1>// [flat.set.cons.alloc], constructors with allocators</c->
+
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- k>explicit</c-> <c- n>flat_set</c-><c- p>(</c-><c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_set</c-><c- p>(</c-><c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_set</c-><c- p>(</c-><c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_set</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Alloc</c-><c- o>></c-></del>
+      <del><c- n>flat_set</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- k>const</c-> <c- n>container_type</c-><c- o>&amp;</c-> <c- n>cont</c-><c- p>,</c-></del>
+               <del><c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c-></del>
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c->
+               <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+    <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- n>R</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Alloc</c-><c- o>></c->
+      <c- n>flat_set</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>key_compare</c-><c- o>&amp;</c-> <c- n>comp</c-><c- p>,</c-> <c- k>const</c-> <c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>);</c->
+
+<c- p>[...]</c->
+
+    <c- n>container_type</c-> <c- n>extract</c-><c- p>()</c-> <c- o>&amp;&amp;</c-><c- p>;</c->
+    <c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>container_type</c-><del><c- o>&amp;&amp;</c-></del><c- p>);</c->
+    <ins><c- b>void</c-> <c- nf>replace</c-><c- p>(</c-><c- n>sorted_unique_t</c-><c- p>,</c-> <c- n>container_type</c-><del><c- o>&amp;&amp;</c-></del><c- p>);</c-></ins>
+</class></pre></small>
+   </blockquote>
+   <p>Remove the whole contents of <a href="https://eel.is/c++draft/flat.set.cons">[flat.set.cons]</a> as follows:</p>
+   <p>(TODO)</p>
+   <p>Change <a href="https://eel.is/c++draft/flat.set.cons.alloc">[flat.set.cons.alloc]</a> as follows:</p>
+   <p>(TODO)</p>
+   <p>Change <a href="https://eel.is/c++draft/flat.set.modifiers">[flat.set.modifiers]</a> as follows:</p>
+   <p>(TODO)</p>
+   <h2 class="heading settled" data-level="15" id="experience"><span class="secno">15. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>I have implemented all of <a data-link-type="biblio" href="#biblio-p0429" title="A standard flat_map">[P0429]</a>/<a data-link-type="biblio" href="#biblio-p1222" title="A standard flat_set">[P1222]</a> and all of this proposal
 as a series of patches against libc++ trunk; see <a data-link-type="biblio" href="#biblio-patch" title="[libc++] trivially_relocatable branch">[Patch]</a>.
 You can experiment with it <a href="https://godbolt.org/z/Trneaj4Mo">on Godbolt Compiler Explorer</a>;
 just use the P1144 branch of Clang, which uses this patched libc++ by default.</p>
-   <h2 class="heading settled" data-level="15" id="acknowledgments"><span class="secno">15. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
+   <h2 class="heading settled" data-level="16" id="acknowledgments"><span class="secno">16. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <ul>
     <li data-md>
      <p>Thanks to Tomasz Kamiński for recommending Arthur write this paper.</p>
