@@ -1,0 +1,310 @@
+<pre class='metadata'>
+Title: auto& operator=(X&&)
+Shortname: D2952
+Revision: 0
+!Draft Revision: 1
+Audience: EWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2952-auto-operators.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2952-auto-operators.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2952-auto-operators.html">rawgit.com/Quuxplusone/draft/gh-pages/d2952-auto-operators.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Editor: Matthew Taylor, mjtaylor214@hotmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Current C++ forbids explicitly defaulted functions to have placeholder return types such as <code>auto&</code>,
+  except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
+  in cases where the deduced return type would be the same as the expected one.
+  This allows more consistency and less repetition when declaring defaulted functions.
+Date: 2023-07-20
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial revision.
+
+
+# Motivation # {#motivation}
+
+Current C++ permits `=default` to appear only on certain signatures, with certain return types.
+The current wording prohibits the use of placeholder types such as `auto&` to express these return
+types, with the single exception of C++20's `operator<=>`. This leads to redundant repetition,
+such as in this real code from libc++'s test suite:
+
+```cpp
+struct ForwardDiffView {
+  [...]
+  ForwardDiffView(ForwardDiffView&&) = default;
+  ForwardDiffView(const ForwardDiffView&) = default;
+  ForwardDiffView& operator=(ForwardDiffView&&) = default;
+  ForwardDiffView& operator=(const ForwardDiffView&) = default;
+  [...]
+};
+```
+
+We might prefer to write the following, but the language doesn't currently permit it:
+
+```cpp
+struct ForwardDiffView {
+  [...]
+  ForwardDiffView(ForwardDiffView&&) = default;
+  ForwardDiffView(const ForwardDiffView&) = default;
+  auto& operator=(ForwardDiffView&&) = default; // ill-formed C++23
+  auto& operator=(const ForwardDiffView&) = default; // ill-formed C++23
+  [...]
+};
+```
+
+The status quo is inconsistent between non-defaulted and defaulted functions,
+making it unnecessarily tedious to upgrade to `=default`:
+
+```cpp
+  auto& operator=(const MyClass& rhs) { i = rhs.i; return *this; } // well-formed
+  auto& operator=(const MyClass& rhs) = default;                   // ill-formed, must say 'MyClass&'
+```
+
+And the comparison operators are inconsistent among themselves: `operator<=>`
+can deduce `strong_ordering`, but the others (including `operator==`) cannot deduce `bool`.
+
+```cpp
+  auto operator<=>(const MyClass& rhs) const = default; // well-formed
+  auto operator<(const MyClass& rhs) const = default;  // ill-formed, must say 'bool'
+
+  auto operator==(const MyClass& rhs) const { return i == rhs.i; } // well-formed
+  auto operator==(const MyClass& rhs) const = default; // ill-formed, must say 'bool'
+```
+
+The current ill-formedness of these declarations comes from overly restrictive wording in the standard,
+such as <a href="https://eel.is/c++draft/class.eq">[class.eq]</a>
+specifically requiring that a defaulted equality
+operator must have a *declared* return type of `bool`, instead of simply specifying that such a function returns `bool`.
+We believe that these declarations should not be ill-formed. The meaning of each of the examples above
+is intuitively clear; the placeholder return type correctly matches the type which the defaulted body
+will actually return. We propose to loosen the current restrictions and permit these declarations to
+be well-formed.
+
+Note that this proposal does *not* seek to change the valid return types of these functions
+(or any other aspect of their semantics). We propose a purely syntactic change to expand the
+range of allowed declaration *syntax*, not semantics. (But we do one drive-by improvement:
+explicitly require `operator<=>` on an empty class type to return a comparison category type.)
+
+# Proposal # {#proposal}
+
+We propose that a defaulted function declaration with a placeholder return type should have its
+type deduced as usual using the `return` statement implied by the standard semantics:
+
+If the declared return type of the defaulted function contains a placeholder type, we propose that the return type
+of the function be deduced (<a href="https://eel.is/c++draft/dcl.spec.auto.general#3.sentence-4">[dcl.spec.auto.general]</a>)
+from a fictional return statement that returns:
+
+* a prvalue of type `bool`, in the case of `operator==`, `operator!=`, `operator<`, `operator>`, `operator<=`, or `operator>=`
+* a prvalue of type `R`, in the case of `operator<=>`; where `R` is the common comparison type of <i>R</i><sub>0</sub>, <i>R</i><sub>1</sub>,... <i>R</i><sub>n-1</sub>
+* an lvalue of type `C`, in the case of `operator=` for a class or union type `C`
+
+Then, the deduced return type is compared to the type(s) required by the standard. If the types match, the
+declaration is well-formed. Otherwise it's ill-formed.
+
+For the copy-assignment operator, our proposal gives the following behavior:
+
+```cpp
+struct MyClass {
+  auto& operator=(const MyClass&) = default;          // Proposed OK: deduces MyClass&
+  decltype(auto) operator=(const MyClass&) = default; // Proposed OK: deduces MyClass&
+  auto&& operator=(const MyClass&) = default;         // Proposed OK: deduces MyClass&
+  const auto& operator=(const MyClass&) = default;    // Still ill-formed: deduces const MyClass&
+  auto operator=(const MyClass&) = default;           // Still ill-formed: deduces MyClass
+  auto* operator=(const MyClass&) = default;          // Still ill-formed: deduction fails
+};
+```
+
+For `operator==`, our proposal gives the following behavior:
+
+```cpp
+struct MyClass {
+  auto operator==(const MyClass&) const = default;           // Proposed OK: deduces bool
+  decltype(auto) operator==(const MyClass&) const = default; // Proposed OK: deduces bool
+  auto&& operator==(const MyClass&) const = default;         // Still ill-formed: deduces bool&&
+  auto& operator==(const MyClass&) const = default;          // Still ill-formed: deduction fails
+};
+```
+
+There is one strange corner case:
+
+```cpp
+  const auto operator==(const MyClass&) const = default;     // Still ill-formed: deduces const bool
+```
+
+Ordinarily, adding a redundant `const` to a return type doesn't affect the meaning of the
+function; in fact, EDG [currently accepts](https://godbolt.org/z/4aYP54b11) a defaulted `operator==` definition
+returning `const bool`.
+But a return type of `const bool` is still detectably different from a return type of `bool`,
+so we don't think such a declaration should be accepted. (Ill-formed before, ill-formed after;
+EDG's current behavior is a bug.)
+
+## Cleaning up `operator<=>` ## {#operator-spaceship}
+
+For `operator<=>`, we propose to remove the special-case wording that permits a placeholder return type
+iff it is `auto`; a placeholder return type is no longer anything special. But `operator<=>` is still
+a special case: it is the only defaultable operator where the programmer can declare a *different*
+return type, e.g.
+
+```cpp
+struct MyComp { explicit MyComp(std::strong_ordering); };
+struct MyClass {
+  MyComp operator<=>(const MyClass&) const = default;
+};
+```
+
+(MSVC [rejects](https://godbolt.org/z/6MPhPK4bv) this declaration; GCC/EDG/Clang accept.)
+
+In fact, `operator<=>` is the only defaultable operator currently permitted to return a dangling reference!
+On the following test case, [EDG rejects and Clang ICEs](https://godbolt.org/z/4MGGcsaGG); GCC and MSVC accept
+and return a dangling reference.
+
+```cpp
+struct MyClass {
+  const std::strong_ordering& operator<=>(const MyClass&) const = default;
+};
+```
+
+This seems like an oversight in the status-quo wording. We fix this as a drive-by, by explicitly
+requiring the return type of `operator<=>` to be a comparison category type even when `MyClass` is
+empty. (It is already indirectly required when `MyClass` is non-empty; see [[#wording]].)
+
+## Impact on existing code ## {#impact}
+
+We believe there is no effect on existing code, since this proposal affects only code that was ill-formed before.
+
+# Implementation experience # {#experience}
+
+None yet.
+
+# Proposed wording # {#wording}
+
+## [class.eq] ## {#wording-class.eq}
+
+Note: The phrase "equality operator function" (<a href="https://eel.is/c++draft/over.binary">[over.binary]</a>)
+covers both `==` or `!=`. But `!=` is not covered by [class.eq]; it's covered by [class.compare.secondary] below.
+
+Modify <a href="https://eel.is/c++draft/class.eq">[class.eq]</a> as follows:
+
+<small><blockquote>
+<del>1․ A defaulted equality operator function ([over.binary]) shall have a declared return type `bool`.</del>
+
+2․ A defaulted `==` operator function for a class `C` is defined as deleted unless, for each `x`<sub><i>i</i></sub>
+in the expanded list of subobjects for an object `x` of type `C`, `x`<sub><i>i</i></sub> `== x`<sub><i>i</i></sub> is usable
+([class.compare.default]).
+
+3․ The return value `V` of a defaulted `==` operator function with parameters `x` and `y` is determined by comparing corresponding elements
+`x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub> in the expanded lists of subobjects for `x` and `y` (in increasing index order)
+until the first index <i>i</i> where `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub> <ins>,</ins> <del>yields a result value which,
+when</del> contextually converted to `bool`, yields `false`. If no such index exists, `V` is `true`. Otherwise, `V` is `false`.
+
+<ins>x․ A defaulted `==` operator function shall have the return type `bool`. If its declared return type
+contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
+
+4․ [<i>Example 1:</i>
+<pre>
+struct D {
+  int i;
+  friend bool operator==(const D& x, const D& y) = default;
+      // OK, returns x.i == y.i
+};
+</pre>
+— <i>end example</i>]
+</blockquote></small>
+
+## [class.spaceship] ## {#wording-class.spaceship}
+
+Note: There are only three "comparison category types" in C++, and `strong_ordering::equal` is implicitly convertible
+to all three of them. The status quo already effectively forbids `<=>` to return a non-comparison-category type,
+since either `R` is deduced as a common comparison type (which is a comparison category type by definition), or else
+a synthesized three-way comparison of type `R` must exist (which means `R` must be a comparison category type),
+or else the sequence `x`<sub><i>i</i></sub> must be empty (in which case there are no restrictions on `R` except
+that it be constructible from `strong_ordering::equal`). We strengthen the wording to directly mandate that the
+return type be a comparison category type, even in the empty case.
+
+Modify <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a> as follows:
+
+<small><blockquote>
+[...]
+
+2․ Let `R` be the declared return type of a defaulted three-way comparison operator function, and let 
+`x`<sub><i>i</i></sub> be the elements of the expanded list of subobjects for an object `x` of type `C`.
+
+— (2.1) If `R` <del>is `auto`,</del> <ins>contains a placeholder type,</ins> then let
+<i>cv<sub>i</sub></i> `R`<sub><i>i</i></sub> be the type of the expression
+`x`<sub><i>i</i></sub> `<=> x`<sub><i>i</i></sub>. The operator function is defined as deleted if that expression is not usable
+or if `R`<sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>.
+The return type is deduced as <ins>if from `return Q(std::strong_ordering::equal);`, where `Q` is</ins> the
+common comparison type (see below) of `R`<sub>0</sub>, `R`<sub>1</sub>, ..., `R`<sub>n-1</sub>.
+
+— (2.2) Otherwise, <del>`R` shall not contain a placeholder type. If</del> <ins>if</ins> the synthesized three-way comparison of type `R`
+between any objects `x`<sub><i>i</i></sub> and `x`<sub><i>i</i></sub> is not defined, the operator function is
+defined as deleted.
+
+3․ The return value `V` <del>of type `R`</del> of the defaulted three-way comparison operator function with parameters `x` and `y` <del>of
+the same type</del> is determined by comparing corresponding elements `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub>
+in the expanded lists of subobjects for `x` and `y` (in increasing index order) until the first index <i>i</i>
+where the synthesized three-way comparison of type `R` between `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub>
+yields a result value `v`<sub><i>i</i></sub> where `v`<sub><i>i</i></sub> `!= 0`, contextually converted to `bool`,
+yields `true`; `V` is a copy of `v`<sub><i>i</i></sub>.
+If no such index exists, `V` is <del>`static_cast<R>(`</del>`std::strong_ordering::equal`<del>`)`</del>.
+
+<ins>x․ A defaulted three-way comparison operator function shall have a return type which is a comparison category type.
+[<i>Note:</i> A reference type is not a comparison category type. —<i>end note</i>]</ins>
+
+4․ The <i>common comparison type</i> `U` of a possibly-empty list of <i>n</i> comparison category types
+`T`<sub>0</sub>, `T`<sub>1</sub>, ..., `T`<sub>n-1</sub> is defined as follows:
+
+[...]
+</blockquote></small>
+
+## [class.compare.secondary] ## {#wording-class.compare.secondary}
+
+Modify <a href="https://eel.is/c++draft/class.compare.secondary">[class.compare.secondary]</a> as follows:
+
+<small><blockquote>
+1․ A <i>secondary comparison operator</i> is a relational operator ([expr.rel]) or the `!=` operator.
+<del>A defaulted operator function ([over.binary]) for a secondary comparison operator `@` shall have a declared return type `bool`.</del>
+
+2․ <del>The</del> <ins>A defaulted secondary comparison</ins> operator function with parameters `x` and `y` is defined as deleted if
+
+— (2.1) overload resolution ([over.match]), as applied to `x @ y`, does not result in a usable candidate, or
+
+— (2.2) the candidate selected by overload resolution is not a rewritten candidate.
+
+Otherwise, the operator function yields `x @ y`. The defaulted operator function is not considered as a candidate
+in the overload resolution for the `@` operator.
+
+<ins>x․ A defaulted secondary comparison operator function shall have the return type `bool`. If its declared return type
+contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
+
+3․ [<i>Example 1</i>:
+<pre>
+struct HasNoLessThan { };
+
+struct C {
+  friend HasNoLessThan operator<=>(const C&, const C&);
+  bool operator<(const C&) const = default; // OK, function is deleted
+};
+</pre>
+— <i>end example</i>]
+</blockquote></small>
+
+## [class.copy.assign] ## {#wording-class.copy.assign}
+
+Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
+
+<small><blockquote>
+TODO FIXME BUG HACK
+</blockquote></small>

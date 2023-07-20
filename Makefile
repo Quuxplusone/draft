@@ -14,7 +14,8 @@ all: \
     d2752-static-storage-for-braced-initializers.html \
     d2767-flat-omnibus.html \
     d2848-std-is-uniqued.html \
-    d2903-ignore-explicit.html
+    d2903-ignore-explicit.html \
+    d2952-auto-operators.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
