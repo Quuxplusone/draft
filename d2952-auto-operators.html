@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2952R0<br>auto&amp; operator=(X&amp;&amp;)</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-07-22">2023-07-22</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-07-23">2023-07-23</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2106,7 +2106,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
      <dt>Draft Revision:
-     <dd>4
+     <dd>7
      <dt>Current Source:
      <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2952-auto-operators.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2952-auto-operators.bs</a>
      <dt>Current:
@@ -2132,10 +2132,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     <li>
      <a href="#proposal"><span class="secno">3</span> <span class="content">Proposal</span></a>
      <ol class="toc">
-      <li><a href="#defaulted-as-deleted"><span class="secno">3.1</span> <span class="content">"Defaulted as deleted"</span></a>
-      <li><a href="#deducing-this"><span class="secno">3.2</span> <span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span></a>
-      <li><a href="#corner-cases"><span class="secno">3.3</span> <span class="content">Existing corner cases</span></a>
-      <li><a href="#impact"><span class="secno">3.4</span> <span class="content">Impact on existing code</span></a>
+      <li><a href="#declared-type"><span class="secno">3.1</span> <span class="content">"Return type" versus "declared return type"</span></a>
+      <li><a href="#defaulted-as-deleted"><span class="secno">3.2</span> <span class="content">"Defaulted as deleted"</span></a>
+      <li><a href="#deducing-this"><span class="secno">3.3</span> <span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span></a>
+      <li><a href="#corner-cases"><span class="secno">3.4</span> <span class="content">Existing corner cases</span></a>
+      <li><a href="#impact"><span class="secno">3.5</span> <span class="content">Impact on existing code</span></a>
      </ol>
     <li><a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
     <li>
@@ -2145,7 +2146,6 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#wording-class.spaceship"><span class="secno">5.2</span> <span class="content">[class.spaceship]</span></a>
       <li><a href="#wording-class.compare.secondary"><span class="secno">5.3</span> <span class="content">[class.compare.secondary]</span></a>
       <li><a href="#wording-class.copy.assign"><span class="secno">5.4</span> <span class="content">[class.copy.assign]</span></a>
-      <li><a href="#wording-dcl.fct.def.default"><span class="secno">5.5</span> <span class="content">[dcl.fct.def.default]</span></a>
      </ol>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
@@ -2246,10 +2246,22 @@ declaration is well-formed. Otherwise it’s ill-formed.</p>
   <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->          <c- c1>// Still ill-formed: deduction fails</c->
 <c- p>};</c->
 </pre>
-   <h3 class="heading settled" data-level="3.1" id="defaulted-as-deleted"><span class="secno">3.1. </span><span class="content">"Defaulted as deleted"</span><a class="self-link" href="#defaulted-as-deleted"></a></h3>
+   <h3 class="heading settled" data-level="3.1" id="declared-type"><span class="secno">3.1. </span><span class="content">"Return type" versus "declared return type"</span><a class="self-link" href="#declared-type"></a></h3>
+   <p>Today, vendors unanimously reject <code class="highlight"><c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-></code>.
+But we can’t find any wording in <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> or <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> that directly justifies
+this behavior. It seems that vendors are interpreting e.g. <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>’s
+"[if] the return type of F<sub>1</sub> differs from the return type of F<sub>2</sub>"
+to mean "the <em>declared</em> return type of F<sub>1</sub>," even though newer sections such as <a href="https://eel.is/c++draft/class.compare">[class.compare]</a> consistently distinguish
+the "declared return type" from the [actual] return type.</p>
+   <p>We tentatively propose to leave <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> alone,
+and simply add an example that indicates the (new) intent of the (existing) wording: that it should
+now be interpreted as talking about the assignment operator’s <em>actual</em> return type,
+not its <em>declared</em> (placeholder) return type.</p>
+   <h3 class="heading settled" data-level="3.2" id="defaulted-as-deleted"><span class="secno">3.2. </span><span class="content">"Defaulted as deleted"</span><a class="self-link" href="#defaulted-as-deleted"></a></h3>
    <p>The current wording for comparison operators is crafted so that the following <code class="highlight"><c- n>Container</c-></code> is well-formed.
-Its <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> is defaulted as deleted (so that operator is unusable), but the template
-instantiation itself is OK. We need to preserve this in our rewriting. (<a href="https://godbolt.org/z/jcPf1Ge9W">Godbolt.</a>)</p>
+Its <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> is defaulted as deleted (so that operator is unusable), but the instantiation
+of class <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex</c-><c- o>></c-></code> itself is OK. We need to preserve this in our rewriting.
+(<a href="https://godbolt.org/z/jcPf1Ge9W">Godbolt.</a>)</p>
 <pre class="language-cpp highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c->
 <c- k>struct</c-> <c- nc>Container</c-> <c- p>{</c->
   <c- n>T</c-> <c- n>t</c-><c- p>;</c->
@@ -2275,32 +2287,42 @@ instantiation itself is OK. We need to preserve this in our rewriting. (<a href=
 </pre>
    <p>Therefore we can’t just say "<code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> <em>shall</em> have a return type which is a comparison category type";
 we must say that if the return type is not a comparison category type then the operator is defaulted as deleted.</p>
-   <h3 class="heading settled" data-level="3.2" id="deducing-this"><span class="secno">3.2. </span><span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span><a class="self-link" href="#deducing-this"></a></h3>
+   <h3 class="heading settled" data-level="3.3" id="deducing-this"><span class="secno">3.3. </span><span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span><a class="self-link" href="#deducing-this"></a></h3>
    <p>Before <a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a>, defaulted functions were never allowed to have explicit object parameters.
-But the resolution of that issue (which is probably a good resolution) permits explicit object parameters.
+But the resolution of that issue (which has been adopted for C++23) permits explicit object parameters.
 This is not a problem for the comparison operators. But it constrains the wordings we can choose for <code class="highlight"><c- k>operator</c-><c- o>=</c-></code>: we can’t say "the return type is deduced as if from <code class="highlight"><c- k>return</c-> <c- o>*</c-><c- k>this</c-></code>" because there might not
 be a <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</p>
    <p>There’s a quirk with rvalue-ref-qualified assignment operators. (Not <em>move</em> assignment, but
 assignment where the <em>destination</em> object is explicitly rvalue-ref-qualified.)</p>
+   <ul>
+    <li data-md>
+     <p><code class="highlight"><c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- p>{</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-></code> deduces an lvalue reference; but</p>
+    <li data-md>
+     <p><code class="highlight"><c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-></code> deduces an rvalue reference.</p>
+   </ul>
+   <p>Nonetheless, a <em>defaulted</em> assignment operator always returns an lvalue reference
+(<a href="https://eel.is/c++draft/class.copy.assign#2">[class.copy.assign]/2</a>, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>),
+regardless of whether it’s declared using explicit object syntax.</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
   <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK today</c->
-  <c- n>A</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Error, return type isn’t A&amp;</c->
+  <c- n>A</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed, return type isn’t A&amp;</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- p>{</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK, deduces A&amp;</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed OK, deduces A&amp;</c->
 <c- p>};</c->
 <c- k>struct</c-> <c- nc>B</c-> <c- p>{</c->
-  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// Error, self is an rvalue</c->
+  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// Error, self can’t bind to B&amp;</c->
   <c- n>B</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK, deduces B&amp;&amp;</c->
-  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK after CWG2586, deduces B&amp;</c->
-  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Unclear after CWG2586 ??</c->
-  <c- n>B</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Error after CWG2586, return type isn’t B&amp;</c->
-  <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed unclear ??</c->
+  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK</c->
+  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK</c->
+  <c- n>B</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed, return type isn’t B&amp;</c->
+  <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed OK, deduces B&amp;</c->
 <c- p>};</c->
 </pre>
-   <p>The easiest (if ambitious) fix here is for <a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> to prohibit defaulting rvalue-ref-qualified assignment operators.
-Should we do that? I’ve sent this question to Barry Revzin and CWG.</p>
-   <h3 class="heading settled" data-level="3.3" id="corner-cases"><span class="secno">3.3. </span><span class="content">Existing corner cases</span><a class="self-link" href="#corner-cases"></a></h3>
+   <p>Defaulted rvalue-ref-qualified assignment operators are weird, so (orthogonally to P2952)
+Arthur proposes in <a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting rvalue-ref-qualified assignment operators">[P2953]</a> to ban them. However, P2952 doesn’t need to treat them specially.
+Defaulted assignment operators invariably return lvalue references, so P2952 deduces an lvalue reference — done.</p>
+   <h3 class="heading settled" data-level="3.4" id="corner-cases"><span class="secno">3.4. </span><span class="content">Existing corner cases</span><a class="self-link" href="#corner-cases"></a></h3>
    <p>There is vendor divergence in some corner cases. Here is a table of the divergences we found,
 plus our opinion as to the conforming behavior, and how it affects this proposal.</p>
    <p><small></small></p>
@@ -2314,7 +2336,7 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <th>GCC
       <th>MSVC
       <th>EDG
-      <th>Proposed
+      <th>Correct
      <tr>
       <td><a href="https://godbolt.org/z/3EqYc43xh">link</a>
       <td>
@@ -2324,6 +2346,15 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <td>✗
       <td bgcolor="#FFCACA">✓
       <td><a href="https://eel.is/c++draft/class.eq#1.sentence-1">✗</a>
+     <tr>
+      <td><a href="https://godbolt.org/z/hx9vvorsn">link</a>
+      <td>
+<pre class="highlight"><c- k>friend</c-> <c- b>bool</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- p>,</c-> <c- k>const</c-> <c- n>C</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
+      <td>✓
+      <td bgcolor="#FFCACA">✗
+      <td>✓
+      <td>✓
+      <td><a href="https://eel.is/c++draft/class.compare#default-1.sentence-1">✓</a>
      <tr>
       <td><a href="https://godbolt.org/z/aPWEs5xnb">link</a>
       <td>
@@ -2377,8 +2408,14 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
      <tr>
       <td><a href="https://godbolt.org/z/KTTGMjWox">link</a>
       <td>
-<pre class="highlight"><c- k>struct</c-> <c- nc>W</c-> <c- p>{</c-> <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>W</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-><c- p>;</c-> <c- p>};</c->
-<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c-> <c- n>W</c-> <c- n>w</c-><c- p>;</c-> <c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- p>};</c-></pre>
+<pre class="highlight"><c- k>struct</c-> <c- nc>W</c-> <c- p>{</c->
+  <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c->
+    <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>W</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-><c- p>;</c->
+<c- p>};</c->
+<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
+  <c- n>W</c-> <c- n>w</c-><c- p>;</c->
+  <c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- p>};</c-></pre>
       <td bgcolor="#FFCACA">✓
       <td bgcolor="#FFCACA">✗
       <td bgcolor="#FFCACA">✓
@@ -2387,13 +2424,30 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
      <tr>
       <td><a href="https://godbolt.org/z/3T4b9YM6r">link</a>
       <td>
-<pre class="highlight"><c- k>struct</c-> <c- nc>W</c-> <c- p>{</c-> <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>W</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-><c- p>;</c-> <c- p>};</c->
-<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c-> <c- n>W</c-> <c- n>w</c-><c- p>;</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- p>};</c-></pre>
+<pre class="highlight"><c- k>struct</c-> <c- nc>W</c-> <c- p>{</c->
+  <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c->
+    <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>W</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-><c- p>;</c->
+<c- p>};</c->
+<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
+  <c- n>W</c-> <c- n>w</c-><c- p>;</c->
+  <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c->
+    <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- p>};</c-></pre>
       <td bgcolor="#FFCACA">✓
       <td bgcolor="#FFCACA">✓
       <td bgcolor="#FFCACA">✓
       <td bgcolor="#FFCACA">✓
       <td><a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-2">deleted</a>
+     <tr>
+      <td><a href="https://godbolt.org/z/G3ddGeex8">link</a>
+      <td>
+<pre class="highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>M</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c->
+  <c- k>noexcept</c-><c- p>(</c->false<c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
+      <td>✓
+      <td>✓
+      <td bgcolor="#FFCACA">noexcept
+      <td bgcolor="#FFCACA">inconsistent
+      <td><a href="https://eel.is/c++draft/class.compare#default-note-1">✓</a>
      <tr>
       <td><a href="https://godbolt.org/z/WezedYYE3">link</a>
       <td>
@@ -2440,9 +2494,9 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <td>✗
       <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a>
    </table>
-   <h3 class="heading settled" data-level="3.4" id="impact"><span class="secno">3.4. </span><span class="content">Impact on existing code</span><a class="self-link" href="#impact"></a></h3>
+   <h3 class="heading settled" data-level="3.5" id="impact"><span class="secno">3.5. </span><span class="content">Impact on existing code</span><a class="self-link" href="#impact"></a></h3>
    <p>There should be little effect on existing code, since this proposal mainly allows syntax that was ill-formed before.
-As shown in <a href="#corner-cases">§ 3.3 Existing corner cases</a>, we do propose to change some very arcane examples, e.g.</p>
+As shown in <a href="#corner-cases">§ 3.4 Existing corner cases</a>, we do propose to change some very arcane examples, e.g.</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>&amp;</c->
     <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2505,11 +2559,19 @@ contains a placeholder type, its return type is deduced as if from <code class="
    <h3 class="heading settled" data-level="5.4" id="wording-class.copy.assign"><span class="secno">5.4. </span><span class="content">[class.copy.assign]</span><a class="self-link" href="#wording-class.copy.assign"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:</p>
    <p><small></small></p>
-   <blockquote><small> TODO FIXME BUG HACK<p></p> </small></blockquote>
-   <h3 class="heading settled" data-level="5.5" id="wording-dcl.fct.def.default"><span class="secno">5.5. </span><span class="content">[dcl.fct.def.default]</span><a class="self-link" href="#wording-dcl.fct.def.default"></a></h3>
-   <p>Modify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote><small> TODO FIXME BUG HACK<p></p> </small></blockquote>
+   <blockquote><small> 14․ The implicitly-defined copy/move assignment operator for a class returns <ins>an lvalue
+reference to</ins> the object for which the assignment operator is invoked, that is,
+the object assigned to.<p></p> <p><ins>15․ If a defaulted copy/move assignment operator’s declared return type contains a
+placeholder type, its return type is deduced as if from <code class="highlight"><c- k>return</c-> <c- n>r</c-><c- p>;</c-></code>, where <code class="highlight"><c- n>r</c-></code> is an lvalue
+reference to the object for which the assignment operator is invoked.</ins> </p><p><ins>16․ [<i>Example:</i></ins> </p><pre class="highlight"><ins><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c-></ins>
+  <ins><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+    <ins><i><c- c1>// Return type is A&amp;</c-></i></ins>
+<ins><c- p>};</c-></ins>
+<ins><c- k>struct</c-> <c- nc>B</c-> <c- p>{</c-></ins>
+  <ins><c- k>auto</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>B</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+    <ins><i><c- c1>// error: Return type is B, which violates [dcl.fct.def.default]/2.5</c-></i></ins>
+<ins><c- p>};</c-></ins>
+</pre><ins>—<i>end example</i>]</ins> </small></blockquote>
   </main>
 <script>
 (function() {
@@ -2644,5 +2706,7 @@ contains a placeholder type, its return type is deduced as if from <code class="
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
    <dt id="biblio-cwg2586">[CWG2586]
-   <dd>Barry Revzin. <a href="https://wg21.link/cwg2586"><cite>Explicit object parameter for assignment and comparison</cite></a>. 7 May 2022. CD6. URL: <a href="https://wg21.link/cwg2586">https://wg21.link/cwg2586</a>
+   <dd>Barry Revzin. <a href="https://cplusplus.github.io/CWG/issues/2586.html"><cite>Explicit object parameter for assignment and comparison</cite></a>. May–July 2022. URL: <a href="https://cplusplus.github.io/CWG/issues/2586.html">https://cplusplus.github.io/CWG/issues/2586.html</a>
+   <dt id="biblio-p2953">[P2953]
+   <dd>Arthur O'Dwyer. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html"><cite>Forbid defaulting rvalue-ref-qualified assignment operators</cite></a>. August 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html</a>
   </dl>
