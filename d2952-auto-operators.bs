@@ -2,7 +2,7 @@
 Title: auto& operator=(X&&)
 Shortname: D2952
 Revision: 0
-!Draft Revision: 4
+!Draft Revision: 7
 Audience: EWG
 Status: D
 Group: WG21
@@ -17,7 +17,7 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2023-07-22
+Date: 2023-07-23
 </pre>
 
 <style>
@@ -137,11 +137,29 @@ struct MyClass {
 };
 ```
 
+## "Return type" versus "declared return type" ## {#declared-type}
+
+Today, vendors unanimously reject `auto& operator=(const A&) = default`.
+But we can't find any wording in <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a>
+or <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> that directly justifies
+this behavior. It seems that vendors are interpreting e.g. <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>'s
+"[if] the return type of F<sub>1</sub> differs from the return type of F<sub>2</sub>"
+to mean "the *declared* return type of F<sub>1</sub>," even though newer sections such as
+<a href="https://eel.is/c++draft/class.compare">[class.compare]</a> consistently distinguish
+the "declared return type" from the [actual] return type.
+
+We tentatively propose to leave <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> alone,
+and simply add an example that indicates the (new) intent of the (existing) wording: that it should
+now be interpreted as talking about the assignment operator's *actual* return type,
+not its *declared* (placeholder) return type.
+
+
 ## "Defaulted as deleted" ## {#defaulted-as-deleted}
 
 The current wording for comparison operators is crafted so that the following `Container` is well-formed.
-Its `operator<=>` is defaulted as deleted (so that operator is unusable), but the template
-instantiation itself is OK. We need to preserve this in our rewriting. ([Godbolt.](https://godbolt.org/z/jcPf1Ge9W))
+Its `operator<=>` is defaulted as deleted (so that operator is unusable), but the instantiation
+of class `Container<mutex>` itself is OK. We need to preserve this in our rewriting.
+([Godbolt.](https://godbolt.org/z/jcPf1Ge9W))
 ```cpp
 template<class T>
 struct Container {
@@ -175,13 +193,21 @@ we must say that if the return type is not a comparison category type then the o
 ## "Deducing `this`" and CWG2586 ## {#deducing-this}
 
 Before [[CWG2586]], defaulted functions were never allowed to have explicit object parameters.
-But the resolution of that issue (which is probably a good resolution) permits explicit object parameters.
+But the resolution of that issue (which has been adopted for C++23) permits explicit object parameters.
 This is not a problem for the comparison operators. But it constrains the wordings we can choose for
 `operator=`: we can't say "the return type is deduced as if from `return *this`" because there might not
 be a `*this`.
 
 There's a quirk with rvalue-ref-qualified assignment operators. (Not *move* assignment, but
 assignment where the *destination* object is explicitly rvalue-ref-qualified.)
+
+* `auto&& operator=(const B&) && { return *this; }` deduces an lvalue reference; but
+* `auto&& operator=(this B&& self, const B&) { return self; }` deduces an rvalue reference.
+
+Nonetheless, a *defaulted* assignment operator always returns an lvalue reference
+(<a href="https://eel.is/c++draft/class.copy.assign#2">[class.copy.assign]/2</a>,
+<a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>),
+regardless of whether it's declared using explicit object syntax.
 
 ```cpp
 struct A {
@@ -194,15 +220,16 @@ struct B {
   B& operator=(this B&& self, const B&) { return self; } // Error, self is an rvalue
   B&& operator=(this B&& self, const B&) { return self; } // OK
   decltype(auto) operator=(this B&& self, const B&) { return self; } // OK, deduces B&&
-  B& operator=(this B& self, const B&) = default; // OK after CWG2586, deduces B&
-  B& operator=(this B&& self, const B&) = default; // Unclear after CWG2586 ??
-  B&& operator=(this B&& self, const B&) = default; // Error after CWG2586, return type isn't B&
-  decltype(auto) operator=(this B&& self, const B&) = default; // Proposed unclear ??
+  B& operator=(this B& self, const B&) = default; // OK, deduces B&
+  B& operator=(this B&& self, const B&) = default; // OK
+  B&& operator=(this B&& self, const B&) = default; // Error, return type isn't B&
+  decltype(auto) operator=(this B&& self, const B&) = default; // Proposed OK, deduces B&
 };
 ```
 
-The easiest (if ambitious) fix here is for [[CWG2586]] to prohibit defaulting rvalue-ref-qualified assignment operators.
-Should we do that? I've sent this question to Barry Revzin and CWG.
+Defaulted rvalue-ref-qualified assignment operators are weird, and Arthur would (orthogonally)
+like to ban them; but P2952 doesn't need to do anything special with them. Assignment operators
+always return lvalue references, so we'll deduce an lvalue reference — done.
 
 
 ## Existing corner cases ## {#corner-cases}
@@ -211,9 +238,11 @@ There is vendor divergence in some corner cases. Here is a table of the divergen
 plus our opinion as to the conforming behavior, and how it affects this proposal.
 
 <small><table>
-<tr><th>URL</th><th>Code</th><th>Clang</th><th>GCC</th><th>MSVC</th><th>EDG</th><th>Proposed</th></tr>
+<tr><th>URL</th><th>Code</th><th>Clang</th><th>GCC</th><th>MSVC</th><th>EDG</th><th>Correct</th></tr>
 <tr><td><a href="https://godbolt.org/z/3EqYc43xh">link</a></td><td><pre>const bool operator==(const C&) const = default;</pre></td>
     <td>✗</td><td>✗</td><td>✗</td><td bgcolor="#FFCACA">✓</td><td><a href="https://eel.is/c++draft/class.eq#1.sentence-1">✗</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/hx9vvorsn">link</a></td><td><pre>friend bool operator==(const C, const C) = default;</pre></td>
+    <td>✓</td><td bgcolor="#FFCACA">✗</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/class.compare#default-1.sentence-1">✓</a></td></tr>
 <tr><td><a href="https://godbolt.org/z/aPWEs5xnb">link</a></td><td><pre>struct U { U(std::strong_ordering); };
 struct C {
   U operator<=>(const C&) const = default;
@@ -236,12 +265,28 @@ struct C {
     operator<=>(const C&) const = default;
 };</pre></td>
     <td bgcolor="#FFCACA">ICE</td><td>✓</td><td>✓</td><td bgcolor="#FFCACA">deleted</td><td>Today: ✓<br>Proposed: deleted</td></tr>
-<tr><td><a href="https://godbolt.org/z/KTTGMjWox">link</a></td><td><pre>struct W { const std::strong_ordering operator<=>(const W&) const; };
-struct C { W w; auto operator<=>(const C&) const = default; };</pre></td>
+<tr><td><a href="https://godbolt.org/z/KTTGMjWox">link</a></td><td><pre>struct W {
+  const std::strong_ordering
+    operator<=>(const W&) const;
+};
+struct C {
+  W w;
+  auto operator<=>(const C&) const = default;
+};</pre></td>
     <td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✓</td><td>deleted</td><td><a href="https://eel.is/c++draft/class.compare#class.spaceship-2.1.sentence-2">deleted</a></td></tr>
-<tr><td><a href="https://godbolt.org/z/3T4b9YM6r">link</a></td><td><pre>struct W { const std::strong_ordering operator<=>(const W&) const; };
-struct C { W w; std::strong_ordering operator<=>(const C&) const = default; };</pre></td>
+<tr><td><a href="https://godbolt.org/z/3T4b9YM6r">link</a></td><td><pre>struct W {
+  const std::strong_ordering
+    operator<=>(const W&) const;
+};
+struct C {
+  W w;
+  std::strong_ordering
+    operator<=>(const C&) const = default;
+};</pre></td>
     <td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td><a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-2">deleted</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/G3ddGeex8">link</a><td><pre>auto operator<=>(const M&) const
+  noexcept(false) = default;</pre></td>
+    <td>✓</td><td>✓</td><td bgcolor="#FFCACA">noexcept</td><td bgcolor="#FFCACA">inconsistent</td><td><a href="https://eel.is/c++draft/class.compare#default-note-1">✓</a></td>
 <tr><td><a href="https://godbolt.org/z/WezedYYE3">link</a></td><td><pre>C& operator=(C&) = default;</pre></td>
     <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
 <tr><td><a href="https://godbolt.org/z/hxc9za5KT">link</a></td><td><pre>C& operator=(const C&&) = default;</pre></td>
@@ -390,13 +435,43 @@ struct C {
 Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
 
 <small><blockquote>
-TODO FIXME BUG HACK
+14․ The implicitly-defined copy/move assignment operator for a class returns <ins>an lvalue
+reference to</ins> the object for which the assignment operator is invoked, that is,
+the object assigned to.
+<p><ins>15․ If a defaulted copy/move assignment operator's declared return type contains a
+placeholder type, its return type is deduced as if from `return r;`, where `r` is an lvalue
+reference to the object for which the assignment operator is invoked.</ins>
+<p><ins>16․ [<i>Example:</i></ins>
+<pre>
+<ins>struct A {</ins>
+  <ins>decltype(auto) operator=(A&&) = default;</ins>
+    <ins><i>// Return type is A&</i></ins>
+<ins>};</ins>
+<ins>struct B {</ins>
+  <ins>auto operator=(B&&) = default;</ins>
+    <ins><i>// error: Return type is B, which violates [dcl.fct.def.default]/2.5</i></ins>
+<ins>};</ins>
+</pre>
+<ins>—<i>end example</i>]</ins>
 </blockquote></small>
 
-## [dcl.fct.def.default] ## {#wording-dcl.fct.def.default}
-
-Modify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> as follows:
-
-<small><blockquote>
-TODO FIXME BUG HACK
-</blockquote></small>
+<pre class=biblio>
+{
+  "CWG2586": {
+    "title": "Explicit object parameter for assignment and comparison",
+    "authors": [
+      "Barry Revzin"
+    ],
+    "href": "https://cplusplus.github.io/CWG/issues/2586.html",
+    "date": "May–July 2022"
+  },
+  "P2953": {
+    "title": "Forbid defaulting rvalue-ref-qualified assignment operators",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html",
+    "date": "August 2023"
+  }
+}
+</pre>
