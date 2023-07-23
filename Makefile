@@ -15,7 +15,8 @@ all: \
     d2767-flat-omnibus.html \
     d2848-std-is-uniqued.html \
     d2903-ignore-explicit.html \
-    d2952-auto-operators.html
+    d2952-auto-operators.html \
+    d2953-forbid-defaulting-rr-assignment.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
