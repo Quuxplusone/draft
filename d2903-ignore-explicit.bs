@@ -295,6 +295,45 @@ I don't think it's a problem, because we can already handle the C++98 version
     E e2 = 'x'; // OK, calls #2 as the best match
 ```
 
+## CWG 1467 ## {#cwg1467}
+
+[[CWG1467]] (adopted November 2014) gave this example:
+```c++
+    struct Agg {
+      Agg() = default;
+      Agg(const Agg&) = default;
+    };
+    Agg x;
+    Agg x2{x};
+```
+We want this to use the copy ctor. It does. Good.
+But then [[CWG2137]] (adopted June 2016) gave this example:
+```c++
+    struct Q {
+      Q();
+      Q(const Q&);
+      Q(std::initializer_list<Q>);
+    };
+    Q x = Q{Q()};
+```
+We want this to use the `initializer_list` ctor, not the copy ctor. It does. Good.
+But then [[CWG2311]] (open) gives this example:
+```c++
+    struct NonAgg {
+      NonAgg();
+    };
+    NonAgg make();
+    NonAgg x{make()};
+```
+We want this to use the copy ctor, and it does; but it does *not* trigger the wording for
+copy elision.
+
+The original sin here seems to be that there is a distinction between "X is initialized from Y"
+(which may trigger copy elision) and the wording in <a href="https://eel.is/c++draft/dcl.init.list#3.7">[dcl.init.list]/3.7</a>
+that explicitly says "constructors are considered." That wording fails to consider conversion functions,
+and fails to consider copy elision. It seems to me that we should never initialize an object
+without using the word of power "initialize"; anything that says we "call a constructor" is
+by definition suspect.
 
 # Current wording # {#current-wording}
 

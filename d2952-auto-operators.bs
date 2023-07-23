@@ -2,7 +2,7 @@
 Title: auto& operator=(X&&)
 Shortname: D2952
 Revision: 0
-!Draft Revision: 1
+!Draft Revision: 4
 Audience: EWG
 Status: D
 Group: WG21
@@ -17,7 +17,7 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2023-07-20
+Date: 2023-07-22
 </pre>
 
 <style>
@@ -51,7 +51,7 @@ struct ForwardDiffView {
 };
 ```
 
-We might prefer to write the following, but the language doesn't currently permit it:
+We'd prefer to write the following, but the language doesn't currently permit it:
 
 ```cpp
 struct ForwardDiffView {
@@ -86,7 +86,8 @@ can deduce `strong_ordering`, but the others (including `operator==`) cannot ded
 The current ill-formedness of these declarations comes from overly restrictive wording in the standard,
 such as <a href="https://eel.is/c++draft/class.eq">[class.eq]</a>
 specifically requiring that a defaulted equality
-operator must have a *declared* return type of `bool`, instead of simply specifying that such a function returns `bool`.
+operator must have a *declared* return type of `bool`, instead of simply specifying that its return type
+must *be* `bool`.
 We believe that these declarations should not be ill-formed. The meaning of each of the examples above
 is intuitively clear; the placeholder return type correctly matches the type which the defaulted body
 will actually return. We propose to loosen the current restrictions and permit these declarations to
@@ -94,20 +95,19 @@ be well-formed.
 
 Note that this proposal does *not* seek to change the valid return types of these functions
 (or any other aspect of their semantics). We propose a purely syntactic change to expand the
-range of allowed declaration *syntax*, not semantics. (But we do one drive-by improvement:
-explicitly require `operator<=>` on an empty class type to return a comparison category type.)
+range of allowed declaration *syntax*, not semantics. (But we do one drive-by clarification
+which we believe matches EWG's original intent:
+if an empty class's defaulted `operator<=>` returns a non-comparison-category type,
+it should be defaulted as deleted.)
 
 # Proposal # {#proposal}
 
 We propose that a defaulted function declaration with a placeholder return type should have its
-type deduced as usual using the `return` statement implied by the standard semantics:
-
-If the declared return type of the defaulted function contains a placeholder type, we propose that the return type
-of the function be deduced (<a href="https://eel.is/c++draft/dcl.spec.auto.general#3.sentence-4">[dcl.spec.auto.general]</a>)
-from a fictional return statement that returns:
+type deduced (<a href="https://eel.is/c++draft/dcl.spec.auto.general#3.sentence-4">[dcl.spec.auto.general]</a>)
+as if from a fictional return statement that returns:
 
 * a prvalue of type `bool`, in the case of `operator==`, `operator!=`, `operator<`, `operator>`, `operator<=`, or `operator>=`
-* a prvalue of type `R`, in the case of `operator<=>`; where `R` is the common comparison type of <i>R</i><sub>0</sub>, <i>R</i><sub>1</sub>,... <i>R</i><sub>n-1</sub>
+* a prvalue of type `Q`, in the case of `operator<=>`; where `Q` is the common comparison type of <i>R</i><sub>0</sub>, <i>R</i><sub>1</sub>,... <i>R</i><sub>n-1</sub>
 * an lvalue of type `C`, in the case of `operator=` for a class or union type `C`
 
 Then, the deduced return type is compared to the type(s) required by the standard. If the types match, the
@@ -137,52 +137,136 @@ struct MyClass {
 };
 ```
 
-There is one strange corner case:
+## "Defaulted as deleted" ## {#defaulted-as-deleted}
 
+The current wording for comparison operators is crafted so that the following `Container` is well-formed.
+Its `operator<=>` is defaulted as deleted (so that operator is unusable), but the template
+instantiation itself is OK. We need to preserve this in our rewriting. ([Godbolt.](https://godbolt.org/z/jcPf1Ge9W))
 ```cpp
-  const auto operator==(const MyClass&) const = default;     // Still ill-formed: deduces const bool
+template<class T>
+struct Container {
+  T t;
+  auto operator<=>(const Container&) const = default;
+};
+
+Container<std::mutex> cm;
+  // OK, <=> is deleted
+
+struct Weird { int operator<=>(Weird) const; };
+Container<Weird> cw;
+  // OK, <=> is deleted because
+  // Weird's operator<=> returns a non-comparison-category type
 ```
 
-Ordinarily, adding a redundant `const` to a return type doesn't affect the meaning of the
-function; in fact, EDG [currently accepts](https://godbolt.org/z/4aYP54b11) a defaulted `operator==` definition
-returning `const bool`.
-But a return type of `const bool` is still detectably different from a return type of `bool`,
-so we don't think such a declaration should be accepted. (Ill-formed before, ill-formed after;
-EDG's current behavior is a bug.)
+Similarly for dependent return types:
+```cpp
+template<class R>
+struct C {
+  int i;
+  R operator<=>(const C&) const = default;
+};
+static_assert(!std::three_way_comparable<C<int>>);
+static_assert(std::three_way_comparable<C<std::strong_ordering>>);
+```
 
-## Cleaning up `operator<=>` ## {#operator-spaceship}
+Therefore we can't just say "`operator<=>` *shall* have a return type which is a comparison category type";
+we must say that if the return type is not a comparison category type then the operator is defaulted as deleted.
 
-For `operator<=>`, we propose to remove the special-case wording that permits a placeholder return type
-iff it is `auto`; a placeholder return type is no longer anything special. But `operator<=>` is still
-a special case: it is the only defaultable operator where the programmer can declare a *different*
-return type, e.g.
+## "Deducing `this`" and CWG2586 ## {#deducing-this}
+
+Before [[CWG2586]], defaulted functions were never allowed to have explicit object parameters.
+But the resolution of that issue (which is probably a good resolution) permits explicit object parameters.
+This is not a problem for the comparison operators. But it constrains the wordings we can choose for
+`operator=`: we can't say "the return type is deduced as if from `return *this`" because there might not
+be a `*this`.
+
+There's a quirk with rvalue-ref-qualified assignment operators. (Not *move* assignment, but
+assignment where the *destination* object is explicitly rvalue-ref-qualified.)
 
 ```cpp
-struct MyComp { explicit MyComp(std::strong_ordering); };
-struct MyClass {
-  MyComp operator<=>(const MyClass&) const = default;
+struct A {
+  A& operator=(const A&) && = default; // OK today
+  A&& operator=(const A&) && = default; // Error, return type isn't A&
+  decltype(auto) operator=(const A&) && { return *this; } // OK, deduces A&
+  decltype(auto) operator=(const A&) && = default; // Proposed OK, deduces A&
+};
+struct B {
+  B& operator=(this B&& self, const B&) { return self; } // Error, self is an rvalue
+  B&& operator=(this B&& self, const B&) { return self; } // OK
+  decltype(auto) operator=(this B&& self, const B&) { return self; } // OK, deduces B&&
+  B& operator=(this B& self, const B&) = default; // OK after CWG2586, deduces B&
+  B& operator=(this B&& self, const B&) = default; // Unclear after CWG2586 ??
+  B&& operator=(this B&& self, const B&) = default; // Error after CWG2586, return type isn't B&
+  decltype(auto) operator=(this B&& self, const B&) = default; // Proposed unclear ??
 };
 ```
 
-(MSVC [rejects](https://godbolt.org/z/6MPhPK4bv) this declaration; GCC/EDG/Clang accept.)
+The easiest (if ambitious) fix here is for [[CWG2586]] to prohibit defaulting rvalue-ref-qualified assignment operators.
+Should we do that? I've sent this question to Barry Revzin and CWG.
 
-In fact, `operator<=>` is the only defaultable operator currently permitted to return a dangling reference!
-On the following test case, [EDG rejects and Clang ICEs](https://godbolt.org/z/4MGGcsaGG); GCC and MSVC accept
-and return a dangling reference.
 
-```cpp
-struct MyClass {
-  const std::strong_ordering& operator<=>(const MyClass&) const = default;
-};
-```
+## Existing corner cases ## {#corner-cases}
 
-This seems like an oversight in the status-quo wording. We fix this as a drive-by, by explicitly
-requiring the return type of `operator<=>` to be a comparison category type even when `MyClass` is
-empty. (It is already indirectly required when `MyClass` is non-empty; see [[#wording]].)
+There is vendor divergence in some corner cases. Here is a table of the divergences we found,
+plus our opinion as to the conforming behavior, and how it affects this proposal.
+
+<small><table>
+<tr><th>URL</th><th>Code</th><th>Clang</th><th>GCC</th><th>MSVC</th><th>EDG</th><th>Proposed</th></tr>
+<tr><td><a href="https://godbolt.org/z/3EqYc43xh">link</a></td><td><pre>const bool operator==(const C&) const = default;</pre></td>
+    <td>✗</td><td>✗</td><td>✗</td><td bgcolor="#FFCACA">✓</td><td><a href="https://eel.is/c++draft/class.eq#1.sentence-1">✗</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/aPWEs5xnb">link</a></td><td><pre>struct U { U(std::strong_ordering); };
+struct C {
+  U operator<=>(const C&) const = default;
+};</pre></td>
+    <td>✓</td><td>✓</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">deleted</td><td>Today: ✓<br>Proposed: deleted</td></tr>
+<tr><td><a href="https://godbolt.org/z/ePnnvvdsz">link</a></td><td><pre>struct U { U(std::strong_ordering); operator int(); };
+struct C {
+  int i;
+  U operator<=>(const C&) const = default;
+};</pre></td>
+    <td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-2">deleted</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/T6bnsMqWo">link</a></td><td><pre>struct C {
+  int i;
+  const std::strong_ordering&
+    operator<=>(const C&) const = default;
+};</pre></td>
+    <td bgcolor="#FFCACA">ICE</td><td>deleted</td><td bgcolor="#FFCACA">✓</td><td>deleted</td><td>deleted</td></tr>
+<tr><td><a href="https://godbolt.org/z/W3eW1Tdb9">link</a></td><td><pre>struct C {
+  const std::strong_ordering&
+    operator<=>(const C&) const = default;
+};</pre></td>
+    <td bgcolor="#FFCACA">ICE</td><td>✓</td><td>✓</td><td bgcolor="#FFCACA">deleted</td><td>Today: ✓<br>Proposed: deleted</td></tr>
+<tr><td><a href="https://godbolt.org/z/KTTGMjWox">link</a></td><td><pre>struct W { const std::strong_ordering operator<=>(const W&) const; };
+struct C { W w; auto operator<=>(const C&) const = default; };</pre></td>
+    <td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✓</td><td>deleted</td><td><a href="https://eel.is/c++draft/class.compare#class.spaceship-2.1.sentence-2">deleted</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/3T4b9YM6r">link</a></td><td><pre>struct W { const std::strong_ordering operator<=>(const W&) const; };
+struct C { W w; std::strong_ordering operator<=>(const C&) const = default; };</pre></td>
+    <td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td><a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-2">deleted</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/WezedYYE3">link</a></td><td><pre>C& operator=(C&) = default;</pre></td>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td><a href="https://godbolt.org/z/hxc9za5KT">link</a></td><td><pre>C& operator=(const C&&) = default;</pre></td>
+    <td>deleted</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/ojM541bTM">link</a></td><td><pre>C& operator=(const C&) const = default;</pre></td>
+    <td bgcolor="#FFCACA">✗</td><td>deleted</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/hchco3rcK">link</a></td><td><pre>C& operator=(const C&) && = default;</pre></td>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/5P6EKrGjo">link</a></td><td><pre>C&& operator=(const C&) && = default;</pre></td>
+    <td>✗</td><td>✗</td><td>✗</td><td>✗</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a></td></tr>
+</table></small>
 
 ## Impact on existing code ## {#impact}
 
-We believe there is no effect on existing code, since this proposal affects only code that was ill-formed before.
+There should be little effect on existing code, since this proposal mainly allows syntax that was ill-formed before.
+As shown in [[#corner-cases]], we do propose to change some very arcane examples, e.g.
+```cpp
+struct C {
+  const std::strong_ordering&
+    operator<=>(const C&) const = default;
+    // Today: Well-formed, non-deleted
+    // Tomorrow: Well-formed, deleted
+};
+```
+
 
 # Implementation experience # {#experience}
 
@@ -260,7 +344,7 @@ yields a result value `v`<sub><i>i</i></sub> where `v`<sub><i>i</i></sub> `!= 0`
 yields `true`; `V` is a copy of `v`<sub><i>i</i></sub>.
 If no such index exists, `V` is <del>`static_cast<R>(`</del>`std::strong_ordering::equal`<del>`)`</del>.
 
-<ins>x․ A defaulted three-way comparison operator function shall have a return type which is a comparison category type.
+<ins>x․ A defaulted three-way comparison operator function which is not deleted shall have a return type which is a comparison category type.
 [<i>Note:</i> A reference type is not a comparison category type. —<i>end note</i>]</ins>
 
 4․ The <i>common comparison type</i> `U` of a possibly-empty list of <i>n</i> comparison category types
@@ -304,6 +388,14 @@ struct C {
 ## [class.copy.assign] ## {#wording-class.copy.assign}
 
 Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
+
+<small><blockquote>
+TODO FIXME BUG HACK
+</blockquote></small>
+
+## [dcl.fct.def.default] ## {#wording-dcl.fct.def.default}
+
+Modify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> as follows:
 
 <small><blockquote>
 TODO FIXME BUG HACK
