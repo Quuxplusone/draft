@@ -2,7 +2,7 @@
 Title: Forbid defaulting rvalue-ref-qualified assignment operators
 Shortname: D2953
 Revision: 0
-!Draft Revision: 1
+!Draft Revision: 2
 Audience: EWG
 Status: D
 Group: WG21
@@ -36,7 +36,8 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 # Motivation and proposal # {#proposal}
 
 Currently, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>
-permits TODO FIXME BUG HACK
+permits an explicitly defaulted special member function to differ from the corresponding
+implicit one by adding <i>ref-qualifiers</i>, but not <i>cv-qualifiers</i>.
 
 For example, the signature `const A& operator=(const A&) const& = default` is forbidden
 because it is additionally const-qualified, and also because its return type differs
@@ -51,8 +52,8 @@ Our concern is that the *unrealistic* signature `A& operator=(const A&) && = def
 * The possibility of these unrealistic signatures makes C++ harder to understand.
     Before writing [[P2952]], Arthur didn't know such signatures were possible.
 
-* To permit these signatures, the wording needs to be more complicated. Forbidding them
-    makes our proposed wording diff more red than green.
+* The wording to permit these signatures is at least a tiny bit more complicated than
+    if they weren't permitted.
 
 * The quirky interaction with [[CWG2586]] and [[P2952]] discussed in the next subsection.
 
@@ -91,10 +92,11 @@ The two "natural" implementations deduce different types! This might be perceive
 If we adopt P2953 alongside P2952, then the second `operator=` will go back to being ill-formed,
 which eliminates the perception of inconsistency.
 
-|       | Today | P2952 |
-|-------|-------|-------|
-| Today | `C&&`/ill-formed | `C&&`/`C&` |
-| P2953 | `C&&`/ill-formed | `C&&`/ill-formed |
+<table>
+<tr><td></td><th>Today</th><th>P2952</th></tr>
+<tr><th>Today</th><td><code>C&&</code>/ill-formed</td><td><code>C&&</code>/<code>C&</code></td></tr>
+<tr><th>P2953</th><td><code>C&&</code>/ill-formed</td><td><code>C&&</code>/ill-formed</td></tr>
+</table>
 
 
 ## Existing corner cases ## {#corner-cases}
@@ -143,143 +145,89 @@ None yet.
 
 # Proposed wording # {#wording}
 
-## [class.compare.secondary] ## {#wording-class.compare.secondary}
+## [dcl.fct.def.default] ## {#wording-dcl.fct.def.default}
+
+Note: The only defaultable special member functions are default constructors,
+copy/move constructors, copy/move assignment operators, and destructors. Of these,
+only the assignment operators can ever be cvref-qualified at all.
 
 Modify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> as follows:
 
 <small><blockquote>
-1․ A function definition whose <i>function-body</i> is of the form `= default ;` is called an explicitly-defaulted definition. A function that is explicitly defaulted shall
-(1.1)
-be a special member function or a comparison operator function ([over.binary]), and
-(1.2)
-not have default arguments.
-2
-#
-An explicitly defaulted special member function 
-F
-1
- is allowed to differ from the corresponding special member function 
-F
-2
- that would have been implicitly declared, as follows:
-(2.1)
-F
-1
- and 
-F
-2
- may have differing ref-qualifiers;
-(2.2)
-if 
-F
-2
- has an implicit object parameter of type “reference to C”, 
-F
-1
- may be an explicit object member function whose explicit object parameter is of type “reference to C”, in which case the type of 
-F
-1
- would differ from the type of 
-F
-2
- in that the type of 
-F
-1
- has an additional parameter;
-(2.3)
-F
-1
- and 
-F
-2
- may have differing exception specifications; and
-(2.4)
-if 
-F
-2
- has a non-object parameter of type const C&, the corresponding non-object parameter of 
-F
-1
- may be of type C&.
-If the type of 
-F
-1
- differs from the type of 
-F
-2
- in a way other than as allowed by the preceding rules, then:
-(2.5)
-if 
-F
-1
- is an assignment operator, and the return type of 
-F
-1
- differs from the return type of 
-F
-2
- or 
-F
-1
-'s non-object parameter type is not a reference, the program is ill-formed;
-(2.6)
-otherwise, if 
-F
-1
- is explicitly defaulted on its first declaration, it is defined as deleted;
-(2.7)
-otherwise, the program is ill-formed.
+1․ A function definition whose <i>function-body</i> is of the form `= default ;` is called an <i>explicitly-defaulted</i> definition.
+A function that is explicitly defaulted shall
 
+* (1.1) be a special member function or a comparison operator function ([over.binary]), and
 
-<small><blockquote>
-1․ A <i>secondary comparison operator</i> is a relational operator ([expr.rel]) or the `!=` operator.
-<del>A defaulted operator function ([over.binary]) for a secondary comparison operator `@` shall have a declared return type `bool`.</del>
+* (1.2) not have default arguments.
 
-2․ <del>The</del> <ins>A defaulted secondary comparison</ins> operator function with parameters `x` and `y` is defined as deleted if
+<p>2․ An explicitly defaulted special member function <code>F</code><sub>1</sub> is allowed to differ
+from the corresponding special member function <code>F</code><sub>2</sub> that would have been implicitly declared, as follows:
 
-— (2.1) overload resolution ([over.match]), as applied to `x @ y`, does not result in a usable candidate, or
+* (2.1) <ins>if <code>F</code><sub>2</sub> is an assignment operator,</ins> <del><code>F</code><sub>1</sub>
+    and <code>F</code><sub>2</sub> may have differing <i>ref-qualifiers</i></del> <ins><code>F</code><sub>1</sub>
+    may have an lvalue <i>ref-qualifier</i></ins>;
 
-— (2.2) the candidate selected by overload resolution is not a rewritten candidate.
+* (2.2) if <code>F</code><sub>2</sub> <del>has an implicit object parameter of type “reference to C”</del> <ins>is
+    an assignment operator with an implicit object parameter of type `C&`</ins>,
+    <code>F</code><sub>1</sub> may <del>be an explicit object member function whose</del> <ins>have an</ins> explicit
+    object parameter <del>is</del> of type <del>(possibly
+    different) “reference to C”</del> <ins>`C&`</ins>, in which case the type of <code>F</code><sub>1</sub>
+    would differ from the type of <code>F</code><sub>2</sub> in that the type of <code>F</code><sub>1</sub>
+    has an additional parameter;
 
-Otherwise, the operator function yields `x @ y`. The defaulted operator function is not considered as a candidate
-in the overload resolution for the `@` operator.
+* (2.3) <code>F</code><sub>1</sub> and <code>F</code><sub>2</sub> may have differing exception specifications; and
 
-<ins>x․ A defaulted secondary comparison operator function shall have the return type `bool`. If its declared return type
-contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
+* (2.4) if <code>F</code><sub>2</sub> has a non-object parameter of type `const C&`, the corresponding
+    non-object parameter of <code>F</code><sub>1</sub> may be of type `C&`.
 
-3․ [<i>Example 1</i>:
-<pre>
-struct HasNoLessThan { };
+<p>If the type of <code>F</code><sub>1</sub> differs from the type of <code>F</code><sub>2</sub>
+in a way other than as allowed by the preceding rules, then:
 
-struct C {
-  friend HasNoLessThan operator<=>(const C&, const C&);
-  bool operator<(const C&) const = default; // OK, function is deleted
-};
-</pre>
-— <i>end example</i>]
+* (2.5) if <del><code>F</code><sub>1</sub></del> <ins><code>F</code><sub>2</sub></ins> is an assignment operator, and the return type of
+    <code>F</code><sub>1</sub> differs from the return type of <code>F</code><sub>2</sub>
+    or <code>F</code><sub>1</sub>'s non-object parameter type is not a reference, the program is ill-formed;
+
+* (2.6) otherwise, if <code>F</code><sub>1</sub> is explicitly defaulted on its first declaration, it is defined as deleted;
+
+* (2.7) otherwise, the program is ill-formed.
+
+<p>[...]
 </blockquote></small>
 
 ## [class.copy.assign] ## {#wording-class.copy.assign}
 
+Note: If we do the wording patch above, then I think nothing in [class.copy.assign] needs
+to change. But much of the wording above is concerned specifically with copy/move assignment operators,
+so it might be nice to move that wording out of [dcl.fct.def.default] and into [class.copy.assign].
+Also note that right now a difference in `noexcept`-ness is handled explicitly by [dcl.fct.def.default]
+for special member functions but only by omission-and-note in <a href="https://eel.is/c++draft/class.compare#default-note-1">[class.compare]</a>
+for comparison operators.
+
 Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
 
 <small><blockquote>
-14․ The implicitly-defined copy/move assignment operator for a class returns <ins>an lvalue
-reference to</ins> the object for which the assignment operator is invoked, that is,
-the object assigned to.
-<p><ins>15․ If a defaulted copy/move assignment operator's declared return type contains a
-placeholder type, its return type is deduced as if from `return r;`, where `r` is an lvalue
-reference to the object for which the assignment operator is invoked.</ins>
-<p><ins>16․ [<i>Example:</i></ins>
-<pre>
-<ins>struct A {</ins>
-  <ins>decltype(auto) operator=(A&&) = default;</ins>
-    <ins><i>// Return type is A&</i></ins>
-<ins>};</ins>
-<ins>struct B {</ins>
-  <ins>auto operator=(B&&) = default;</ins>
-    <ins><i>// error: Return type is B, which violates [dcl.fct.def.default]/2.5</i></ins>
-<ins>};</ins>
-</pre>
-<ins>—<i>end example</i>]</ins>
+TODO FIXME BUG HACK
 </blockquote></small>
+
+<pre class=biblio>
+{
+  "CWG2586": {
+    "title": "Explicit object parameter for assignment and comparison",
+    "authors": [
+      "Barry Revzin"
+    ],
+    "href": "https://cplusplus.github.io/CWG/issues/2586.html",
+    "date": "May–July 2022"
+  },
+  "P2952": {
+    "title": "auto& operator=(X&&)",
+    "authors": [
+      "Arthur O'Dwyer",
+      "Matthew Taylor"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2952r0.html",
+    "date": "August 2023"
+  }
+}
+</pre>
