@@ -212,24 +212,24 @@ regardless of whether it's declared using explicit object syntax.
 ```cpp
 struct A {
   A& operator=(const A&) && = default; // OK today
-  A&& operator=(const A&) && = default; // Error, return type isn't A&
+  A&& operator=(const A&) && = default; // Ill-formed, return type isn't A&
   decltype(auto) operator=(const A&) && { return *this; } // OK, deduces A&
   decltype(auto) operator=(const A&) && = default; // Proposed OK, deduces A&
 };
 struct B {
-  B& operator=(this B&& self, const B&) { return self; } // Error, self is an rvalue
+  B& operator=(this B&& self, const B&) { return self; } // Error, self can't bind to B&
   B&& operator=(this B&& self, const B&) { return self; } // OK
   decltype(auto) operator=(this B&& self, const B&) { return self; } // OK, deduces B&&
-  B& operator=(this B& self, const B&) = default; // OK, deduces B&
+  B& operator=(this B& self, const B&) = default; // OK
   B& operator=(this B&& self, const B&) = default; // OK
-  B&& operator=(this B&& self, const B&) = default; // Error, return type isn't B&
+  B&& operator=(this B&& self, const B&) = default; // Ill-formed, return type isn't B&
   decltype(auto) operator=(this B&& self, const B&) = default; // Proposed OK, deduces B&
 };
 ```
 
-Defaulted rvalue-ref-qualified assignment operators are weird, and Arthur would (orthogonally)
-like to ban them; but P2952 doesn't need to do anything special with them. Assignment operators
-always return lvalue references, so we'll deduce an lvalue reference — done.
+Defaulted rvalue-ref-qualified assignment operators are weird, so (orthogonally to P2952)
+Arthur proposes in [[P2953]] to ban them. However, P2952 doesn't need to treat them specially.
+Defaulted assignment operators invariably return lvalue references, so P2952 deduces an lvalue reference — done.
 
 
 ## Existing corner cases ## {#corner-cases}

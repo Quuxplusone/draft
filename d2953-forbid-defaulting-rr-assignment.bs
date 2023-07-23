@@ -1,0 +1,285 @@
+<pre class='metadata'>
+Title: Forbid defaulting rvalue-ref-qualified assignment operators
+Shortname: D2953
+Revision: 0
+!Draft Revision: 1
+Audience: EWG
+Status: D
+Group: WG21
+URL:
+!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2953-forbid-defaulting-rr-assignment.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2953-forbid-defaulting-rr-assignment.bs</a>
+!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2953-forbid-defaulting-rr-assignment.html">rawgit.com/Quuxplusone/draft/gh-pages/d2953-forbid-defaulting-rr-assignment.html</a>
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Current C++ permits explicitly-defaulted special members to differ from their
+  implicitly-defaulted counterparts in various ways, including parameter type and
+  ref-qualification. This permits implausible
+  signatures like `A& operator=(const A&) && = default`, where the left-hand
+  operand is rvalue-ref-qualified. We propose to forbid such signatures.
+Date: 2023-07-23
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial revision.
+
+
+# Motivation and proposal # {#proposal}
+
+Currently, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>
+permits TODO FIXME BUG HACK
+
+For example, the signature `const A& operator=(const A&) const& = default` is forbidden
+because it is additionally const-qualified, and also because its return type differs
+from the implicitly-defaulted `A&`. This might be considered unfortunate, because that's
+a reasonable signature for a const-assignable proxy-reference type (assuming all of its
+members are also const-assignable). Regardless, programmers aren't clamoring for that signature
+to be supported, so we do not propose to support it here.
+
+Our concern is that the *unrealistic* signature `A& operator=(const A&) && = default` is
+*permitted!* This causes three minor drawbacks:
+
+* The possibility of these unrealistic signatures makes C++ harder to understand.
+    Before writing [[P2952]], Arthur didn't know such signatures were possible.
+
+* To permit these signatures, the wording needs to be more complicated. Forbidding them
+    makes our proposed wording diff more red than green.
+
+* The quirky interaction with [[CWG2586]] and [[P2952]] discussed in the next subsection.
+
+To eliminate all three drawbacks,
+we propose that a defaulted copy/move assignment operator should not be permitted to add
+an *rvalue* ref-qualifier to its implicit counterpart (nor an explicit object parameter
+of rvalue reference type).
+
+
+## Interaction with P2952 ## {#p2952}
+
+[[CWG2586]] (adopted for C++23) permits `operator=` to have an explicit object parameter.
+
+[[P2952]] proposes that `operator=` should (also) be allowed to have a placeholder return type.
+If P2952 is adopted without P2953, then we will have the following pub-quiz fodder:
+
+```cpp
+struct C {
+  auto&& operator=(this C&& self, const C&) { return self; }
+    // Today: OK, deduces C&&
+    // After P2952: Still OK, still deduces C&&
+    // Proposed: Still OK, still deduces C&&
+
+  auto&& operator=(this C&& self, const C&) = default;
+    // Today: Ill-formed
+    // After P2952: OK, deduces C&
+    // Proposed: Ill-formed
+};
+```
+
+The first, non-defaulted, operator "does the natural thing" by returning its left-hand operand,
+and deduces `C&&`. The second operator also "does the natural thing" by being defaulted; but
+after P2952 it will deduce `C&`. (For rationale, see [[P2952]] §3.3 "Deducing `this`".)
+The two "natural" implementations deduce different types! This might be perceived as inconsistency.
+
+If we adopt P2953 alongside P2952, then the second `operator=` will go back to being ill-formed,
+which eliminates the perception of inconsistency.
+
+|       | Today | P2952 |
+|-------|-------|-------|
+| Today | `C&&`/ill-formed | `C&&`/`C&` |
+| P2953 | `C&&`/ill-formed | `C&&`/ill-formed |
+
+
+## Existing corner cases ## {#corner-cases}
+
+There is vendor divergence in some corner cases. Here is a table of the divergences we found,
+plus our opinion as to the conforming behavior, and how it affects this proposal.
+
+<small><table>
+<tr><th>URL</th><th>Code</th><th>Clang</th><th>GCC</th><th>MSVC</th><th>EDG</th><th>Correct</th></tr>
+<tr><td><a href="https://godbolt.org/z/WezedYYE3">link</a></td><td><pre>C& operator=(C&) = default;</pre></td>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td><a href="https://godbolt.org/z/hxc9za5KT">link</a></td><td><pre>C& operator=(const C&&) = default;</pre></td>
+    <td>deleted</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/ojM541bTM">link</a></td><td><pre>C& operator=(const C&) const = default;</pre></td>
+    <td bgcolor="#FFCACA">✗</td><td>deleted</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/hchco3rcK">link</a></td><td><pre>C& operator=(const C&) && = default;</pre></td>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>Today: <a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>Proposed: ✗</td></tr>
+<tr><td><a href="https://godbolt.org/z/5P6EKrGjo">link</a></td><td><pre>C&& operator=(const C&) && = default;</pre></td>
+    <td>✗</td><td>✗</td><td>✗</td><td>✗</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a></td></tr>
+</table></small>
+
+## Impact on existing code ## {#impact}
+
+This proposal takes code that was formerly well-formed C++23, and makes it ill-formed.
+The affected constructs are extremely implausible in Arthur's opinion; but of course we
+need some implementation and usage experience in a real compiler before adopting this proposal.
+
+```cpp
+struct C {
+  C& operator=(const C&) && = default;
+    // Today: Well-formed
+    // Tomorrow: Ill-formed (hard error)
+};
+
+struct D {
+  D& operator=(this D&& self, const C&) = default;
+    // Today: Well-formed
+    // Tomorrow: Ill-formed (hard error)
+};
+```
+
+
+# Implementation experience # {#experience}
+
+None yet.
+
+# Proposed wording # {#wording}
+
+## [class.compare.secondary] ## {#wording-class.compare.secondary}
+
+Modify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> as follows:
+
+<small><blockquote>
+1․ A function definition whose <i>function-body</i> is of the form `= default ;` is called an explicitly-defaulted definition. A function that is explicitly defaulted shall
+(1.1)
+be a special member function or a comparison operator function ([over.binary]), and
+(1.2)
+not have default arguments.
+2
+#
+An explicitly defaulted special member function 
+F
+1
+ is allowed to differ from the corresponding special member function 
+F
+2
+ that would have been implicitly declared, as follows:
+(2.1)
+F
+1
+ and 
+F
+2
+ may have differing ref-qualifiers;
+(2.2)
+if 
+F
+2
+ has an implicit object parameter of type “reference to C”, 
+F
+1
+ may be an explicit object member function whose explicit object parameter is of type “reference to C”, in which case the type of 
+F
+1
+ would differ from the type of 
+F
+2
+ in that the type of 
+F
+1
+ has an additional parameter;
+(2.3)
+F
+1
+ and 
+F
+2
+ may have differing exception specifications; and
+(2.4)
+if 
+F
+2
+ has a non-object parameter of type const C&, the corresponding non-object parameter of 
+F
+1
+ may be of type C&.
+If the type of 
+F
+1
+ differs from the type of 
+F
+2
+ in a way other than as allowed by the preceding rules, then:
+(2.5)
+if 
+F
+1
+ is an assignment operator, and the return type of 
+F
+1
+ differs from the return type of 
+F
+2
+ or 
+F
+1
+'s non-object parameter type is not a reference, the program is ill-formed;
+(2.6)
+otherwise, if 
+F
+1
+ is explicitly defaulted on its first declaration, it is defined as deleted;
+(2.7)
+otherwise, the program is ill-formed.
+
+
+<small><blockquote>
+1․ A <i>secondary comparison operator</i> is a relational operator ([expr.rel]) or the `!=` operator.
+<del>A defaulted operator function ([over.binary]) for a secondary comparison operator `@` shall have a declared return type `bool`.</del>
+
+2․ <del>The</del> <ins>A defaulted secondary comparison</ins> operator function with parameters `x` and `y` is defined as deleted if
+
+— (2.1) overload resolution ([over.match]), as applied to `x @ y`, does not result in a usable candidate, or
+
+— (2.2) the candidate selected by overload resolution is not a rewritten candidate.
+
+Otherwise, the operator function yields `x @ y`. The defaulted operator function is not considered as a candidate
+in the overload resolution for the `@` operator.
+
+<ins>x․ A defaulted secondary comparison operator function shall have the return type `bool`. If its declared return type
+contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
+
+3․ [<i>Example 1</i>:
+<pre>
+struct HasNoLessThan { };
+
+struct C {
+  friend HasNoLessThan operator<=>(const C&, const C&);
+  bool operator<(const C&) const = default; // OK, function is deleted
+};
+</pre>
+— <i>end example</i>]
+</blockquote></small>
+
+## [class.copy.assign] ## {#wording-class.copy.assign}
+
+Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
+
+<small><blockquote>
+14․ The implicitly-defined copy/move assignment operator for a class returns <ins>an lvalue
+reference to</ins> the object for which the assignment operator is invoked, that is,
+the object assigned to.
+<p><ins>15․ If a defaulted copy/move assignment operator's declared return type contains a
+placeholder type, its return type is deduced as if from `return r;`, where `r` is an lvalue
+reference to the object for which the assignment operator is invoked.</ins>
+<p><ins>16․ [<i>Example:</i></ins>
+<pre>
+<ins>struct A {</ins>
+  <ins>decltype(auto) operator=(A&&) = default;</ins>
+    <ins><i>// Return type is A&</i></ins>
+<ins>};</ins>
+<ins>struct B {</ins>
+  <ins>auto operator=(B&&) = default;</ins>
+    <ins><i>// error: Return type is B, which violates [dcl.fct.def.default]/2.5</i></ins>
+<ins>};</ins>
+</pre>
+<ins>—<i>end example</i>]</ins>
+</blockquote></small>
