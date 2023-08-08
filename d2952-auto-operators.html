@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2952R0<br>auto&amp; operator=(X&amp;&amp;)</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-07-23">2023-07-23</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-08-08">2023-08-08</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2104,13 +2104,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Audience:
      <dd>EWG
      <dt>Project:
-     <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
+     <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>8
-     <dt>Current Source:
-     <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2952-auto-operators.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2952-auto-operators.bs</a>
-     <dt>Current:
-     <dd><a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2952-auto-operators.html">rawgit.com/Quuxplusone/draft/gh-pages/d2952-auto-operators.html</a>
+     <dd>9
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2188,30 +2184,29 @@ such as in this real code from libc++'s test suite:</p>
   <c- p>[...]</c->
 <c- p>};</c->
 </pre>
+   <p>The comparison operators are inconsistent among themselves: <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> can deduce <code class="highlight"><c- n>strong_ordering</c-></code>, but the others cannot deduce <code class="highlight"><c- b>bool</c-></code>.</p>
+<pre class="language-cpp highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// well-formed</c->
+<c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->  <c- c1>// ill-formed, must say 'bool'</c->
+<c- k>auto</c-> <c- k>operator</c-><c- o>&lt;</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->  <c- c1>// ill-formed, must say 'bool'</c->
+</pre>
    <p>The status quo is inconsistent between non-defaulted and defaulted functions,
 making it unnecessarily tedious to upgrade to <code class="highlight"><c- o>=</c-><c- k>default</c-></code>:</p>
 <pre class="language-cpp highlight"><c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- p>{</c-> <c- n>i</c-> <c- o>=</c-> <c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// well-formed</c->
-<c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->                   <c- c1>// ill-formed, must say 'MyClass&amp;'</c->
-</pre>
-   <p>And the comparison operators are inconsistent among themselves: <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> can deduce <code class="highlight"><c- n>strong_ordering</c-></code>, but the others (including <code class="highlight"><c- k>operator</c-><c- o>==</c-></code>) cannot deduce <code class="highlight"><c- b>bool</c-></code>.</p>
-<pre class="language-cpp highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// well-formed</c->
-<c- k>auto</c-> <c- k>operator</c-><c- o>&lt;</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->  <c- c1>// ill-formed, must say 'bool'</c->
+<c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// ill-formed, must say 'MyClass&amp;'</c->
 
 <c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- p>{</c-> <c- k>return</c-> <c- n>i</c-> <c- o>==</c-> <c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// well-formed</c->
 <c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// ill-formed, must say 'bool'</c->
 </pre>
-   <p>The current ill-formedness of these declarations comes from overly restrictive wording in the standard,
-such as <a href="https://eel.is/c++draft/class.eq">[class.eq]</a> specifically requiring that a defaulted equality
+   <p>The ill-formedness of these declarations comes from overly restrictive wording in the standard,
+such as <a href="https://eel.is/c++draft/class.eq#1.sentence-1">[class.eq]/1</a> specifically requiring that a defaulted equality
 operator must have a <em>declared</em> return type of <code class="highlight"><c- b>bool</c-></code>, instead of simply specifying that its return type
 must <em>be</em> <code class="highlight"><c- b>bool</c-></code>.
-We believe that these declarations should not be ill-formed. The meaning of each of the examples above
-is intuitively clear; the placeholder return type correctly matches the type which the defaulted body
-will actually return. We propose to loosen the current restrictions and permit these declarations to
-be well-formed.</p>
-   <p>Note that this proposal does <em>not</em> seek to change the valid return types of these functions
-(or any other aspect of their semantics). We propose a purely syntactic change to expand the
-range of allowed declaration <em>syntax</em>, not semantics. (But we do one drive-by clarification
-which we believe matches EWG’s original intent:
+We believe each of the examples above has an intuitively clear meaning: the placeholder return type
+correctly matches the type which the defaulted body will actually return. We propose to loosen the
+current restrictions and permit these declarations to be well-formed.</p>
+   <p>This proposal does not seek to change the set of valid return types for these functions.
+We propose a purely syntactic change to expand the range of allowed declaration <em>syntax</em>, not semantics.
+(But we do one drive-by clarification which we believe matches EWG’s original intent:
 if an empty class’s defaulted <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> returns a non-comparison-category type,
 it should be defaulted as deleted.)</p>
    <h2 class="heading settled" data-level="3" id="proposal"><span class="secno">3. </span><span class="content">Proposal</span><a class="self-link" href="#proposal"></a></h2>
@@ -2226,8 +2221,8 @@ as if from a fictional return statement that returns:</p>
     <li data-md>
      <p>an lvalue of type <code class="highlight"><c- n>C</c-></code>, in the case of <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> for a class or union type <code class="highlight"><c- n>C</c-></code></p>
    </ul>
-   <p>Then, the deduced return type is compared to the type(s) required by the standard. If the types match, the
-declaration is well-formed. Otherwise it’s ill-formed.</p>
+   <p>Then, the deduced return type is compared to the return type(s) permitted by the standard.
+If the types match, the declaration is well-formed. Otherwise it’s ill-formed.</p>
    <p>For the copy-assignment operator, our proposal gives the following behavior:</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>MyClass</c-> <c- p>{</c->
   <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->          <c- c1>// Proposed OK: deduces MyClass&amp;</c->
@@ -2252,7 +2247,7 @@ But we can’t find any wording in <a href="https://eel.is/c++draft/class.copy.a
 this behavior. It seems that vendors are interpreting e.g. <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>’s
 "[if] the return type of F<sub>1</sub> differs from the return type of F<sub>2</sub>"
 to mean "the <em>declared</em> return type of F<sub>1</sub>," even though newer sections such as <a href="https://eel.is/c++draft/class.compare">[class.compare]</a> consistently distinguish
-the "declared return type" from the [actual] return type.</p>
+the "declared return type" from the (actual) return type.</p>
    <p>We tentatively propose to leave <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> alone,
 and simply add an example that indicates the (new) intent of the (existing) wording: that it should
 now be interpreted as talking about the assignment operator’s <em>actual</em> return type,
@@ -2282,18 +2277,18 @@ of class <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex<
   <c- b>int</c-> <c- n>i</c-><c- p>;</c->
   <c- n>R</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c->
-<c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>three_way_comparable</c-><c- o>&lt;</c-><c- n>C</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>);</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>three_way_comparable</c-><c- o>&lt;</c-><c- n>C</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>>></c-><c- p>);</c->
+<c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>three_way_comparable</c-><c- o>&lt;</c-><c- n>C</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>);</c->
+  <c- c1>// OK, C&lt;int>'s operator&lt;=> is deleted</c->
 </pre>
    <p>Therefore we can’t just say "<code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> <em>shall</em> have a return type which is a comparison category type";
 we must say that if the return type is not a comparison category type then the operator is defaulted as deleted.</p>
    <h3 class="heading settled" data-level="3.3" id="deducing-this"><span class="secno">3.3. </span><span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span><a class="self-link" href="#deducing-this"></a></h3>
-   <p>Before <a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a>, defaulted functions were never allowed to have explicit object parameters.
-But the resolution of that issue (which has been adopted for C++23) permits explicit object parameters.
-This is not a problem for the comparison operators. But it constrains the wordings we can choose for <code class="highlight"><c- k>operator</c-><c- o>=</c-></code>: we can’t say "the return type is deduced as if from <code class="highlight"><c- k>return</c-> <c- o>*</c-><c- k>this</c-></code>" because there might not
-be a <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</p>
-   <p>There’s a quirk with rvalue-ref-qualified assignment operators. (Not <em>move</em> assignment, but
-assignment where the <em>destination</em> object is explicitly rvalue-ref-qualified.)</p>
+   <p>The resolution of <a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> (adopted for C++23) permits defaulted functions to have explicit object parameters.
+This constrains the wordings we can choose for <code class="highlight"><c- k>operator</c-><c- o>=</c-></code>: we can’t say “the return type is deduced
+as if from <code class="highlight"><c- k>return</c-> <c- o>*</c-><c- k>this</c-></code>” because there might not be a <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</p>
+   <p>There’s a quirk with rvalue-ref-qualified assignment operators — not <em>move</em> assignment, but
+assignment where the <em>destination</em> object is explicitly rvalue-ref-qualified.</p>
    <ul>
     <li data-md>
      <p><code class="highlight"><c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- p>{</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-></code> deduces an lvalue reference; but</p>
@@ -2319,12 +2314,13 @@ regardless of whether it’s declared using explicit object syntax.</p>
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed OK, deduces B&amp;</c->
 <c- p>};</c->
 </pre>
-   <p>Defaulted rvalue-ref-qualified assignment operators are weird, so (orthogonally to P2952)
-Arthur proposes in <a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting rvalue-ref-qualified assignment operators">[P2953]</a> to ban them. However, P2952 doesn’t need to treat them specially.
-Defaulted assignment operators invariably return lvalue references, so P2952 deduces an lvalue reference — done.</p>
+   <p>Defaulted rvalue-ref-qualified assignment operators are weird; Arthur is bringing another paper
+to forbid them entirely (<a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting rvalue-ref-qualified assignment operators">[P2953]</a>). However, P2952 doesn’t need to treat them specially.
+Defaulted assignment operators invariably return lvalue references, so we invariably deduce as-if-from
+an lvalue reference, full stop.</p>
    <h3 class="heading settled" data-level="3.4" id="corner-cases"><span class="secno">3.4. </span><span class="content">Existing corner cases</span><a class="self-link" href="#corner-cases"></a></h3>
    <p>There is vendor divergence in some corner cases. Here is a table of the divergences we found,
-plus our opinion as to the conforming behavior, and how it affects this proposal.</p>
+plus our opinion as to the conforming behavior, and our proposed behavior.</p>
    <p><small></small></p>
    <p></p>
    <table>
@@ -2483,7 +2479,7 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <td>✓
       <td>✓
       <td>✓
-      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a>
+      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>(<a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting rvalue-ref-qualified assignment operators">[P2953]</a>: deleted)
      <tr>
       <td><a href="https://godbolt.org/z/5P6EKrGjo">link</a>
       <td>
@@ -2516,8 +2512,9 @@ covers both <code class="highlight"><c- o>==</c-></code> or <code class="highlig
     <p></p>
     <small> <del>1․ A defaulted equality operator function ([over.binary]) shall have a declared return type <code class="highlight"><c- b>bool</c-></code>.</del> <p>2․ A defaulted <code class="highlight"><c- o>==</c-></code> operator function for a class <code class="highlight"><c- n>C</c-></code> is defined as deleted unless, for each <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> in the expanded list of subobjects for an object <code class="highlight"><c- n>x</c-></code> of type <code class="highlight"><c- n>C</c-></code>, <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>==</c-> <c- n>x</c-></code><sub><i>i</i></sub> is usable
 ([class.compare.default]).</p> <p>3․ The return value <code class="highlight"><c- n>V</c-></code> of a defaulted <code class="highlight"><c- o>==</c-></code> operator function with parameters <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> is determined by comparing corresponding elements <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> and <code class="highlight"><c- n>y</c-></code><sub><i>i</i></sub> in the expanded lists of subobjects for <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> (in increasing index order)
-until the first index <i>i</i> where <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> and <code class="highlight"><c- n>y</c-></code><sub><i>i</i></sub> <ins>,</ins> <del>yields a result value which,
-when</del> contextually converted to <code class="highlight"><c- b>bool</c-></code>, yields <code class="highlight">false</code>. If no such index exists, <code class="highlight"><c- n>V</c-></code> is <code class="highlight">true</code>. Otherwise, <code class="highlight"><c- n>V</c-></code> is <code class="highlight">false</code>.</p> <ins>x․ A defaulted <code class="highlight"><c- o>==</c-></code> operator function shall have the return type <code class="highlight"><c- b>bool</c-></code>. If its declared return type
+until the first index <i>i</i> where <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>==</c-></code> <code class="highlight"><c- n>y</c-></code><sub><i>i</i></sub> <del>yields a result value
+which</del> , <del>when</del> contextually converted to <code class="highlight"><c- b>bool</c-></code>, yields <code class="highlight">false</code>.
+If no such index exists, <code class="highlight"><c- n>V</c-></code> is <code class="highlight">true</code>. Otherwise, <code class="highlight"><c- n>V</c-></code> is <code class="highlight">false</code>.</p> <ins>x․ A defaulted <code class="highlight"><c- o>==</c-></code> operator function shall have the return type <code class="highlight"><c- b>bool</c-></code>. If its declared return type
 contains a placeholder type, its return type is deduced as if from <code class="highlight"><c- k>return</c-> true<c- p>;</c-></code>.</ins> <p>4․ [<i>Example 1:</i></p> <pre class="highlight"><c- k>struct</c-> <c- nc>D</c-> <c- p>{</c->
   <c- b>int</c-> <c- n>i</c-><c- p>;</c->
   <c- k>friend</c-> <c- b>bool</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>D</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>,</c-> <c- k>const</c-> <c- n>D</c-><c- o>&amp;</c-> <c- n>y</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2541,9 +2538,9 @@ The return type is deduced as <ins>if from <code class="highlight"><c- k>return<
 common comparison type (see below) of <code class="highlight"><c- n>R</c-></code><sub>0</sub>, <code class="highlight"><c- n>R</c-></code><sub>1</sub>, ..., <code class="highlight"><c- n>R</c-></code><sub>n-1</sub>.</p> <p>— (2.2) Otherwise, <del><code class="highlight"><c- n>R</c-></code> shall not contain a placeholder type. If</del> <ins>if</ins> the synthesized three-way comparison of type <code class="highlight"><c- n>R</c-></code> between any objects <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> and <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> is not defined, the operator function is
 defined as deleted.</p> <p>3․ The return value <code class="highlight"><c- n>V</c-></code> <del>of type <code class="highlight"><c- n>R</c-></code></del> of the defaulted three-way comparison operator function with parameters <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> <del>of
 the same type</del> is determined by comparing corresponding elements <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> and <code class="highlight"><c- n>y</c-></code><sub><i>i</i></sub> in the expanded lists of subobjects for <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> (in increasing index order) until the first index <i>i</i> where the synthesized three-way comparison of type <code class="highlight"><c- n>R</c-></code> between <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> and <code class="highlight"><c- n>y</c-></code><sub><i>i</i></sub> yields a result value <code class="highlight"><c- n>v</c-></code><sub><i>i</i></sub> where <code class="highlight"><c- n>v</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>!=</c-> <c- mi>0</c-></code>, contextually converted to <code class="highlight"><c- b>bool</c-></code>,
-yields <code class="highlight">true</code>; <code class="highlight"><c- n>V</c-></code> is a copy of <code class="highlight"><c- n>v</c-></code><sub><i>i</i></sub>.
-If no such index exists, <code class="highlight"><c- n>V</c-></code> is <del><code class="highlight"><c- k>static_cast</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-></code></del><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-></code><del><code class="highlight"><c- p>)</c-></code></del>.</p> <ins>x․ A defaulted three-way comparison operator function which is not deleted shall have a return type which is a comparison category type.
-[<i>Note:</i> A reference type is not a comparison category type. —<i>end note</i>]</ins> <p>4․ The <i>common comparison type</i> <code class="highlight"><c- n>U</c-></code> of a possibly-empty list of <i>n</i> comparison category types <code class="highlight"><c- n>T</c-></code><sub>0</sub>, <code class="highlight"><c- n>T</c-></code><sub>1</sub>, ..., <code class="highlight"><c- n>T</c-></code><sub>n-1</sub> is defined as follows:</p> <p>[...]</p> </small></blockquote>
+yields <code class="highlight">true</code>; <code class="highlight"><c- n>V</c-></code> is <del>a copy of</del> <code class="highlight"><c- n>v</c-></code><sub><i>i</i></sub>.
+If no such index exists, <code class="highlight"><c- n>V</c-></code> is <del><code class="highlight"><c- k>static_cast</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-></code></del><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-></code><del><code class="highlight"><c- p>)</c-></code></del>.</p> <ins>x․ A defaulted three-way comparison operator function which is not deleted shall have a return type which is a comparison category type
+([cmp.categories.pre]).</ins> <p>4․ The <i>common comparison type</i> <code class="highlight"><c- n>U</c-></code> of a possibly-empty list of <i>n</i> comparison category types <code class="highlight"><c- n>T</c-></code><sub>0</sub>, <code class="highlight"><c- n>T</c-></code><sub>1</sub>, ..., <code class="highlight"><c- n>T</c-></code><sub>n-1</sub> is defined as follows:</p> <p>[...]</p> </small></blockquote>
    <h3 class="heading settled" data-level="5.3" id="wording-class.compare.secondary"><span class="secno">5.3. </span><span class="content">[class.compare.secondary]</span><a class="self-link" href="#wording-class.compare.secondary"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/class.compare.secondary">[class.compare.secondary]</a> as follows:</p>
    <p><small></small></p>
@@ -2561,10 +2558,12 @@ contains a placeholder type, its return type is deduced as if from <code class="
 But we need this new wording to ensure that an <em>explicitly-defaulted</em> copy/move assignment operator
 will deduce that same type. (If it didn’t deduce that type, then the explicitly-defaulted operator
 would be deleted, as in example <code class="highlight"><c- n>B</c-></code> below.)</p>
+   <p class="note" role="note"><span class="marker">Note:</span> Arthur initially proposed that [class.copy.assign]/14 should say "...returns <em>an lvalue reference to</em> the object for which...", but Jens Maurer thought that wouldn’t be
+an improvement from CWG’s point of view.</p>
    <p>Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:</p>
    <p><small></small></p>
-   <blockquote><small> 14․ The implicitly-defined copy/move assignment operator for a class returns <ins>an lvalue
-reference to</ins> the object for which the assignment operator is invoked, that is,
+   <blockquote><small> 14․ The implicitly-defined copy/move assignment operator for a class returns
+the object for which the assignment operator is invoked, that is,
 the object assigned to.<p></p> <p><ins>15․ If a defaulted copy/move assignment operator’s declared return type contains a
 placeholder type, its return type is deduced as if from <code class="highlight"><c- k>return</c-> <c- n>r</c-><c- p>;</c-></code>, where <code class="highlight"><c- n>r</c-></code> is an lvalue
 reference to the object for which the assignment operator is invoked.</ins> </p><p><ins>16․ [<i>Example:</i></ins> </p><pre class="highlight"><ins><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c-></ins>

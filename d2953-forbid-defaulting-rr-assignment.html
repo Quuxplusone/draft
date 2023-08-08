@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2953R0<br>Forbid defaulting rvalue-ref-qualified assignment operators</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-07-23">2023-07-23</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-08-08">2023-08-08</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2103,13 +2103,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Audience:
      <dd>EWG
      <dt>Project:
-     <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
+     <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>2
-     <dt>Current Source:
-     <dd><a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2953-forbid-defaulting-rr-assignment.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2953-forbid-defaulting-rr-assignment.bs</a>
-     <dt>Current:
-     <dd><a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2953-forbid-defaulting-rr-assignment.html">rawgit.com/Quuxplusone/draft/gh-pages/d2953-forbid-defaulting-rr-assignment.html</a>
+     <dd>3
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2132,8 +2128,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <a href="#proposal"><span class="secno">2</span> <span class="content">Motivation and proposal</span></a>
      <ol class="toc">
       <li><a href="#p2952"><span class="secno">2.1</span> <span class="content">Interaction with P2952</span></a>
-      <li><a href="#corner-cases"><span class="secno">2.2</span> <span class="content">Existing corner cases</span></a>
-      <li><a href="#impact"><span class="secno">2.3</span> <span class="content">Impact on existing code</span></a>
+      <li><a href="#deleted-versus-ill-formed"><span class="secno">2.2</span> <span class="content">"Deleted" versus "ill-formed"</span></a>
+      <li><a href="#corner-cases"><span class="secno">2.3</span> <span class="content">Existing corner cases</span></a>
+      <li><a href="#impact"><span class="secno">2.4</span> <span class="content">Impact on existing code</span></a>
      </ol>
     <li><a href="#experience"><span class="secno">3</span> <span class="content">Implementation experience</span></a>
     <li>
@@ -2142,6 +2139,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#wording-dcl.fct.def.default"><span class="secno">4.1</span> <span class="content">[dcl.fct.def.default]</span></a>
       <li><a href="#wording-class.copy.assign"><span class="secno">4.2</span> <span class="content">[class.copy.assign]</span></a>
      </ol>
+    <li><a href="#straw-polls"><span class="secno">5</span> <span class="content">Proposed straw polls</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -2160,15 +2158,14 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      </ul>
    </ul>
    <h2 class="heading settled" data-level="2" id="proposal"><span class="secno">2. </span><span class="content">Motivation and proposal</span><a class="self-link" href="#proposal"></a></h2>
-   <p>Currently, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a> permits an explicitly defaulted special member function to differ from the corresponding
+   <p>Currently, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a> permits an explicitly defaulted special member function to differ from the
 implicit one by adding <i>ref-qualifiers</i>, but not <i>cv-qualifiers</i>.</p>
    <p>For example, the signature <code class="highlight"><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-><c- o>&amp;</c-> <c- o>=</c-> <c- k>default</c-></code> is forbidden
 because it is additionally const-qualified, and also because its return type differs
 from the implicitly-defaulted <code class="highlight"><c- n>A</c-><c- o>&amp;</c-></code>. This might be considered unfortunate, because that’s
-a reasonable signature for a const-assignable proxy-reference type (assuming all of its
-members are also const-assignable). Regardless, programmers aren’t clamoring for that signature
-to be supported, so we do not propose to support it here.</p>
-   <p>Our concern is that the <em>unrealistic</em> signature <code class="highlight"><c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-></code> is <em>permitted!</em> This causes three minor drawbacks:</p>
+a reasonable signature for a const-assignable proxy-reference type.
+But programmers aren’t clamoring for that signature to be supported, so we do not propose to support it here.</p>
+   <p>Our concern is that the <em>unrealistic</em> signature <code class="highlight"><c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-></code> is <em>permitted!</em> This has three minor drawbacks:</p>
    <ul>
     <li data-md>
      <p>The possibility of these unrealistic signatures makes C++ harder to understand.
@@ -2181,7 +2178,7 @@ if they weren’t permitted.</p>
    </ul>
    <p>To eliminate all three drawbacks,
 we propose that a defaulted copy/move assignment operator should not be permitted to add
-an <em>rvalue</em> ref-qualifier to its implicit counterpart (nor an explicit object parameter
+to its implicit signature an <em>rvalue</em> ref-qualifier (nor an explicit object parameter
 of rvalue reference type).</p>
    <h3 class="heading settled" data-level="2.1" id="p2952"><span class="secno">2.1. </span><span class="content">Interaction with P2952</span><a class="self-link" href="#p2952"></a></h3>
    <p><a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> (adopted for C++23) permits <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> to have an explicit object parameter.</p>
@@ -2194,17 +2191,17 @@ If P2952 is adopted without P2953, then we will have the following pub-quiz fodd
     <c- c1>// Proposed: Still OK, still deduces C&amp;&amp;</c->
 
   <c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>C</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- c1>// Today: Ill-formed</c->
+    <c- c1>// Today: Ill-formed, return type involves placeholder</c->
     <c- c1>// After P2952: OK, deduces C&amp;</c->
-    <c- c1>// Proposed: Ill-formed</c->
+    <c- c1>// Proposed: Deleted, object parameter is not C&amp;</c->
 <c- p>};</c->
 </pre>
    <p>The first, non-defaulted, operator "does the natural thing" by returning its left-hand operand,
 and deduces <code class="highlight"><c- n>C</c-><c- o>&amp;&amp;</c-></code>. The second operator also "does the natural thing" by being defaulted; but
-after P2952 it will deduce <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code>. (For rationale, see <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;)">[P2952]</a> §3.3 "Deducing <code class="highlight"><c- k>this</c-></code>".)
+after P2952 it will deduce <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code>. (For rationale, see <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;)">[P2952]</a> §3.3 "Deducing <code class="highlight"><c- k>this</c-></code> and CWG2586.")
 The two "natural" implementations deduce different types! This might be perceived as inconsistency.</p>
-   <p>If we adopt P2953 alongside P2952, then the second <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> will go back to being ill-formed,
-which eliminates the perception of inconsistency.</p>
+   <p>If we adopt P2953 alongside P2952, then the second <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> will go back to being unusable,
+which reduces the perception of inconsistency.</p>
    <table>
     <tbody>
      <tr>
@@ -2218,11 +2215,44 @@ which eliminates the perception of inconsistency.</p>
      <tr>
       <th>P2953
       <td><code class="highlight"><c- n>C</c-><c- o>&amp;&amp;</c-></code>/ill-formed
-      <td><code class="highlight"><c- n>C</c-><c- o>&amp;&amp;</c-></code>/ill-formed
+      <td><code class="highlight"><c- n>C</c-><c- o>&amp;&amp;</c-></code>/deleted
    </table>
-   <h3 class="heading settled" data-level="2.2" id="corner-cases"><span class="secno">2.2. </span><span class="content">Existing corner cases</span><a class="self-link" href="#corner-cases"></a></h3>
+   <h3 class="heading settled" data-level="2.2" id="deleted-versus-ill-formed"><span class="secno">2.2. </span><span class="content">"Deleted" versus "ill-formed"</span><a class="self-link" href="#deleted-versus-ill-formed"></a></h3>
+   <p><a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> goes out of its way
+to make many explicitly defaulted assignment operators "defaulted as deleted," rather than ill-formed.
+I think I understand the reason for this in the case of <em>comparison operators</em> (see <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;)">[P2952]</a> §3.2 "Defaulted as deleted"), but it’s non-obvious why we should care about
+the corresponding cases for constructors, destructors, and assignment operators.
+(Clang handles this example correctly; GCC, MSVC, and EDG
+already non-conformingly treat <em>both</em> <code class="highlight"><c- n>cl</c-></code> and <code class="highlight"><c- n>cr</c-></code> as ill-formed.)</p>
+<pre class="language-cpp highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- o>></c-> <c- k>class</c-> <c- nc>TT</c-><c- o>></c->
+<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
+  <c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>TT</c-><c- o>&lt;</c-><c- k>const</c-> <c- n>C</c-><c- o>></c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- p>};</c->
+
+<c- n>C</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>add_lvalue_reference_t</c-><c- o>></c-> <c- n>cl</c-><c- p>;</c->
+  <c- c1>// OK, operator= is defaulted</c->
+  <c- c1>// (and GCC/MSVC/EDG have a bug)</c->
+
+<c- n>C</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>add_rvalue_reference_t</c-><c- o>></c-> <c- n>cr</c-><c- p>;</c->
+  <c- c1>// OK, operator= is defaulted as deleted</c->
+  <c- c1>// (but why not just make it ill-formed?)</c->
+</pre>
+   <p>P2953 isn’t yet proposing to change the complicated status quo, but Arthur would certainly like
+to learn the status quo’s rationale. If we were willing to aggressively change the status quo,
+we could simplify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> something like this:</p>
+   <p><small></small></p>
+   <blockquote><small> 1․ A function definition whose <i>function-body</i> is of the form <code class="highlight"><c- o>=</c-> <c- k>default</c-> <c- p>;</c-></code> is called an <i>explicitly-defaulted</i> definition.
+A function that is explicitly defaulted shall<p></p> <ul><li data-md><p>(1.1) be a special member function or a comparison operator function ([over.binary]), and</p> </li><li data-md><p>(1.2) not have default arguments.</p> </li></ul> <p>2․ An explicitly defaulted special member function <code class="highlight"><c- n>F</c-></code><sub>1</sub> is allowed to differ
+from the corresponding special member function <code class="highlight"><c- n>F</c-></code><sub>2</sub> that would have been implicitly declared, as follows: </p><ul><li data-md><p>(2.1) <ins>if <code class="highlight"><c- n>F</c-></code><sub>2</sub> is an assignment operator,</ins> <del><code class="highlight"><c- n>F</c-></code><sub>1</sub> and <code class="highlight"><c- n>F</c-></code><sub>2</sub> may have differing <i>ref-qualifiers</i></del> <ins><code class="highlight"><c- n>F</c-></code><sub>1</sub> may have an lvalue <i>ref-qualifier</i></ins>;</p> </li><li data-md><p>(2.2) if <code class="highlight"><c- n>F</c-></code><sub>2</sub> <del>has an implicit object parameter of type “reference to C”</del> <ins>is
+an assignment operator with an implicit object parameter of type <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code></ins>, <code class="highlight"><c- n>F</c-></code><sub>1</sub> may <del>be an explicit object member function whose</del> <ins>have an</ins> explicit
+object parameter <del>is</del> of type <del>(possibly
+different) “reference to C”</del> <ins><code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code></ins>, in which case the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> would differ from the type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> in that the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> has an additional parameter; <ins>and</ins></p> </li><li data-md><p>(2.3) <code class="highlight"><c- n>F</c-></code><sub>1</sub> and <code class="highlight"><c- n>F</c-></code><sub>2</sub> may have differing exception specifications<ins>.</ins> <del>; and</del></p> </li><li data-md><del>(2.4) if <code class="highlight"><c- n>F</c-></code><sub>2</sub> has a non-object parameter of type <code class="highlight"><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-></code>, the corresponding
+non-object parameter of <code class="highlight"><c- n>F</c-></code><sub>1</sub> may be of type <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code>.</del> </li></ul> <p>If the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> differs from the type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> in a way other than as allowed by the preceding rules, then: </p><ul><li data-md><del>(2.5) if <code class="highlight"><c- n>F</c-></code><sub>1</sub> is an assignment operator, and the return type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> differs from the return type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> or <code class="highlight"><c- n>F</c-></code><sub>1</sub>’s non-object parameter type is not a reference, the program is ill-formed;</del> </li><li data-md><p>(2.6) <del>otherwise,</del> if <code class="highlight"><c- n>F</c-></code><sub>1</sub> is <ins>a three-way comparison operator</ins> explicitly
+defaulted on its first declaration, it is defined as deleted;</p> </li><li data-md><p>(2.7) otherwise, the program is ill-formed.</p> </li></ul> <p>[...] </p></small></blockquote>
+   <p>Again, P2953 doesn’t yet propose the above change; but it would be good to know why we shouldn’t.</p>
+   <h3 class="heading settled" data-level="2.3" id="corner-cases"><span class="secno">2.3. </span><span class="content">Existing corner cases</span><a class="self-link" href="#corner-cases"></a></h3>
    <p>There is vendor divergence in some corner cases. Here is a table of the divergences we found,
-plus our opinion as to the conforming behavior, and how it affects this proposal.</p>
+plus our opinion as to the conforming behavior, and our proposed behavior.</p>
    <p><small></small></p>
    <p></p>
    <table>
@@ -2243,7 +2273,7 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <td>✓
       <td>✓
       <td>✓
-      <td>✓
+      <td>✓<br>(§2.2: ✗)
      <tr>
       <td><a href="https://godbolt.org/z/hxc9za5KT">link</a>
       <td>
@@ -2252,7 +2282,7 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <td bgcolor="#FFCACA">✗
       <td bgcolor="#FFCACA">✗
       <td>deleted
-      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a>
+      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a><br>(§2.2: ✗)
      <tr>
       <td><a href="https://godbolt.org/z/ojM541bTM">link</a>
       <td>
@@ -2261,7 +2291,7 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <td>deleted
       <td bgcolor="#FFCACA">✗
       <td>deleted
-      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a>
+      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a><br>(§2.2: ✗)
      <tr>
       <td><a href="https://godbolt.org/z/hchco3rcK">link</a>
       <td>
@@ -2270,7 +2300,7 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <td>✓
       <td>✓
       <td>✓
-      <td>Today: <a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>Proposed: ✗
+      <td>Today: <a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>Proposed: deleted<br>(§2.2: ✗)
      <tr>
       <td><a href="https://godbolt.org/z/5P6EKrGjo">link</a>
       <td>
@@ -2280,21 +2310,33 @@ plus our opinion as to the conforming behavior, and how it affects this proposal
       <td>✗
       <td>✗
       <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a>
+     <tr>
+      <td><a href="https://godbolt.org/z/Th33Meeez">link</a>
+      <td>
+<pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-><c- o>></c->
+<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
+  <c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>add_lvalue_reference_t</c-><c- o>&lt;</c-><c- k>const</c-> <c- n>C</c-><c- o>></c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- p>};</c-></pre>
+      <td>✓
+      <td bgcolor="#FFCACA">✗
+      <td bgcolor="#FFCACA">✗
+      <td bgcolor="#FFCACA">✗
+      <td>✓
    </table>
-   <h3 class="heading settled" data-level="2.3" id="impact"><span class="secno">2.3. </span><span class="content">Impact on existing code</span><a class="self-link" href="#impact"></a></h3>
+   <h3 class="heading settled" data-level="2.4" id="impact"><span class="secno">2.4. </span><span class="content">Impact on existing code</span><a class="self-link" href="#impact"></a></h3>
    <p>This proposal takes code that was formerly well-formed C++23, and makes it ill-formed.
 The affected constructs are extremely implausible in Arthur’s opinion; but of course we
 need some implementation and usage experience in a real compiler before adopting this proposal.</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
     <c- c1>// Today: Well-formed</c->
-    <c- c1>// Tomorrow: Ill-formed (hard error)</c->
+    <c- c1>// Tomorrow: Deleted</c->
 <c- p>};</c->
 
 <c- k>struct</c-> <c- nc>D</c-> <c- p>{</c->
   <c- n>D</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>D</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
     <c- c1>// Today: Well-formed</c->
-    <c- c1>// Tomorrow: Ill-formed (hard error)</c->
+    <c- c1>// Tomorrow: Deleted</c->
 <c- p>};</c->
 </pre>
    <h2 class="heading settled" data-level="3" id="experience"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
@@ -2322,6 +2364,32 @@ for special member functions but only by omission-and-note in <a href="https://e
    <p>Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:</p>
    <p><small></small></p>
    <blockquote><small> TODO FIXME BUG HACK<p></p> </small></blockquote>
+   <h2 class="heading settled" data-level="5" id="straw-polls"><span class="secno">5. </span><span class="content">Proposed straw polls</span><a class="self-link" href="#straw-polls"></a></h2>
+   <p>The next revision of this paper (if any) will be guided by the outcomes of these two straw polls.</p>
+   <table class="def">
+    <tbody>
+     <tr>
+      <th style="width: 70%;">
+      <th><strong>SF</strong>
+      <th><strong>F</strong>
+      <th><strong>N</strong>
+      <th><strong>A</strong>
+      <th><strong>SA</strong>
+     <tr>
+      <th><small>EWG would like to forbid rvalue-ref-qualified assignment operators (by any means, not necessarily by this proposed wording).</small>
+      <th> – 
+      <th> — 
+      <th> — 
+      <th> — 
+      <th> — 
+     <tr>
+      <th><small>P2953R1 should pursue §2.2’s wording, making some "defaulted-as-deleted" operators into hard errors.</small>
+      <th> – 
+      <th> — 
+      <th> — 
+      <th> — 
+      <th> — 
+   </table>
   </main>
 <script>
 (function() {

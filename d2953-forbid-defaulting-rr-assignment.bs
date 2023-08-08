@@ -2,13 +2,11 @@
 Title: Forbid defaulting rvalue-ref-qualified assignment operators
 Shortname: D2953
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: EWG
 Status: D
 Group: WG21
 URL:
-!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2953-forbid-defaulting-rr-assignment.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2953-forbid-defaulting-rr-assignment.bs</a>
-!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2953-forbid-defaulting-rr-assignment.html">rawgit.com/Quuxplusone/draft/gh-pages/d2953-forbid-defaulting-rr-assignment.html</a>
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
@@ -17,7 +15,7 @@ Abstract:
   ref-qualification. This permits implausible
   signatures like `A& operator=(const A&) && = default`, where the left-hand
   operand is rvalue-ref-qualified. We propose to forbid such signatures.
-Date: 2023-07-23
+Date: 2023-08-08
 </pre>
 
 <style>
@@ -36,18 +34,17 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 # Motivation and proposal # {#proposal}
 
 Currently, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>
-permits an explicitly defaulted special member function to differ from the corresponding
+permits an explicitly defaulted special member function to differ from the
 implicit one by adding <i>ref-qualifiers</i>, but not <i>cv-qualifiers</i>.
 
 For example, the signature `const A& operator=(const A&) const& = default` is forbidden
 because it is additionally const-qualified, and also because its return type differs
 from the implicitly-defaulted `A&`. This might be considered unfortunate, because that's
-a reasonable signature for a const-assignable proxy-reference type (assuming all of its
-members are also const-assignable). Regardless, programmers aren't clamoring for that signature
-to be supported, so we do not propose to support it here.
+a reasonable signature for a const-assignable proxy-reference type.
+But programmers aren't clamoring for that signature to be supported, so we do not propose to support it here.
 
 Our concern is that the *unrealistic* signature `A& operator=(const A&) && = default` is
-*permitted!* This causes three minor drawbacks:
+*permitted!* This has three minor drawbacks:
 
 * The possibility of these unrealistic signatures makes C++ harder to understand.
     Before writing [[P2952]], Arthur didn't know such signatures were possible.
@@ -59,7 +56,7 @@ Our concern is that the *unrealistic* signature `A& operator=(const A&) && = def
 
 To eliminate all three drawbacks,
 we propose that a defaulted copy/move assignment operator should not be permitted to add
-an *rvalue* ref-qualifier to its implicit counterpart (nor an explicit object parameter
+to its implicit signature an *rvalue* ref-qualifier (nor an explicit object parameter
 of rvalue reference type).
 
 
@@ -78,44 +75,125 @@ struct C {
     // Proposed: Still OK, still deduces C&&
 
   auto&& operator=(this C&& self, const C&) = default;
-    // Today: Ill-formed
+    // Today: Ill-formed, return type involves placeholder
     // After P2952: OK, deduces C&
-    // Proposed: Ill-formed
+    // Proposed: Deleted, object parameter is not C&
 };
 ```
 
 The first, non-defaulted, operator "does the natural thing" by returning its left-hand operand,
 and deduces `C&&`. The second operator also "does the natural thing" by being defaulted; but
-after P2952 it will deduce `C&`. (For rationale, see [[P2952]] §3.3 "Deducing `this`".)
+after P2952 it will deduce `C&`. (For rationale, see [[P2952]] §3.3 "Deducing `this` and CWG2586.")
 The two "natural" implementations deduce different types! This might be perceived as inconsistency.
 
-If we adopt P2953 alongside P2952, then the second `operator=` will go back to being ill-formed,
-which eliminates the perception of inconsistency.
+If we adopt P2953 alongside P2952, then the second `operator=` will go back to being unusable,
+which reduces the perception of inconsistency.
 
 <table>
 <tr><td></td><th>Today</th><th>P2952</th></tr>
 <tr><th>Today</th><td><code>C&&</code>/ill-formed</td><td><code>C&&</code>/<code>C&</code></td></tr>
-<tr><th>P2953</th><td><code>C&&</code>/ill-formed</td><td><code>C&&</code>/ill-formed</td></tr>
+<tr><th>P2953</th><td><code>C&&</code>/ill-formed</td><td><code>C&&</code>/deleted</td></tr>
 </table>
+
+
+## "Deleted" versus "ill-formed" ## {#deleted-versus-ill-formed}
+
+<a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> goes out of its way
+to make many explicitly defaulted assignment operators "defaulted as deleted," rather than ill-formed.
+I think I understand the reason for this in the case of *comparison operators*
+(see [[P2952]] §3.2 "Defaulted as deleted"), but it's non-obvious why we should care about
+the corresponding cases for constructors, destructors, and assignment operators.
+(Clang handles this example correctly; GCC, MSVC, and EDG
+already non-conformingly treat *both* `cl` and `cr` as ill-formed.)
+
+```cpp
+template<template<class> class TT>
+struct C {
+  C& operator=(TT<const C>) = default;
+};
+
+C<std::add_lvalue_reference_t> cl;
+  // OK, operator= is defaulted
+  // (and GCC/MSVC/EDG have a bug)
+
+C<std::add_rvalue_reference_t> cr;
+  // OK, operator= is defaulted as deleted
+  // (but why not just make it ill-formed?)
+```
+
+P2953 isn't yet proposing to change the complicated status quo, but Arthur would certainly like
+to learn the status quo's rationale. If we were willing to aggressively change the status quo,
+we could simplify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a>
+something like this:
+
+<small><blockquote>
+1․ A function definition whose <i>function-body</i> is of the form `= default ;` is called an <i>explicitly-defaulted</i> definition.
+A function that is explicitly defaulted shall
+
+* (1.1) be a special member function or a comparison operator function ([over.binary]), and
+
+* (1.2) not have default arguments.
+
+<p>2․ An explicitly defaulted special member function <code>F</code><sub>1</sub> is allowed to differ
+from the corresponding special member function <code>F</code><sub>2</sub> that would have been implicitly declared, as follows:
+
+* (2.1) <ins>if <code>F</code><sub>2</sub> is an assignment operator,</ins> <del><code>F</code><sub>1</sub>
+    and <code>F</code><sub>2</sub> may have differing <i>ref-qualifiers</i></del> <ins><code>F</code><sub>1</sub>
+    may have an lvalue <i>ref-qualifier</i></ins>;
+
+* (2.2) if <code>F</code><sub>2</sub> <del>has an implicit object parameter of type “reference to C”</del> <ins>is
+    an assignment operator with an implicit object parameter of type `C&`</ins>,
+    <code>F</code><sub>1</sub> may <del>be an explicit object member function whose</del> <ins>have an</ins> explicit
+    object parameter <del>is</del> of type <del>(possibly
+    different) “reference to C”</del> <ins>`C&`</ins>, in which case the type of <code>F</code><sub>1</sub>
+    would differ from the type of <code>F</code><sub>2</sub> in that the type of <code>F</code><sub>1</sub>
+    has an additional parameter; <ins>and</ins>
+
+* (2.3) <code>F</code><sub>1</sub> and <code>F</code><sub>2</sub> may have differing exception specifications<ins>.</ins> <del>; and</del>
+
+* <del>(2.4) if <code>F</code><sub>2</sub> has a non-object parameter of type `const C&`, the corresponding
+    non-object parameter of <code>F</code><sub>1</sub> may be of type `C&`.</del>
+
+<p>If the type of <code>F</code><sub>1</sub> differs from the type of <code>F</code><sub>2</sub>
+in a way other than as allowed by the preceding rules, then:
+
+* <del>(2.5) if <code>F</code><sub>1</sub> is an assignment operator, and the return type of
+    <code>F</code><sub>1</sub> differs from the return type of <code>F</code><sub>2</sub>
+    or <code>F</code><sub>1</sub>'s non-object parameter type is not a reference, the program is ill-formed;</del>
+
+* (2.6) <del>otherwise,</del> if <code>F</code><sub>1</sub> is <ins>a three-way comparison operator</ins> explicitly
+    defaulted on its first declaration, it is defined as deleted;
+
+* (2.7) otherwise, the program is ill-formed.
+
+<p>[...]
+</blockquote></small>
+
+Again, P2953 doesn't yet propose the above change; but it would be good to know why we shouldn't.
 
 
 ## Existing corner cases ## {#corner-cases}
 
 There is vendor divergence in some corner cases. Here is a table of the divergences we found,
-plus our opinion as to the conforming behavior, and how it affects this proposal.
+plus our opinion as to the conforming behavior, and our proposed behavior.
 
 <small><table>
 <tr><th>URL</th><th>Code</th><th>Clang</th><th>GCC</th><th>MSVC</th><th>EDG</th><th>Correct</th></tr>
 <tr><td><a href="https://godbolt.org/z/WezedYYE3">link</a></td><td><pre>C& operator=(C&) = default;</pre></td>
-    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓<br>(§2.2: ✗)</td></tr>
 <tr><td><a href="https://godbolt.org/z/hxc9za5KT">link</a></td><td><pre>C& operator=(const C&&) = default;</pre></td>
-    <td>deleted</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
+    <td>deleted</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a><br>(§2.2: ✗)</td></tr>
 <tr><td><a href="https://godbolt.org/z/ojM541bTM">link</a></td><td><pre>C& operator=(const C&) const = default;</pre></td>
-    <td bgcolor="#FFCACA">✗</td><td>deleted</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
+    <td bgcolor="#FFCACA">✗</td><td>deleted</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a><br>(§2.2: ✗)</td></tr>
 <tr><td><a href="https://godbolt.org/z/hchco3rcK">link</a></td><td><pre>C& operator=(const C&) && = default;</pre></td>
-    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>Today: <a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>Proposed: ✗</td></tr>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>Today: <a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>Proposed: deleted<br>(§2.2: ✗)</td></tr>
 <tr><td><a href="https://godbolt.org/z/5P6EKrGjo">link</a></td><td><pre>C&& operator=(const C&) && = default;</pre></td>
     <td>✗</td><td>✗</td><td>✗</td><td>✗</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a></td></tr>
+<tr><td><a href="https://godbolt.org/z/Th33Meeez">link</a></td><td><pre>template&lt;class>
+struct C {
+  C& operator=(std::add_lvalue_reference_t&lt;const C>) = default;
+};</pre></td>
+    <td>✓</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>✓</td></tr>
 </table></small>
 
 ## Impact on existing code ## {#impact}
@@ -128,13 +206,13 @@ need some implementation and usage experience in a real compiler before adopting
 struct C {
   C& operator=(const C&) && = default;
     // Today: Well-formed
-    // Tomorrow: Ill-formed (hard error)
+    // Tomorrow: Deleted
 };
 
 struct D {
   D& operator=(this D&& self, const C&) = default;
     // Today: Well-formed
-    // Tomorrow: Ill-formed (hard error)
+    // Tomorrow: Deleted
 };
 ```
 
@@ -209,6 +287,20 @@ Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</
 <small><blockquote>
 TODO FIXME BUG HACK
 </blockquote></small>
+
+# Proposed straw polls # {#straw-polls}
+
+The next revision of this paper (if any) will be guided by the outcomes of these two straw polls.
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>EWG would like to forbid rvalue-ref-qualified assignment operators (by any means, not necessarily by this proposed wording).</th>
+<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
+
+<tr><th><small>P2953R1 should pursue §2.2's wording, making some "defaulted-as-deleted" operators into hard errors.</th>
+<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
+</table>
 
 <pre class=biblio>
 {
