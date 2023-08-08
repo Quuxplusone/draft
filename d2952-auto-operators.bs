@@ -2,13 +2,11 @@
 Title: auto& operator=(X&&)
 Shortname: D2952
 Revision: 0
-!Draft Revision: 8
+!Draft Revision: 9
 Audience: EWG
 Status: D
 Group: WG21
 URL:
-!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2952-auto-operators.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2952-auto-operators.bs</a>
-!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2952-auto-operators.html">rawgit.com/Quuxplusone/draft/gh-pages/d2952-auto-operators.html</a>
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Editor: Matthew Taylor, mjtaylor214@hotmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
@@ -17,7 +15,7 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2023-07-23
+Date: 2023-08-08
 </pre>
 
 <style>
@@ -64,39 +62,38 @@ struct ForwardDiffView {
 };
 ```
 
+The comparison operators are inconsistent among themselves: `operator<=>`
+can deduce `strong_ordering`, but the others cannot deduce `bool`.
+
+```cpp
+  auto operator<=>(const MyClass& rhs) const = default; // well-formed
+  auto operator==(const MyClass& rhs) const = default;  // ill-formed, must say 'bool'
+  auto operator<(const MyClass& rhs) const = default;  // ill-formed, must say 'bool'
+```
+
 The status quo is inconsistent between non-defaulted and defaulted functions,
 making it unnecessarily tedious to upgrade to `=default`:
 
 ```cpp
   auto& operator=(const MyClass& rhs) { i = rhs.i; return *this; } // well-formed
-  auto& operator=(const MyClass& rhs) = default;                   // ill-formed, must say 'MyClass&'
-```
-
-And the comparison operators are inconsistent among themselves: `operator<=>`
-can deduce `strong_ordering`, but the others (including `operator==`) cannot deduce `bool`.
-
-```cpp
-  auto operator<=>(const MyClass& rhs) const = default; // well-formed
-  auto operator<(const MyClass& rhs) const = default;  // ill-formed, must say 'bool'
+  auto& operator=(const MyClass& rhs) = default; // ill-formed, must say 'MyClass&'
 
   auto operator==(const MyClass& rhs) const { return i == rhs.i; } // well-formed
   auto operator==(const MyClass& rhs) const = default; // ill-formed, must say 'bool'
 ```
 
-The current ill-formedness of these declarations comes from overly restrictive wording in the standard,
-such as <a href="https://eel.is/c++draft/class.eq">[class.eq]</a>
+The ill-formedness of these declarations comes from overly restrictive wording in the standard,
+such as <a href="https://eel.is/c++draft/class.eq#1.sentence-1">[class.eq]/1</a>
 specifically requiring that a defaulted equality
 operator must have a *declared* return type of `bool`, instead of simply specifying that its return type
 must *be* `bool`.
-We believe that these declarations should not be ill-formed. The meaning of each of the examples above
-is intuitively clear; the placeholder return type correctly matches the type which the defaulted body
-will actually return. We propose to loosen the current restrictions and permit these declarations to
-be well-formed.
+We believe each of the examples above has an intuitively clear meaning: the placeholder return type
+correctly matches the type which the defaulted body will actually return. We propose to loosen the
+current restrictions and permit these declarations to be well-formed.
 
-Note that this proposal does *not* seek to change the valid return types of these functions
-(or any other aspect of their semantics). We propose a purely syntactic change to expand the
-range of allowed declaration *syntax*, not semantics. (But we do one drive-by clarification
-which we believe matches EWG's original intent:
+This proposal does not seek to change the set of valid return types for these functions.
+We propose a purely syntactic change to expand the range of allowed declaration *syntax*, not semantics.
+(But we do one drive-by clarification which we believe matches EWG's original intent:
 if an empty class's defaulted `operator<=>` returns a non-comparison-category type,
 it should be defaulted as deleted.)
 
@@ -110,8 +107,8 @@ as if from a fictional return statement that returns:
 * a prvalue of type `Q`, in the case of `operator<=>`; where `Q` is the common comparison type of <i>R</i><sub>0</sub>, <i>R</i><sub>1</sub>,... <i>R</i><sub>n-1</sub>
 * an lvalue of type `C`, in the case of `operator=` for a class or union type `C`
 
-Then, the deduced return type is compared to the type(s) required by the standard. If the types match, the
-declaration is well-formed. Otherwise it's ill-formed.
+Then, the deduced return type is compared to the return type(s) permitted by the standard.
+If the types match, the declaration is well-formed. Otherwise it's ill-formed.
 
 For the copy-assignment operator, our proposal gives the following behavior:
 
@@ -146,7 +143,7 @@ this behavior. It seems that vendors are interpreting e.g. <a href="https://eel.
 "[if] the return type of F<sub>1</sub> differs from the return type of F<sub>2</sub>"
 to mean "the *declared* return type of F<sub>1</sub>," even though newer sections such as
 <a href="https://eel.is/c++draft/class.compare">[class.compare]</a> consistently distinguish
-the "declared return type" from the [actual] return type.
+the "declared return type" from the (actual) return type.
 
 We tentatively propose to leave <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> alone,
 and simply add an example that indicates the (new) intent of the (existing) wording: that it should
@@ -183,8 +180,9 @@ struct C {
   int i;
   R operator<=>(const C&) const = default;
 };
-static_assert(!std::three_way_comparable<C<int>>);
 static_assert(std::three_way_comparable<C<std::strong_ordering>>);
+static_assert(!std::three_way_comparable<C<int>>);
+  // OK, C<int>'s operator<=> is deleted
 ```
 
 Therefore we can't just say "`operator<=>` *shall* have a return type which is a comparison category type";
@@ -192,14 +190,12 @@ we must say that if the return type is not a comparison category type then the o
 
 ## "Deducing `this`" and CWG2586 ## {#deducing-this}
 
-Before [[CWG2586]], defaulted functions were never allowed to have explicit object parameters.
-But the resolution of that issue (which has been adopted for C++23) permits explicit object parameters.
-This is not a problem for the comparison operators. But it constrains the wordings we can choose for
-`operator=`: we can't say "the return type is deduced as if from `return *this`" because there might not
-be a `*this`.
+The resolution of [[CWG2586]] (adopted for C++23) permits defaulted functions to have explicit object parameters.
+This constrains the wordings we can choose for `operator=`: we can't say “the return type is deduced
+as if from `return *this`” because there might not be a `*this`.
 
-There's a quirk with rvalue-ref-qualified assignment operators. (Not *move* assignment, but
-assignment where the *destination* object is explicitly rvalue-ref-qualified.)
+There's a quirk with rvalue-ref-qualified assignment operators — not *move* assignment, but
+assignment where the *destination* object is explicitly rvalue-ref-qualified.
 
 * `auto&& operator=(const B&) && { return *this; }` deduces an lvalue reference; but
 * `auto&& operator=(this B&& self, const B&) { return self; }` deduces an rvalue reference.
@@ -227,15 +223,16 @@ struct B {
 };
 ```
 
-Defaulted rvalue-ref-qualified assignment operators are weird, so (orthogonally to P2952)
-Arthur proposes in [[P2953]] to ban them. However, P2952 doesn't need to treat them specially.
-Defaulted assignment operators invariably return lvalue references, so P2952 deduces an lvalue reference — done.
+Defaulted rvalue-ref-qualified assignment operators are weird; Arthur is bringing another paper
+to forbid them entirely ([[P2953]]). However, P2952 doesn't need to treat them specially.
+Defaulted assignment operators invariably return lvalue references, so we invariably deduce as-if-from
+an lvalue reference, full stop.
 
 
 ## Existing corner cases ## {#corner-cases}
 
 There is vendor divergence in some corner cases. Here is a table of the divergences we found,
-plus our opinion as to the conforming behavior, and how it affects this proposal.
+plus our opinion as to the conforming behavior, and our proposed behavior.
 
 <small><table>
 <tr><th>URL</th><th>Code</th><th>Clang</th><th>GCC</th><th>MSVC</th><th>EDG</th><th>Correct</th></tr>
@@ -294,7 +291,7 @@ struct C {
 <tr><td><a href="https://godbolt.org/z/ojM541bTM">link</a></td><td><pre>C& operator=(const C&) const = default;</pre></td>
     <td bgcolor="#FFCACA">✗</td><td>deleted</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
 <tr><td><a href="https://godbolt.org/z/hchco3rcK">link</a></td><td><pre>C& operator=(const C&) && = default;</pre></td>
-    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a></td></tr>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>([[P2953]]: deleted)</td></tr>
 <tr><td><a href="https://godbolt.org/z/5P6EKrGjo">link</a></td><td><pre>C&& operator=(const C&) && = default;</pre></td>
     <td>✗</td><td>✗</td><td>✗</td><td>✗</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a></td></tr>
 </table></small>
@@ -335,8 +332,9 @@ in the expanded list of subobjects for an object `x` of type `C`, `x`<sub><i>i</
 
 3․ The return value `V` of a defaulted `==` operator function with parameters `x` and `y` is determined by comparing corresponding elements
 `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub> in the expanded lists of subobjects for `x` and `y` (in increasing index order)
-until the first index <i>i</i> where `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub> <ins>,</ins> <del>yields a result value which,
-when</del> contextually converted to `bool`, yields `false`. If no such index exists, `V` is `true`. Otherwise, `V` is `false`.
+until the first index <i>i</i> where `x`<sub><i>i</i></sub> `==` `y`<sub><i>i</i></sub> <del>yields a result value
+which</del> , <del>when</del> contextually converted to `bool`, yields `false`.
+If no such index exists, `V` is `true`. Otherwise, `V` is `false`.
 
 <ins>x․ A defaulted `==` operator function shall have the return type `bool`. If its declared return type
 contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
@@ -386,11 +384,11 @@ the same type</del> is determined by comparing corresponding elements `x`<sub><i
 in the expanded lists of subobjects for `x` and `y` (in increasing index order) until the first index <i>i</i>
 where the synthesized three-way comparison of type `R` between `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub>
 yields a result value `v`<sub><i>i</i></sub> where `v`<sub><i>i</i></sub> `!= 0`, contextually converted to `bool`,
-yields `true`; `V` is a copy of `v`<sub><i>i</i></sub>.
+yields `true`; `V` is <del>a copy of</del> `v`<sub><i>i</i></sub>.
 If no such index exists, `V` is <del>`static_cast<R>(`</del>`std::strong_ordering::equal`<del>`)`</del>.
 
-<ins>x․ A defaulted three-way comparison operator function which is not deleted shall have a return type which is a comparison category type.
-[<i>Note:</i> A reference type is not a comparison category type. —<i>end note</i>]</ins>
+<ins>x․ A defaulted three-way comparison operator function which is not deleted shall have a return type which is a comparison category type
+([cmp.categories.pre]).</ins>
 
 4․ The <i>common comparison type</i> `U` of a possibly-empty list of <i>n</i> comparison category types
 `T`<sub>0</sub>, `T`<sub>1</sub>, ..., `T`<sub>n-1</sub> is defined as follows:
@@ -438,11 +436,15 @@ But we need this new wording to ensure that an *explicitly-defaulted* copy/move 
 will deduce that same type. (If it didn't deduce that type, then the explicitly-defaulted operator
 would be deleted, as in example `B` below.)
 
+Note: Arthur initially proposed that [class.copy.assign]/14 should say "...returns
+*an lvalue reference to* the object for which...", but Jens Maurer thought that wouldn't be
+an improvement from CWG's point of view.
+
 Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
 
 <small><blockquote>
-14․ The implicitly-defined copy/move assignment operator for a class returns <ins>an lvalue
-reference to</ins> the object for which the assignment operator is invoked, that is,
+14․ The implicitly-defined copy/move assignment operator for a class returns
+the object for which the assignment operator is invoked, that is,
 the object assigned to.
 <p><ins>15․ If a defaulted copy/move assignment operator's declared return type contains a
 placeholder type, its return type is deduced as if from `return r;`, where `r` is an lvalue
