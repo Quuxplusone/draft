@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2952R0<br>auto&amp; operator=(X&amp;&amp;) = default</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-08-09">2023-08-09</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-08-10">2023-08-10</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2106,7 +2106,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>10
+     <dd>12
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2224,7 +2224,8 @@ as if from a fictional return statement that returns:</p>
    </ul>
    <p>Then, the deduced return type is compared to the return type(s) permitted by the standard.
 If the types match, the declaration is well-formed. Otherwise it’s ill-formed.</p>
-   <p>For the copy-assignment operator, our proposal gives the following behavior:</p>
+   <div class="example" id="example-ceae92fe">
+    <a class="self-link" href="#example-ceae92fe"></a> For the copy-assignment operator, our proposal gives the following behavior: 
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>MyClass</c-> <c- p>{</c->
   <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->          <c- c1>// Proposed OK: deduces MyClass&amp;</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed OK: deduces MyClass&amp;</c->
@@ -2234,7 +2235,7 @@ If the types match, the declaration is well-formed. Otherwise it’s ill-formed.
   <c- k>auto</c-><c- o>*</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->          <c- c1>// Still ill-formed: deduction fails</c->
 <c- p>};</c->
 </pre>
-   <p>For <code class="highlight"><c- k>operator</c-><c- o>==</c-></code>, our proposal gives the following behavior:</p>
+    <p>For <code class="highlight"><c- k>operator</c-><c- o>==</c-></code>, our proposal gives the following behavior:</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>MyClass</c-> <c- p>{</c->
   <c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->           <c- c1>// Proposed OK: deduces bool</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed OK: deduces bool</c->
@@ -2242,6 +2243,7 @@ If the types match, the declaration is well-formed. Otherwise it’s ill-formed.
   <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->          <c- c1>// Still ill-formed: deduction fails</c->
 <c- p>};</c->
 </pre>
+   </div>
    <h3 class="heading settled" data-level="3.1" id="declared-type"><span class="secno">3.1. </span><span class="content">"Return type" versus "declared return type"</span><a class="self-link" href="#declared-type"></a></h3>
    <p>Today, vendors unanimously reject <code class="highlight"><c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-></code>.
 But we can’t find any wording in <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> or <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> that directly justifies
@@ -2269,8 +2271,8 @@ of class <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex<
 
 <c- k>struct</c-> <c- nc>Weird</c-> <c- p>{</c-> <c- b>int</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- n>Weird</c-><c- p>)</c-> <c- k>const</c-><c- p>;</c-> <c- p>};</c->
 <c- n>Container</c-><c- o>&lt;</c-><c- n>Weird</c-><c- o>></c-> <c- n>cw</c-><c- p>;</c->
-  <c- c1>// OK, &lt;=> is deleted because</c->
-  <c- c1>// Weird’s operator&lt;=> returns a non-comparison-category type</c->
+  <c- c1>// OK, &lt;=> is deleted because Weird’s operator&lt;=></c->
+  <c- c1>// returns a non-comparison-category type</c->
 </pre>
    <p>Similarly for dependent return types:</p>
 <pre class="language-cpp highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>R</c-><c- o>></c->
@@ -2325,29 +2327,33 @@ and reinterpret its term "return type" to mean the actual return type, not the d
 This will, by default, permit the programmer to use placeholder return types on their defaulted operators.
 So there is a new burden on the specification of the defaultable operator, to specify exactly how
 return type deduction works for the implicitly defined operator.</p>
-   <p>For example, <a data-link-type="biblio" href="#biblio-p1046r2" title="Automatically Generate More Operators">[P1046R2]</a> proposed to make <code class="highlight"><c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-></code> defaultable. It would presumably have done this by
+   <div class="example" id="example-c9efd4ed">
+    <a class="self-link" href="#example-c9efd4ed"></a> <a data-link-type="biblio" href="#biblio-p1046" title="Automatically Generate More Operators">[P1046]</a> proposed to make <code class="highlight"><c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-></code> defaultable in the same way as a
+secondary comparison operator. It would presumably have done this by
 adding wording to <a href="https://eel.is/c++draft/over.oper#over.inc">[over.inc]</a>. After P2952, this
-added wording would need to include a sentence like:</p>
-   <p><small></small></p>
-   <blockquote><small> A defaulted postfix <code class="highlight"><c- k>operator</c-><c- o>++</c-></code> for class <code class="highlight"><c- n>X</c-></code> shall have a return type that is an object type or <code class="highlight"><c- b>void</c-></code>.
+added wording would need to include a sentence like: 
+    <p><small></small></p>
+    <blockquote><small> A defaulted postfix <code class="highlight"><c- k>operator</c-><c- o>++</c-></code> for class <code class="highlight"><c- n>X</c-></code> shall have a return type that is <code class="highlight"><c- n>X</c-></code> or <code class="highlight"><c- b>void</c-></code>.
 If its declared return type contains a placeholder type, its return type is deduced as if from<p></p> <ul><li data-md><p><code class="highlight"><c- k>return</c-> <c- n>X</c-><c- p>(</c-><c- n>r</c-><c- p>);</c-></code> where <code class="highlight"><c- n>r</c-></code> is an lvalue reference to the function’s object parameter, if <code class="highlight"><c- n>X</c-><c- p>(</c-><c- n>r</c-><c- p>)</c-></code> is a well-formed expression;</p> </li><li data-md><p><code class="highlight"><c- k>return</c-><c- p>;</c-></code> otherwise.</p> </li></ul> </small></blockquote>
-   <p>P1046’s wording would be trickier than ours, because <a data-link-type="biblio" href="#biblio-p1046r2" title="Automatically Generate More Operators">[P1046R2]</a> was written before explicit object parameters ("deducing <code class="highlight"><c- k>this</c-></code>")
-were invented, and presumably it would want to support them out of the box. Here is <a data-link-type="biblio" href="#biblio-p0847" title="Deducing this">[P0847]</a> <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html#crtp">§5.2</a>’s example
-of "CRTP without the C, R, or even T," reworked to use <a data-link-type="biblio" href="#biblio-p1046r2" title="Automatically Generate More Operators">[P1046R2]</a>'s <code class="highlight"><c- o>=</c-><c- k>default</c-></code>’able <code class="highlight"><c- k>operator</c-><c- o>++</c-></code>:</p>
+    <p><a data-link-type="biblio" href="#biblio-p0847" title="Deducing this">[P0847]</a> <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html#crtp">§5.2</a>’s
+example of <code class="highlight"><c- n>add_postfix_increment</c-></code> ("CRTP without the C, R, or even T") involves an <code class="highlight"><c- k>operator</c-><c- o>++</c-></code> with return
+type <code class="highlight"><c- k>auto</c-></code>; but that <code class="highlight"><c- k>operator</c-><c- o>++</c-></code> is not defaulted, and probably couldn’t be defaulted even after <a data-link-type="biblio" href="#biblio-p1046" title="Automatically Generate More Operators">[P1046]</a>, firstly
+because it is a template and secondly because its deduced return type is <code class="highlight"><c- n>Self</c-></code> instead of <code class="highlight"><c- n>add_postfix_increment</c-></code>.</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>add_postfix_increment</c-> <c- p>{</c->
     <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Self</c-><c- o>></c->
     <c- k>auto</c-> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- k>this</c-> <c- n>Self</c-><c- o>&amp;</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
       <c- c1>// Today: ill-formed, can’t default operator++</c->
-      <c- c1>// After P1046: presumably OK, and deduces Self</c->
+      <c- c1>// After P1046: presumably still not OK, can’t default a template</c->
 <c- p>};</c->
 <c- k>struct</c-> <c- nc>S</c-> <c- o>:</c-> <c- n>add_postfix_increment</c-> <c- p>{</c->
     <c- b>int</c-> <c- n>i</c-><c- p>;</c->
     <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>++</c-><c- p>()</c-> <c- p>{</c-> <c- o>++</c-><c- n>i</c-><c- p>;</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c->
+    <c- k>using</c-> <c- n>add_postfix_increment</c-><c- o>::</c-><c- k>operator</c-><c- o>++</c-><c- p>;</c->
 <c- p>};</c->
 <c- n>S</c-> <c- n>s</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>};</c->
-<c- n>S</c-> <c- n>t</c-> <c- o>=</c-> <c- n>s</c-><c- o>++</c-><c- p>;</c->  <c- c1>// After P1046: presumably OK</c->
-<c- n>S</c-> <c- n>u</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>as_const</c-><c- p>(</c-><c- n>s</c-><c- p>)</c-><c- o>++</c-><c- p>;</c->  <c- c1>// After P1046: presumably ill-formed, defaulted as deleted</c->
+<c- n>S</c-> <c- n>t</c-> <c- o>=</c-> <c- n>s</c-><c- o>++</c-><c- p>;</c->
 </pre>
+   </div>
    <h3 class="heading settled" data-level="3.5" id="corner-cases"><span class="secno">3.5. </span><span class="content">Existing corner cases</span><a class="self-link" href="#corner-cases"></a></h3>
    <p>There is vendor divergence in some corner cases. Here is a table of the divergences we found,
 plus our opinion as to the conforming behavior, and our proposed behavior.</p>
@@ -2532,8 +2538,8 @@ plus our opinion as to the conforming behavior, and our proposed behavior.</p>
       <td><a href="https://godbolt.org/z/ojM541bTM">link</a>
       <td>
 <pre class="highlight"><c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
-      <td bgcolor="#FFCACA">✗
       <td>deleted
+      <td bgcolor="#FFCACA">✗
       <td bgcolor="#FFCACA">✗
       <td>deleted
       <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a>
@@ -2778,7 +2784,7 @@ reference to the object for which the assignment operator is invoked.</ins> </p>
    <dd>Barry Revzin. <a href="https://cplusplus.github.io/CWG/issues/2586.html"><cite>Explicit object parameter for assignment and comparison</cite></a>. May–July 2022. URL: <a href="https://cplusplus.github.io/CWG/issues/2586.html">https://cplusplus.github.io/CWG/issues/2586.html</a>
    <dt id="biblio-p0847">[P0847]
    <dd>Sy Brand; et al. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html"><cite>Deducing this</cite></a>. July 2021. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html</a>
-   <dt id="biblio-p1046r2">[P1046R2]
+   <dt id="biblio-p1046">[P1046]
    <dd>David Stone. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1046r2.html"><cite>Automatically Generate More Operators</cite></a>. January 2020. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1046r2.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1046r2.html</a>
    <dt id="biblio-p2953">[P2953]
    <dd>Arthur O'Dwyer. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html"><cite>Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;</cite></a>. August 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html</a>
