@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2953R0: Forbid defaulting rvalue-ref-qualified assignment operators</title>
+  <title>D2953R0: Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -2094,7 +2094,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2953R0<br>Forbid defaulting rvalue-ref-qualified assignment operators</h1>
+   <h1 class="p-name no-ref" id="title">D2953R0<br>Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;</h1>
    <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-08-08">2023-08-08</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
@@ -2169,12 +2169,12 @@ But programmers aren’t clamoring for that signature to be supported, so we do 
    <ul>
     <li data-md>
      <p>The possibility of these unrealistic signatures makes C++ harder to understand.
-Before writing <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;)">[P2952]</a>, Arthur didn’t know such signatures were possible.</p>
+Before writing <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;) = default">[P2952]</a>, Arthur didn’t know such signatures were possible.</p>
     <li data-md>
      <p>The wording to permit these signatures is at least a tiny bit more complicated than
 if they weren’t permitted.</p>
     <li data-md>
-     <p>The quirky interaction with <a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> and <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;)">[P2952]</a> discussed in the next subsection.</p>
+     <p>The quirky interaction with <a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> and <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;) = default">[P2952]</a> discussed in the next subsection.</p>
    </ul>
    <p>To eliminate all three drawbacks,
 we propose that a defaulted copy/move assignment operator should not be permitted to add
@@ -2182,7 +2182,7 @@ to its implicit signature an <em>rvalue</em> ref-qualifier (nor an explicit obje
 of rvalue reference type).</p>
    <h3 class="heading settled" data-level="2.1" id="p2952"><span class="secno">2.1. </span><span class="content">Interaction with P2952</span><a class="self-link" href="#p2952"></a></h3>
    <p><a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> (adopted for C++23) permits <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> to have an explicit object parameter.</p>
-   <p><a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;)">[P2952]</a> proposes that <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> should (also) be allowed to have a placeholder return type.
+   <p><a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;) = default">[P2952]</a> proposes that <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> should (also) be allowed to have a placeholder return type.
 If P2952 is adopted without P2953, then we will have the following pub-quiz fodder:</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>C</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c->
@@ -2198,7 +2198,7 @@ If P2952 is adopted without P2953, then we will have the following pub-quiz fodd
 </pre>
    <p>The first, non-defaulted, operator "does the natural thing" by returning its left-hand operand,
 and deduces <code class="highlight"><c- n>C</c-><c- o>&amp;&amp;</c-></code>. The second operator also "does the natural thing" by being defaulted; but
-after P2952 it will deduce <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code>. (For rationale, see <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;)">[P2952]</a> §3.3 "Deducing <code class="highlight"><c- k>this</c-></code> and CWG2586.")
+after P2952 it will deduce <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code>. (For rationale, see <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;) = default">[P2952]</a> §3.3 "Deducing <code class="highlight"><c- k>this</c-></code> and CWG2586.")
 The two "natural" implementations deduce different types! This might be perceived as inconsistency.</p>
    <p>If we adopt P2953 alongside P2952, then the second <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> will go back to being unusable,
 which reduces the perception of inconsistency.</p>
@@ -2220,7 +2220,7 @@ which reduces the perception of inconsistency.</p>
    <h3 class="heading settled" data-level="2.2" id="deleted-versus-ill-formed"><span class="secno">2.2. </span><span class="content">"Deleted" versus "ill-formed"</span><a class="self-link" href="#deleted-versus-ill-formed"></a></h3>
    <p><a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> goes out of its way
 to make many explicitly defaulted assignment operators "defaulted as deleted," rather than ill-formed.
-I think I understand the reason for this in the case of <em>comparison operators</em> (see <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;)">[P2952]</a> §3.2 "Defaulted as deleted"), but it’s non-obvious why we should care about
+I think I understand the reason for this in the case of <em>comparison operators</em> (see <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;) = default">[P2952]</a> §3.2 "Defaulted as deleted"), but it’s non-obvious why we should care about
 the corresponding cases for constructors, destructors, and assignment operators.
 (Clang handles this example correctly; GCC, MSVC, and EDG
 already non-conformingly treat <em>both</em> <code class="highlight"><c- n>cl</c-></code> and <code class="highlight"><c- n>cr</c-></code> as ill-formed.)</p>
@@ -2526,5 +2526,5 @@ for special member functions but only by omission-and-note in <a href="https://e
    <dt id="biblio-cwg2586">[CWG2586]
    <dd>Barry Revzin. <a href="https://cplusplus.github.io/CWG/issues/2586.html"><cite>Explicit object parameter for assignment and comparison</cite></a>. May–July 2022. URL: <a href="https://cplusplus.github.io/CWG/issues/2586.html">https://cplusplus.github.io/CWG/issues/2586.html</a>
    <dt id="biblio-p2952">[P2952]
-   <dd>Arthur O'Dwyer; Matthew Taylor. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2952r0.html"><cite>auto&amp; operator=(X&amp;&amp;)</cite></a>. August 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2952r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2952r0.html</a>
+   <dd>Arthur O'Dwyer; Matthew Taylor. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2952r0.html"><cite>auto&amp; operator=(X&amp;&amp;) = default</cite></a>. August 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2952r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2952r0.html</a>
   </dl>
