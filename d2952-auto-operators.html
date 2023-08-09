@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2952R0: auto&amp; operator=(X&amp;&amp;)</title>
+  <title>D2952R0: auto&amp; operator=(X&amp;&amp;) = default</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -2094,8 +2094,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2952R0<br>auto&amp; operator=(X&amp;&amp;)</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-08-08">2023-08-08</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D2952R0<br>auto&amp; operator=(X&amp;&amp;) = default</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-08-09">2023-08-09</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2106,7 +2106,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>9
+     <dd>10
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2131,8 +2131,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#declared-type"><span class="secno">3.1</span> <span class="content">"Return type" versus "declared return type"</span></a>
       <li><a href="#defaulted-as-deleted"><span class="secno">3.2</span> <span class="content">"Defaulted as deleted"</span></a>
       <li><a href="#deducing-this"><span class="secno">3.3</span> <span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span></a>
-      <li><a href="#corner-cases"><span class="secno">3.4</span> <span class="content">Existing corner cases</span></a>
-      <li><a href="#impact"><span class="secno">3.5</span> <span class="content">Impact on existing code</span></a>
+      <li><a href="#new-burden"><span class="secno">3.4</span> <span class="content">Burden on specifying new defaultable operators</span></a>
+      <li><a href="#corner-cases"><span class="secno">3.5</span> <span class="content">Existing corner cases</span></a>
+      <li><a href="#impact"><span class="secno">3.6</span> <span class="content">Impact on existing code</span></a>
      </ol>
     <li><a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
     <li>
@@ -2315,10 +2316,39 @@ regardless of whether it’s declared using explicit object syntax.</p>
 <c- p>};</c->
 </pre>
    <p>Defaulted rvalue-ref-qualified assignment operators are weird; Arthur is bringing another paper
-to forbid them entirely (<a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting rvalue-ref-qualified assignment operators">[P2953]</a>). However, P2952 doesn’t need to treat them specially.
+to forbid them entirely (<a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;">[P2953]</a>). However, P2952 doesn’t need to treat them specially.
 Defaulted assignment operators invariably return lvalue references, so we invariably deduce as-if-from
 an lvalue reference, full stop.</p>
-   <h3 class="heading settled" data-level="3.4" id="corner-cases"><span class="secno">3.4. </span><span class="content">Existing corner cases</span><a class="self-link" href="#corner-cases"></a></h3>
+   <h3 class="heading settled" data-level="3.4" id="new-burden"><span class="secno">3.4. </span><span class="content">Burden on specifying new defaultable operators</span><a class="self-link" href="#new-burden"></a></h3>
+   <p>We propose to leave <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> alone
+and reinterpret its term "return type" to mean the actual return type, not the declared return type.
+This will, by default, permit the programmer to use placeholder return types on their defaulted operators.
+So there is a new burden on the specification of the defaultable operator, to specify exactly how
+return type deduction works for the implicitly defined operator.</p>
+   <p>For example, <a data-link-type="biblio" href="#biblio-p1046r2" title="Automatically Generate More Operators">[P1046R2]</a> proposed to make <code class="highlight"><c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-></code> defaultable. It would presumably have done this by
+adding wording to <a href="https://eel.is/c++draft/over.oper#over.inc">[over.inc]</a>. After P2952, this
+added wording would need to include a sentence like:</p>
+   <p><small></small></p>
+   <blockquote><small> A defaulted postfix <code class="highlight"><c- k>operator</c-><c- o>++</c-></code> for class <code class="highlight"><c- n>X</c-></code> shall have a return type that is an object type or <code class="highlight"><c- b>void</c-></code>.
+If its declared return type contains a placeholder type, its return type is deduced as if from<p></p> <ul><li data-md><p><code class="highlight"><c- k>return</c-> <c- n>X</c-><c- p>(</c-><c- n>r</c-><c- p>);</c-></code> where <code class="highlight"><c- n>r</c-></code> is an lvalue reference to the function’s object parameter, if <code class="highlight"><c- n>X</c-><c- p>(</c-><c- n>r</c-><c- p>)</c-></code> is a well-formed expression;</p> </li><li data-md><p><code class="highlight"><c- k>return</c-><c- p>;</c-></code> otherwise.</p> </li></ul> </small></blockquote>
+   <p>P1046’s wording would be trickier than ours, because <a data-link-type="biblio" href="#biblio-p1046r2" title="Automatically Generate More Operators">[P1046R2]</a> was written before explicit object parameters ("deducing <code class="highlight"><c- k>this</c-></code>")
+were invented, and presumably it would want to support them out of the box. Here is <a data-link-type="biblio" href="#biblio-p0847" title="Deducing this">[P0847]</a> <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html#crtp">§5.2</a>’s example
+of "CRTP without the C, R, or even T," reworked to use <a data-link-type="biblio" href="#biblio-p1046r2" title="Automatically Generate More Operators">[P1046R2]</a>'s <code class="highlight"><c- o>=</c-><c- k>default</c-></code>’able <code class="highlight"><c- k>operator</c-><c- o>++</c-></code>:</p>
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>add_postfix_increment</c-> <c- p>{</c->
+    <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Self</c-><c- o>></c->
+    <c- k>auto</c-> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- k>this</c-> <c- n>Self</c-><c- o>&amp;</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+      <c- c1>// Today: ill-formed, can’t default operator++</c->
+      <c- c1>// After P1046: presumably OK, and deduces Self</c->
+<c- p>};</c->
+<c- k>struct</c-> <c- nc>S</c-> <c- o>:</c-> <c- n>add_postfix_increment</c-> <c- p>{</c->
+    <c- b>int</c-> <c- n>i</c-><c- p>;</c->
+    <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>++</c-><c- p>()</c-> <c- p>{</c-> <c- o>++</c-><c- n>i</c-><c- p>;</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c->
+<c- p>};</c->
+<c- n>S</c-> <c- n>s</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>};</c->
+<c- n>S</c-> <c- n>t</c-> <c- o>=</c-> <c- n>s</c-><c- o>++</c-><c- p>;</c->  <c- c1>// After P1046: presumably OK</c->
+<c- n>S</c-> <c- n>u</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>as_const</c-><c- p>(</c-><c- n>s</c-><c- p>)</c-><c- o>++</c-><c- p>;</c->  <c- c1>// After P1046: presumably ill-formed, defaulted as deleted</c->
+</pre>
+   <h3 class="heading settled" data-level="3.5" id="corner-cases"><span class="secno">3.5. </span><span class="content">Existing corner cases</span><a class="self-link" href="#corner-cases"></a></h3>
    <p>There is vendor divergence in some corner cases. Here is a table of the divergences we found,
 plus our opinion as to the conforming behavior, and our proposed behavior.</p>
    <p><small></small></p>
@@ -2351,6 +2381,42 @@ plus our opinion as to the conforming behavior, and our proposed behavior.</p>
       <td>✓
       <td>✓
       <td><a href="https://eel.is/c++draft/class.compare#default-1.sentence-1">✓</a>
+     <tr>
+      <td><a href="https://godbolt.org/z/e7Eba49qr">link</a>
+      <td>
+<pre class="highlight"><c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
+      <td>✗
+      <td bgcolor="#FFCACA">✓
+      <td>✗
+      <td>✗
+      <td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: ✓
+     <tr>
+      <td><a href="https://godbolt.org/z/heEs3haxs">link</a>
+      <td>
+<pre class="highlight"><c- k>const</c-> <c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
+      <td>✗
+      <td>✗
+      <td bgcolor="#FFCACA">✓
+      <td bgcolor="#FFCACA">✓
+      <td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: ✗
+     <tr>
+      <td><a href="https://godbolt.org/z/jcz8ceeKx">link</a>
+      <td>
+<pre class="highlight"><c- n>True</c-> <c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
+      <td>✗
+      <td bgcolor="#FFCACA">✓
+      <td bgcolor="#FFCACA">✓
+      <td bgcolor="#FFCACA">✓
+      <td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: ✓
+     <tr>
+      <td><a href="https://godbolt.org/z/Ps9sEzWsn">link</a>
+      <td>
+<pre class="highlight"><c- n>False</c-> <c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
+      <td>✗
+      <td bgcolor="#FFCACA">unmet
+      <td bgcolor="#FFCACA">✓
+      <td bgcolor="#FFCACA">✓
+      <td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: unmet
      <tr>
       <td><a href="https://godbolt.org/z/aPWEs5xnb">link</a>
       <td>
@@ -2479,7 +2545,7 @@ plus our opinion as to the conforming behavior, and our proposed behavior.</p>
       <td>✓
       <td>✓
       <td>✓
-      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>(<a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting rvalue-ref-qualified assignment operators">[P2953]</a>: deleted)
+      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>(<a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;">[P2953]</a>: deleted)
      <tr>
       <td><a href="https://godbolt.org/z/5P6EKrGjo">link</a>
       <td>
@@ -2490,9 +2556,9 @@ plus our opinion as to the conforming behavior, and our proposed behavior.</p>
       <td>✗
       <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a>
    </table>
-   <h3 class="heading settled" data-level="3.5" id="impact"><span class="secno">3.5. </span><span class="content">Impact on existing code</span><a class="self-link" href="#impact"></a></h3>
+   <h3 class="heading settled" data-level="3.6" id="impact"><span class="secno">3.6. </span><span class="content">Impact on existing code</span><a class="self-link" href="#impact"></a></h3>
    <p>There should be little effect on existing code, since this proposal mainly allows syntax that was ill-formed before.
-As shown in <a href="#corner-cases">§ 3.4 Existing corner cases</a>, we do propose to change some very arcane examples, e.g.</p>
+As shown in <a href="#corner-cases">§ 3.5 Existing corner cases</a>, we do propose to change some very arcane examples, e.g.</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>&amp;</c->
     <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2710,6 +2776,10 @@ reference to the object for which the assignment operator is invoked.</ins> </p>
   <dl>
    <dt id="biblio-cwg2586">[CWG2586]
    <dd>Barry Revzin. <a href="https://cplusplus.github.io/CWG/issues/2586.html"><cite>Explicit object parameter for assignment and comparison</cite></a>. May–July 2022. URL: <a href="https://cplusplus.github.io/CWG/issues/2586.html">https://cplusplus.github.io/CWG/issues/2586.html</a>
+   <dt id="biblio-p0847">[P0847]
+   <dd>Sy Brand; et al. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html"><cite>Deducing this</cite></a>. July 2021. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html</a>
+   <dt id="biblio-p1046r2">[P1046R2]
+   <dd>David Stone. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1046r2.html"><cite>Automatically Generate More Operators</cite></a>. January 2020. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1046r2.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1046r2.html</a>
    <dt id="biblio-p2953">[P2953]
-   <dd>Arthur O'Dwyer. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html"><cite>Forbid defaulting rvalue-ref-qualified assignment operators</cite></a>. August 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html</a>
+   <dd>Arthur O'Dwyer. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html"><cite>Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;</cite></a>. August 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2953r0.html</a>
   </dl>
