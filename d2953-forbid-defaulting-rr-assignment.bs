@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Forbid defaulting operator=(X&&) &&
 Shortname: D2953
-Revision: 0
-!Draft Revision: 4
+Revision: 1
+!Draft Revision: 6
 Audience: EWG
 Status: D
 Group: WG21
@@ -15,7 +15,7 @@ Abstract:
   ref-qualification. This permits implausible
   signatures like `A& operator=(const A&) && = default`, where the left-hand
   operand is rvalue-ref-qualified. We propose to forbid such signatures.
-Date: 2023-08-10
+Date: 2023-09-12
 </pre>
 
 <style>
@@ -25,6 +25,11 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R1:
+
+    - TODO FIXME BUG HACK: Note the editorial clarification in e1bcedcf9516290f285c3fa3e7301dc92b94c515.
+        At first I thought it was backwards, but now I think it's correct.
 
 - R0:
 
@@ -98,13 +103,36 @@ which reduces the perception of inconsistency.
 
 ## "Deleted" versus "ill-formed" ## {#deleted-versus-ill-formed}
 
-<a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> goes out of its way
-to make many explicitly defaulted assignment operators "defaulted as deleted," rather than ill-formed.
-I think I understand the reason for this in the case of *comparison operators*
-(see [[P2952]] §3.2 "Defaulted as deleted"), but it's non-obvious why we should care about
-the corresponding cases for constructors, destructors, and assignment operators.
-(Clang handles this example correctly; GCC, MSVC, and EDG
-already non-conformingly treat *both* `cl` and `cr` as ill-formed.)
+(See also [[P2952]] §3.2 "Defaulted as deleted".)
+
+<a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">[dcl.fct.def.default]/2.6</a> goes out of its way
+to make many explicitly defaulted constructors, assignment operators, and comparison operators
+"defaulted as deleted," rather than ill-formed. This was done by [[P0641]] (resolving [[CWG1331]]),
+in order to support class templates with "canonically spelled" defaulted declarations:
+
+```cpp
+struct A {
+  // Permitted by (2.4)
+  A(A&) = default;
+  A& operator=(A&) = default;
+};
+
+template<class T>
+struct C {
+  T t_;
+  explicit C();
+  // Permitted, but defaulted-as-deleted, by (2.6), since P0641
+  C(const C&) = default;
+  C& operator=(const C&) = default;
+};
+
+C<A> ca; // OK
+```
+
+However, the current wording also seems to require implementations to support weird stuff
+like the following. (Clang handles this example correctly; GCC, MSVC, and EDG
+already non-conformingly treat *both* `cl` and `cr` as ill-formed. This is
+GCC bug [#86646](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=86646).)
 
 ```cpp
 template<template<class> class TT>
@@ -124,7 +152,7 @@ C<std::add_rvalue_reference_t> cr;
 P2953 isn't yet proposing to change the complicated status quo, but Arthur would certainly like
 to learn the status quo's rationale. If we were willing to aggressively change the status quo,
 we could simplify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a>
-something like this:
+something like this: [TODO FIXME BUG HACK: revisit this]
 
 <small><blockquote>
 1․ A function definition whose <i>function-body</i> is of the form `= default ;` is called an <i>explicitly-defaulted</i> definition.
@@ -304,6 +332,14 @@ The next revision of this paper (if any) will be guided by the outcomes of these
 
 <pre class=biblio>
 {
+  "CWG1331": {
+    "title": "const mismatch with defaulted copy constructor",
+    "authors": [
+      "Daniel Krügler"
+    ],
+    "href": "https://cplusplus.github.io/CWG/issues/1331.html",
+    "date": "June 2011"
+  },
   "CWG2586": {
     "title": "Explicit object parameter for assignment and comparison",
     "authors": [
@@ -311,6 +347,15 @@ The next revision of this paper (if any) will be guided by the outcomes of these
     ],
     "href": "https://cplusplus.github.io/CWG/issues/2586.html",
     "date": "May–July 2022"
+  },
+  "P0641": {
+    "title": "Resolving CWG1331: const mismatch with defaulted copy constructor",
+    "authors": [
+      "Daniel Krügler",
+      "Botond Ballo"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0641r2.html",
+    "date": "November 2017"
   },
   "P2952": {
     "title": "auto& operator=(X&&) = default",
