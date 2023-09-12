@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: <code>std::span</code> over an initializer list
 Shortname: D2447
-Revision: 4
-!Draft Revision: 5
+Revision: 5
+!Draft Revision: 7
 Audience: LEWG
 Status: D
 Group: WG21
@@ -18,7 +18,7 @@ Abstract:
   can replace <code>const string&amp;</code>. While <code>"abc"</code> binds to a <code>string_view</code>
   function parameter, <code>{1,2,3}</code> fails to bind to a <code>span&lt;const int&gt;</code> function parameter.
   We show why this gap is undesirable, and propose to close it, ideally as a DR.
-Date: 2023-05-13
+Date: 2023-09-12
 </pre>
 
 <style>
@@ -30,6 +30,13 @@ td {font-size: smaller;}
 
 # Changelog # {#changelog}
 
+- R5 (post-LEWG 2023):
+
+    - Reintroduce feature-test macro `__cpp_lib_span_initializer_list`.
+
+    - Add Annex C entries to [[#wording]]; LEWG points out that it's easy for LWG
+        to eliminate insertions they deem redundant.
+
 - R4 (pre-Varna 2023):
 
     - Reorganize references to [[P2752]] and fix HTML goofs in proposed wording.
@@ -38,7 +45,7 @@ td {font-size: smaller;}
 
     - Changed primary authorship from Federico Kircheis to Arthur O'Dwyer.
 
-    - Removed R2's feature macro `__cpp_lib_span_init`; it didn't seem motivated.
+    - Removed R2's feature-test macro `__cpp_lib_span_init`; it didn't seem motivated.
 
 - R2:
 
@@ -199,8 +206,8 @@ as a `span`, how could there be any additional harm in treating `{1,2,3}` as a `
 
 ### Better performance via synergy with P2752 ### {#p2752}
 
-[[P2752]], sent to EWG for Varna, proposes to let a constant `initializer_list` like `{1,2,3}`
-refer to a backing array in static storage, rather than forcing all backing arrays onto the stack.
+[[P2752]], adopted as a DR at Varna 2023, allows a constant `initializer_list` like `{1,2,3}`
+to refer to a backing array in static storage, rather than forcing all backing arrays onto the stack.
 This doesn't change anything dangling-wise: referring to the backing array of an
 `initializer_list` outside that `initializer_list`'s lifetime remains undefined behavior.
 ```c++
@@ -210,9 +217,8 @@ std::span<const int> v1 = {1,2,3};     // dangles, even after P2752
 
 Today, `{{1,2,3}}` converts to `span` by materializing a temporary `const int[3]` on the stack.
 Tomorrow, if P2447 is adopted, `{1,2,3}` will convert to `span` via an `initializer_list` that
-refers to a backing array on the stack. P2752 proposes to performance-optimize the latter
-(let the backing array occupy static storage) but not the former (keep the status quo for
-materialized array temporaries). In other words, the `initializer_list` constructor we propose
+refers to a backing array in static storage.
+In other words, the `initializer_list` constructor we propose
 here in P2447 is "more optimizer-friendly" than today's array-temporary constructor.
 
 This example (<a href="https://godbolt.org/z/7a5zGnx5s">Godbolt</a>) shows how
@@ -227,24 +233,22 @@ int test() {
 
 <table>
 <tr><td></td><td>`{{1,2,3}}`</td><td>`{1,2,3}`</td></tr>
+<tr><th>Before 2752</th><td>Array on stack</td><td>Ill-formed</td></tr>
 <tr><th>Today</th><td>Array on stack</td><td>Ill-formed</td></tr>
-<tr><th>P2752 only</th><td>Array on stack</td><td>Ill-formed</td></tr>
-<tr><th>P2447 only</th><td>IL on stack</td><td>IL on stack</td></tr>
-<tr><th>P2447+P2752</th><td>IL in rodata, tail-call</td><td>IL in rodata, tail-call</td></tr>
+<tr><th>P2447</th><td>IL in rodata, tail-call</td><td>IL in rodata, tail-call</td></tr>
 </table>
 
 In each row, there's no performance difference between the single-braced or double-braced form.
-But the only way to reach the bottom row (tail-call, no stack usage) is to adopt both P2447
-and P2752; which by a happy coincidence also permits the single-braced form.
+But the only way to reach the bottom row (tail-call, no stack usage) in _either_ column
+is to adopt P2447, which by a happy coincidence also permits the single-braced form.
 
-# Annex C examples # {#annex-c}
+# Breaking changes # {#annex-c}
 
 This change will, of course, break some code (most of it pathological).
-We might want to add some of these examples to Annex C.
-
-However, *any* change to overload sets (particularly the addition of new
-non-`explicit` constructors) can break code.
-For example, there was nothing wrong with C++23's adopting [[P1425]] "Iterator-pair constructors for `stack` and `queue`"
+We propose adding three new examples to Annex C.
+But *any* change to overload sets can break code, and sometimes LWG doesn't bother with
+an Annex C entry.
+For example, C++23 adopted [[P1425]] "Iterator-pair constructors for `stack` and `queue`"
 with no change to Annex C, despite its breaking code like this:
 ```c++
 void zero(queue<int>);
@@ -256,57 +260,28 @@ void test() { zero({a, a+10}); }
 <b>After P1425:</b> Ambiguous.<br/>
 <b>To fix:</b> Eliminate the ambiguous overloading, or cast the argument to `pair`.
 
-We can simply agree that such examples are sufficiently unlikely in practice,
-and sufficiently easy to fix, that the benefits of the changed overload set
-outweigh the costs of running into these examples.
+Therefore, we're happy for LWG to eliminate any or all of our proposed Annex C entries
+if they're going too far into the weeds.
+
+For explanation and suggested fixits for each of the Annex C examples included in [[#wording]],
+see <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2447r4.html#annex-c">P2447R4 §4</a>.
 
 
-## Overload resolution is affected ## {#annex-c-1}
+# Straw polls # {#polls}
 
-```c++
-void one(pair<int, int>);
-void one(span<const int>);
-void test() { one({1,2}); }
-```
-<b>Before:</b> Calls `one(pair<int, int>)`.<br/>
-<b>After P2447:</b> Ambiguous.<br/>
-<b>To fix:</b> Eliminate the ambiguous overloading, or replace `{1,2}` with `std::pair{1,2}`.
+P2447R4 was presented to LEWG on 2023-09-12. The following polls were taken. The first
+was classified as "no consensus," the second as "weak consensus."
 
-## The `initializer_list` ctor has high precedence ## {#annex-c-2}
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
 
-```c++
-void two(span<const int, 2>);
-void test() { two({{1,2}}); }
-```
-<b>Before:</b> Selects `span(const int(&)[2])`, which is non-`explicit`; success.<br/>
-<b>After P2447:</b> Selects `span(initializer_list<int>)`, which is `explicit` for `span<const int, 2>`; failure.<br/>
-<b>To fix:</b> Replace `{{1,2}}` with `std::array{1,2}`; or, replace `span<const int, 2>` with `span<const int>`.<br/>
+<tr><th><small>Forward P2447R4 to LWG for C++26 and as a defect.</th>
+<th> 2 </th><th> 5 </th><th> 3 </th><th> 2 </th><th> 1 </th></tr>
 
-## Implicit two-argument construction with a highly convertible `value_type` ## {#annex-c-3}
+<tr><th><small>Forward P2447R4 to LWG for C++26 (not as a defect).</th>
+<th> 2 </th><th> 6 </th><th> 4 </th><th> 1 </th><th> 1 </th></tr>
+</table>
 
-In these two highly contrived examples, the caller deliberately constructs
-a `span` via its iterator-pair constructor *implicitly, from a braced initializer of two elements,*
-and furthermore `value_type` is implicitly convertible from the iterator type.
-These examples strike me as highly contrived: both conditions are unlikely, and their
-conjunction is unlikelier still.
-
-```c++
-int three(span<void* const> v) { return v.size(); }
-void *a[10];
-int x = three({a, 0});
-```
-<b>Before:</b> Selects `span(void**, int)`; `x` is 0.<br/>
-<b>After P2447:</b> Selects `span(initializer_list<void*>)`; `x` is 2.<br/>
-<b>To fix:</b> Replace `{a, 0}` with `span(a, 0)` or `span(a, a)`.
-
-```c++
-int four(span<const any> v) { return v.size(); }
-any a[10];
-int y = four({a, a+10});
-```
-<b>Before:</b> Selects `span(any*, any*)`; `y` is 10.<br/>
-<b>After P2447:</b> Selects `span(initializer_list<any>)`; `y` is 2.<br/>
-<b>To fix:</b> Replace `{a, a+10}` with `span(a, a+10)`.
 
 # Proposed wording # {#wording}
 
@@ -343,10 +318,49 @@ Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:
 <p><ins><i>Effects:</i> Initializes <i>`data_`</i> with `il.begin()` and <i>`size_`</i> with `il.size()`.</ins>
 </blockquote></small>
 
+Modify <a href="https://eel.is/c++draft/diff">[diff.cpp26]</a> as follows:
+
+Note: For explanation and suggested fixits for each of these examples,
+see <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2447r4.html#annex-c">P2447R4 §4</a>.
+My understanding is that Annex C wording shouldn't contain that extra material.
+
+<small><blockquote>
+<p><ins><b>[containers]: containers library</b></ins>
+<p><ins>1․ Affected subclause: [span.overview]</ins><br>
+<ins><b>Change:</b> `span<const T>` is constructible from `initializer_list<T>`.</ins><br>
+<ins><b>Rationale:</b> Permit passing a braced initializer list to a function taking `span`.</ins><br>
+<ins><b>Effect on original feature:</b> Valid C++ 2023 code that relies on the lack of this constructor may refuse to compile, or change behavior. For example:</ins>
+<pre>
+  <ins>void one(pair&lt;int, int>);    // #1</ins>
+  <ins>void one(span&lt;const int>);   // #2</ins>
+  <ins>void t1() { one({1,2}); }  // ambiguous between #1 and #2; previously called #1</ins>
+
+  <ins>void two(span&lt;const int, 2>);</ins>
+  <ins>void t2() { two({{1,2}}); }  // ill-formed; previously well-formed</ins>
+
+  <ins>void *a[10];</ins>
+  <ins>int x = span&lt;void* const>{a, 0}.size(); // x is 2; previously 0</ins>
+  <ins>any b[10];</ins>
+  <ins>int y = span&lt;const any>{b, b+10}.size(); // y is 2; previously 10</ins>
+</pre>
+</blockquote></small>
+
+Add a feature-test macro to <a href="https://eel.is/c++draft/version.syn">[version.syn]/2</a> as follows:
+
+<small><blockquote>
+<pre>
+#define __cpp_lib_span                    202002L // also in &lt;span>
+<ins>#define __cpp_lib_span_initializer_list   XXYYZZL // also in &lt;span></ins>
+#define __cpp_lib_spanstream              202106L // also in &lt;spanstream>
+</pre>
+</blockquote></small>
+
 
 # Acknowledgments # {#acknowledgments}
 
 - Thanks to Federico Kircheis for writing the first drafts of this paper.
+
+- Thanks to Jarrad Waterloo for his support.
 
 <pre class=biblio>
 {
@@ -363,15 +377,15 @@ Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:
     "authors": [
       "Arthur O'Dwyer"
     ],
-    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2752r2.html",
-    "date": "May 2023"
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2752r3.html",
+    "date": "June 2023"
   },
   "Patch": {
     "title": "Implement P2447 std::span convertible from std::initializer_list",
     "authors": [
       "Arthur O'Dwyer"
     ],
-    "href": "https://github.com/Quuxplusone/llvm-project/commit/d0d11ae5f2146d2ac76680bd1ddaf1f011f96ef4",
+    "href": "https://github.com/Quuxplusone/llvm-project/pull/17",
     "date": "October 2021"
   }
 }
