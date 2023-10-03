@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 9
-!Draft Revision: 50
+!Draft Revision: 53
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
   Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::shared_ptr</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2023-10-03
+Date: 2023-10-06
 </pre>
 
 <style>
@@ -30,6 +30,8 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 - R9 (pre-Kona 2023):
 
     - Added feature-test macros `__cpp_impl_trivially_relocatable` and `__cpp_lib_trivially_relocatable`.
+
+    - Added <a href="#design-non-goals">§3.1 "Design non-goals"</a> and comparison to [[P2785R3]].
 
     - Replaced [[#non-trivial-samples|Appendix C "Examples of non-trivially relocatable class types"]]
             with a shorter summary.
@@ -293,7 +295,8 @@ is the most important benefit to be gained by this proposal.
 
 # Design goals # {#design-goals}
 
-For the former, longer, contents of this section, see <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r7.html#design-goals">P1144R7 §3</a>.
+For the former, longer, contents of this section, see
+<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r7.html#design-goals">P1144R7 §3</a>.
 
 Briefly: We want to support all five of the following use-cases ([Godbolt](https://godbolt.org/z/4WGq7ddWh)).
 
@@ -329,6 +332,72 @@ Briefly: We want to support all five of the following use-cases ([Godbolt](https
     static_assert(std::is_trivially_relocatable_v<Wrap3>); // #5
 ```
 
+## Non-goals ## {#design-non-goals}
+
+Note: This section is new in P1144R9.
+
+We propose special support for trivially relocatable types, but no particular support for
+types that are relocatable in other ways. The two most-frequently-asked scenarios are:
+
+- "Never-empty types," e.g. `gsl::not_null<unique_ptr<int>>`. Such types are not movable (because by design
+        they never enter a moved-from state), but they are swappable and could in theory be
+        relocatable (but not via move-and-destroy, since they cannot be moved).
+        P1144 supports the physical possibility that `is_trivially_relocatable_v<T> && !is_relocatable_v<T>`,
+        but keeps the status quo w.r.t. library support for such types;
+        e.g. you can't `resize`, `insert`, or `erase` a `vector` of such types.
+        P1144's `std::relocate_at` rejects such types.
+
+- Types that are "efficiently but non-trivially relocatable," e.g. libc++'s `tuple<string, list<int>>`,
+        where the ideal relocation operation would trivially relocate the string and
+        move-and-destroy the list; this is not trivial, but still faster than move-and-destroy'ing
+        the whole `tuple`. P1144 keeps the status quo w.r.t. such types, and doesn't
+        provide any way to optimize their relocation.
+        See ["Cheaply relocatable, but not trivially relocatable"](https://quuxplusone.github.io/blog/2018/10/26/cheaply-but-not-trivially-relocatable/)
+        (October 2018).
+
+The most promising active proposal for "non-trivial relocation" is [[P2785R3]]. It proposes a
+"relocation constructor" like this:
+
+```c++
+    struct A {
+        A(A) = default;
+    };
+```
+
+which the compiler deduces is trivial iff all of `A`'s members are trivially relocatable.
+This solves both of the above "non-goal" scenarios.
+However, [[P2785R3]] fails to support our positive goals `Wrap0` and `Wrap3`, which are
+trivially relocatable despite having some *non-trivial* members. In other words, P1144 is
+forward-compatible with (does not close the door to) [[P2785R3]]; and vice versa,
+adopting [[P2785R3]] would not solve two of P1144's five advertised use-cases. WG21 might
+well want to adopt both proposals. But P1144 solves "the 99% problem"; P1144 might
+not leave enough performance on the table to motivate the further adoption of [[P2785R3]].
+
+Notably, P1144R9 is almost entirely a subset of [[P2785R3]]; the only significant difference
+is that [[P2785R3]] doesn't propose the `[[trivially_relocatable]]` warrant itself.
+(P2785 proposes that to make a type trivially relocatable, you `=default`
+its relocation constructor. P1144 can't do that, and anyway wants to support `Wrap0` and `Wrap3`.)
+
+<small>
+<table>
+<tr><th>P1144</th><th>P2785R3</th></tr>
+<tr><td>`[[trivially_relocatable]]`</td><td></td></tr>
+<tr><td></td><td><code>T(T) = default;</code></td></tr>
+<tr><td></td><td><code>T&amp; operator=(T) = default;</code></td></tr>
+<tr><td>QoI `[[trivially_relocatable]]`<br>on STL containers</td><td>Mandate relocation ctors<br>for all STL containers</td></tr>
+<tr><td></td><td><code>T t = reloc u;</code> (ends <code>u</code>'s lifetime)</td></tr>
+<tr><td><code>std::is_trivially_relocatable_v&lt;T></code></td><td><code>std::is_trivially_relocatable_v&lt;T></code></td></tr>
+<tr><td><code>concept std::relocatable&lt;T></code></td><td></td></tr>
+<tr><td><code>std::relocate_at(psrc, pdst);</code></td><td><code>std::construct_at(pdst, reloc *psrc);</code></td></tr>
+<tr><td><code>T t = std::relocate(psrc);</code></td><td><code>T t = std::destroy_relocate(psrc);</code></td></tr>
+<tr><td><code>FwdIt std::uninitialized_relocate(<br>&emsp; InIt, InIt, FwdIt)</code></td><td><code>FwdIt std::uninitialized_relocate(<br>&emsp; InIt, InIt, FwdIt)</code></td></tr>
+<tr><td><code>pair&lt;InIt, FwdIt> std::uninitialized_relocate_n(<br>&emsp; InIt, Size, FwdIt)</code></td><td><code>pair&lt;InIt, FwdIt> std::uninitialized_relocate_n(<br>&emsp; InIt, Size, FwdIt)</code></td></tr>
+<tr><td><code>Bidi2 std::uninitialized_relocate_backward(<br>&emsp; Bidi1, Bidi1, Bidi2)</code></td><td></td></tr>
+<tr><td></td><td><code>std::relocate_t</code>, <code>std::relocate</code> tag type</td></tr>
+<tr><td></td><td><code>vector&lt;T>::relocate_out(<br>&emsp; const_iterator, const_iterator, OutIt) etc.</code></td></tr>
+<tr><td></td><td><code>T queue&lt;T>::pop(relocate_t)</code> etc.</td></tr>
+</table>
+</small>
 
 
 # Proposed wording for C++26 # {#wording}
@@ -344,13 +413,13 @@ and `__cpp_impl_three_way_comparison`+`__cpp_lib_three_way_comparison`.
 
 ## Predefined macro names [cpp.predefined] ## {#wording-cpp.predefined}
 
-Add a feature-test macro to
+Add a feature-test macro to the table in
 <a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:
 
 <small><blockquote>
 <pre>
 __cpp_impl_three_way_comparison   201907L
-<ins>__cpp_impl_trivially_relocatable  XXYYZZL</ins>
+<ins>__cpp_impl_trivially_relocatable  YYYYMML</ins>
 __cpp_inheriting_constructors     201511L
 </pre>
 </blockquote></small>
@@ -363,7 +432,7 @@ Add a feature-test macro to <a href="https://eel.is/c++draft/version.syn">[versi
 <small><blockquote>
 <pre>
 #define __cpp_lib_transparent_operators   201510L // also in &lt;memory>, &lt;functional>
-<ins>#define __cpp_lib_trivially_relocatable   XXYYZZL // also in &lt;type_traits></ins>
+<ins>#define __cpp_lib_trivially_relocatable   YYYYMML // also in &lt;memory>, &lt;type_traits></ins>
 #define __cpp_lib_tuple_element_t         201402L // also in &lt;tuple>
 </pre>
 </blockquote></small>
@@ -447,6 +516,20 @@ mismatched `trivially_relocatable` attributes.
 
 If a class type is declared with the `trivially_relocatable` attribute, and the program relies on
 observable side-effects of its relocation other than a copy of the underlying bytes, the behavior is undefined.
+</blockquote></small>
+
+
+### `__has_cpp_attribute` entry [cpp.cond] ### {#wording-cpp.cond}
+
+Add a new entry to the table of supported attributes in
+<a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.cond.ha">[cpp.cond]</a>:
+
+<small><blockquote>
+<pre>
+noreturn              200809L
+<ins>trivially_relocatable YYYYMML</ins>
+unlikely              201803L
+</pre>
 </blockquote></small>
 
 
@@ -672,7 +755,8 @@ My Clang implementation, currently available on Godbolt, supports both
 `[[clang::trivially_relocatable]]` and another attribute called `[[clang::maybe_trivially_relocatable]]`,
 which John McCall requested that I explore.
 
-In Issaquah (February 2023), [[P2786R0]] suggested a very similar design to `[[clang::maybe_trivially_relocatable]]`.
+In Issaquah (February 2023), <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a>
+suggested a very similar design to `[[clang::maybe_trivially_relocatable]]`.
 EWGI took a three-way straw poll on `[[trivially_relocatable]]` versus `[[maybe_trivially_relocatable]]`,
 with an inconclusive 7–5–6 vote (the author of P1144 voting "For" and the three representatives of P2786
 presumably voting "Against").
@@ -862,7 +946,8 @@ Appendix A: Straw polls {#polls}
 
 ## Polls taken at EWGI at Issaquah on 2023-02-10 ## {#taken-polls-2023-02-10}
 
-Arthur O'Dwyer presented [[P1144R6]]. Alisdair Meredith presented [[P2786R0]] (which proposed a
+Arthur O'Dwyer presented [[P1144R6]]. Alisdair Meredith presented
+<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a> (which proposed a
 `[[maybe_trivially_relocatable]]`-style facility, and expressed it as a contextual keyword instead
 of an attribute). EWGI took the following [straw polls](https://wiki.edg.com/bin/view/Wg21issaquah2023/EWGIP1144R6)
 (as well as polls on attribute syntax and on both papers' readiness for EWG).
@@ -922,7 +1007,7 @@ for each of the following reasons:
 
 - Class contains pointer to self (e.g. libstdc++'s `std::string`)
 - Allocated memory contains pointer to self (e.g. libstdc++'s `std::list`)
-- Class invariant depends on `this` (e.g. `boost::offset_ptr`)
+- Class invariant depends on `this` (e.g. <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html">`boost::interprocess::offset_ptr`</a>
 - Program invariant depends on `this` (e.g. a global registry of `Widget` addresses)
 - Polymorphic object effectively relies on offset-into-self (see also [[Polymorphic]])
 
@@ -954,7 +1039,7 @@ all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. S
 [on godbolt.org](https://p1144.godbolt.org/z/jf67zx5hq), under the name "x86-64 clang (experimental P1144)."
 ([Here](https://p1144.godbolt.org/z/t28saC) is another example showing P1144's interaction with fancy allocators.)
 
-Since September 2023, Stellar HPX implements `relocate_at` and `uninitialized_relocate{,_n,_backward}`
+Since September 2023, Stellar HPX implements `relocate_at` and `uninitialized_relocate{,_n}`
 in the `hpx::experimental` namespace. This was a GSoC project. See [[HPX]].
 
 [[Qt]] implements `q_uninitialized_relocate_n` in the `QtPrivate` namespace, but (unlike P1144's `std::uninitialized_relocate_n`)
@@ -1168,6 +1253,15 @@ See [[#applications|table §2.1]] for more details on [[Qt]], [[Folly]], and [[B
     "title": "Trivial relocatability — comparing P2786 with P1144",
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2814r1.pdf",
     "date": "May 2023"
+  },
+  "P2785R3": {
+    "authors": [
+      "Sébastien Bini",
+      "Ed Catmur"
+    ],
+    "title": "Relocating prvalues",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2785r3.html",
+    "date": "June 2023"
   },
   "P2786R2": {
     "authors": [
