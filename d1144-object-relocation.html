@@ -2147,7 +2147,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R9<br>std::is_trivially_relocatable</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-10-03">2023-10-03</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-10-06">2023-10-06</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -2159,7 +2159,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>50
+     <dd>53
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2194,7 +2194,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#benefit-assertions"><span class="secno">2.2</span> <span class="content">Assertions, not assumptions</span></a>
       <li><a href="#doing-it-wrong"><span class="secno">2.3</span> <span class="content">Eliminate manual warrants, improve safety</span></a>
      </ol>
-    <li><a href="#design-goals"><span class="secno">3</span> <span class="content">Design goals</span></a>
+    <li>
+     <a href="#design-goals"><span class="secno">3</span> <span class="content">Design goals</span></a>
+     <ol class="toc">
+      <li><a href="#design-non-goals"><span class="secno">3.1</span> <span class="content">Non-goals</span></a>
+     </ol>
     <li>
      <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording for C++26</span></a>
      <ol class="toc">
@@ -2202,7 +2206,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#wording-version.syn"><span class="secno">4.2</span> <span class="content">Header <code class="highlight"><c- o>&lt;</c-><c- n>version</c-><c- o>></c-></code> synopsis [version.syn]</span></a>
       <li><a href="#wording-defns.relocation"><span class="secno">4.3</span> <span class="content">Relocation operation [defns.relocation]</span></a>
       <li><a href="#wording-basic.types.general"><span class="secno">4.4</span> <span class="content">Trivially relocatable type [basic.types.general]</span></a>
-      <li><a href="#wording-dcl.attr.trivreloc"><span class="secno">4.5</span> <span class="content">Trivially relocatable attribute [dcl.attr.trivreloc]</span></a>
+      <li>
+       <a href="#wording-dcl.attr.trivreloc"><span class="secno">4.5</span> <span class="content">Trivially relocatable attribute [dcl.attr.trivreloc]</span></a>
+       <ol class="toc">
+        <li><a href="#wording-cpp.cond"><span class="secno">4.5.1</span> <span class="content"><code class="highlight"><c- n>__has_cpp_attribute</c-></code> entry [cpp.cond]</span></a>
+       </ol>
       <li><a href="#wording-concept.relocatable"><span class="secno">4.6</span> <span class="content"><code class="highlight"><c- n>relocatable</c-></code> concept [concept.relocatable]</span></a>
       <li><a href="#wording-meta.unary.prop"><span class="secno">4.7</span> <span class="content">Type trait <code class="highlight"><c- n>is_trivially_relocatable</c-></code> [meta.unary.prop]</span></a>
       <li><a href="#wording-relocate"><span class="secno">4.8</span> <span class="content"><code class="highlight"><c- n>relocate_at</c-></code> and <code class="highlight"><c- n>relocate</c-></code> [specialized.relocate]</span></a>
@@ -2252,6 +2260,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <ul>
       <li data-md>
        <p>Added feature-test macros <code class="highlight"><c- n>__cpp_impl_trivially_relocatable</c-></code> and <code class="highlight"><c- n>__cpp_lib_trivially_relocatable</c-></code>.</p>
+      <li data-md>
+       <p>Added <a href="#design-non-goals">§3.1 "Design non-goals"</a> and comparison to <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a>.</p>
       <li data-md>
        <p>Replaced <a href="#non-trivial-samples">Appendix C "Examples of non-trivially relocatable class types"</a> with a shorter summary.</p>
       <li data-md>
@@ -2487,6 +2497,46 @@ is the most important benefit to be gained by this proposal.</p>
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Wrap3</c-><c- o>></c-><c- p>);</c-> <c- c1>// #5</c->
 </pre>
+   <h3 class="heading settled" data-level="3.1" id="design-non-goals"><span class="secno">3.1. </span><span class="content">Non-goals</span><a class="self-link" href="#design-non-goals"></a></h3>
+   <p class="note" role="note"><span class="marker">Note:</span> This section is new in P1144R9.</p>
+   <p>We propose special support for trivially relocatable types, but no particular support for
+types that are relocatable in other ways. The two most-frequently-asked scenarios are:</p>
+   <ul>
+    <li data-md>
+     <p>"Never-empty types," e.g. <code class="highlight"><c- n>gsl</c-><c- o>::</c-><c- n>not_null</c-><c- o>&lt;</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-></code>. Such types are not movable (because by design
+    they never enter a moved-from state), but they are swappable and could in theory be
+    relocatable (but not via move-and-destroy, since they cannot be moved).
+    P1144 supports the physical possibility that <code class="highlight"><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- o>!</c-><c- n>is_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code>,
+    but keeps the status quo w.r.t. library support for such types;
+    e.g. you can’t <code class="highlight"><c- n>resize</c-></code>, <code class="highlight"><c- n>insert</c-></code>, or <code class="highlight"><c- n>erase</c-></code> a <code class="highlight"><c- n>vector</c-></code> of such types.
+    P1144’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>relocate_at</c-></code> rejects such types.</p>
+    <li data-md>
+     <p>Types that are "efficiently but non-trivially relocatable," e.g. libc++'s <code class="highlight"><c- n>tuple</c-><c- o>&lt;</c-><c- n>string</c-><c- p>,</c-> <c- n>list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-></code>,
+    where the ideal relocation operation would trivially relocate the string and
+    move-and-destroy the list; this is not trivial, but still faster than move-and-destroy’ing
+    the whole <code class="highlight"><c- n>tuple</c-></code>. P1144 keeps the status quo w.r.t. such types, and doesn’t
+    provide any way to optimize their relocation.
+    See <a href="https://quuxplusone.github.io/blog/2018/10/26/cheaply-but-not-trivially-relocatable/">"Cheaply relocatable, but not trivially relocatable"</a> (October 2018).</p>
+   </ul>
+   <p>The most promising active proposal for "non-trivial relocation" is <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a>. It proposes a
+"relocation constructor" like this:</p>
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
+    <c- n>A</c-><c- p>(</c-><c- n>A</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- p>};</c->
+</pre>
+   <p>which the compiler deduces is trivial iff all of <code class="highlight"><c- n>A</c-></code>’s members are trivially relocatable.
+This solves both of the above "non-goal" scenarios.
+However, <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a> fails to support our positive goals <code class="highlight"><c- n>Wrap0</c-></code> and <code class="highlight"><c- n>Wrap3</c-></code>, which are
+trivially relocatable despite having some <em>non-trivial</em> members. In other words, P1144 is
+forward-compatible with (does not close the door to) <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a>; and vice versa,
+adopting <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a> would not solve two of P1144’s five advertised use-cases. WG21 might
+well want to adopt both proposals. But P1144 solves "the 99% problem"; P1144 might
+not leave enough performance on the table to motivate the further adoption of <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a>.</p>
+   <p>Notably, P1144R9 is almost entirely a subset of <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a>; the only significant difference
+is that <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a> doesn’t propose the <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> warrant itself.
+(P2785 proposes that to make a type trivially relocatable, you <code class="highlight"><c- o>=</c-><c- k>default</c-></code> its relocation constructor. P1144 can’t do that, and anyway wants to support <code class="highlight"><c- n>Wrap0</c-></code> and <code class="highlight"><c- n>Wrap3</c-></code>.)</p>
+   <p><small></small></p>
+   <small> <table> <tbody><tr><th>P1144</th><th>P2785R3</th></tr> <tr><td><code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code></td><td></td></tr> <tr><td></td><td><code class="highlight"><c- n>T</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></code></td></tr> <tr><td></td><td><code class="highlight"><c- n>T</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></code></td></tr> <tr><td>QoI <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code><br>on STL containers</td><td>Mandate relocation ctors<br>for all STL containers</td></tr> <tr><td></td><td><code class="highlight"><c- n>T</c-> <c- n>t</c-> <c- o>=</c-> <c- n>reloc</c-> <c- n>u</c-><c- p>;</c-></code> (ends <code class="highlight"><c- n>u</c-></code>’s lifetime)</td></tr> <tr><td><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code></td><td><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code></td></tr> <tr><td><code class="highlight"><c- k>concept</c-> <c- nc>std</c-><c- o>::</c-><c- n>relocatable</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code></td><td></td></tr> <tr><td><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>relocate_at</c-><c- p>(</c-><c- n>psrc</c-><c- p>,</c-> <c- n>pdst</c-><c- p>);</c-></code></td><td><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>construct_at</c-><c- p>(</c-><c- n>pdst</c-><c- p>,</c-> <c- n>reloc</c-> <c- o>*</c-><c- n>psrc</c-><c- p>);</c-></code></td></tr> <tr><td><code class="highlight"><c- n>T</c-> <c- n>t</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>relocate</c-><c- p>(</c-><c- n>psrc</c-><c- p>);</c-></code></td><td><code class="highlight"><c- n>T</c-> <c- n>t</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>destroy_relocate</c-><c- p>(</c-><c- n>psrc</c-><c- p>);</c-></code></td></tr> <tr><td><code class="highlight"><c- n>FwdIt</c-> <c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate</c-><c- p>(</c-><br>  <c- n>InIt</c-><c- p>,</c-> <c- n>InIt</c-><c- p>,</c-> <c- n>FwdIt</c-><c- p>)</c-></code></td><td><code class="highlight"><c- n>FwdIt</c-> <c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate</c-><c- p>(</c-><br>  <c- n>InIt</c-><c- p>,</c-> <c- n>InIt</c-><c- p>,</c-> <c- n>FwdIt</c-><c- p>)</c-></code></td></tr> <tr><td><code class="highlight"><c- n>pair</c-><c- o>&lt;</c-><c- n>InIt</c-><c- p>,</c-> <c- n>FwdIt</c-><c- o>></c-> <c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate_n</c-><c- p>(</c-><br>  <c- n>InIt</c-><c- p>,</c-> <c- n>Size</c-><c- p>,</c-> <c- n>FwdIt</c-><c- p>)</c-></code></td><td><code class="highlight"><c- n>pair</c-><c- o>&lt;</c-><c- n>InIt</c-><c- p>,</c-> <c- n>FwdIt</c-><c- o>></c-> <c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate_n</c-><c- p>(</c-><br>  <c- n>InIt</c-><c- p>,</c-> <c- n>Size</c-><c- p>,</c-> <c- n>FwdIt</c-><c- p>)</c-></code></td></tr> <tr><td><code class="highlight"><c- n>Bidi2</c-> <c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate_backward</c-><c- p>(</c-><br>  <c- n>Bidi1</c-><c- p>,</c-> <c- n>Bidi1</c-><c- p>,</c-> <c- n>Bidi2</c-><c- p>)</c-></code></td><td></td></tr> <tr><td></td><td><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>relocate_t</c-></code>, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>relocate</c-></code> tag type</td></tr> <tr><td></td><td><code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>::</c-><c- n>relocate_out</c-><c- p>(</c-><br>  <c- n>const_iterator</c-><c- p>,</c-> <c- n>const_iterator</c-><c- p>,</c-> <c- n>OutIt</c-><c- p>)</c-> <c- n>etc</c-><c- p>.</c-></code></td></tr> <tr><td></td><td><code class="highlight"><c- n>T</c-> <c- n>queue</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>::</c-><c- n>pop</c-><c- p>(</c-><c- n>relocate_t</c-><c- p>)</c-></code> etc.</td></tr> </tbody></table> </small> 
    <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording for C++26</span><a class="self-link" href="#wording"></a></h2>
    <p>The wording in this section is relative to the current working draft (<a data-link-type="biblio" href="#biblio-n4958" title="Working Draft, Programming Languages — C++">[N4958]</a>).</p>
    <p class="note" role="note"><span class="marker">Note:</span> There is no difficulty in changing the attribute syntax to a contextual-keyword syntax;
@@ -2494,12 +2544,12 @@ the only downsides are aesthetic. We can defer that decision to the last minute,
 to CWG’s feedback on the final wording.</p>
    <p class="note" role="note"><span class="marker">Note:</span> Our feature-test macros follow the pattern laid out by <code class="highlight"><c- n>__cpp_impl_coroutine</c-></code>+<code class="highlight"><c- n>__cpp_lib_coroutine</c-></code> and <code class="highlight"><c- n>__cpp_impl_three_way_comparison</c-></code>+<code class="highlight"><c- n>__cpp_lib_three_way_comparison</c-></code>.</p>
    <h3 class="heading settled" data-level="4.1" id="wording-cpp.predefined"><span class="secno">4.1. </span><span class="content">Predefined macro names [cpp.predefined]</span><a class="self-link" href="#wording-cpp.predefined"></a></h3>
-   <p>Add a feature-test macro to <a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:</p>
+   <p>Add a feature-test macro to the table in <a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
     <small> <pre class="highlight"><c- n>__cpp_impl_three_way_comparison</c->   <c- mf>201907L</c->
-<ins><c- n>__cpp_impl_trivially_relocatable</c->  <c- n>XXYYZZL</c-></ins>
+<ins><c- n>__cpp_impl_trivially_relocatable</c->  <c- n>YYYYMML</c-></ins>
 <c- n>__cpp_inheriting_constructors</c->     <c- mf>201511L</c->
 </pre></small>
    </blockquote>
@@ -2509,7 +2559,7 @@ to CWG’s feedback on the final wording.</p>
    <blockquote>
     <p></p>
     <small> <pre class="highlight"><c- cp>#define __cpp_lib_transparent_operators   201510L </c-><c- c1>// also in &lt;memory>, &lt;functional></c->
-<ins><c- cp>#define __cpp_lib_trivially_relocatable   XXYYZZL </c-><c- c1>// also in &lt;type_traits></c-></ins>
+<ins><c- cp>#define __cpp_lib_trivially_relocatable   YYYYMML </c-><c- c1>// also in &lt;memory>, &lt;type_traits></c-></ins>
 <c- cp>#define __cpp_lib_tuple_element_t         201402L </c-><c- c1>// also in &lt;tuple></c->
 </pre></small>
    </blockquote>
@@ -2542,6 +2592,16 @@ definition of the same class type shall have a <code class="highlight"><c- n>tri
 No diagnostic is required if definitions in different translation units have
 mismatched <code class="highlight"><c- n>trivially_relocatable</c-></code> attributes.</p> <p>If a class type is declared with the <code class="highlight"><c- n>trivially_relocatable</c-></code> attribute, and the program relies on
 observable side-effects of its relocation other than a copy of the underlying bytes, the behavior is undefined.</p> </small></blockquote>
+   <h4 class="heading settled" data-level="4.5.1" id="wording-cpp.cond"><span class="secno">4.5.1. </span><span class="content"><code class="highlight"><c- n>__has_cpp_attribute</c-></code> entry [cpp.cond]</span><a class="self-link" href="#wording-cpp.cond"></a></h4>
+   <p>Add a new entry to the table of supported attributes in <a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.cond.ha">[cpp.cond]</a>:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- n>noreturn</c->              <c- mf>200809L</c->
+<ins><c- n>trivially_relocatable</c-> <c- n>YYYYMML</c-></ins>
+<c- n>unlikely</c->              <c- mf>201803L</c->
+</pre></small>
+   </blockquote>
    <h3 class="heading settled" data-level="4.6" id="wording-concept.relocatable"><span class="secno">4.6. </span><span class="content"><code class="highlight"><c- n>relocatable</c-></code> concept [concept.relocatable]</span><a class="self-link" href="#wording-concept.relocatable"></a></h3>
    <p>Add a new section after <a href="http://eel.is/c++draft/concept.copyconstructible">[concept.copyconstructible]</a>:</p>
    <p><small></small></p>
@@ -2662,7 +2722,7 @@ ranges are destroyed.</p> </small>
    <h3 class="heading settled" data-level="5.1" id="maybe-trivially-relocatable"><span class="secno">5.1. </span><span class="content">Attribute <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code></span><a class="self-link" href="#maybe-trivially-relocatable"></a></h3>
    <p>My Clang implementation, currently available on Godbolt, supports both <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> and another attribute called <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>,
 which John McCall requested that I explore.</p>
-   <p>In Issaquah (February 2023), <a data-link-type="biblio" href="#biblio-p2786r0" title="Trivial relocatability options">[P2786R0]</a> suggested a very similar design to <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>.
+   <p>In Issaquah (February 2023), <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a> suggested a very similar design to <code class="highlight"><c- p>[[</c-><c- n>clang</c-><c- o>::</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>.
 EWGI took a three-way straw poll on <code class="highlight"><c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-></code> versus <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>,
 with an inconclusive 7–5–6 vote (the author of P1144 voting "For" and the three representatives of P2786
 presumably voting "Against").</p>
@@ -2800,7 +2860,7 @@ to Giuseppe D’Angelo and Thiago Maceira for contributing the Qt entries in <a 
 and to Giuseppe D’Angelo for extensive review comments and discussion.</p>
    <h2 class="heading settled" id="polls"><span class="content">Appendix A: Straw polls</span><a class="self-link" href="#polls"></a></h2>
    <h3 class="heading settled" id="taken-polls-2023-02-10"><span class="content">Polls taken at EWGI at Issaquah on 2023-02-10</span><a class="self-link" href="#taken-polls-2023-02-10"></a></h3>
-   <p>Arthur O’Dwyer presented <a data-link-type="biblio" href="#biblio-p1144r6" title="Object relocation in terms of move plus destroy">[P1144R6]</a>. Alisdair Meredith presented <a data-link-type="biblio" href="#biblio-p2786r0" title="Trivial relocatability options">[P2786R0]</a> (which proposed a <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>-style facility, and expressed it as a contextual keyword instead
+   <p>Arthur O’Dwyer presented <a data-link-type="biblio" href="#biblio-p1144r6" title="Object relocation in terms of move plus destroy">[P1144R6]</a>. Alisdair Meredith presented <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a> (which proposed a <code class="highlight"><c- p>[[</c-><c- n>maybe_trivially_relocatable</c-><c- p>]]</c-></code>-style facility, and expressed it as a contextual keyword instead
 of an attribute). EWGI took the following <a href="https://wiki.edg.com/bin/view/Wg21issaquah2023/EWGIP1144R6">straw polls</a> (as well as polls on attribute syntax and on both papers' readiness for EWG).</p>
    <table class="def">
     <tbody>
@@ -2889,7 +2949,7 @@ for each of the following reasons:</p>
     <li data-md>
      <p>Allocated memory contains pointer to self (e.g. libstdc++'s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>list</c-></code>)</p>
     <li data-md>
-     <p>Class invariant depends on <code class="highlight"><c- k>this</c-></code> (e.g. <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>offset_ptr</c-></code>)</p>
+     <p>Class invariant depends on <code class="highlight"><c- k>this</c-></code> (e.g. <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html"><code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>interprocess</c-><c- o>::</c-><c- n>offset_ptr</c-></code></a></p>
     <li data-md>
      <p>Program invariant depends on <code class="highlight"><c- k>this</c-></code> (e.g. a global registry of <code class="highlight"><c- n>Widget</c-></code> addresses)</p>
     <li data-md>
@@ -2910,7 +2970,7 @@ all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. S
    <p><a href="https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable">Arthur’s fork of libc++</a> implements
 all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. See it in action <a href="https://p1144.godbolt.org/z/jf67zx5hq">on godbolt.org</a>, under the name "x86-64 clang (experimental P1144)."
 (<a href="https://p1144.godbolt.org/z/t28saC">Here</a> is another example showing P1144’s interaction with fancy allocators.)</p>
-   <p>Since September 2023, Stellar HPX implements <code class="highlight"><c- n>relocate_at</c-></code> and <code class="highlight"><c- n>uninitialized_relocate</c-><c- p>{,</c-><c- n>_n</c-><c- p>,</c-><c- n>_backward</c-><c- p>}</c-></code> in the <code class="highlight"><c- n>hpx</c-><c- o>::</c-><c- n>experimental</c-></code> namespace. This was a GSoC project. See <a data-link-type="biblio" href="#biblio-hpx" title="Relocation Semantics in the HPX Library">[HPX]</a>.</p>
+   <p>Since September 2023, Stellar HPX implements <code class="highlight"><c- n>relocate_at</c-></code> and <code class="highlight"><c- n>uninitialized_relocate</c-><c- p>{,</c-><c- n>_n</c-><c- p>}</c-></code> in the <code class="highlight"><c- n>hpx</c-><c- o>::</c-><c- n>experimental</c-></code> namespace. This was a GSoC project. See <a data-link-type="biblio" href="#biblio-hpx" title="Relocation Semantics in the HPX Library">[HPX]</a>.</p>
    <p><a data-link-type="biblio" href="#biblio-qt" title="Qt Base">[Qt]</a> implements <code class="highlight"><c- n>q_uninitialized_relocate_n</c-></code> in the <code class="highlight"><c- n>QtPrivate</c-></code> namespace, but (unlike P1144’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate_n</c-></code>)
 does not support overlap; it optimizes to <code class="highlight"><c- n>memcpy</c-></code>. Qt also provides <code class="highlight"><c- n>q_relocate_overlap_n</c-></code>, which optimizes to <code class="highlight"><c- n>memmove</c-></code>.</p>
    <p>Since November 2018, libstdc++ optimizes <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>reserve</c-></code> for types that manually specialize <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>__is_bitwise_relocatable</c-></code>.
@@ -3104,8 +3164,8 @@ to be manually specialized by the client programmer.</p>
    <dd>Niall Douglas. <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1029r3.pdf"><cite>P1029R3: move = bitcopies</cite></a>. January 2020. URL: <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1029r3.pdf">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1029r3.pdf</a>
    <dt id="biblio-p1144r6">[P1144R6]
    <dd>Arthur O'Dwyer. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1144r6.html"><cite>Object relocation in terms of move plus destroy</cite></a>. June 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1144r6.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1144r6.html</a>
-   <dt id="biblio-p2786r0">[P2786R0]
-   <dd>Mungo Gill, Alisdair Meredith. <a href="https://wg21.link/p2786r0"><cite>Trivial relocatability options</cite></a>. 11 February 2023. URL: <a href="https://wg21.link/p2786r0">https://wg21.link/p2786r0</a>
+   <dt id="biblio-p2785r3">[P2785R3]
+   <dd>Sébastien Bini; Ed Catmur. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2785r3.html"><cite>Relocating prvalues</cite></a>. June 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2785r3.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2785r3.html</a>
    <dt id="biblio-p2786r2">[P2786R2]
    <dd>Mungo Gill; Alisdair Meredith. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r2.pdf"><cite>Trivial relocatability options</cite></a>. June 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r2.pdf">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r2.pdf</a>
    <dt id="biblio-p2814r1">[P2814R1]
