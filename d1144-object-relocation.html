@@ -2147,7 +2147,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R9<br>std::is_trivially_relocatable</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-10-06">2023-10-06</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-10-12">2023-10-12</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -2159,7 +2159,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>53
+     <dd>54
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2172,7 +2172,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   For many C++ types, this is implementable "trivially," as a single <code class="highlight"><c- n>memcpy</c-></code>.
   We propose a standard trait so library writers can detect such types.
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
-  Finally, we propose a standard syntax for a user-defined type (e.g. <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>shared_ptr</c-></code>) to warrant
+  Finally, we propose a standard syntax for a user-defined type (e.g. <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>movelib</c-><c- o>::</c-><c- n>unique_ptr</c-></code>) to warrant
   to the implementation that it is trivially relocatable.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
@@ -2333,10 +2333,10 @@ to <b><i>warrant</i></b> to the compiler that a resource-management type is triv
 Explicit warrants are rarely needed because the compiler can infer trivial relocatability for
 Rule-of-Zero types. See <a href="#wording-basic.types.general">§ 4.4 Trivially relocatable type [basic.types.general]</a>.</p>
    <p>The most important thing about P1144 relocation is that it is backward compatible and does not
-break either API or ABI. My intention is simply to legalize the well-understood tricks
-that many industry codebases already do in practice (see <a data-link-type="biblio" href="#biblio-bsl" title="bslmf::IsBitwiseMoveable: bitwise moveable trait metafunction">[BSL]</a>, <a data-link-type="biblio" href="#biblio-folly" title="Folly documentation on &quot;Object Relocation&quot;">[Folly]</a>, <a data-link-type="biblio" href="#biblio-deque" title="Improve relocation ... (__is_trivially_relocatable): Specialize for deque">[Deque]</a>).
-P1144 is not intended to change the behavior of any existing source code (except to speed it up),
-nor does it require major work from standard library vendors.</p>
+break either API or ABI. P1144 intends simply to legalize the well-understood tricks
+that many industry codebases already do (see <a data-link-type="biblio" href="#biblio-bsl" title="bslmf::IsBitwiseMoveable: bitwise moveable trait metafunction">[BSL]</a>, <a data-link-type="biblio" href="#biblio-folly" title="Folly documentation on &quot;Object Relocation&quot;">[Folly]</a>, <a data-link-type="biblio" href="#biblio-deque" title="Improve relocation ... (__is_trivially_relocatable): Specialize for deque">[Deque]</a>),
+not to change the behavior of any existing source code (except to speed it up),
+nor to require major work from standard library vendors.</p>
    <h3 class="heading settled" data-level="2.1" id="applications"><span class="secno">2.1. </span><span class="content">Optimizations enabled by trivial relocatability</span><a class="self-link" href="#applications"></a></h3>
    <p>The following optimizations are possible according to P1144R9’s notion of
 trivial relocatability. Here’s who does these optimizations in practice:</p>
@@ -2542,7 +2542,7 @@ is that <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prva
    <p class="note" role="note"><span class="marker">Note:</span> There is no difficulty in changing the attribute syntax to a contextual-keyword syntax;
 the only downsides are aesthetic. We can defer that decision to the last minute, according
 to CWG’s feedback on the final wording.</p>
-   <p class="note" role="note"><span class="marker">Note:</span> Our feature-test macros follow the pattern laid out by <code class="highlight"><c- n>__cpp_impl_coroutine</c-></code>+<code class="highlight"><c- n>__cpp_lib_coroutine</c-></code> and <code class="highlight"><c- n>__cpp_impl_three_way_comparison</c-></code>+<code class="highlight"><c- n>__cpp_lib_three_way_comparison</c-></code>.</p>
+   <p class="note" role="note"><span class="marker">Note:</span> Our feature-test macros follow the pattern set by <code class="highlight"><c- n>__cpp_impl_coroutine</c-></code>+<code class="highlight"><c- n>__cpp_lib_coroutine</c-></code> and <code class="highlight"><c- n>__cpp_impl_three_way_comparison</c-></code>+<code class="highlight"><c- n>__cpp_lib_three_way_comparison</c-></code>.</p>
    <h3 class="heading settled" data-level="4.1" id="wording-cpp.predefined"><span class="secno">4.1. </span><span class="content">Predefined macro names [cpp.predefined]</span><a class="self-link" href="#wording-cpp.predefined"></a></h3>
    <p>Add a feature-test macro to the table in <a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:</p>
    <p><small></small></p>
@@ -2949,7 +2949,7 @@ for each of the following reasons:</p>
     <li data-md>
      <p>Allocated memory contains pointer to self (e.g. libstdc++'s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>list</c-></code>)</p>
     <li data-md>
-     <p>Class invariant depends on <code class="highlight"><c- k>this</c-></code> (e.g. <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html"><code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>interprocess</c-><c- o>::</c-><c- n>offset_ptr</c-></code></a></p>
+     <p>Class invariant depends on <code class="highlight"><c- k>this</c-></code> (e.g. <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html"><code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>interprocess</c-><c- o>::</c-><c- n>offset_ptr</c-></code></a>)</p>
     <li data-md>
      <p>Program invariant depends on <code class="highlight"><c- k>this</c-></code> (e.g. a global registry of <code class="highlight"><c- n>Widget</c-></code> addresses)</p>
     <li data-md>
