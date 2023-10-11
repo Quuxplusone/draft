@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 9
-!Draft Revision: 53
+!Draft Revision: 54
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -14,9 +14,9 @@ Abstract:
   For many C++ types, this is implementable "trivially," as a single <code>memcpy</code>.
   We propose a standard trait so library writers can detect such types.
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
-  Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::shared_ptr</code>) to warrant
+  Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::movelib::unique_ptr</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2023-10-06
+Date: 2023-10-12
 </pre>
 
 <style>
@@ -106,10 +106,10 @@ Explicit warrants are rarely needed because the compiler can infer trivial reloc
 Rule-of-Zero types. See [[#wording-basic.types.general]].
 
 The most important thing about P1144 relocation is that it is backward compatible and does not
-break either API or ABI. My intention is simply to legalize the well-understood tricks
-that many industry codebases already do in practice (see [[BSL]], [[Folly]], [[Deque]]).
-P1144 is not intended to change the behavior of any existing source code (except to speed it up),
-nor does it require major work from standard library vendors.
+break either API or ABI. P1144 intends simply to legalize the well-understood tricks
+that many industry codebases already do (see [[BSL]], [[Folly]], [[Deque]]),
+not to change the behavior of any existing source code (except to speed it up),
+nor to require major work from standard library vendors.
 
 
 ## Optimizations enabled by trivial relocatability ## {#applications}
@@ -408,7 +408,7 @@ Note: There is no difficulty in changing the attribute syntax to a contextual-ke
 the only downsides are aesthetic. We can defer that decision to the last minute, according
 to CWG's feedback on the final wording.
 
-Note: Our feature-test macros follow the pattern laid out by `__cpp_impl_coroutine`+`__cpp_lib_coroutine`
+Note: Our feature-test macros follow the pattern set by `__cpp_impl_coroutine`+`__cpp_lib_coroutine`
 and `__cpp_impl_three_way_comparison`+`__cpp_lib_three_way_comparison`.
 
 ## Predefined macro names [cpp.predefined] ## {#wording-cpp.predefined}
@@ -1007,7 +1007,7 @@ for each of the following reasons:
 
 - Class contains pointer to self (e.g. libstdc++'s `std::string`)
 - Allocated memory contains pointer to self (e.g. libstdc++'s `std::list`)
-- Class invariant depends on `this` (e.g. <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html">`boost::interprocess::offset_ptr`</a>
+- Class invariant depends on `this` (e.g. <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html">`boost::interprocess::offset_ptr`</a>)
 - Program invariant depends on `this` (e.g. a global registry of `Widget` addresses)
 - Polymorphic object effectively relies on offset-into-self (see also [[Polymorphic]])
 
