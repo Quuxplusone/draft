@@ -16,7 +16,8 @@ all: \
     d2848-std-is-uniqued.html \
     d2903-ignore-explicit.html \
     d2952-auto-operators.html \
-    d2953-forbid-defaulting-rr-assignment.html
+    d2953-forbid-defaulting-rr-assignment.html \
+    d3016-valarray.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
