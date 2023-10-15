@@ -2,19 +2,17 @@
 Title: flat_map/flat_set omnibus
 Shortname: D2767
 Revision: 2
-!Draft Revision: 15
-Audience: LWG
+!Draft Revision: 17
+Audience: LEWG, LWG
 Status: D
 Group: WG21
 URL:
-!Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2767-flat-omnibus.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2767-flat-omnibus.bs</a>
-!Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2767-flat-omnibus.html">rawgit.com/Quuxplusone/draft/gh-pages/d2767-flat-omnibus.html</a>
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Issues and resolutions in C++23 <code>flat_set</code>
   and <code>flat_map</code>, based on libc++'s implementation experience.
-Date: 2023-07-18
+Date: 2023-10-17
 </pre>
 
 <style>
@@ -27,9 +25,11 @@ dst  {background-color: #CCFFEE; text-decoration: underline;}
 
 # Changelog # {#changelog}
 
-- R2:
+- R2 (post-LEWG-telecon, pre-Kona):
 
     - Wording nits in §5.
+
+    - Add [[#zero-initialization]].
 
 - R1 (post-Varna 2023):
 
@@ -464,8 +464,8 @@ then inserts `t`</del> <ins>Adds an element to <i>`c`</i></ins> as if by:
 <pre>
 <del>auto it = ranges::upper_bound(c, t, compare);</del>
 <del>c.insert(it, std::move(t));</del>
-<ins>auto n = ranges::upper_bound(c, t, compare) - c.begin();</ins>
-<ins>c.emplace_back(std::forward<Args>(args)...);</ins>
+<ins>c.emplace_back(std::forward&lt;Args>(args)...);</ins>
+<ins>auto n = upper_bound(c.begin(), c.end() - 1, c.back(), compare) - c.begin();</ins>
 <ins>ranges::rotate(c.begin() + n, c.end() - 1, c.end());</ins>
 </pre>
 <p>3․ Returns: An iterator that points to the inserted element.
@@ -515,10 +515,10 @@ Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as fo
 <pre>
     // [flat.map.modifiers], modifiers
     template&lt;class... Args> pair&lt;iterator, bool> emplace(Args&&... args)<del>;</del>
-      <ins>{ return insert(value_type(std::forward<Args>(args)...)); }</ins>
+      <ins>{ return insert(value_type(std::forward&lt;Args>(args)...)); }</ins>
     template&lt;class... Args>
       iterator emplace_hint(const_iterator position, Args&&... args)<del>;</del>
-        <ins>{ return insert(position, value_type(std::forward<Args>(args)...)); }</ins>
+        <ins>{ return insert(position, value_type(std::forward&lt;Args>(args)...)); }</ins>
 
     pair&lt;iterator, bool> insert(const value_type& x)<ins>;</ins>
       <del>{ return emplace(x); }</del>
@@ -580,8 +580,8 @@ and the iterator component of the pair points to the element with key equivalent
 and the iterator component of the pair points to the element with key equivalent to `x.first`.</ins>
 
 <pre>
-template<class P> pair&lt;iterator, bool> insert(P&& x);
-template<class P> iterator insert(const_iterator position, P&& x);
+template&lt;class P> pair&lt;iterator, bool> insert(P&& x);
+template&lt;class P> iterator insert(const_iterator position, P&& x);
 </pre>
 4․ Constraints: `is_constructible_v<pair<key_type, mapped_type>, P>` is `true`. <ins>For
 the second overload, `is_convertible_v<P&&, const_iterator>` and
@@ -597,10 +597,10 @@ Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]
 <pre>
     // modifiers
     template&lt;class... Args> iterator emplace(Args&&... args)<del>;</del>
-      <ins>{ return insert(value_type(std::forward<Args>(args)...)); }</ins>
+      <ins>{ return insert(value_type(std::forward&lt;Args>(args)...)); }</ins>
     template&lt;class... Args>
       iterator emplace_hint(const_iterator position, Args&&... args)<del>;</del>
-        <ins>{ return insert(position, value_type(std::forward<Args>(args)...)); }</ins>
+        <ins>{ return insert(position, value_type(std::forward&lt;Args>(args)...)); }</ins>
 
     iterator insert(const value_type& x)<ins>;</ins>
       <del>{ return emplace(x); }</del>
@@ -1943,11 +1943,11 @@ Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]
 <small><blockquote>
 <pre>
     // [flat.multiset.modifiers], modifiers
-    template<class... Args> iterator emplace(Args&&... args)
-      { return insert(value_type(std::forward<Args>(args)...)); }
-    template<class... Args>
+    template&lt;class... Args> iterator emplace(Args&&... args)
+      { return insert(value_type(std::forward&lt;Args>(args)...)); }
+    template&lt;class... Args>
       iterator emplace_hint(const_iterator position, Args&&... args)
-        { return insert(position, value_type(std::forward<Args>(args)...)); }
+        { return insert(position, value_type(std::forward&lt;Args>(args)...)); }
 
     iterator insert(const value_type& x);
     iterator insert(value_type&& x);
@@ -2714,7 +2714,7 @@ Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]
                     const key_compare& comp = key_compare())
         : <i>c</i>(), <i>compare</i>(comp)
         { insert(first, last); }
-    template<class InputIterator>
+    template&lt;class InputIterator>
       flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
                     const key_compare& comp = key_compare())
         : <i>c</i>(first, last), <i>compare</i>(comp) { }
@@ -2936,7 +2936,7 @@ Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as fo
         : <i>c</i>(), <i>compare</i>(comp)
         { insert(first, last); }
 
-    template<class InputIterator>
+    template&lt;class InputIterator>
       flat_set(sorted_unique_t, InputIterator first, InputIterator last,
                     const key_compare& comp = key_compare())
         : <i>c</i>(first, last), <i>compare</i>(comp) { }
@@ -3134,6 +3134,178 @@ consecutive equivalent elements.</ins>
 <p>16․ <i>Preconditions:</i> <del>The elements of `cont` are</del> <ins>`cont` is</ins> sorted with respect to `compare`, and `cont` contains no
 <del>equal</del> <ins>equivalent</ins> elements.
 <p>17․ <i>Effects:</i> Equivalent to: `c = std::move(cont);`
+</blockquote></small>
+
+# Zero-initialization of containers # {#zero-initialization}
+
+Jean-Philippe Boivin points out that the flat containers currently specify their constructors
+as value-initializing, rather than default-initializing, the `keys` and `values` containers.
+This is extremely expensive for in-place containers such as
+<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html">P0843</a> `std::inplace_vector` (proposed for C++26).
+A reduced example looks like this ([Godbolt](https://godbolt.org/z/aWoYxEfve)):
+
+```c++
+    struct flat_set {
+        using key_compare = std::less<int>;
+        using container_type = std::inplace_vector<int, 1024>;
+
+        flat_set() : flat_set(key_compare()) { }
+        explicit flat_set(const key_compare& comp)
+          : c_(), compare_(comp) { }
+    private:
+        [[no_unique_address]] key_compare compare_;
+        container_type c_;
+    };
+```
+
+The value-initialization of `c_` zeroes the memory footprint of `c_` and then calls `inplace_vector`'s
+default constructor (which initializes `size_` but is otherwise trivial). This involves a 4096-byte `memset`.
+On the other hand, if `flat_set`'s constructors were defined as
+
+```c++
+        flat_set() = default;
+        explicit flat_set(const key_compare& comp)
+          : compare_(comp) { }
+```
+
+then there would be no 4096-byte `memset`. This would make `flat_set` more suitable for embedded programming,
+where every cycle counts.
+
+We don't care about the cost of zero-initializing the comparator, since
+comparators are usually empty types, or at least small.
+
+## Proposed wording ## {#wording-zero-initialization}
+
+Note: This wording is based on top of the editorial refactoring from §3.
+
+Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+    // [flat.map.cons], constructors
+    <del>flat_map() : flat_map(key_compare()) { }</del>
+    <ins>flat_map() = default;</ins>
+    explicit flat_map(const key_compare& comp)
+      : <del>c(),</del> compare(comp) { }
+    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
+             const key_compare& comp = key_compare());
+    flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,
+             const key_compare& comp = key_compare());
+    template&lt;class InputIterator>
+      flat_map(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
+        : <del>c(),</del> compare(comp) { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_map(sorted_unique_t s, InputIterator first, InputIterator last,
+               const key_compare& comp = key_compare())
+        : <del>c(),</del> compare(comp) { insert(s, first, last); }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_map(from_range_t fr, R&& rg)
+        : flat_map(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_map(from_range_t, R&& rg, const key_compare& comp)
+        : flat_map(comp) { insert_range(std::forward&lt;R>(rg)); }
+</pre>
+[...]
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+    // [flat.multimap.cons], constructors
+    <del>flat_multimap() : flat_multimap(key_compare()) { }</del>
+    <ins>flat_multimap() = default;</ins>
+    explicit flat_multimap(const key_compare& comp)
+      : <del>c(),</del> compare(comp) { }
+    flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
+                  const key_compare& comp = key_compare());
+    flat_multimap(sorted_equivalent_t, key_container_type key_cont, mapped_container_type mapped_cont,
+                  const key_compare& comp = key_compare());
+    template&lt;class InputIterator>
+      flat_multimap(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
+        : <del>c(),</del> compare(comp) { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_multimap(sorted_equivalent_t s, InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <del>c(),</del> compare(comp) { insert(s, first, last); }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multimap(from_range_t fr, R&& rg)
+        : flat_multimap(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multimap(from_range_t, R&& rg, const key_compare& comp)
+        : flat_multimap(comp) { insert_range(std::forward&lt;R>(rg)); }
+</pre>
+[...]
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+    // [flat.multiset.cons], constructors
+    <del>flat_multiset() : flat_multiset(key_compare()) { }</del>
+    <ins>flat_multiset() = default;</ins>
+    explicit flat_multiset(const key_compare& comp)
+      : <del>c(),</del> compare(comp) { }
+    explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());
+    flat_multiset(sorted_equivalent_t, container_type cont,
+                  const key_compare& comp = key_compare())
+      : <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }
+    template&lt;class InputIterator>
+      flat_multiset(InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <del><i>c</i>(),</del> <i>compare</i>(comp)
+        { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <i>c</i>(first, last), <i>compare</i>(comp) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multiset(from_range_t fr, R&& rg)
+        : flat_multiset(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multiset(from_range_t, R&& rg, const key_compare& comp)
+        : flat_multiset(comp)
+        { insert_range(std::forward&lt;R>(rg)); }
+</pre>
+[...]
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+    // [flat.set.cons], constructors
+    <del>flat_set() : flat_set(key_compare()) { }</del>
+    <ins>flat_set() = default;</ins>
+    explicit flat_set(const key_compare& comp)
+      : <del>c(),</del> compare(comp) { }
+    explicit flat_set(container_type cont, const key_compare& comp = key_compare());
+    flat_set(sorted_unique_t, container_type cont,
+             const key_compare& comp = key_compare())
+      : <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }
+    template&lt;class InputIterator>
+      flat_set(InputIterator first, InputIterator last,
+               const key_compare& comp = key_compare())
+        : <del><i>c</i>(),</del> <i>compare</i>(comp)
+        { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_set(sorted_unique_t, InputIterator first, InputIterator last,
+               const key_compare& comp = key_compare())
+        : <i>c</i>(first, last), <i>compare</i>(comp) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_set(from_range_t fr, R&& rg)
+        : flat_set(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_set(from_range_t, R&& rg, const key_compare& comp)
+        : flat_set(comp)
+        { insert_range(std::forward&lt;R>(rg)); }
+</pre>
+[...]
 </blockquote></small>
 
 
