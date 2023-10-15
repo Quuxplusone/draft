@@ -2,7 +2,7 @@
 Title: Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists
 Shortname: D3016
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -14,7 +14,7 @@ Abstract:
   applied to `valarray` and to braced initializer lists were caused by
   C++0x uncertainty around [stmt.ranged], and resolve these inconsistencies
   for C++26.
-Date: 2023-10-13
+Date: 2023-10-15
 </pre>
 
 <style>
@@ -183,7 +183,20 @@ major compiler vendors.
 
 Arthur has implemented [[#wording]] in his fork of libc++, and used it to compile
 both LLVM/Clang/libc++ and another large C++17 codebase. Naturally, it caused
-no problems except in the relevant parts of libc++'s own test suite.
+no problems except in this single test from libc++'s own test suite:
+
+```c++
+    #include <initializer_list> // but not <iterator>
+    std::initializer_list<int> il;
+    static_assert(noexcept(std::begin(il)));
+```
+
+This test now fails first because `<iterator>` was not included, and second
+because today's `begin(initializer_list<E>)` is noexcept
+but the primary template `begin(C&)` is non-noexcept
+(per <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf">P0884</a> guidance).
+Of course P3016 preserves that `ranges::begin(il)` is noexcept.
+
 
 ## Tony Table ## {#tony-table}
 
