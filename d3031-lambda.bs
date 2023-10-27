@@ -1,0 +1,585 @@
+<pre class='metadata'>
+Title: Resolve CWG2561, conversion function for lambda with explicit object parameter
+Shortname: D3031
+Revision: 0
+!Draft Revision: 3
+Audience: EWG, CWG
+Status: D
+Group: WG21
+URL:
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Let `T` be the closure type of `[](this auto, int){}`.
+  CWG2561 points out that the meaning of `+T()` is unclear.
+  Microsoft (non-conformingly) treats that expression the same as `+[](int){}`.
+  Clang (conformingly) treats the lambda as a generic lambda and `+T()` as ill-formed,
+  but (non-conformingly and awkwardly) accepts `void (*pf)(T, int) = T()`.
+  Contrary to the (February 2022) P/R of CWG2561, this paper proposes
+  to resolve CWG2561 in the more user-friendly and consistent direction taken by Microsoft.
+Date: 2023-10-31
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins     {background-color: #CCFFCC; text-decoration: underline;}
+del     {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial revision.
+
+
+# Background # {#background}
+
+"Deducing this" allows lambdas to have explicit object parameters.
+Microsoft and Clang both support the feature already, but with differing semantics.
+
+```c++
+struct Any { Any(auto) { puts("called"); } };
+
+auto a1 = [](int x) { return x+1; };
+auto a2 = [](this Any self, int x) { return x+1; };
+```
+
+Here `a1`'s closure type is certainly equivalent to
+```c++
+template<class T> using Just = T;
+
+struct A1 {
+  int operator()(int x) const { return x+1; }
+  operator Just<int(*)(int)>() const { return +[](int x) { return A1()(x); }; }
+};
+```
+
+But it's unclear which of the following two options should correspond to `a2`'s closure type:
+```c++
+struct A2_MSVC {
+  int operator()(this Any self, int x) { return x+1; }
+  operator Just<int(*)(int)>() const { return +[](int x) { return A2_MSVC()(x); }; }
+};
+
+struct A2_Clang {
+  int operator()(this Any self, int x) { return x+1; }
+  operator Just<int(*)(Any, int)>() const { return &A2_Clang::operator(); }
+};
+```
+
+MSVC's version is friendlier: it allows us to refactor an implicit-object-parameter lambda
+into an explicit-object-parameter lambda (or vice versa) without changing the type of
+the expression `+a2`. MSVC also allows us to write a recursive captureless lambda taking
+itself as a function pointer; this is impossible on Clang, because the function pointer's
+type would recursively involve its own type.
+
+<table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td><pre>void f(auto c);
+auto a1 = [](int x) { return x+1; };
+f(a1);  // OK
+f(+a1); // OK
+</pre></td><td><pre>void f(auto pf);
+auto a2 = [](this Any, int x) { return x+1; };
+f(a2);  // OK
+f(+a2); // Error on Clang, OK on MSVC
+</td></tr>
+<tr><td><pre>// OK
+auto fib = [](this auto fib, int x) -> int {
+  return x < 2 ? x : fib(x-1) + fib(x-2);
+};
+int i = fib(5);
+</pre></td><td><pre>// Error on Clang, OK on MSVC
+auto fib = [](this int (*fib)(int), int x) {
+  return x < 2 ? x : fib(x-1) + fib(x-2);
+};
+int i = fib(5);
+</pre></td></tr>
+</table>
+
+But if you try `A2_MSVC` as written, you'll find that it is ambiguous:
+```c++
+A2_MSVC a2;
+a2(1); // ill-formed, ambiguous
+```
+There are two candidates for this call: (1) call `Any(A2_MSVC)` and then `A2_MSVC::operator()(this Any, int)`,
+or (2) call `A2_MSVC::operator Just<int(*)(int)>() const` and then the built-in `operator()` on that function pointer.
+We need new core wording to prefer (1) over (2).
+
+Why don't ordinary (implicit-object-parameter) lambdas suffer from this ambiguity? I think it's because
+the identity conversion binding `this` always wins over the user-defined conversion to function pointer.
+But for the explicit-object-parameter lambda `a2`, binding `this` to `this Any self` is *also* a user-defined
+conversion.
+
+
+## Is `[](this auto){}` generic? ## {#generic}
+
+According to <a href="https://eel.is/c++draft/expr.prim.lambda#def:generic_lambda">[expr.prim.lambda.general]/6</a>,
+a lambda becomes "generic" when any of its parameters involve placeholder types — even when the
+only placeholder type is the explicit object parameter's! In other words, `b` below is technically
+considered a generic lambda.
+```c++
+auto b = [](this auto self, int x) { return x+1; };
+```
+
+It is unclear which of the following three options should correspond to `b`'s closure type.
+```c++
+struct B_Clang {
+  template<class T> int operator()(this T self, int x) { return x+1; }
+  template<class T> operator Just<int(*)(T, int)>() const { return &B_Clang::operator(); }
+};
+
+struct B_Generic {
+  template<class T> int operator()(this T self, int x) { return x+1; }
+  template<class T> operator Just<int(*)(int)>() const { return +[](int x) { return B_Generic()(x); }; }
+};
+
+struct B_MSVC {
+  template<class T> static int f(T&&, int x) { return x+1; }
+  template<class T> int operator()(this T self, int x) { return x+1; }
+  operator Just<int(*)(int)>() const { return +[](int x) { return B_MSVC()(x); }; } 
+};
+```
+
+MSVC's version is friendliest:
+```c++
+auto b = [](this auto self, int x) { return x+1; };
+int (*pb1)(int) = b; // Generic+MSVC: OK; Clang: error
+int (*pb2)(decltype(b), int) = b; // Clang: OK; Generic+MSVC: error
+auto pb3 = +b; // MSVC: OK; Generic+Clang: error
+```
+
+This suggests that a `this auto` parameter shouldn't suffice to make a lambda "generic."
+
+But now consider this case, which (having a placeholder non-object parameter) is clearly
+a generic lambda:
+```c++
+auto c = []<class T>(this T self, T x) { std::cout << x; };
+```
+It is unclear which of the following three options should correspond to `c`'s closure type:
+```c++
+struct C_Clang {
+  template<class T> void operator()(this T self, T x) const { std::cout << x; }
+  template<class T> operator Just<void(*)(T, T)>() const { return &C_Clang::operator(); }
+};
+
+struct C_MSVC {
+  template<class T> void operator()(this T self, T x) const { std::cout << x; }
+  template<class T> operator Just<void(*)(T)>() const
+  { return +[](auto x) { std::cout << x; }; }
+};
+
+struct C_Constrained {
+  template<class T> void operator()(this T self, T x) const { std::cout << x; }
+  template<class T> operator Just<void(*)(T)>() const
+    requires std::is_same_v<C_Constrained, T>
+  { return +[](auto x) { std::cout << x; }; }
+};
+```
+
+Here MSVC's version is friendly, but confusing, because MSVC rightly rejects `c(1)`
+but accepts `(+c)(1)`! So the function pointer that MSVC returns from `+c` is not
+in fact "invoking the closure type's function call operator on a default-constructed instance
+of the closure type" — that wouldn't compile! Do we need the conversion function template
+to be constrained? and if so, should it be constrained as in `C_Constrained`, or otherwise?
+
+
+# Implementation experience # {#experience}
+
+As far as I can tell, we have implementation experience of both Clang's approach (in Clang)
+and MSVC's approach (in MSVC) — although I don't fully understand what MSVC might be doing
+internally. MSVC's approach seems to be implementable, since it's been implemented.
+
+
+# Options for proposed wording # {#wording}
+
+Note: Throughout, the Standard's chosen examples rarely seem on-point. I'd like to add more
+relevant examples and eliminate some of the examples already present.
+
+## Punt for now ## {#wording-punt}
+
+Modify <a href="https://eel.is/c++draft/expr.prim.lambda#general-6">[expr.prim.lambda.general]/6</a> as follows:
+
+<small><blockquote>
+6․ A lambda is a <i>generic lambda</i> if the <i>lambda-expression</i> has any generic parameter type placeholders ([dcl.spec.auto]),
+or if the lambda has a <i>template-parameter-list</i>.<br>
+[<i>Example 4:</i><br>
+<pre><del>int i = [](int i, auto a) { return i; }(3, 4);                  // OK, a generic lambda<br>
+int j = []&lt;class T>(T t, int i) { return i; }(3, 4);            // OK, a generic lambda</del>
+<ins>auto x = [](int i, auto a) { return i; };                          // OK, a generic lambda</ins>
+<ins>auto y = [](this auto self, int i) { return i; };                  // OK, a generic lambda</ins>
+<ins>auto z = []&lt;class T>(int i) { return i; };                         // OK, a generic lambda</ins>
+</pre><i>— end example</i>]
+</blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/expr.prim.lambda#closure-9">[expr.prim.lambda.closure]/9</a> as follows:
+
+<small><blockquote>
+<p>9․ The closure type for a non-generic *lambda-expression* with no *lambda-capture* <ins>and
+no explicit object parameter ([dcl.fct])</ins> whose constraints (if any) are satisfied
+has a conversion function to pointer to function with C++ language linkage
+having the same parameter and return types as the closure type's function call operator.
+The conversion is to “pointer to noexcept function” if the function call operator has a non-throwing exception specification.
+If the function call operator is a static member function, then the value returned by this conversion function is the address
+of the function call operator. Otherwise, the value returned by this conversion function is the address of a function `F` that,
+when invoked, has the same effect as invoking the closure type's function call operator on a default-constructed instance
+of the closure type.
+`F` is a constexpr function if the function call operator is a constexpr function
+and an immediate function if the function call operator is an immediate function.
+<p>10․ For a generic lambda with no *lambda-capture* <ins>and no explicit object parameter</ins>,
+the closure type has a conversion function template to pointer to function.
+The conversion function template has the same invented template parameter list, and the pointer to function has the same parameter types,
+as the function call operator template. The return type of the pointer to function shall behave as if it were
+a *decltype-specifier* denoting the return type of the corresponding function call operator template specialization.
+<p>11․ [<i>Note 4:</i> If the generic lambda has no *trailing-return-type* or the *trailing-return-type* contains a placeholder type,
+return type deduction of the corresponding function call operator template specialization has to be done.
+The corresponding specialization is that instantiation of the function call operator template with the same template arguments
+as those deduced for the conversion function template. Consider the following:
+<pre>
+auto glambda = [](auto a) { return a; };
+int (*fp)(int) = glambda;
+</pre>
+The behavior of the conversion function of `glambda` above is like that of the following conversion function:
+<pre>
+struct Closure {
+  template&lt;class T> auto operator()(T t) const { /* ... */ }
+  template&lt;class T> static auto lambda_call_operator_invoker(T a) {
+    // forwards execution to operator()(a) and therefore has
+    // the same return type deduced
+    /* ... */
+  }
+  template&lt;class T> using fptr_t =
+     decltype(lambda_call_operator_invoker(declval&lt;T>())) (*)(T);
+
+  template&lt;class T> operator fptr_t&lt;T>() const
+    { return &lambda_call_operator_invoker; }
+};
+</pre><i>— end note</i>]
+<p>[<i>Example 6:</i><pre>
+void f1(int (*)(int))   { }
+void f2(char (*)(int))  { }<br>
+void g(int (*)(int))    { }     // #1
+void g(char (*)(char))  { }     // #2<br>
+void h(int (*)(int))    { }     // #3
+void h(char (*)(int))   { }     // #4<br>
+auto glambda = [](auto a) { return a; };
+f1(glambda);                    // OK
+f2(glambda);                    // error: ID is not convertible
+g(glambda);                     // error: ambiguous
+h(glambda);                     // OK, calls #3 since it is convertible from ID
+int& (*fpi)(int*) = [](auto* a) -> auto& { return *a; };        // OK
+</pre><i>— end example</i>]
+<p>12․ If the function call operator template is a static member function template, then the value returned
+by any given specialization of this conversion function template is the address of the corresponding function call operator template specialization.
+Otherwise, the value returned by any given specialization of this conversion function template is
+the address of a function `F` that, when invoked, has the same effect as invoking the generic lambda's corresponding function call
+operator template specialization on a default-constructed instance of the closure type.
+`F` is a constexpr function if the corresponding specialization is a constexpr function
+and an immediate function if the function call operator template specialization is an immediate function.
+<p>[<i>Note 5:</i> This will result in the implicit instantiation of the generic lambda's body.
+The instantiated generic lambda's return type and parameter types are required to match the return type and parameter types of the pointer to function.
+<i>— end note</i>]
+<p>[<i>Example 7:</i><br>
+<pre>
+auto GL = [](auto a) { std::cout &lt;&lt; a; return a; };
+int (*GL_int)(int) = GL;        // OK, through conversion function template
+GL_int(3);                      // OK, same as GL(3)
+</pre><i>— end example</i>]
+<p>13․ The conversion function or conversion function template is public, constexpr, non-virtual, non-explicit, const, and has a non-throwing exception specification.
+<p>[<i>Example 8:</i><br><pre>
+auto Fwd = [](int (*fp)(int), auto a) { return fp(a); };
+auto C = [](auto a) { return a; };<br>
+static_assert(Fwd(C,3) == 3);   // OK<br>
+// No specialization of the function call operator template can be constexpr (due to the local static).
+auto NC = [](auto a) { static int s; return a; };
+static_assert(Fwd(NC,3) == 3);  // error
+</pre><i>— end example</i>]
+</blockquote></small>
+
+
+## Clang's approach ## {#wording-clang}
+
+Modify <a href="https://eel.is/c++draft/expr.prim.lambda#general-6">[expr.prim.lambda.general]/6</a> as follows:
+
+<small><blockquote>
+6․ A lambda is a <i>generic lambda</i> if the <i>lambda-expression</i> has any generic parameter type placeholders ([dcl.spec.auto]),
+or if the lambda has a <i>template-parameter-list</i>.<br>
+[<i>Example 4:</i><br>
+<pre><del>int i = [](int i, auto a) { return i; }(3, 4);                  // OK, a generic lambda<br>
+int j = []&lt;class T>(T t, int i) { return i; }(3, 4);            // OK, a generic lambda</del>
+<ins>auto x = [](int i, auto a) { return i; };                          // OK, a generic lambda</ins>
+<ins>auto y = [](this auto self, int i) { return i; };                  // OK, a generic lambda</ins>
+<ins>auto z = []&lt;class T>(int i) { return i; };                         // OK, a generic lambda</ins>
+</pre><i>— end example</i>]
+</blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/expr.prim.lambda#closure-9">[expr.prim.lambda.closure]/9</a> as follows:
+
+<small><blockquote>
+<p>9․ The closure type for a non-generic *lambda-expression* with no *lambda-capture*
+whose constraints (if any) are satisfied
+has a conversion function to pointer to function with C++ language linkage
+having the same parameter and return types as the closure type's function call operator<ins>,
+except that if the function call operator has an explicit object parameter of type `T`, then
+the function type has a leading parameter of type `T`</ins>.
+The conversion is to “pointer to noexcept function” if the function call operator has a non-throwing exception specification.
+If the function call operator is a static member function <ins>or explicit object member function</ins>, then the value returned by this conversion function is the address
+of the function call operator. Otherwise, the value returned by this conversion function is the address of a function `F` that,
+when invoked, has the same effect as invoking the closure type's function call operator on a default-constructed instance
+of the closure type.
+`F` is a constexpr function if the function call operator is a constexpr function
+and an immediate function if the function call operator is an immediate function.
+<p>10․ For a generic lambda with no *lambda-capture*,
+the closure type has a conversion function template to pointer to function.
+The conversion function template has the same invented template parameter list, and the pointer to function has the same parameter types,
+as the function call operator template<ins>, except that if the function call operator template has an explicit object parameter of type `T`, then 
+the function type has a leading parameter of type `T`</ins>. The return type of the pointer to function shall behave as if it were
+a *decltype-specifier* denoting the return type of the corresponding function call operator template specialization.
+<p>11․ [<i>Note 4:</i> If the generic lambda has no *trailing-return-type* or the *trailing-return-type* contains a placeholder type,
+return type deduction of the corresponding function call operator template specialization has to be done.
+The corresponding specialization is that instantiation of the function call operator template with the same template arguments
+as those deduced for the conversion function template. Consider the following:
+<pre>
+auto glambda = [](auto a) { return a; };
+int (*fp)(int) = glambda;
+</pre>
+The behavior of the conversion function of `glambda` above is like that of the following conversion function:
+<pre>
+struct Closure {
+  template&lt;class T> auto operator()(T t) const { /* ... */ }
+  template&lt;class T> static auto lambda_call_operator_invoker(T a) {
+    // forwards execution to operator()(a) and therefore has
+    // the same return type deduced
+    /* ... */
+  }
+  template&lt;class T> using fptr_t =
+     decltype(lambda_call_operator_invoker(declval&lt;T>())) (*)(T);
+
+  template&lt;class T> operator fptr_t&lt;T>() const
+    { return &lambda_call_operator_invoker; }
+};
+</pre><i>— end note</i>]
+<p>[<i>Example 6:</i><pre>
+void f1(int (*)(int))   { }
+void f2(char (*)(int))  { }<br>
+void g(int (*)(int))    { }     // #1
+void g(char (*)(char))  { }     // #2<br>
+void h(int (*)(int))    { }     // #3
+void h(char (*)(int))   { }     // #4<br>
+auto glambda = [](auto a) { return a; };
+f1(glambda);                    // OK
+f2(glambda);                    // error: ID is not convertible
+g(glambda);                     // error: ambiguous
+h(glambda);                     // OK, calls #3 since it is convertible from ID
+int& (*fpi)(int*) = [](auto* a) -> auto& { return *a; };        // OK
+</pre><i>— end example</i>]
+<p>12․ If the function call operator template is a static member function template <ins>or explicit object member function</ins>, then the value returned
+by any given specialization of this conversion function template is the address of the corresponding function call operator template specialization.
+Otherwise, the value returned by any given specialization of this conversion function template is
+the address of a function `F` that, when invoked, has the same effect as invoking the generic lambda's corresponding function call
+operator template specialization on a default-constructed instance of the closure type.
+`F` is a constexpr function if the corresponding specialization is a constexpr function
+and an immediate function if the function call operator template specialization is an immediate function.
+<p>[<i>Note 5:</i> This will result in the implicit instantiation of the generic lambda's body.
+The instantiated generic lambda's return type and parameter types are required to match the return type and parameter types of the pointer to function.
+<i>— end note</i>]
+<p>[<i>Example 7:</i><br>
+<pre>
+auto GL = [](auto a) { std::cout &lt;&lt; a; return a; };
+int (*GL_int)(int) = GL;        // OK, through conversion function template
+GL_int(3);                      // OK, same as GL(3)
+</pre><i>— end example</i>]
+<p>13․ The conversion function or conversion function template is public, constexpr, non-virtual, non-explicit, const, and has a non-throwing exception specification.
+<p>[<i>Example 8:</i><br><pre>
+auto Fwd = [](int (*fp)(int), auto a) { return fp(a); };
+auto C = [](auto a) { return a; };<br>
+static_assert(Fwd(C,3) == 3);   // OK<br>
+// No specialization of the function call operator template can be constexpr (due to the local static).
+auto NC = [](auto a) { static int s; return a; };
+static_assert(Fwd(NC,3) == 3);  // error
+</pre><i>— end example</i>]
+</blockquote></small>
+
+## MSVC's approach ## {#wording-msvc}
+
+Note: This proposed wording doesn't explain why `[](this auto){}()` should prefer to call the user-defined `operator()`
+instead of using the builtin operator on the result of the lambda's non-template conversion function.
+I'm hoping someone at Microsoft can shed light on how MSVC tiebreaks this internally.
+
+Modify <a href="https://eel.is/c++draft/expr.prim.lambda#general-6">[expr.prim.lambda.general]/6</a> as follows:
+
+<small><blockquote>
+6․ A lambda is a <i>generic lambda</i> if the <i>lambda-expression</i> has any generic <ins>non-object</ins> parameter type placeholders ([dcl.spec.auto]),
+or if the lambda has a <i>template-parameter-list</i>.<br>
+[<i>Example 4:</i><br>
+<pre><del>int i = [](int i, auto a) { return i; }(3, 4);                  // OK, a generic lambda<br>
+int j = []&lt;class T>(T t, int i) { return i; }(3, 4);            // OK, a generic lambda</del>
+<ins>auto w = [](int i, auto a) { return i; };                          // OK, a generic lambda</ins>
+<ins>auto x = [](this auto self, int i) { return i; };                  // OK, a non-generic lambda</ins>
+<ins>auto y = [](this auto self, auto a) { return i; };                 // OK, a generic lambda</ins>
+<ins>auto z = []&lt;class T>(int i) { return i; };                         // OK, a generic lambda</ins>
+</pre><i>— end example</i>]
+</blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/expr.prim.lambda#closure-4">[expr.prim.lambda.closure]/4</a> as follows:
+
+<small><blockquote>
+<p>The closure type for a *lambda-expression* has a public inline function call operator <del>(for a non-generic lambda)</del>
+or function call operator template <del>(for a generic lambda)</del> ([over.call]) whose parameters and return type are those
+of the <i>lambda-expression</i>'s *parameter-declaration-clause* and *trailing-return-type* respectively,
+and whose *template-parameter-list* consists of the specified *template-parameter-list*, if any. The *requires-clause* of
+the function call operator template is the *requires-clause* immediately following `<` *template-parameter-list* `>`, if any.
+The trailing *requires-clause* of the function call operator or operator template is the *requires-clause* of the *lambda-declarator*, if any.
+<p>[<i>Note 2:</i> The function call operator template <del>for a generic lambda</del> can be an abbreviated function template ([dcl.fct]). <i>— end note</i>]
+</blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/expr.prim.lambda#closure-9">[expr.prim.lambda.closure]/9</a> as follows:
+
+<small><blockquote>
+<p>9․ The closure type for a non-generic *lambda-expression* with no *lambda-capture*
+whose constraints (if any) are satisfied
+has a conversion function to pointer to function with C++ language linkage
+having the same parameter and return types as the closure type's function call operator <ins>(omitting the object parameter, if any)</ins>.
+The conversion is to “pointer to noexcept function” if the function call operator has a non-throwing exception specification.
+If the function call operator is a static member function, then the value returned by this conversion function is the address
+of the function call operator. Otherwise, the value returned by this conversion function is the address of a function `F` that,
+when invoked, has the same effect as invoking the closure type's function call operator on a default-constructed instance
+of the closure type.
+`F` is a constexpr function if the function call operator is a constexpr function
+and an immediate function if the function call operator is an immediate function.
+<p>10․ For a generic lambda with no *lambda-capture*,
+the closure type has a conversion function template to pointer to function.
+The conversion function template has the same invented template parameter list <ins>as the function call operator template
+(omitting the invented <i>template-parameter</i> corresponding to the function call operator's explicit
+object parameter, if any)</ins>, and the pointer to function has the same parameter types<del>,</del> as
+the function call operator template <ins>(omitting the object parameter, if any)</ins>. The return type of the pointer to function shall behave as if it were
+a *decltype-specifier* denoting the return type of the corresponding function call operator template specialization.
+<p>11․ [<i>Note 4:</i> If the generic lambda has no *trailing-return-type* or the *trailing-return-type* contains a placeholder type,
+return type deduction of the corresponding function call operator template specialization has to be done.
+The corresponding specialization is that instantiation of the function call operator template with the same template arguments
+as those deduced for the conversion function template. Consider the following:
+<pre>
+auto glambda = [](auto a) { return a; };
+int (*fp)(int) = glambda;
+</pre>
+The behavior of the conversion function of `glambda` above is like that of the following conversion function:
+<pre>
+struct Closure {
+  template&lt;class T> auto operator()(T t) const { /* ... */ }
+  template&lt;class T> static auto lambda_call_operator_invoker(T a) {
+    // forwards execution to operator()(a) and therefore has
+    // the same return type deduced
+    /* ... */
+  }
+  template&lt;class T> using fptr_t =
+     decltype(lambda_call_operator_invoker(declval&lt;T>())) (*)(T);
+
+  template&lt;class T> operator fptr_t&lt;T>() const
+    { return &lambda_call_operator_invoker; }
+};
+</pre><i>— end note</i>]
+<p>[<i>Example 6:</i><pre>
+void f1(int (*)(int))   { }
+void f2(char (*)(int))  { }<br>
+void g(int (*)(int))    { }     // #1
+void g(char (*)(char))  { }     // #2<br>
+void h(int (*)(int))    { }     // #3
+void h(char (*)(int))   { }     // #4<br>
+auto glambda = [](auto a) { return a; };
+f1(glambda);                    // OK
+f2(glambda);                    // error: ID is not convertible
+g(glambda);                     // error: ambiguous
+h(glambda);                     // OK, calls #3 since it is convertible from ID
+int& (*fpi)(int*) = [](auto* a) -> auto& { return *a; };        // OK
+</pre><i>— end example</i>]
+<p>12․ If the function call operator template is a static member function template, then the value returned
+by any given specialization of this conversion function template is the address of the corresponding function call operator template specialization.
+Otherwise, the value returned by any given specialization of this conversion function template is
+the address of a function `F` that, when invoked, has the same effect as invoking the generic lambda's corresponding function call
+operator template specialization on a default-constructed instance of the closure type.
+`F` is a constexpr function if the corresponding specialization is a constexpr function
+and an immediate function if the function call operator template specialization is an immediate function.
+<p>[<i>Note 5:</i> This will result in the implicit instantiation of the generic lambda's body.
+The instantiated generic lambda's return type and <ins>non-object</ins> parameter types are required to match the return type and parameter types of the pointer to function.
+<i>— end note</i>]
+<p>[<i>Example 7:</i><br>
+<pre>
+auto GL = [](auto a) { std::cout &lt;&lt; a; return a; };
+int (*GL_int)(int) = GL;        // OK, through conversion function template
+GL_int(3);                      // OK, same as GL(3)
+</pre><i>— end example</i>]
+<p>13․ The conversion function or conversion function template is public, constexpr, non-virtual, non-explicit, const, and has a non-throwing exception specification.
+<p>[<i>Example 8:</i><br><pre>
+auto Fwd = [](int (*fp)(int), auto a) { return fp(a); };
+auto C = [](auto a) { return a; };<br>
+static_assert(Fwd(C,3) == 3);   // OK<br>
+// No specialization of the function call operator template can be constexpr (due to the local static).
+auto NC = [](auto a) { static int s; return a; };
+static_assert(Fwd(NC,3) == 3);  // error
+</pre><i>— end example</i>]
+</blockquote></small>
+
+
+# Proposed straw polls # {#straw-polls}
+
+The next revision of this paper (if any) will be guided by the outcomes of these straw polls.
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>Pursue MSVC's approach, making the conversion function yield a function pointer with the same effect as the lambda.</th>
+<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
+
+<tr><th><small>Pursue Clang's approach, making the conversion function simply return `&T::operator()`.</th>
+<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
+
+<tr><th><small>Pursue the "punt" strategy, removing the conversion function from explicit-object lambdas.</th>
+<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
+</table>
+
+<pre class=biblio>
+{
+  "CWG1274": {
+    "title": "Common nonterminal for expression and braced-init-list",
+    "authors": [
+      "Daniel Krügler"
+    ],
+    "href": "https://cplusplus.github.io/CWG/issues/1274.html",
+    "date": "March 2011–October 2015"
+  },
+  "LWG2058": {
+    "title": "valarray and begin/end",
+    "authors": [
+      "Gabriel Dos Reis"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue2058",
+    "date": "May 2011–October 2012"
+  },
+  "LWG2128": {
+    "title": "Absence of global functions cbegin/cend",
+    "authors": [
+      "Dmitry Polukhin"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue2128",
+    "date": "January 2012–January 2016"
+  },
+  "N2930": {
+    "title": "Range-Based For Loop Wording (Without Concepts)",
+    "authors": [
+      "Doug Gregor",
+      "Beman Dawes" 
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2009/n2930.html",
+    "date": "July 2009"
+  },
+  "N3271": {
+    "title": "Wording for Range-Based For Loop (Option #5)",
+    "authors": [
+      "Doug Gregor" 
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3271.htm",
+    "date": "March 2011"
+  }
+}
+</pre>
