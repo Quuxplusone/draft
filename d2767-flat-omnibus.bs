@@ -2,7 +2,7 @@
 Title: flat_map/flat_set omnibus
 Shortname: D2767
 Revision: 2
-!Draft Revision: 17
+!Draft Revision: 19
 Audience: LEWG, LWG
 Status: D
 Group: WG21
@@ -12,7 +12,7 @@ Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Issues and resolutions in C++23 <code>flat_set</code>
   and <code>flat_map</code>, based on libc++'s implementation experience.
-Date: 2023-10-17
+Date: 2023-10-31
 </pre>
 
 <style>
@@ -27,7 +27,12 @@ dst  {background-color: #CCFFEE; text-decoration: underline;}
 
 - R2 (post-LEWG-telecon, pre-Kona):
 
-    - Wording nits in §5.
+    - Vastly reorder, and separate the sections into "LWG business" and "LEWG business."
+          Combine all the subsections that would be resolved at once by [[#monolith]].
+
+    - Replace many snippets with Tony Tables for clarity.
+
+    - Wording nits.
 
     - Add [[#zero-initialization]].
 
@@ -37,11 +42,7 @@ dst  {background-color: #CCFFEE; text-decoration: underline;}
 
     - LWG reviewed §4,5,6,7. Update those sections' rationales and proposed wordings.
 
-    - Split [[#heterogeneous-insert-multiset-redirect]] away from the rest of §7, because it (alone) requires LEWG input;
-          it is now [[#heterogeneous-insert-multiset]].
-
-    - Split [[#deceptive-redirect]] away from the rest of §12, to draw attention;
-          it is now [[#deceptive]]. Write its wording.
+    - Split [[#heterogeneous-insert-multiset]] and [[#deceptive]] out of their respective sections.
 
 - R0 (pre-Varna 2023):
 
@@ -58,34 +59,27 @@ Some of the proposed solutions are LEWG-level design changes. Contrariwise, some
 here don't have "solutions" at all, but are recorded merely For Your Information (for other vendors/implementors)
 to document the design choices libc++ has made.
 
-# Editorial (merged in R0) # {#editorial-cons-alloc}
+# LWG business # {#lwg-business}
 
-P2767R0's editorial change was reviewed by LWG in Varna (2023-06-16) and approved;
+## Editorial (merged in R0) ## {#editorial-cons-alloc}
+
+P2767R0's editorial change was reviewed by LWG in Varna (2023-06-16) and approved by a vote of 7–0–1
+([minutes](https://wiki.edg.com/bin/view/Wg21varna/P2767-20230616-LM));
 it is submitted as <a href="https://github.com/cplusplus/draft/pull/6274">#6274</a>.
+Jonathan Wakely is on the hook to approve and merge it.
 
-#6274 trivially merge-conflicts with the resolution of [[LWG3884]] (which adds new
-allocator-extended constructors). I propose to rebase LWG3884's resolution on top of #6274
-as soon as #6274 is merged to trunk.
+Once this editorial business is merged, the rest of the diffs presented in this paper will
+apply cleanly.
 
-# Accidentally explicit constructor # {#explicit-oops}
+## Accidentally explicit constructor ## {#explicit-oops}
 
 STL style is that multi-argument constructors should be non-`explicit`; see [[P1163]].
-This change is non-editorial, but should be non-controversial.
-
-```c++
-    std::vector<int> v;
-    std::flat_set s = { v, std::less(), std::allocator<int>() };
-      // OK
-    std::flat_set s = { v, std::less() };
-      // Before: Ill-formed
-      // After: OK
-```
-
-## Wording ## {#wording-explicit-oops}
-
-Note: This section was updated in R1 following LWG's preferred direction.
-Thanks to Zhihao Yuan for finding the precedent for "Let `comp` be..." in
+This change is non-editorial, but non-controversial. LWG reviewed R0's wording in
+Varna and expressed a preferred direction.
+Zhihao Yuan found the precedent for "Let `comp` be..." in
 <a href="https://eel.is/c++draft/list.ops#20">`list::unique`</a>.
+
+### Wording ### {#wording-explicit-oops}
 
 Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
 
@@ -163,7 +157,7 @@ and finally erases all but the first element from each group of consecutive equi
 and otherwise <i>N</i> log <i>N</i>, where <i>N</i> is the value of `cont.size()` before this call.
 </blockquote></small>
 
-# Add move semantics to `flat_set::insert_range` # {#set-insert-range}
+## Add move semantics to `flat_set::insert_range` ## {#set-insert-range}
 
 ```c++
     std::flat_set<std::string> fs1;
@@ -188,11 +182,9 @@ Compare the current wording for
 
 Arthur doesn't know why P1206R5/R6 chose to pass `forward<R>(rg)` to `append_range` but plain old lvalue `rg`
 to `ranges::copy`; it seems like it should have forwarded in both places or else forwarded in neither place.
-Arthur is trying to find out from P1206's authors. For now, by default, let's just be consistent with P1206.
+On 2023-07-17, Casey Carter concurred: "Let's assume it's just a mistake and change both places consistently."
 
-## Wording ## {#wording-set-insert-range}
-
-Note: This section was updated in R1 following LWG's preferred direction; see rationale above.
+### Wording ### {#wording-set-insert-range}
 
 Change <a href="https://eel.is/c++draft/flat.set#modifiers-10">[flat.set.modifiers]/10</a> as follows:
 
@@ -208,7 +200,7 @@ template&lt;<i>container-compatible-range</i>&lt;value_type> R>
   <del>c.insert(c.end(), e);</del>
 <del>}</del>
 </pre>
-<ins>Adds the elements of `rg` to <i>`c`</i> via `c.append_range(std::forward<R>(rg))`
+<ins>Adds the elements of `rg` to <i>`c`</i> via `c.append_range(rg)`
 if that is a valid expression, or `ranges::copy(rg, back_inserter(c))` otherwise.</ins> Then,
 sorts the range of newly inserted elements with respect to <i>`compare`</i>;
 merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range;
@@ -228,7 +220,7 @@ explaining the semantics of `flat_multiset::insert_range`.
   <ins>void insert_range(R&& rg);</ins>
 </pre>
 
-<p><ins>x․ Effects: Adds the elements of `rg` to <i>`c`</i> via `c.append_range(std::forward<R>(rg))`
+<p><ins>x․ Effects: Adds the elements of `rg` to <i>`c`</i> via `c.append_range(rg)`
 if that is a valid expression, or `ranges::copy(rg, back_inserter(c))` otherwise.
 Then, sorts the range of newly inserted elements with respect to <i>`compare`</i>, and
 merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range.
@@ -239,7 +231,9 @@ merges the resulting sorted range and the sorted range of pre-existing elements 
 </blockquote></small>
 
 
-# Add move semantics to `flat_map::insert_range` # {#map-insert-range}
+## (LWG4000) Add move semantics to `flat_map::insert_range` ## {#map-insert-range}
+
+Note: This resolves [[LWG4000]].
 
 `flat_map`'s `insert_range` has the same issue as `flat_set`'s, at least on paper.
 
@@ -281,9 +275,10 @@ whose very next step was to do an O(M log M) sort and an O(N) `inplace_merge`.
 If any library vendor actually wants to try that kind of metaprogramming,
 they are welcome to do so under the As-If Rule. libc++ will not do it.
 
-## Wording ## {#wording-map-insert-range}
+### Wording ### {#wording-map-insert-range}
 
-Note: This section was updated in R1 following LWG's preferred direction; see rationale above.
+Note: This section was updated in R1 following LWG's preferred direction.
+I don't recall why LWG preferred `ranges::for_each` over the ranged-for-loop shown in [[LWG4000]]'s P/R.
 
 We don't need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
 because of <a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview]/4</a>:
@@ -326,7 +321,7 @@ c.values.erase(c.values.begin() + dist, c.values.end());
 </blockquote></small>
 
 
-# `insert` is more primitive than `emplace` # {#insert-emplace}
+## `insert` is more primitive than `emplace` ## {#insert-emplace}
 
 ```c++
     std::pmr::set_default_resource(std::pmr::null_memory_resource());
@@ -357,14 +352,7 @@ not to change it, simply to keep the diff small. But LWG in Varna asked to make 
 libc++'s implementation already implements `emplace` in terms of `insert`, so there doesn't seem to be
 any sneaky subtlety in that area; we can just do it. So P2767R1 does it.
 
-## Heterogeneous `insert` (to LEWG) ## {#heterogeneous-insert-multiset-redirect}
-
-Note: LWG in Varna raised an objection to adding heterogeneous `flat_multiset::insert(K&&)`
-without LEWG input. On the other hand, §7.2,3,4 were acceptable LWG business. Therefore,
-the rationale and wording for P2767R0's §7.1 have moved to [[#heterogeneous-insert-multiset]],
-and P2767R1's [[#wording-insert-emplace]] no longer includes the `insert(K&&)` overload.
-
-## "Initializes" phrasing ## {#emplace-phrasing}
+### "Initializes" phrasing ### {#emplace-phrasing}
 
 The proposed wording below brings <a href="https://eel.is/c++draft/flat.map.modifiers#2">[flat.map.modifiers]/2</a>
 into line with e.g. <a href="https://eel.is/c++draft/variant#ctor-21">[variant.ctor]/21</a> and
@@ -377,7 +365,7 @@ if the map already contains an element whose key is equivalent to `t.first`, `*t
 
 P2767R0 asked whether LWG had appetite to invent something less jargony. No, LWG did not.
 
-## Unusual constraints ## {#emplace-constraint}
+### Inconsistent `emplace` constraints ### {#emplace-constraint}
 
 The usual pattern in [containers] is that `x.emplace(args...)`
 has a precondition (<a href="https://eel.is/c++draft/containers#sequence.reqmts-21">[sequence.reqmts]</a>,
@@ -416,7 +404,7 @@ The rewrite of `emplace_hint(pos, x...)` into `insert(pos, value_type(x...))` is
 the very large overload set of `insert`; but I think it's safe: it should always be a perfect match for
 `insert(const_iterator, value_type&&)` and never a viable match for any other overload at all.
 
-## Ambiguity with `insert(first, last)` ## {#insert-ambiguity}
+### Ambiguous `insert(first, last)` ### {#insert-ambiguity}
 
 ```c++
 struct Address {
@@ -436,7 +424,7 @@ We simply need to copy the usual wording "Constraints: For the second overload, 
 This is a problem only for the sets, where `const_iterator` can be convertible to `value_type`.
 It's not a problem for the maps, so they don't need to change.
 
-## `flat_multiset::emplace` by rotation ## {#multiset-emplace}
+### `flat_multiset::emplace` by rotation? ### {#multiset-emplace}
 
 ```c++
     template<class T, class C = std::less<T>>
@@ -452,7 +440,8 @@ P2767R1 proposes to simplify the specification of `flat_multiset::emplace` in te
 but does not propose to change this behavior. We'll still be constructing a temporary with the wrong
 allocator.
 
-Tim Song has observed that we could specify `flat_multiset::emplace` as follows, instead:
+Tim Song has observed that we could instead specify `flat_multiset::emplace` like this
+(following `inplace_vector`'s precedent):
 
 <small><blockquote>
 <pre>
@@ -492,13 +481,12 @@ rotate-based version only for `emplace_hint`. There, if the caller gives us an a
 we won't need to rotate anything at all; and when we do rotate, it can only be because
 the caller gave us an inaccurate hint (i.e. it's "their fault"). But this would still
 suffer the third downside (i.e. inconsistency), and it would be more complicated to teach.
-Arthur thinks that it is best *not* to use `rotate` at all. The proposed wording below
-does not use `rotate`.
+Arthur thinks that it is best not to use `rotate`.
 
 
-## Wording ## {#wording-insert-emplace}
+### Wording ### {#wording-insert-emplace}
 
-Note: This section was updated in R1 following LWG’s preferred direction; see rationale above.
+Note: This section was updated in R1 following LWG’s preferred direction.
 We no longer add `insert(K&&)` to `flat_multiset`; that wording has moved to [[#heterogeneous-insert-multiset]].
 
 We don't need to touch [flat.multimap.modifiers]; in fact it does not currently exist;
@@ -737,47 +725,1021 @@ The returned iterator points to the element <del>whose key is</del> equivalent t
 </blockquote></small>
 
 
-# `insert_range(sorted_unique, rg)` # {#insert-range-sorted-unique}
+## Inconsistent handling of redundancy in [flat.multiset] and [flat.multimap] ## {#redundancy}
 
-The multi-element insertion API consists of these overloads:
+See <a href="https://github.com/cplusplus/draft/pull/6246#issuecomment-1539789693">#6246</a>.
+
+<a href="https://eel.is/c++draft/flat.multiset#overview-4">[flat.multiset.overview/4]</a> uses
+the same boilerplate as `vector`, `set`, `flat_set`, and `flat_map`:
+
+<small><blockquote>
+Descriptions are provided here only for operations on `flat_multiset` that are not described
+in one of the general sections or for operations where there is additional semantic information.
+</blockquote></small>
+
+<a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview/4]</a> uses
+different boilerplate:
+
+<small><blockquote>
+Except as otherwise noted, operations on `flat_multimap` are equivalent to those of `flat_map`,
+except that `flat_multimap` operations do not remove or replace elements with equal keys.
+
+[Example 1: `flat_multimap` constructors and emplace do not erase non-unique elements after sorting them. —end example]
+</blockquote></small>
+
+That's a little handwavey: It doesn't bother to explain that
+`flat_multimap::insert(sorted_equivalent_t, initializer_list)` is "equivalent to"
+`flat_map::insert(sorted_unique_t, initializer_list)`. It doesn't bother to explain how
+the `iterator` return value of `flat_multimap::insert(value_type&&)` is derived from the
+`pair<iterator, bool>` return value of `flat_map::insert(value_type&&)`.  
+
+But it does make the spec a lot shorter! Should we apply the same technique to [flat.multiset]
+that we already apply to [flat.multimap]? I haven't written wording for this yet, but can do so
+if LWG is interested.
+
+Vice versa, should we tweak [flat.multimap]'s wording to address the two "doesn't bother" points above?
+Should we tweak it to say "equivalent keys" or "duplicate keys" instead of "equal keys"?
+
+## Special member functions ## {#special-members}
+
+<a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> currently does not declare
+any special member functions. This implies that they are defaulted, which implicitly specifies
+their constexprness, noexceptness, and triviality.
+
+All three C++20 container adaptors (e.g. <a href="https://eel.is/c++draft/priqueue.overview">[priqueue.overview]</a>)
+follow that approach, too.
+
+All eight associative and/or unordered containers (e.g. <a href="https://eel.is/c++draft/set.overview">[set.overview]</a>)
+explicitly provide signatures for all five special members, including destructor, like this:
+
+<small><blockquote>
+<pre>
+    set(const set& x);
+    set(set&& x);
+[...]
+    ~set();
+    set& operator=(const set& x);
+    set& operator=(set&& x)
+      noexcept(allocator_traits&lt;Allocator>::is_always_equal::value &&
+               is_nothrow_move_assignable_v&lt;Compare>);
+</pre>
+</blockquote></small>
+
+Should `flat_set`'s spec hew more closely to `std::set`'s or `priority_queue`'s?
+We tentatively think `set`'s is the better model, so that the vendor would be free to
+make the special members non-defaulted. Vendors are still permitted to strengthen the
+noexceptness and/or triviality of declared functions; for example, both libc++ and libstdc++
+make `set(set&&)` conditionally noexcept.
 
 ```c++
-  insert(first, last);
-  insert(il);
-  insert_range(rg);
-
-  insert(sorted_unique, first, last);
-  insert(sorted_unique, il);
+    using V = std::inplace_vector<int, 100>;
+    static_assert(std::is_trivially_destructible_v<V>);
+    using M = std::flat_set<int, std::less<int>, V>;
+    static_assert(std::is_trivially_destructible_v<M>);
+      // Before: Mandatory.
+      // After: Permitted but not mandatory.
 ```
 
-An overload of `insert_range(sorted_unique, rg)` is conspicuously missing.
+### Moving from the comparator ### {#move-from-comparator}
+
+As shown above, the associative and unordered containers give their move-assignment operator
+a noexcept-spec that strongly implies it must move-from the comparator, never copy it.
+This particularly affects libstdc++, where `set(set&&)` will copy a stateful comparator
+(e.g. `std::function`) instead of moving-from it, but `set::operator=(set&&)` must move
+the comparator, leaving the source object in a "radioactive" state.
+
+This whole area is the subject of [[LWG2227]] "Stateful comparison objects in associative containers,"
+and is certainly beyond the scope of this paper P2767.
 
 ```c++
-   auto rg = std::views::iota(0, 100) | std::take_while(lessThan50);
-   assert(!std::ranges::common_range<decltype(rg)>);
-   assert(std::ranges::is_sorted(rg));
-
-   std::flat_set<int> fs;
-
-   fs.insert_range(rg);
-     // OK, but unnecessarily re-sorts the input
-
-   if (auto cv = rg | std::views::common; true) {
-     fs.insert(std::sorted_unique, cv.begin(), cv.end());
-       // OK, doesn't re-sort, but arcane
-   }
-
-   fs.insert_range(std::sorted_unique, rg);
-     // Before: Ill-formed
-     // After: OK
+  struct TestLess : std::less<> {
+    // make this too big to fit in the small buffer
+    char pad_[1000];
+  };
+  using C = std::function<bool(int,int)>;
+  std::set<int, C> s({1,2,3}, C(TestLess()));
+  assert(s.key_comp() != nullptr);
+  auto t = std::move(s);
+  assert(s.key_comp() != nullptr);
+    // libstdc++: Succeeds
+    // libc++: Fails
+  s.clear();
+  s.insert({1,2});
+    // libstdc++: OK
+    // libc++: Throws std::bad_function_call
+  t = std::move(s);
+  s.insert({1,2});
+    // Everyone: Throws std::bad_function_call
 ```
+
+If we user-declare `flat_set::operator=(flat_set&&)`,
+we must decide whether to give it a similar noexcept-spec.
+
+### Partial wording ### {#wording-special-members}
+
+For example, change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+
+<small><blockquote><pre>
+    // [flat.map.cons], constructors
+    flat_map() : flat_map(key_compare()) { }
+
+    <ins>flat_map(const flat_map&);</ins>
+    <ins>flat_map(flat_map&&);</ins>
+    <ins>flat_map& operator=(const flat_multimap&);</ins>
+    <ins>flat_map& operator=(flat_multimap&&)</ins>
+      <ins>noexcept(is_nothrow_move_assignable_v&lt;KeyContainer> &&</ins>
+               <ins>is_nothrow_move_assignable_v&lt;MappedContainer> &&</ins>
+               <ins>is_nothrow_move_assignable_v&lt;Compare>);)</ins>
+    <ins>~flat_map();</ins>
+
+    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
+             const key_compare& comp = key_compare());
+</pre></blockquote></small>
+
+
+# LEWG business # {#lewg-business}
+
+## `iterator` and `const_iterator` ## {#iterator-types}
+
+`flat_set::iterator` and `flat_set::const_iterator` are presented as if they could be
+two different types. This is consistent with how we do it in `set` and `unordered_set`.
+But in practice, all three vendors make `set::iterator` and `set::const_iterator` the
+same type. We should consider refactoring the spec of `set`, `unordered_set`, and `flat_set`
+all at once to *mandate* that these iterator types be the same type, the same way we
+already do for <a href="https://eel.is/c++draft/string.view#footnote-207">`basic_string_view`</a>
+and (since C++23 introduced `std::const_iterator`) <a href="https://eel.is/c++draft/span.overview">`span<const T>`</a>.
+
+This would allow us to remove a lot of redundant overloads from the specification,
+e.g. we don't need both `iterator find(value_type)` and `const_iterator find(value_type) const`
+if those are the same iterator type. Vendors can already do this removal in their implementations
+if they choose to. This is merely a question of our getting to do it in the paper specification too,
+under the banner of "standardizing existing practice."
+
+## Zero-initialization of containers ## {#zero-initialization}
+
+Jean-Philippe Boivin points out that the flat containers currently specify their constructors
+as value-initializing, rather than default-initializing, the `keys` and `values` containers.
+This is extremely expensive for in-place containers such as
+<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html">P0843</a> `std::inplace_vector` (proposed for C++26).
+A reduced example looks like this ([Godbolt](https://godbolt.org/z/aWoYxEfve)):
+
+```c++
+    struct flat_set {
+        using key_compare = std::less<int>;
+        using container_type = std::inplace_vector<int, 1024>;
+
+        flat_set() : flat_set(key_compare()) { }
+        explicit flat_set(const key_compare& comp)
+          : c_(), compare_(comp) { }
+    private:
+        [[no_unique_address]] key_compare compare_;
+        container_type c_;
+    };
+```
+
+The value-initialization of `c_` zeroes the memory footprint of `c_` and then calls `inplace_vector`'s
+default constructor (which initializes `size_` but is otherwise trivial). This involves a 4096-byte `memset`.
+On the other hand, if `flat_set`'s constructors were defined as
+
+```c++
+        flat_set() = default;
+        explicit flat_set(const key_compare& comp)
+          : compare_(comp) { }
+```
+
+then there would be no 4096-byte `memset`. This would make `flat_set` more suitable for embedded programming,
+where every cycle counts.
+
+We don't care about the cost of zero-initializing the comparator, since
+comparators are usually empty types, or at least small.
+
+### Wording ### {#wording-zero-initialization}
+
+Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+    // [flat.map.cons], constructors
+    <del>flat_map() : flat_map(key_compare()) { }</del>
+    <ins>flat_map() = default;</ins>
+    explicit flat_map(const key_compare& comp)
+      : <del>c(),</del> compare(comp) { }
+    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
+             const key_compare& comp = key_compare());
+    flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,
+             const key_compare& comp = key_compare());
+    template&lt;class InputIterator>
+      flat_map(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
+        : <del>c(),</del> compare(comp) { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_map(sorted_unique_t s, InputIterator first, InputIterator last,
+               const key_compare& comp = key_compare())
+        : <del>c(),</del> compare(comp) { insert(s, first, last); }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_map(from_range_t fr, R&& rg)
+        : flat_map(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_map(from_range_t, R&& rg, const key_compare& comp)
+        : flat_map(comp) { insert_range(std::forward&lt;R>(rg)); }
+</pre>
+[...]
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+    // [flat.multimap.cons], constructors
+    <del>flat_multimap() : flat_multimap(key_compare()) { }</del>
+    <ins>flat_multimap() = default;</ins>
+    explicit flat_multimap(const key_compare& comp)
+      : <del>c(),</del> compare(comp) { }
+    flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
+                  const key_compare& comp = key_compare());
+    flat_multimap(sorted_equivalent_t, key_container_type key_cont, mapped_container_type mapped_cont,
+                  const key_compare& comp = key_compare());
+    template&lt;class InputIterator>
+      flat_multimap(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
+        : <del>c(),</del> compare(comp) { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_multimap(sorted_equivalent_t s, InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <del>c(),</del> compare(comp) { insert(s, first, last); }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multimap(from_range_t fr, R&& rg)
+        : flat_multimap(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multimap(from_range_t, R&& rg, const key_compare& comp)
+        : flat_multimap(comp) { insert_range(std::forward&lt;R>(rg)); }
+</pre>
+[...]
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+    // [flat.multiset.cons], constructors
+    <del>flat_multiset() : flat_multiset(key_compare()) { }</del>
+    <ins>flat_multiset() = default;</ins>
+    explicit flat_multiset(const key_compare& comp)
+      : <del>c(),</del> compare(comp) { }
+    explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());
+    flat_multiset(sorted_equivalent_t, container_type cont,
+                  const key_compare& comp = key_compare())
+      : <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }
+    template&lt;class InputIterator>
+      flat_multiset(InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <del><i>c</i>(),</del> <i>compare</i>(comp)
+        { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
+                    const key_compare& comp = key_compare())
+        : <i>c</i>(first, last), <i>compare</i>(comp) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multiset(from_range_t fr, R&& rg)
+        : flat_multiset(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_multiset(from_range_t, R&& rg, const key_compare& comp)
+        : flat_multiset(comp)
+        { insert_range(std::forward&lt;R>(rg)); }
+</pre>
+[...]
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+    // [flat.set.cons], constructors
+    <del>flat_set() : flat_set(key_compare()) { }</del>
+    <ins>flat_set() = default;</ins>
+    explicit flat_set(const key_compare& comp)
+      : <del>c(),</del> compare(comp) { }
+    explicit flat_set(container_type cont, const key_compare& comp = key_compare());
+    flat_set(sorted_unique_t, container_type cont,
+             const key_compare& comp = key_compare())
+      : <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }
+    template&lt;class InputIterator>
+      flat_set(InputIterator first, InputIterator last,
+               const key_compare& comp = key_compare())
+        : <del><i>c</i>(),</del> <i>compare</i>(comp)
+        { insert(first, last); }
+    template&lt;class InputIterator>
+      flat_set(sorted_unique_t, InputIterator first, InputIterator last,
+               const key_compare& comp = key_compare())
+        : <i>c</i>(first, last), <i>compare</i>(comp) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_set(from_range_t fr, R&& rg)
+        : flat_set(fr, std::forward&lt;R>(rg), key_compare()) { }
+    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
+      flat_set(from_range_t, R&& rg, const key_compare& comp)
+        : flat_set(comp)
+        { insert_range(std::forward&lt;R>(rg)); }
+</pre>
+[...]
+</blockquote></small>
+
+
+## Add `flat_set::keys()` ## {#keys-method}
+
+`flat_map` and `flat_multimap` provide `keys()` and `values()` getters:
+
+<small><blockquote><pre>
+    <i>// observers</i>
+    key_compare key_comp() const;
+    value_compare value_comp() const;
+    const key_container_type& keys() const noexcept      { return c.keys; }
+    const mapped_container_type& values() const noexcept { return c.values; }
+</pre></blockquote></small>
+
+`flat_set` and `flat_multiset` do not:
+
+<small><blockquote><pre>
+    <i>// observers</i>
+    key_compare key_comp() const;
+    value_compare value_comp() const;
+</pre></blockquote></small>
+
+libc++ has found that `.keys` and `.values` are helpful in unit tests.
+The `.extract` method is a poor replacement, because it is mutating.
+For a const `flat_set`, there's literally no way to get at the container
+and query its properties, such as capacity, allocator, or even size.
+
+Therefore we suggest adding `flat_{multi,}set.keys()`.
+
+Notice that `flat_map`'s `.values()` getter returns a container of `mapped_type`,
+not a container of `value_type`. `flat_set` doesn't have a `mapped_type`;
+therefore it shouldn't have `.values()` either.
+
+<small><table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td><pre>
+auto m = std::flat_map({{1,2},{3,4},{5,6}}, A(1));
+assert(m.keys().get_allocator() == A(1));
+assert(m.values().get_allocator() == A(1));
+  // OK, m is not modified
+auto s = std::flat_set({1,2,3}, A(1));
+assert(std::move(s).extract().get_allocator() == A(1));
+  // awkward, s is modified
+const auto cs = std::flat_set<int>();
+assert(???);
+  // no way to check cs's capacity
+</pre></td><td><pre>
+auto m = std::flat_map({{1,2},{3,4},{5,6}}, A(1));
+assert(m.keys().get_allocator() == A(1));
+assert(m.values().get_allocator() == A(1));
+  // OK, m is not modified
+auto s = std::flat_set({1,2,3}, A(1));
+assert(s.keys().get_allocator() == A(1));
+  // OK, s is not modified
+const auto cs = std::flat_set<int>();
+assert(cs.keys().capacity() == 0);
+  // OK, cs can be tested
+</pre></td></tr>
+</table></small>
+
+### Wording ### {#wording-keys-method}
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    <i>// observers</i>
+    key_compare key_comp() const;
+    value_compare value_comp() const;
+
+    <ins>const container_type& keys() const noexcept { return <i>c</i>; }</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    <i>// observers</i>
+    key_compare key_comp() const;
+    value_compare value_comp() const;
+
+    <ins>const container_type& keys() const noexcept { return <i>c</i>; }</ins>
+</pre>
+</blockquote></small>
+
+
+## Efficient `flat_multiset::insert(K&&)` ## {#heterogeneous-insert-multiset}
+
+<small><table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td><pre>
+std::set&lt;BigNum, std::less&lt;>> s;
+s.insert(42);
+  // Find the insertion point via less(int, BigNum)
+  // Maybe construct BigNum(int) in-place in a new node
+  // Maybe attach the node to the tree
+std::flat_set&lt;BigNum, std::less&lt;>> s;
+s.insert(42);
+  // Find the insertion point via less(int, BigNum)
+  // Maybe construct BigNum(int) in-place in the vector
+</pre></td><td><pre>
+std::set&lt;BigNum, std::less&lt;>> s;
+s.insert(42);
+  // Find the insertion point via less(int, BigNum)
+  // Maybe construct BigNum(int) in-place in a new node
+  // Maybe attach the node to the tree
+std::flat_set&lt;BigNum, std::less&lt;>> s;
+s.insert(42);
+  // Find the insertion point via less(int, BigNum)
+  // Maybe construct BigNum(int) in-place in the vector
+</pre></td></tr>
+<tr><td><pre>
+std::multiset&lt;BigNum, std::less&lt;>> s;
+s.insert(42);
+  // Construct BigNum(int) in-place in a new node
+  // Find the insertion point via less(BigNum, BigNum)
+  // Attach the node to the tree
+std::flat_multiset&lt;BigNum, std::less&lt;>> s;
+s.insert(42);
+  // <del> Construct BigNum(int) in the argument slot</del>
+  // Find the insertion point via less(<del>BigNum</del> , BigNum)
+  // <del> Move-construct BigNum(BigNum&&) into the vector</del>
+</pre></td><td><pre>
+std::multiset&lt;BigNum, std::less&lt;>> s;
+s.insert(42);
+  // Construct BigNum(int) in-place in a new node
+  // Find the insertion point via less(BigNum, BigNum)
+  // Attach the node to the tree
+std::flat_multiset&lt;BigNum, std::less&lt;>> s;
+s.insert(42);
+  // Find the insertion point via less(<ins>int</ins> , BigNum)
+  // <ins> Construct BigNum(int) in-place in the vector</ins>
+</pre></td></tr>
+<tr><td colspan="2"><pre>
+template&lt;class T, class C>
+using PmrFlatMultiset = std::flat_multiset&lt;T, C, std::pmr::vector&lt;T>>;
+std::pmr::monotonic_buffer_resource mr(1'000'000);
+std::pmr::set_default_resource(std::pmr::null_memory_resource());
+char cstr[] = "too long to fit in the small string buffer";
+</pre></td></tr>
+<tr><td><pre>
+std::pmr::multiset&lt;std::pmr::string, std::less&lt;>> s(&mr);
+s.emplace(cstr);
+  // Construct string(cstr, &mr) in-place in a new node
+  // Find the insertion point via less(string, string)
+  // Attach the node to the tree
+s.insert(cstr);
+  // Construct string(cstr, &mr) in-place in a new node
+  // Find the insertion point via less(string, string)
+  // Attach the node to the tree
+</pre></td><td><pre>
+std::pmr::multiset&lt;std::pmr::string, std::less&lt;>> s(&mr);
+s.emplace(cstr);
+  // Construct string(cstr, &mr) in-place in a new node
+  // Find the insertion point via less(string, string)
+  // Attach the node to the tree
+s.insert(cstr);
+  // Construct string(cstr, &mr) in-place in a new node
+  // Find the insertion point via less(string, string)
+  // Attach the node to the tree
+</pre></td></tr>
+<tr><td><pre>
+PmrFlatMultiset&lt;std::pmr::string, std::less&lt;>> fs(&mr);
+fs.emplace(cstr);
+  // Construct string(cstr) in a temporary t
+  //   (throws bad_alloc)
+  // Find the insertion point via less(string, string)
+  // Move-construct string(std::move(t)) into the vector
+fs.insert(cstr);
+  // <del> Construct string(cstr) in the argument slot</del>
+  //   <del> (throws bad_alloc)</del>
+  // Find the insertion point via less(<del>string</del> , string)
+  // <del> Move-construct string(string&&) into the vector</del>
+</pre></td><td><pre>
+PmrFlatMultiset&lt;std::pmr::string, std::less&lt;>> fs(&mr);
+fs.emplace(cstr);
+  // Construct string(cstr) in a temporary t
+  //   (throws bad_alloc)
+  // Find the insertion point via less(string, string)
+  // Move-construct string(std::move(t)) into the vector
+fs.insert(cstr);
+  // Find the insertion point via less(<ins>char*</ins> , string)
+  // <ins> Construct string(cstr, &mr) into the vector</ins>
+  //   <ins> (OK, does not throw)</ins>
+</pre></td></tr>
+</table></small>
+
+[[P2363]] <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html#ins">explains</a>
+why they chose not to add `insert(K&&)` to the node-based `std::multiset`:
+
+> Adding heterogeneous `insert` overload makes no sense for associative containers with non-unique keys (`std::multimap`, `std::multiset`,
+> `std::unordered_multimap` and `std::unordered_multiset`) because the insertion will be successful in any case and the key would be always
+> constructed. All additional overheads introduced by `insert` can be mitigated by using `emplace`.
+
+That last sentence is false for the vector-based `flat_multiset`: We *cannot* mitigate overheads by using `emplace`, because
+`emplace` must first construct `t` outside the vector using the default allocator (which may throw `bad_alloc`). `emplace`
+cannot use the proper allocator, because `flat_multiset` is (deliberately) not allocator-aware.
+Therefore we propose to add `flat_multiset::insert(K&&)`.
+
+### Wording ### {#wording-heterogeneous-insert-multiset}
+
+Note: This diff assumes [[#wording-insert-emplace]] as the starting point.
+
+Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
+
+<small><blockquote>
+<pre>
+    // [flat.multiset.modifiers], modifiers
+    template&lt;class... Args> iterator emplace(Args&&... args)
+      { return insert(value_type(std::forward&lt;Args>(args)...)); }
+    template&lt;class... Args>
+      iterator emplace_hint(const_iterator position, Args&&... args)
+        { return insert(position, value_type(std::forward&lt;Args>(args)...)); }
+
+    iterator insert(const value_type& x);
+    iterator insert(value_type&& x);
+    <ins>template&lt;class K> iterator insert(K&& x);</ins>
+    iterator insert(const_iterator position, const value_type& x);
+    iterator insert(const_iterator position, value_type&& x);
+    <ins>template&lt;class K> iterator insert(const_iterator hint, K&& x);</ins>
+</pre>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+iterator insert(const value_type& x);
+iterator insert(value_type&& x);
+</pre>
+x․ Effects: Inserts a new element as if by:
+<pre>
+auto it = ranges::upper_bound(c, x, compare);
+c.insert(it, x);
+</pre>
+for the first overload or
+<pre>
+auto it = ranges::upper_bound(c, x, compare);
+c.insert(it, std::move(x));
+</pre>
+for the second overload.
+
+<p>x․ Returns: An iterator that points to the inserted element.
+
+<pre>
+<ins>template&lt;class K> iterator insert(K&& x);</ins>
+</pre>
+
+<ins>x․ Constraints: The *qualified-id* `Compare::is_transparent` is valid and denotes a type.
+`is_constructible_v<value_type, K>` is `true`.
+For the second overload, `is_convertible_v<K&&, const_iterator>` and `is_convertible_v<K&&, iterator>` are both `false`.</ins>
+
+<p><ins>x․ Preconditions: The conversion from `x` into `value_type` constructs an object `u` for which `upper_bound(x) == upper_bound(u)` is `true`.</ins>
+
+<p><ins>x․ Effects: Inserts a new element as if by</ins>
+<pre>
+<ins>auto it = ranges::upper_bound(<i>c</i>, x, <i>compare</i>);</ins>
+<ins>c.emplace(it, std::forward&lt;K>(x));</ins>
+</pre>
+
+<p><ins>x․ Returns: An iterator that points to the inserted element.</ins>
+</blockquote></small>
+
+
+## Complexity of `equal_range` ## {#complexity-equal-range}
+
+<a href="https://eel.is/c++draft/associative.reqmts.general#171">[associative.reqmts.general]/171 and /174</a>
+define the complexity of `b.equal_range(k)` and `a_tran.equal_range(ke)` as "Logarithmic."
+This means that we have the following required complexities, for both `foo` and `flat_foo`:
+
+```c++
+    std::set<std::string> s;
+    std::multiset<std::string> ms;
+    std::set<std::string, std::less<>> st;
+    std::multiset<std::string, std::less<>> mst;
+
+    s.equal_range("abc"s);
+      // 171: lower_bound, lower_bound+1; (1 + lg N) operations total
+    ms.equal_range("abc"s);
+      // 171: lower_bound, upper_bound; (2 lg N) operations total
+    st.equal_range("abc");
+      // 174: lower_bound, upper_bound; (2 lg N) operations total
+    mst.equal_range("abc");
+      // 174: lower_bound, upper_bound; (2 lg N) operations total
+```
+
+For `st.equal_range`, <a href="https://eel.is/c++draft/associative.reqmts.general#7.22">[associative.reqmts.general]/7.22</a>
+forces us to consider the possibility that `std::less<>::operator()(key_type, const char*)`
+is a less granular equivalence relation than `std::less<>::operator()(key_type, key_type)`; i.e., even though
+this is a `set`, it might still contain "duplicates" from the point of view of the heterogeneous comparator.
+It would be efficient in practice to find `lower_bound("abc")` in lg N time and then step forward linearly
+until we find an element not equal to `"abc"` — the expected number of duplicates for the average real-world workload
+is small. But the number of duplicates *theoretically* could be O(N); so we're not allowed to do this
+(at least not without an arbitrary cap, e.g. if we don't find the end of the range in 10 probes then fall back
+to `upper_bound` — bookkeeping which would again unnecessarily slow down the average case).
+
+Consider a working programmer who writes
+
+```c++
+    std::flat_set<std::string> s;
+    s.equal_range("abc");
+      // lower_bound, lower_bound+1; (1 + lg N) operations total
+```
+
+and then switches to a heterogeneous comparator in an effort to "speed up" the code
+by avoiding the conversion to `std::string`:
+
+```c++
+    std::flat_set<std::string, std::less<>> st;
+    st.equal_range("abc");
+      // lower_bound, upper_bound; (2 lg N) operations total, cache-unfriendly
+```
+
+libc++ would like to see vendors given a little more freedom to experiment here.
+
+The proposed wording below doesn't require any vendor to change their implementation,
+since an existing implementation in O(log N) certainly also satisfies O(M + log N).
+
+### Wording ### {#wording-complexity-equal-range}
+
+Change <a href="https://eel.is/c++draft/associative.reqmts.general#171">[associative.reqmts.general]</a> as follows:
+
+<small><blockquote>
+<pre>
+a_tran.upper_bound(ku)
+</pre>
+
+166․ Result: `iterator`; `const_iterator` for constant `a_tran`.
+
+167․ Returns: An iterator pointing to the first element with key `r` such that `c(ku, r)`, or `a_tran.end()` if such an element is not found.
+
+168․ Complexity: Logarithmic.
+
+<pre>
+b.equal_range(k)
+</pre>
+
+169․ Result: `pair<iterator, iterator>`; `pair<const_iterator, const_iterator>` for constant `b`.
+
+170․ Effects: Equivalent to: `return make_pair(b.lower_bound(k), b.upper_bound(k));`
+
+171․ Complexity: <del>Logarithmic.</del> <ins>O(M + log N), where N is `b.size()` and M is `distance(b.lower_bound(k), b.upper_bound(k))`.</ins>
+
+<pre>
+a_tran.equal_range(ke)
+</pre>
+
+172․ Result: `pair<iterator, iterator>`; `pair<const_iterator, const_iterator>` for constant `a_tran`.
+
+173․ Effects: Equivalent to: `return make_pair(a_tran.lower_bound(ke), a_tran.upper_bound(ke));`
+
+174․ Complexity: <del>Logarithmic.</del> <ins>O(M + log N), where N is `a_tran.size()` and M is `distance(a_tran.lower_bound(ke), a_tran.upper_bound(ke))`.</ins>
+</blockquote></small>
+
+## "Qualifies as a container" ## {#qualifies-container}
+
+Arthur's libc++ implements an alternative resolution to [[LWG3803]]. This resolution applies
+generally to all container adaptors, and has the advantage of not ad-hoc relying on a
+complicated type trait (`is_invocable`) but being a little more consistent with the
+pre-existing spec.
+
+The choice of `C::const_iterator` is simply because `T::value_type` is already present
+for allocators, and `T::iterator` is already present for many iterators (those that inherit
+from `std::iterator`, for example). We could just as well choose a criterion like
+"The expression `declval<C&>().size()` is well-formed when treated as an unevaluated operand."
+
+### Wording ### {#wording-qualifies-container}
+
+Arthur's preferred resolution is shown in <ins>this color</ins>.
+Parts of the current C++23 Working Draft that were introduced by the adopted
+resolution of LWG3803, but would be removed by this change, are shown in <src>this color</src>.
+
+Change <a href="https://eel.is/c++draft/container.requirements#container.reqmts-69">[container.reqmts]/69</a> as follows:
+
+<small><blockquote>
+69․ The behavior of certain container member functions and deduction guides depends on whether types qualify as
+input iterators<ins>, containers,</ins> or allocators.
+
+<p><ins>x․</ins> The extent to which an implementation determines that a type cannot be an input iterator is unspecified,
+except that as a minimum integral types shall not qualify as input iterators.
+
+<p><ins>x․</ins> <del>Likewise, the</del> <ins>The</ins> extent to which an implementation determines that a type cannot be an allocator is unspecified,
+except that as a minimum a type `A` shall not qualify as an allocator unless it meets both of the following conditions:
+
+* (69.1) The qualified-id `A::value_type` is valid and denotes a type ([temp.deduct]).
+* (69.2) The expression `declval<A&>().allocate(size_t{})` is well-formed when treated as an unevaluated operand.
+
+<p><ins>x․ The extent to which an implementation determines that a type cannot be a container
+is unspecified, except that as a minimum a type C shall not qualify as a container
+unless the qualified-id `C::const_iterator` is valid and denotes a type.</ins>
+</blockquote></small>
+
+Change <a href="https://eel.is/c++draft/container.adaptors.general">[container.adaptors.general]/6</a> as follows:
+
+<small><blockquote>
+6․ A deduction guide for a container adaptor shall not participate in overload resolution if any of the following are true:
+
+* (6.1) It has an `InputIterator` template parameter and a type that does not qualify as an input iterator is deduced for that parameter.
+
+* (6.2) It has a `Compare` template parameter and a type that qualifies as an allocator is deduced for that parameter.
+
+* (6.3) It has a `Container`, `KeyContainer`, or `MappedContainer` template parameter
+     and a type that <del>qualifies as an allocator</del> <ins>does not qualify as a container</ins> is deduced for that parameter.
+
+* (6.4) It has no `Container`, `KeyContainer`, or `MappedContainer` template parameter,
+     and it has an `Allocator` template parameter, and a type that does not qualify as an allocator is deduced for that parameter.
+
+* (6.5) It has both `Container` and `Allocator` template parameters, and `uses_allocator_v<Container, Allocator>` is `false`.
+
+* (6.6) It has both `KeyContainer` and `Allocator` template parameters, and `uses_allocator_v<KeyContainer, Allocator>` is `false`.
+
+* <src>(6.7) It has both `KeyContainer` and `Compare` template parameters, and</src>
+    <pre>
+        <src>is_invocable_v&lt;const Compare&,</src>
+                      <src>const typename KeyContainer::value_type&,</src>
+                      <src>const typename KeyContainer::value_type&></src>
+    </pre>
+    <src>is not a valid expression or is `false`.</src>
+
+* (6.8) It has both `MappedContainer` and `Allocator` template parameters, and `uses_allocator_v<MappedContainer, Allocator>` is `false`.
+
+</blockquote></small>
+
+## Support for non-standard containers ## {#containers}
+
+Vendors are required to support "random-access containers," which means `vector<T>` (except for `vector<bool>`)
+and `deque<T>`. It's unclear if vendors are required to support non-standard containers such as
+`boost::container::vector<T>`; and if so, what public API those containers must provide in order
+to interoperate with `flat_set`.
+
+For example, suppose the underlying container supports `C(first, last)` but not
+`C(from_range, rg)`. Then I would expect that I couldn't initialize a `flat_set<T, Compare, C>`
+with `flat_set(from_range, rg)`; but I should still be able to initialize it with `flat_set(first, last)`,
+right? It would be nice to see what's required and what's encouraged in this area.
+
+libc++ goes very slightly out of its way to support `vector<bool>` as the underlying container,
+even though we believe we're not required to support it.
+
+## Noexcept `swap` ## {#noexcept-swap}
+
+This area seems to have been tweaked quite a bit at Batavia 2018.
+See <a href="https://wiki.edg.com/bin/view/LWGBatavia2018/WednesdayAMMinutes">the minutes</a>.
+
+`flat_set::swap` is currently specified as unconditionally noexcept, which is inconsistent both
+with `std::set` and with the pre-existing adaptors.
+
+<small><blockquote>
+<pre>
+    // [flat.set.defn]
+    void swap(flat_set& y) noexcept;
+
+    // [priqueue.overview]
+    void swap(priority_queue& q) noexcept(is_nothrow_swappable_v&lt;Container> &&
+                                          is_nothrow_swappable_v&lt;Compare>)
+      { using std::swap; swap(c, q.c); swap(comp, q.comp); }
+
+    // [set.overview]
+    void swap(set&)
+      noexcept(allocator_traits&lt;Allocator>::is_always_equal::value &&
+               is_nothrow_swappable_v&lt;Compare>);
+</pre>
+<a href="https://eel.is/c++draft/associative.reqmts#except-3">[associative.reqmts.except]/3</a>:
+For associative containers, no `swap` function throws an exception unless that exception
+is thrown by the swap of the container's `Compare` object (if any).
+</blockquote></small>
+
+Suppose the underlying container has a throwing move-constructor (like MSVC `std::list`), and lacks a custom `swap`;
+then `std::swap<Container>` can throw. Or, suppose the underlying container is `std::inplace_vector<T>`;
+then its `swap` must swap `T` objects, which can throw.
+
+Now, what happens if swapping the containers actually does throw? Then both containers are in an unknown
+state, so we must restore the invariant by clearing both containers. We do the same thing if `insert` or `erase`
+throws, so this is nothing new.
+
+What happens if swapping the comparators throws? Then we cannot recover. Louis suggests adding
+`is_nothrow_swappable_v<Compare>` as a constraint. The intent is nicely ergonomic:
+Almost all comparators are nothrow swappable (including `std::function`, if we want to support that: [[LWG2227]]).
+And the resulting behavior seems better: In the pathological corner case where `flat_set` cannot safely provide
+swappability, it's better for it not to be swappable at all, than for it to falsely advertise a
+noexcept `swap`. But, if we constrain away `flat_set`'s hidden-friend `swap`, `swap(fs, fs)` will still
+compile; it'll just fall back to `std::swap<T> [with T=flat_set]`. We could actually `=delete`
+the `swap` function, like this:
+
+<small><blockquote>
+<pre>
+    <del>void swap(flat_map& y) noexcept;</del>
+    <ins>void swap(flat_map& y)</ins>
+      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
+               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+    void clear() noexcept;
+
+[...]
+
+    <del>friend void swap(flat_map& x, flat_map& y) noexcept { x.swap(y); }</del>
+    <ins>friend void swap(flat_map& x, flat_map& y)</ins>
+      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
+               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
+      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
+        <ins>{ x.swap(y); }</ins>
+    <ins>friend void swap(flat_map& x, flat_map& y)</ins>
+      <ins>requires (!is_nothrow_swappable_v&lt;key_compare>) = delete;</ins>
+</pre>
+</blockquote></small>
+
+but even then `ranges::swap(fs, fs)` would still compile; it would fall back to the
+three-step move-and-assign.
+
+It seems to be impossible to make `flat_set` non-swappable. The only reasonable options are:
+
+* Keep the status quo (unconditional `noexcept`) and terminate the program if swapping containers throws
+
+* Conditional `noexcept` like in [priqueue.overview], and don't care if swapping throws
+    (i.e. match `priority_queue`'s status quo)
+
+* Conditional `noexcept` like in [priqueue.overview], and clear both containers if swapping throws
+    (but this won't prevent radioactivity, if `swap` left the comparator in a bad state)
+
+### Specified in terms of `ranges::swap` ### {#ranges-swap}
+
+Orthogonally: It surprises us that [flat.map.modifiers] specifies `swap`'s
+implementation in terms of `ranges::swap(c, y.c)` etc. This feels overspecified;
+<a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]</a> adequately covers the semantics of swapping,
+and vendors should be able to decide for themselves how to swap comparator objects, just like
+we do in `std::set`. Arguably the tight specification helps programmers providing their own
+underlying containers: they know they just need to provide an ADL `swap` or the requirements
+of <a href="https://eel.is/c++draft/concept.swappable#2.3.sentence-1">[concept.swappable]/2.3</a>.
+But one might point out to those programmers that their underlying container
+must provide the API required in <a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]/49–51</a>,
+so the vendor can use ADL `swap(c, y.c)` or `c.swap(y.c)` if they want to.
+
+libc++'s implementation currently uses ADL `swap(c, y.c)`, which is equivalent to `ranges::swap`
+for all containers satisfying <a href="https://eel.is/c++draft/container.reqmts#51">[container.reqmts]/51</a>;
+but the difference between `swap(compare, y.compare)` and `ranges::swap(compare, y.compare)` is probably observable.
+
+
+## Stable sorting ## {#stable-sorting}
+
+For the tree-based associative containers,
+<a href="https://eel.is/c++draft/associative.reqmts#general-68.sentence-2">[associative.reqmts.general]</a> defines
+the single-element `foo::insert(val)` to insert in a well-defined order;
+<a href="https://eel.is/c++draft/associative.reqmts.general#lib:insert,ordered_associative_containers___">[associative.reqmts.general]</a> defines
+the multi-element `foo::insert(first, last)` to insert in an unspecified order.
+Nevertheless, in practice, all three vendors implement the latter as a simple
+loop over the former, so we have this de-facto behavior portable everywhere:
+
+```c++
+    struct Apathy { bool operator()(int, int) const { return false; } };
+    int a[] = {1,2,3,4,5};
+    std::multiset<int, Apathy> s;
+
+    // #1
+    for (int i : a) s.insert(i);
+    assert(std::ranges::equal(s, a)); // de jure
+
+    // #2
+    s.insert(a, a+5);
+    assert(std::ranges::is_permutation(s, a)); // de jure
+    assert(std::ranges::equal(s, a)); // de facto portable
+
+    // #3
+    s.insert_range(a);
+    assert(std::ranges::is_permutation(s, a)); // de jure
+    assert(std::ranges::equal(s, a)); // de facto portable
+```
+
+Similarly with equivalent keys in a `map` or `multimap`:
+
+```c++
+    std::pair<int, int> a[] = {{1,1},{1,2},{1,3}};
+    std::map<int, int, Apathy> m;
+
+    // #1
+    for (auto kv : a) m.insert(kv);
+    assert(m[1] == 1); // de jure
+
+    // #2
+    m.insert(a, a+5);
+    assert(m[1] > 0); // de jure
+    assert(m[1] == 1); // de facto portable
+
+    // #3
+    m.insert_range(a);
+    assert(m[1] > 0); // de jure
+    assert(m[1] == 1); // de facto portable
+```
+
+Arthur's libc++ implementation leans into the idea that `flat_foo` is a drop-in replacement for `foo`,
+and ensures that `flat_foo::insert{,_range}` will behave exactly like `foo::insert{,_range}`.
+
+```c++
+    std::flat_multiset<int, Apathy> fs;
+
+    // #1
+    for (int i : a) fs.insert(i);
+    assert(std::ranges::equal(fs, a)); // de jure
+
+    // #2
+    fs.insert(a, a+5);
+    assert(std::ranges::is_permutation(fs, a)); // de jure
+    assert(std::ranges::equal(fs, a)); // libc++
+
+    // #3
+    fs.insert_range(a);
+    assert(std::ranges::is_permutation(fs, a)); // de jure
+    assert(std::ranges::equal(fs, a)); // libc++
+```
+
+`flat_foo::insert(first, last)` is defined by <a href="https://eel.is/c++draft/flat.set.modifiers#lib:insert,flatset">[flat.set.modifiers]</a>
+to insert in order and then "sort the range." The vendor will be tempted to use `std::sort`,
+which in practice is not stable. Arthur's implementation uses `std::stable_sort` specifically
+to ensure that `fs` will give the same results as `s` for all multi-element insertions.
+
+Louis Dionne worries that by providing this additional de-facto guarantee, libc++ might be creating
+a "portability trap" — the programmer writes obvious code that works perfectly on libc++, and then when
+the programmer migrates to libstdc++ or Microsoft STL, they suddenly find that their code no longer works.
+
+Therefore Louis asks whether LWG could *specifically require* that newly inserted elements be sorted stably, e.g.
+
+<small><blockquote>
+<pre>
+template&lt;class InputIterator>
+  void insert(InputIterator first, InputIterator last);
+</pre>
+
+5․ Effects: Adds elements to `c` as if by:
+<pre>
+c.insert(c.end(), first, last);
+</pre>
+Then, <ins>stably</ins> sorts the range of newly inserted elements with respect to `compare`;
+merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range;
+and finally erases all but the first element from each group of consecutive equivalent elements.
+
+6․ Complexity: N + M log M, where N is `size()` before the operation and M is `distance(first, last)`.
+
+7․ Remarks: Since this operation performs an in-place merge, it may allocate memory.
+</blockquote></small>
+
+This operation already requires an in-place merge, which allocates memory,
+so requiring it to also do a stable sort — which allocates memory — might not be considered such a big deal.
+
+The alternative here would be for libc++ to lean into the idea that `multiset::insert_range` is supposed to
+leave the order of equivalent elements unspecified, and instrument it under libc++'s existing
+`_LIBCPP_DEBUG_RANDOMIZE_UNSPECIFIED_STABILITY` flag (currently used only for `sort`, `nth_element`, and `partial_sort`).
+This would preserve the symmetry between `multiset` and `flat_multiset`, by making both of them de facto
+randomized order (at least in debug mode).
+
+
+## `insert_range(sorted_unique, rg)` ## {#insert-range-sorted-unique}
+
+The multi-element insertion API consists of these five overloads:
+
+```c++
+  insert(first, last);                 // 1a
+  insert(il);                          // 2a
+  insert_range(rg);                    // 3a
+
+  insert(sorted_unique, first, last);  // 1b
+  insert(sorted_unique, il);           // 2b
+```
+
+`insert_range(sorted_unique, rg) // 3c` is conspicuously missing.
+
+<small><table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td colspan="2"><pre>
+auto rg = std::views::iota(0, 100) | std::take_while(lessThan50);
+assert(!std::ranges::common_range&lt;decltype(rg)>);
+assert(std::ranges::is_sorted(rg));
+std::flat_set&lt;int> fs;
+</pre></td></tr>
+<tr><td><pre>
+// O(n lg n)
+fs.insert_range(rg);
+</pre></td><td><pre>
+// O(n)
+fs.insert_range(std::sorted_unique, rg);
+</pre></td></tr>
+<tr><td><pre>
+// O(n)
+if (auto cv = rg | std::views::common) {
+  fs.insert(std::sorted_unique, cv.begin(), cv.end());
+}
+</pre></td><td><pre>
+// O(n)
+fs.insert_range(std::sorted_unique, rg);
+</pre></td></tr>
+</table></small>
 
 Now, we're also conspicuously missing a constructor overload `flat_set(sorted_unique, from_range, rg)`.
 There we have a real API-design conflict: Which of `sorted_unique` and `from_range` should come first?
 This is enough of a reason to simply give up on that constructor. But `insert_range` has no such API-design
 problem. We can easily add this overload.
 
-## Wording ## {#wording-insert-range-sorted-unique}
+### Wording ### {#wording-insert-range-sorted-unique}
 
 Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
 
@@ -925,18 +1887,95 @@ and finally erases all but the first element from each group of consecutive equi
 </pre>
 <p><ins>x․ Effects: Equivalent to `insert_range(std::forward<R>(rg))`.</ins>
 <p><ins>x․ Complexity: Linear in <i>N</i>, where <i>N</i> is `size()` after the operation.</ins>
-<p><ins>x․ Remarks: Since this operation performs an in-place merge, it may allocate memory.</ins>
 </blockquote></small>
 
-# Complexity clauses of container constructors # {#sorting-complexity}
 
-(This whole section would be mooted by [[#deceptive-remove]].)
+# (LEWG) Monolithic proposal: tag narrow-contract functions, remove container ctors # {#monolith}
 
-Most operations that require sorting come in `sorted_unique` and non-`sorted_unique` flavors;
-the `sorted_unique` flavor is rightly specified not to sort, which means it can be O(N)
-instead of O(N + M log M). That's fine. But some non-`sorted_unique` constructors have
+The following proposal is large, and late-breaking. The flat adaptors technically shipped in C++23,
+but no library vendor has implemented them yet — except for Arthur's own `sg14::flat_{set,map}` and
+libc++ implementation, both of which are motivation and implementation experience for this very proposal.
+So WG21 does have time to fix these issues as a DR, if we are responsible enough to do so.
+
+There are a constellation of problems with the existing flat-adaptor API.
+I'll present these problems, and then present a monolithic solution with all of these benefits:
+
+- Reduces `flat_map`'s constructor overload set from 26 (pre-LWG3802) down to 20
+- Reduces `flat_map`'s deduction guide set from 12 down to 6
+- Resolves [[LWG3802]], which saves adding 12 <i>more</i> constructors to `flat_map` ([[#lwg-3802]])
+- Eliminates the cause of users' surprise at `flat_map<int, int> fm = {{}, {}}` ([[#deceptive]])
+- Prevents accidentally constructing a `flat_map` that straddles two different allocators ([[#pmr-invariant]])
+- Eliminates "<i>Complexity:</i> Linear" elements that would otherwise need LWG attention ([[#sorting-complexity]])
+- Makes all narrow-contract functions uniformly take the `sorted_unique` tag ([[#replace-contract]])
+- Makes all mutators uniformly come in tagged (narrow-contract) and untagged (wide-contract) flavors
+- Provides a wide-contract version of `replace`, which didn't exist before ([[#replace-wide]])
+- Provides a narrow-contract version of `insert_range`, which didn't exist before (i.e. [[#insert-range-sorted-unique]])
+- Since no vendor has shipped flat adaptors yet, this patch reduces rather than increases vendors' workload
+
+## Deceptive list-initialization from two lists ## {#deceptive}
+
+Arthur has observed [in a blog post](https://quuxplusone.github.io/blog/2023/04/28/flat-map-constructors/)
+that `flat_{multi,}map`'s non-explicit constructor from two containers is deceptive when used with braced initializers.
+
+```c++
+    void print_map(std::flat_multimap<int, int>);
+
+    print_map({ {1, 2, 3}, {10, 20, 30} }); // prints {1,10}, {2,20}, {3,30}
+    print_map({ {1, 2},    {10, 20} });     // prints {1,2}, {10,20}
+    print_map({ {1},       {10} });         // prints {1,10}
+    print_map({ {},        {} });           // prints {0,0}, {0,0}
+```
+
+To address this issue (if we wanted to), we could make `flat_{multi,}map`'s container constructors `explicit`.
+But my preferred solution, presented here, is to remove those container constructors.
+
+## `flat_map` violates PMR invariant ## {#pmr-invariant}
+
+Using the two-container constructor of `flat_map`, we can construct
+a `flat_map` that uses two different PMR allocators at once.
+This violates the basic philosophical invariant of PMR: that a single
+data structure never "straddles" two arenas at once.
+
+<small><table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td colspan="2"><pre>
+std::pmr::monotonic_buffer_resource mr1, mr2;
+using V = std::pmr::vector&lt;int>;
+auto ks = V({1,2,3}, &mr1);
+auto vs = V({1,2,3}, &mr2);
+using FM = std::flat_map&lt;int, int, std::less&lt;>, V, V>;
+</pre></td></tr>
+<tr><td><pre>
+FM fm = FM(&mr1);
+  // Keys and values both allocated from mr1.
+fm.replace(std::move(ks), std::move(vs));
+  // values' elements will be copied from mr2 to mr1.
+</pre></td><td><pre>
+FM fm = FM(&mr1);
+  // Keys and values both allocated from mr1.
+fm.replace(std::sorted_unique, std::move(ks), std::move(vs));
+  // values' elements will be copied from mr2 to mr1.
+</pre></td></tr>
+<tr><td><pre>
+FM fm = FM(std::sorted_unique, std::move(ks), std::move(vs));
+  // "Split-brain" flat adaptor: keys allocated from mr1,
+  // values allocated from mr2. Violates PMR invariant.
+  // This is the only way to set up such a flat adaptor.
+</pre></td><td><pre>
+FM fm = FM(&mr1);
+fm.replace(std::sorted_unique, std::move(ks), std::move(vs));
+  // values' elements will be copied from mr2 to mr1.
+  // Physically impossible to create the "split-brain"
+  // adaptor from the "Before" picture.
+</pre></td></tr>
+</table></small>
+
+## Complexity clauses of container ctors ## {#sorting-complexity}
+
+The flat adaptors' container constructors have
 Complexity clauses that mandate O(N) performance on input that *happens* to be sorted
-at runtime. The vendor has three ways to deal with this:
+at runtime, even when calling the untagged wide-contract container constructor.
+The vendor has three ways to deal with this:
 
 - Guarantee that `std::sort` (or `std::stable_sort` if [[#stable-sorting]] is adopted) will
     always run in O(N) time on sorted input. This is not currently mandated by <a href="https://eel.is/c++draft/alg.sort#sort-5">[alg.sort]</a>,
@@ -969,864 +2008,161 @@ Otherwise, <del>at most</del> <ins>O(</ins>N log<sup>2</sup>(N)<ins>)</ins> comp
 In <del>either</del> <ins>any</ins> case, twice as many projections as <del>the number of</del> comparisons.
 </blockquote></small>
 
-If we changed [alg.sort], then we'd get [flat.foo]'s unusual complexity guarantees for free, and
-the following changes in [flat.foo] would be no-ops, just a bit of editorial cleanup.
-However, Louis and Arthur would prefer to leave [alg.sort] alone for now,
-making the following changes in [flat.foo] significant and non-editorial.
+[[P2767R0]] presented a second possible solution, as a patch against the Complexity clauses of
+the flat adaptors' container constructors. The third solution, presented in [[P2767R0]] and again below,
+is simply to remove the container constructors, so that we don't have to worry about this entire problem.
 
-## Wording ## {#wording-sorting-complexity}
+## `replace` is unexpectedly narrow-contract ## {#replace-contract}
 
-Change <a href="https://eel.is/c++draft/flat.map.cons">[flat.map.cons]</a> as follows:
+Most flat-adaptor member functions with narrow contracts are tagged with `std::sorted_unique`
+resp. `std::sorted_equivalent`. Currently the only exception is `.replace`. It has the same
+narrow contract as `std::flat_set(std::sorted_unique, v)` — that `v` must be sorted and uniqued —
+but it doesn't advertise this fact in its signature, and the consequence for violating the
+precondition is simply UB. This will undoubtedly lead to serious bugs.
 
-<small><blockquote>
-<pre>
-flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
-         const key_compare& comp = key_compare());
-</pre>
-1․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`,
-and `compare` with `comp`; sorts the range [`begin()`, `end()`) with respect to `value_comp()`; and
-finally erases the duplicate elements as if by:
-<pre>
-auto zv = views::zip(c.keys, c.values);
-auto it = ranges::unique(zv, key_equiv(compare)).begin();
-auto dist = distance(zv.begin(), it);
-c.keys.erase(c.keys.begin() + dist, c.keys.end());
-c.values.erase(c.values.begin() + dist, c.values.end());
-</pre>
+<small><table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td colspan="2"><pre>
+std::flat_set&lt;int> fs;
+std::vector<int> v = {3,1,4,1,5};
+</pre></td></tr>
+<tr><td><pre>
+fs = {3,1,4,1,5};
+  // OK
+fs = std::flat_set(std::move(v));
+  // OK
+fs.replace(std::move(v));
+  // undefined behavior
+</pre></td><td><pre>
+fs = {3,1,4,1,5};
+  // OK
+fs = std::flat_set(std::move(v));
+  // OK
+fs.replace(std::move(v));
+  // OK
+</pre></td></tr>
+<tr><td><pre>
+fs = std::flat_set(std::sorted_unique, std::move(v));
+  // undefined behavior
+fs.replace(std::move(v));
+  // undefined behavior
+</pre></td><td><pre>
+fs = std::flat_set(std::sorted_unique, std::move(v));
+  // undefined behavior
+fs.replace(std::sorted_unique, std::move(v));
+  // undefined behavior
+</pre></td></tr>
+</table></small>
 
-<p>2․ Complexity: <del>Linear in N if the container arguments are already sorted with respect to `value_comp()`
-and otherwise N log N, where N is the value of `key_cont.size()` before this call.</del>
-<ins>Same as `ranges::sort(ranges::zip(c.keys, c.values), value_comp())`.</ins>
-</blockquote></small>
+## Wide-contract `replace` is difficult to simulate ## {#replace-wide}
 
-Change <a href="https://eel.is/c++draft/flat.multimap.cons">[flat.multimap.cons]</a> as follows:
+Suppose the programmer has a `flat_map` with certain keys and values,
+and wants to apply a transformation to the keys. He has to do something
+like this:
 
-<small><blockquote>
-<pre>
-flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
-              const key_compare& comp = key_compare());
-</pre>
-1․ Effects: Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`,
-and `compare` with `comp`; sorts the range [`begin()`, `end()`) with respect to `value_comp()`.
+<small><table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td colspan="2"><pre>
+std::flat_map&lt;char, int> fm = {
+  {'a', 1}, {'B', 2}, {'c', 3}
+};
+auto [ks, vs] = std::move(fm).extract();
+for (auto& k : ks)
+  k = std::toupper(k);
+</pre></td></tr>
+<tr><td><pre>
+fm.replace(std::move(ks), std::move(vs));
+  // undefined behavior
+</pre></td><td><pre>
+fm.replace(std::move(ks), std::move(vs));
+  // OK
+</pre></td></tr>
+<tr><td><pre>
+fm = std::flat_map(std::move(ks), std::move(vs));
+  // OK, move-construct + sort + move-assign
+  // (but uses the container ctor we propose to remove)
+</pre></td><td><pre>
+fm.replace(std::move(ks), std::move(vs));
+  // OK, move-construct + sort + move-assign
+</pre></td></tr>
+<tr><td><pre>
+std::ranges::sort(std::ranges::zip(ks, vs));
+std::ranges::unique(???); // difficult to spell
+fm.replace(std::move(ks), std::move(vs));
+  // OK but tedious and error-prone
+</pre></td><td><pre>
+fm.replace(std::move(ks), std::move(vs));
+  // OK, not tedious at all
+</pre></td></tr>
+</table></small>
 
-<p>2․ Complexity: <del>Linear in N if the container arguments are already sorted with respect to `value_comp()`
-and otherwise N log N, where N is the value of `key_cont.size()` before this call.</del>
-<ins>Same as `ranges::sort(ranges::zip(c.keys, c.values), value_comp())`.</ins>
-</blockquote></small>
+## `replace` can't take lvalues ## {#replace-by-value}
 
-Change <a href="https://eel.is/c++draft/flat.multiset.cons">[flat.multiset.cons]</a> as follows:
-
-<small><blockquote>
-<pre>
-explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());
-</pre>
-
-1․ Effects: Initializes <i>`c`</i> with `std::move(cont)` and <i>`compare`</i> with `comp`<del>, and</del> <ins>;</ins>
-sorts the range [`begin()`, `end()`) with respect to <i>`compare`</i>.
-
-2․ Complexity: <del>Linear in N if `cont` is sorted with respect to <i>`compare`</i>
-and otherwise N log N, where N is the value of `cont.size()` before this call.</del> <ins>Same as `ranges::sort(c, compare)`.</ins>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.set.cons">[flat.set.cons]</a> as follows:
-
-<small><blockquote>
-<pre>
-explicit flat_set(container_type cont, const key_compare& comp = key_compare());
-</pre>
-
-1․ Effects: Initializes <i>`c`</i> with `std::move(cont)` and <i>`compare`</i> with `comp`<del>,</del> <ins>;</ins>
-sorts the range [`begin()`, `end()`) with respect to <i>`compare`</i><del>,</del> <ins>;</ins>
-and finally erases all but the first element from each group of consecutive equivalent elements.
-
-2․ Complexity: <del>Linear in N if `cont` is sorted with respect to <i>`compare`</i>
-and otherwise N log N, where N is the value of `cont.size()` before this call.</del> <ins>Same as `ranges::sort(c, compare)`.</ins>
-</blockquote></small>
-
-# `replace` should take by value # {#replace-by-value}
-
-The current specification for `replace` takes the new container(s) by rvalue reference,
-which means you can't just pass in a container the way you can with the `key_cont` constructor;
-instead, you have to manually `std::move` the container.
-
+The current specification for `replace` takes the new container(s) by rvalue reference.
 This might have been originally intended as a guard against accidental expensive copying of containers.
-But C++ doesn't use this (explicit-pass-by-rvalue-reference) pattern anywhere else; and it's
-inconsistent with the specification of the `key_cont` constructors, which do take by value
-and happily allow passing in lvalue containers by copy.
-
-```c++
-    std::vector<int> v = {1,2,3};
-    std::flat_set<int> fs;
-
-    fs = std::flat_set(v); // OK
-    fs.replace(std::vector(v)); // OK
-
-    fs.replace(v);
-      // Before: Ill-formed
-      // After: OK
-```
-
-Taking by value and move-constructing into place is almost always just as performant as
-taking by rvalue-reference and move-constructing into place. Caveat: some containers
-are expensive to move-construct. `std::pmr::vector` is *not* such a container.
-Boost `static_vector` is. But we shouldn't cater for such types, especially not at
-the cost of API consistency.
-
-```
-    boost::container::static_vector<int, 100> v;
-    auto fs = std::flat_set(std::move(v)); // OK, does 2 expensive moves
-    fs.replace(std::move(v));
-      // Before: OK, does 1 expensive move
-      // After: OK, does 2 expensive moves
-    fs.replace(v);
-      // Before: Ill-formed
-      // After: OK, does 1 expensive copy and 1 expensive move
-```
-
-## Wording ## {#wording-replace-by-value}
-
-Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    containers extract() &&;
-    void replace(key_container_type<del>&&</del> key_cont, mapped_container_type<del>&&</del> mapped_cont);
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.map.modifiers#lib:replace,flat_map">[flat.map.modifiers]</a> as follows:
-
-<small><blockquote>
-<pre>
-void replace(key_container_type<del>&&</del> key_cont, mapped_container_type<del>&&</del> mapped_cont);
-</pre>
-
-36․ Preconditions: `key_cont.size() == mapped_cont.size()` is `true`, the elements of `key_cont` are sorted with respect to `compare`,
-and `key_cont` contains no equal elements.
-
-37․ Effects: Equivalent to:
-<pre>
-c.keys = std::move(key_cont);
-c.values = std::move(mapped_cont);
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    containers extract() &&;
-    void replace(key_container_type<del>&&</del> key_cont, mapped_container_type<del>&&</del> mapped_cont);
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    container_type extract() &&;
-    void replace(container_type<del>&&</del>);
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multiset.modifiers#lib:replace,flat_multiset">[flat.multiset.modifiers]</a> as follows:
-
-<small><blockquote>
-<pre>
-void replace(container_type<del>&&</del> cont);
-</pre>
-
-12․ Preconditions: The elements of `cont` are sorted with respect to `compare`.
-
-13․ Effects: Equivalent to: `c = std::move(cont);`
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    container_type extract() &&;
-    void replace(container_type<del>&&</del>);
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.set.modifiers#lib:replace,flat_set">[flat.set.modifiers]</a> as follows:
-
-<small><blockquote>
-<pre>
-void replace(container_type<del>&&</del> cont);
-</pre>
-
-12․ Preconditions: The elements of `cont` are sorted with respect to `compare`, and `cont` contains no equal elements.
-
-13․ Effects: Equivalent to: `c = std::move(cont);`
-</blockquote></small>
-
-# Add `flat_set::keys()` # {#keys-method}
-
-`flat_map` and `flat_multimap` both provide `keys()` and `values()` getters:
-
-<small><blockquote>
-<pre>
-    <i>// observers</i>
-    key_compare key_comp() const;
-    value_compare value_comp() const;
-
-    const key_container_type& keys() const noexcept      { return c.keys; }
-    const mapped_container_type& values() const noexcept { return c.values; }
-</pre>
-</blockquote></small>
-
-`flat_set` and `flat_multiset` do not:
-
-<small><blockquote>
-<pre>
-    <i>// observers</i>
-    key_compare key_comp() const;
-    value_compare value_comp() const;
-</pre>
-</blockquote></small>
-
-libc++ has found that `.keys` and `.values` are helpful in unit tests.
-The `.extract` method is a poor replacement.
-
-```c++
-    auto ks = std::vector<int, A>({1,2,3}, A(1));
-    auto vs = std::vector<int, A>({4,5,6}, A(2));
-    auto m = std::flat_map(std::move(ks), std::move(vs));
-    assert(m.keys().get_allocator() == A(1));
-    assert(m.values().get_allocator() == A(2));
-      // convenient
-
-    auto ks = std::vector<int, A>({1,2,3}, A(1));
-    auto s = std::flat_set(std::move(ks));
-    assert(std::move(s).extract().get_allocator() == A(1));
-      // awkward, and modifies the value of s
-```
-
-For a const `flat_set`, there's literally no way to get at the container
-and query its properties, such as capacity, allocator, or even size
-(which is important for unit tests, if not for real programming).
-
-```c++
-    using S = std::flat_set<int, std::less<>, std::vector<int, A>>;
-    const S s = {1,2,3};
-    assert(s.keys().size() == 3);
-    assert(s.keys().capacity() >= 3);
-      // Before: Impossible to retrieve this information
-      // After: OK
-```
-
-Therefore we suggest adding a getter for the `.keys` of a set, just
-like we already have for the flat map types.
-
-Notice that `flat_map`'s `.values()` getter returns a container of `mapped_type`,
-not a container of `value_type`. `flat_set` doesn't have a `mapped_type`;
-therefore it shouldn't have `.values()` either.
-
-## Wording ## {#wording-keys-method}
-
-Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    <i>// observers</i>
-    key_compare key_comp() const;
-    value_compare value_comp() const;
-
-    <ins>const container_type& keys() const noexcept { return <i>c</i>; }</ins>
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    <i>// observers</i>
-    key_compare key_comp() const;
-    value_compare value_comp() const;
-
-    <ins>const container_type& keys() const noexcept { return <i>c</i>; }</ins>
-</pre>
-</blockquote></small>
-
-
-# Issues for discussion # {#issues-for-discussion}
-
-The following subsections describe known issues with the flat containers where we
-don't (yet) strongly propose a change. In some cases Louis Dionne asks for further
-clarification and/or changes to the wording. In some cases we're just reporting
-implementation experience. In some cases it seems like a change is warranted, but
-it's confusing enough that we don't have a good wording patch yet.
-
-## Stable sorting in `insert` ## {#stable-sorting}
-
-For the tree-based associative containers,
-<a href="https://eel.is/c++draft/associative.reqmts#general-68.sentence-2">[associative.reqmts.general]</a> defines
-the single-element `foo::insert(val)` to insert in a well-defined order;
-<a href="https://eel.is/c++draft/associative.reqmts.general#lib:insert,ordered_associative_containers___">[associative.reqmts.general]</a> defines
-the multi-element `foo::insert(first, last)` to insert in an unspecified order.
-Nevertheless, in practice, all three vendors implement the latter as a simple
-loop over the former, so we have this de-facto behavior portable everywhere:
-
-```c++
-    struct Apathy { bool operator()(int, int) const { return false; } };
-    int a[] = {1,2,3,4,5};
-    std::multiset<int, Apathy> s;
-
-    // #1
-    for (int i : a) s.insert(i);
-    assert(std::ranges::equal(s, a)); // de jure
-
-    // #2
-    s.insert(a, a+5);
-    assert(std::ranges::is_permutation(s, a)); // de jure
-    assert(std::ranges::equal(s, a)); // de facto portable
-
-    // #3
-    s.insert_range(a);
-    assert(std::ranges::is_permutation(s, a)); // de jure
-    assert(std::ranges::equal(s, a)); // de facto portable
-```
-
-Similarly with equivalent keys in a `map` or `multimap`:
-
-```c++
-    std::pair<int, int> a[] = {{1,1},{1,2},{1,3}};
-    std::map<int, int, Apathy> m;
-
-    // #1
-    for (auto kv : a) m.insert(kv);
-    assert(m[1] == 1); // de jure
-
-    // #2
-    m.insert(a, a+5);
-    assert(m[1] > 0); // de jure
-    assert(m[1] == 1); // de facto portable
-
-    // #3
-    m.insert_range(a);
-    assert(m[1] > 0); // de jure
-    assert(m[1] == 1); // de facto portable
-```
-
-Arthur's libc++ implementation leans into the idea that `flat_foo` is a drop-in replacement for `foo`,
-and ensures that `flat_foo::insert{,_range}` will behave exactly like `foo::insert{,_range}`.
-
-```c++
-    std::flat_multiset<int, Apathy> fs;
-
-    // #1
-    for (int i : a) fs.insert(i);
-    assert(std::ranges::equal(fs, a)); // de jure
-
-    // #2
-    fs.insert(a, a+5);
-    assert(std::ranges::is_permutation(fs, a)); // de jure
-    assert(std::ranges::equal(fs, a)); // libc++
-
-    // #3
-    fs.insert_range(a);
-    assert(std::ranges::is_permutation(fs, a)); // de jure
-    assert(std::ranges::equal(fs, a)); // libc++
-```
-
-`flat_foo::insert(first, last)` is defined by <a href="https://eel.is/c++draft/flat.set.modifiers#lib:insert,flatset">[flat.set.modifiers]</a>
-to insert in order and then "sort the range." The vendor will be tempted to use `std::sort`,
-which in practice is not stable. Arthur's implementation uses `std::stable_sort` specifically
-to ensure that `fs` will give the same results as `s` for all multi-element insertions.
-
-Louis Dionne worries that by providing this additional de-facto guarantee, libc++ might be creating
-a "portability trap" — the programmer writes obvious code that works perfectly on libc++, and then when
-the programmer migrates to libstdc++ or Microsoft STL, they suddenly find that their code no longer works.
-
-Therefore Louis asks whether LWG could *specifically require* that newly inserted elements be sorted stably, e.g.
-
-<small><blockquote>
-<pre>
-template&lt;class InputIterator>
-  void insert(InputIterator first, InputIterator last);
-</pre>
-
-5․ Effects: Adds elements to `c` as if by:
-<pre>
-c.insert(c.end(), first, last);
-</pre>
-Then, <ins>stably</ins> sorts the range of newly inserted elements with respect to `compare`;
-merges the resulting sorted range and the sorted range of pre-existing elements into a single sorted range;
-and finally erases all but the first element from each group of consecutive equivalent elements.
-
-6․ Complexity: N + M log M, where N is `size()` before the operation and M is `distance(first, last)`.
-
-7․ Remarks: Since this operation performs an in-place merge, it may allocate memory.
-</blockquote></small>
-
-This operation already requires an in-place merge, which allocates memory,
-so requiring it to also do a stable sort — which allocates memory — might not be considered such a big deal.
-
-The alternative here would be for libc++ to lean into the idea that `multiset::insert_range` is supposed to
-leave the order of equivalent elements unspecified, and instrument it under libc++'s existing
-`_LIBCPP_DEBUG_RANDOMIZE_UNSPECIFIED_STABILITY` flag (currently used only for `sort`, `nth_element`, and `partial_sort`).
-This would preserve the symmetry between `multiset` and `flat_multiset`, by making both of them de facto
-randomized order (at least in debug mode).
-
-## Non-explicit container constructor ## {#deceptive-redirect}
-
-Note: This section of P2767R0 has moved in P2767R1 to [[#deceptive]].
-
-## Complexity of `equal_range` ## {#complexity-equal-range}
-
-<a href="https://eel.is/c++draft/associative.reqmts.general#171">[associative.reqmts.general]/171 and /174</a>
-define the complexity of `b.equal_range(k)` and `a_tran.equal_range(ke)` as "Logarithmic."
-This means that we have the following required complexities, for both `foo` and `flat_foo`:
-
-```c++
-    std::set<std::string> s;
-    std::multiset<std::string> ms;
-    std::set<std::string, std::less<>> st;
-    std::multiset<std::string, std::less<>> mst;
-
-    s.equal_range("abc"s);
-      // 171: lower_bound, lower_bound+1; (1 + lg N) operations total
-    ms.equal_range("abc"s);
-      // 171: lower_bound, upper_bound; (2 lg N) operations total
-    st.equal_range("abc");
-      // 174: lower_bound, upper_bound; (2 lg N) operations total
-    mst.equal_range("abc");
-      // 174: lower_bound, upper_bound; (2 lg N) operations total
-```
-
-For `st.equal_range`, <a href="https://eel.is/c++draft/associative.reqmts.general#7.22">[associative.reqmts.general]/7.22</a>
-forces us to consider the possibility that `std::less<>::operator()(key_type, const char*)`
-is a less granular equivalence relation than `std::less<>::operator()(key_type, key_type)`; i.e., even though
-this is a `set`, it might still contain "duplicates" from the point of view of the heterogeneous comparator.
-It would be efficient in practice to find `lower_bound("abc")` in lg N time and then step forward linearly
-until we find an element not equal to `"abc"` — the expected number of duplicates for the average real-world workload
-is small. But the number of duplicates *theoretically* could be O(N); so we're not allowed to do this
-(at least not without an arbitrary cap, e.g. if we don't find the end of the range in 10 probes then fall back
-to `upper_bound` — bookkeeping which would again unnecessarily slow down the average case).
-
-Consider a working programmer who writes
-
-```c++
-    std::flat_set<std::string> s;
-    s.equal_range("abc");
-      // lower_bound, lower_bound+1; (1 + lg N) operations total
-```
-
-and then switches to a heterogeneous comparator in an effort to "speed up" the code
-by avoiding the conversion to `std::string`:
-
-```c++
-    std::flat_set<std::string, std::less<>> st;
-    st.equal_range("abc");
-      // lower_bound, upper_bound; (2 lg N) operations total, cache-unfriendly
-```
-
-libc++ would like to see vendors given a little more freedom to experiment here.
-
-The proposed wording below doesn't require any vendor to change their implementation,
-since an existing implementation in O(log N) certainly also satisfies O(M + log N).
-
-### Wording ### {#wording-complexity-equal-range}
-
-Change <a href="https://eel.is/c++draft/associative.reqmts.general#171">[associative.reqmts.general]</a> as follows:
-
-<small><blockquote>
-<pre>
-a_tran.upper_bound(ku)
-</pre>
-
-166․ Result: `iterator`; `const_iterator` for constant `a_tran`.
-
-167․ Returns: An iterator pointing to the first element with key `r` such that `c(ku, r)`, or `a_tran.end()` if such an element is not found.
-
-168․ Complexity: Logarithmic.
-
-<pre>
-b.equal_range(k)
-</pre>
-
-169․ Result: `pair<iterator, iterator>`; `pair<const_iterator, const_iterator>` for constant `b`.
-
-170․ Effects: Equivalent to: `return make_pair(b.lower_bound(k), b.upper_bound(k));`
-
-171․ Complexity: <del>Logarithmic.</del> <ins>O(M + log N), where N is `b.size()` and M is `distance(b.lower_bound(k), b.upper_bound(k))`.</ins>
-
-<pre>
-a_tran.equal_range(ke)
-</pre>
-
-172․ Result: `pair<iterator, iterator>`; `pair<const_iterator, const_iterator>` for constant `a_tran`.
-
-173․ Effects: Equivalent to: `return make_pair(a_tran.lower_bound(ke), a_tran.upper_bound(ke));`
-
-174․ Complexity: <del>Logarithmic.</del> <ins>O(M + log N), where N is `a_tran.size()` and M is `distance(a_tran.lower_bound(ke), a_tran.upper_bound(ke))`.</ins>
-</blockquote></small>
-
-
-## Special member functions ## {#special-members}
-
-<a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> currently does not declare
-any special member functions. This implies that they are defaulted, which implicitly specifies
-their constexprness, noexceptness, and triviality.
-
-All three C++20 container adaptors (e.g. <a href="https://eel.is/c++draft/priqueue.overview">[priqueue.overview]</a>)
-follow that approach, too.
-
-All four associative and four unordered containers (e.g. <a href="https://eel.is/c++draft/set.overview">[set.overview]</a>)
-explicitly provide signatures for all five special members, including the destructor, like
-this:
-
-<small><blockquote>
-<pre>
-    set(const set& x);
-    set(set&& x);
-[...]
-    ~set();
-    set& operator=(const set& x);
-    set& operator=(set&& x)
-      noexcept(allocator_traits&lt;Allocator>::is_always_equal::value &&
-               is_nothrow_move_assignable_v&lt;Compare>);
-</pre>
-</blockquote></small>
-
-Should `flat_set`'s spec hew more closely to `std::set`'s or `priority_queue`'s?
-We tentatively think `set`'s is the better model, so that the vendor would be free to
-make the special members non-defaulted. Vendors are still permitted to strengthen the
-noexceptness and/or triviality of declared functions; for example, both libc++ and libstdc++
-make `set(set&&)` conditionally noexcept.
-
-```c++
-    using V = std::experimental::fixed_capacity_vector<int, 100>;
-    static_assert(std::is_trivially_destructible_v<V>);
-    using M = std::flat_set<int, std::less<int>, V>;
-    static_assert(std::is_trivially_destructible_v<M>);
-      // Before: Mandatory.
-      // After: Permitted but not mandatory.
-```
-
-## Moving from the comparator ## {#move-from-comparator}
-
-As shown above, the associative and unordered containers give their move-assignment operator
-a noexcept-spec that strongly implies it must move-from the comparator, never copy it.
-This particularly affects libstdc++, where `set(set&&)` will copy a stateful comparator
-(e.g. `std::function`) instead of moving-from it, but `set::operator=(set&&)` must move
-the comparator, leaving the source object in a "radioactive" state.
-
-This whole area is the subject of [[LWG2227]] "Stateful comparison objects in associative containers,"
-and is certainly beyond the scope of this paper P2767.
-
-```c++
-  struct TestLess : std::less<> {
-    // make this too big to fit in the small buffer
-    char pad_[1000];
-  };
-  using C = std::function<bool(int,int)>;
-  std::set<int, C> s({1,2,3}, C(TestLess()));
-  assert(s.key_comp() != nullptr);
-  auto t = std::move(s);
-  assert(s.key_comp() != nullptr);
-    // libstdc++: Succeeds
-    // libc++: Fails
-  s.clear();
-  s.insert({1,2});
-    // libstdc++: OK
-    // libc++: Throws std::bad_function_call
-  t = std::move(s);
-  s.insert({1,2});
-    // Everyone: Throws std::bad_function_call
-```
-
-If we user-declare `flat_set::operator=(flat_set&&)`,
-we must decide whether to give it a similar noexcept-spec.
-
-### Possible wording ### {#wording-special-members}
-
-Note: This wording merge-conflicts with the resolution of [[LWG3884]], which in turn merge-conflicts
-with the editorial refactoring in §3. We can polish it later;
-the first question is whether LWG wants to pursue this direction at all.
-
-For example, change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    // [flat.map.cons], constructors
-    flat_map() : flat_map(key_compare()) { }
-
-    <ins>flat_map(const flat_map&);</ins>
-    <ins>flat_map(flat_map&&);</ins>
-    <ins>flat_map& operator=(const flat_multimap&);</ins>
-    <ins>flat_map& operator=(flat_multimap&&)</ins>
-      <ins>noexcept(is_nothrow_move_assignable_v&lt;KeyContainer> &&</ins>
-               <ins>is_nothrow_move_assignable_v&lt;MappedContainer> &&</ins>
-               <ins>is_nothrow_move_assignable_v&lt;Compare>);)</ins>
-    <ins>~flat_map();</ins>
-
-    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
-             const key_compare& comp = key_compare());
-</pre>
-</blockquote></small>
-
-## "Qualifies as a container" ## {#qualifies-container}
-
-Arthur's libc++ implements an alternative resolution to [[LWG3803]]. This resolution applies
-generally to all container adaptors, and has the advantage of not ad-hoc relying on a
-complicated type trait (`is_invocable`) but being a little more consistent with the
-pre-existing spec.
-
-The choice of `C::const_iterator` is simply because `T::value_type` is already present
-for allocators, and `T::iterator` is already present for many iterators (those that inherit
-from `std::iterator`, for example). We could just as well choose a criterion like
-"The expression `declval<C&>().size()` is well-formed when treated as an unevaluated operand."
-
-### Wording ### {#wording-qualifies-container}
-
-Arthur's preferred resolution is shown in <ins>this color</ins>.
-Parts of the current C++23 Working Draft that were introduced by the adopted
-resolution of LWG3803, but would be removed by this change, are shown in <src>this color</src>.
-
-Change <a href="https://eel.is/c++draft/container.requirements#container.reqmts-69">[container.reqmts]/69</a> as follows:
-
-<small><blockquote>
-69․ The behavior of certain container member functions and deduction guides depends on whether types qualify as
-input iterators<ins>, containers,</ins> or allocators.
-
-<p><ins>x․</ins> The extent to which an implementation determines that a type cannot be an input iterator is unspecified,
-except that as a minimum integral types shall not qualify as input iterators.
-
-<p><ins>x․</ins> <del>Likewise, the</del> <ins>The</ins> extent to which an implementation determines that a type cannot be an allocator is unspecified,
-except that as a minimum a type `A` shall not qualify as an allocator unless it meets both of the following conditions:
-
-* (69.1) The qualified-id `A::value_type` is valid and denotes a type ([temp.deduct]).
-* (69.2) The expression `declval<A&>().allocate(size_t{})` is well-formed when treated as an unevaluated operand.
-
-<p><ins>x․ The extent to which an implementation determines that a type cannot be a container
-is unspecified, except that as a minimum a type C shall not qualify as a container
-unless the qualified-id `C::const_iterator` is valid and denotes a type.</ins>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/container.adaptors.general">[container.adaptors.general]/6</a> as follows:
-
-<small><blockquote>
-6․ A deduction guide for a container adaptor shall not participate in overload resolution if any of the following are true:
-
-* (6.1) It has an `InputIterator` template parameter and a type that does not qualify as an input iterator is deduced for that parameter.
-
-* (6.2) It has a `Compare` template parameter and a type that qualifies as an allocator is deduced for that parameter.
-
-* (6.3) It has a `Container`, `KeyContainer`, or `MappedContainer` template parameter
-     and a type that <del>qualifies as an allocator</del> <ins>does not qualify as a container</ins> is deduced for that parameter.
-
-* (6.4) It has no `Container`, `KeyContainer`, or `MappedContainer` template parameter,
-     and it has an `Allocator` template parameter, and a type that does not qualify as an allocator is deduced for that parameter.
-
-* (6.5) It has both `Container` and `Allocator` template parameters, and `uses_allocator_v<Container, Allocator>` is `false`.
-
-* (6.6) It has both `KeyContainer` and `Allocator` template parameters, and `uses_allocator_v<KeyContainer, Allocator>` is `false`.
-
-* <src>(6.7) It has both `KeyContainer` and `Compare` template parameters, and</src>
-    <pre>
-        <src>is_invocable_v&lt;const Compare&,</src>
-                      <src>const typename KeyContainer::value_type&,</src>
-                      <src>const typename KeyContainer::value_type&></src>
-    </pre>
-    <src>is not a valid expression or is `false`.</src>
-
-* (6.8) It has both `MappedContainer` and `Allocator` template parameters, and `uses_allocator_v<MappedContainer, Allocator>` is `false`.
-
-</blockquote></small>
-
-## `iterator` and `const_iterator` ## {#iterator-types}
-
-`flat_set::iterator` and `flat_set::const_iterator` are presented as if they could be
-two different types. This is consistent with how we do it in `set` and `unordered_set`.
-But in practice, all three vendors make `set::iterator` and `set::const_iterator` the
-same type. We should consider refactoring the spec of `set`, `unordered_set`, and `flat_set`
-all at once to *mandate* that these iterator types be the same type, the same way we
-already do for <a href="https://eel.is/c++draft/string.view#footnote-207">`basic_string_view`</a>
-and (since C++23 introduced `std::const_iterator`) <a href="https://eel.is/c++draft/span.overview">`span<const T>`</a>.
-
-This would allow us to remove a lot of redundant overloads from the specification,
-e.g. we don't need both `iterator find(value_type)` and `const_iterator find(value_type) const`
-if those are the same iterator type. Vendors can already do this removal in their implementations
-if they choose to. This is merely a question of our getting to do it in the paper specification too,
-under the banner of "standardizing existing practice."
-
-## Support for non-standard containers ## {#containers}
-
-Vendors are required to support "random-access containers," which means `vector<T>` (except for `vector<bool>`)
-and `deque<T>`. It's unclear if vendors are required to support non-standard containers such as
-`boost::container::vector<T>`; and if so, what public API those containers must provide in order
-to interoperate with `flat_set`.
-
-For example, suppose the underlying container supports `C(first, last)` but not
-`C(from_range, rg)`. Then I would expect that I couldn't initialize a `flat_set<T, Compare, C>`
-with `flat_set(from_range, rg)`; but I should still be able to initialize it with `flat_set(first, last)`,
-right? It would be nice to see what's required and what's encouraged in this area.
-
-libc++ goes very slightly out of its way to support `vector<bool>` as the underlying container,
-even though we believe we're not required to support it.
-
-## Inconsistent handling of redundancy in [flat.multiset] and [flat.multimap] ## {#redundancy}
-
-See <a href="https://github.com/cplusplus/draft/pull/6246#issuecomment-1539789693">#6246</a>.
-
-<a href="https://eel.is/c++draft/flat.multiset#overview-4">[flat.multiset.overview/4]</a> uses
-the same boilerplate as `vector`, `set`, `flat_set`, and `flat_map`:
-
-<small><blockquote>
-Descriptions are provided here only for operations on `flat_multiset` that are not described
-in one of the general sections or for operations where there is additional semantic information.
-</blockquote></small>
-
-<a href="https://eel.is/c++draft/flat.multimap#overview-4">[flat.multimap.overview/4]</a> uses
-different boilerplate:
-
-<small><blockquote>
-Except as otherwise noted, operations on `flat_multimap` are equivalent to those of `flat_map`,
-except that `flat_multimap` operations do not remove or replace elements with equal keys.
-
-[Example 1: `flat_multimap` constructors and emplace do not erase non-unique elements after sorting them. —end example]
-</blockquote></small>
-
-That's a little handwavey: It doesn't bother to explain that
-`flat_multimap::insert(sorted_equivalent_t, initializer_list)` is "equivalent to"
-`flat_map::insert(sorted_unique_t, initializer_list)`. It doesn't bother to explain how
-the `iterator` return value of `flat_multimap::insert(value_type&&)` is derived from the
-`pair<iterator, bool>` return value of `flat_map::insert(value_type&&)`.  
-
-But it does make the spec a lot shorter! Should we apply the same technique to [flat.multiset]
-that we already apply to [flat.multimap]? I haven't written wording for this yet, but can do so
-if LWG is interested.
-
-Vice versa, should we tweak [flat.multimap]'s wording to address the two "doesn't bother" points above?
-Should we tweak it to say "equivalent keys" or "duplicate keys" instead of "equal keys"?
-
-## Noexcept `swap` ## {#noexcept-swap}
-
-This area seems to have been tweaked quite a bit at Batavia 2018.
-See <a href="https://wiki.edg.com/bin/view/LWGBatavia2018/WednesdayAMMinutes">the minutes</a>.
-
-`flat_set::swap` is currently specified as unconditionally noexcept, which is inconsistent both
-with `std::set` and with the pre-existing adaptors.
-
-<small><blockquote>
-<pre>
-    // [flat.set.defn]
-    void swap(flat_set& y) noexcept;
-
-    // [priqueue.overview]
-    void swap(priority_queue& q) noexcept(is_nothrow_swappable_v&lt;Container> &&
-                                          is_nothrow_swappable_v&lt;Compare>)
-      { using std::swap; swap(c, q.c); swap(comp, q.comp); }
-
-    // [set.overview]
-    void swap(set&)
-      noexcept(allocator_traits&lt;Allocator>::is_always_equal::value &&
-               is_nothrow_swappable_v&lt;Compare>);
-</pre>
-<a href="https://eel.is/c++draft/associative.reqmts#except-3">[associative.reqmts.except]/3</a>:
-For associative containers, no `swap` function throws an exception unless that exception
-is thrown by the swap of the container's `Compare` object (if any).
-</blockquote></small>
-
-Suppose the underlying container has a throwing move-constructor (like MSVC `std::list`), and lacks a custom `swap`;
-then `std::swap<Container>` can throw. Or, suppose the underlying container is `boost::container::static_vector<T>`;
-then its `swap` must swap `T` objects, which can throw.
-
-Now, what happens if swapping the containers actually does throw? Then both containers are in an unknown
-state, so we must restore the invariant by clearing both containers. We do the same thing if `insert` or `erase`
-throws, so this is nothing new.
-
-What happens if swapping the comparators throws? Then we cannot recover. Louis suggests adding
-`is_nothrow_swappable_v<Compare>` as a constraint. The intent is nicely ergonomic:
-Almost all comparators are nothrow swappable (including `std::function`, if we want to support that: [[LWG2227]]).
-And the resulting behavior seems better: In the pathological corner case where `flat_set` cannot safely provide
-swappability, it's better for it not to be swappable at all, than for it to falsely advertise a
-noexcept `swap`. But, if we constrain away `flat_set`'s hidden-friend `swap`, `swap(fs, fs)` will still
-compile; it'll just fall back to `std::swap<T> [with T=flat_set]`. We could actually `=delete`
-the `swap` function, like this:
-
-<small><blockquote>
-<pre>
-    <del>void swap(flat_map& y) noexcept;</del>
-    <ins>void swap(flat_map& y)</ins>
-      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
-               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-    void clear() noexcept;
-
-[...]
-
-    <del>friend void swap(flat_map& x, flat_map& y) noexcept { x.swap(y); }</del>
-    <ins>friend void swap(flat_map& x, flat_map& y)</ins>
-      <ins>noexcept(is_nothrow_swappable_v&lt;key_container_type> &&</ins>
-               <ins>is_nothrow_swappable_v&lt;mapped_container_type>)</ins>
-      <ins>requires is_nothrow_swappable_v&lt;key_compare></ins>
-        <ins>{ x.swap(y); }</ins>
-    <ins>friend void swap(flat_map& x, flat_map& y)</ins>
-      <ins>requires (!is_nothrow_swappable_v&lt;key_compare>) = delete;</ins>
-</pre>
-</blockquote></small>
-
-but even then `ranges::swap(fs, fs)` would still compile; it would fall back to the
-three-step move-and-assign.
-
-It seems to be impossible to make `flat_set` non-swappable. The only reasonable options are:
-
-* Keep the status quo (unconditional `noexcept`) and terminate the program if swapping containers throws
-
-* Conditional `noexcept` like in [priqueue.overview], and don't care if swapping throws
-    (i.e. match `priority_queue`'s status quo)
-
-* Conditional `noexcept` like in [priqueue.overview], and clear both containers if swapping throws
-    (but this won't prevent radioactivity, if `swap` left the comparator in a bad state)
-
-### Specified in terms of `ranges::swap` ### {#ranges-swap}
-
-Orthogonally: It surprises us that [flat.map.modifiers] specifies `swap`'s
-implementation in terms of `ranges::swap(c, y.c)` etc. This feels overspecified;
-<a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]</a> adequately covers the semantics of swapping,
-and vendors should be able to decide for themselves how to swap comparator objects, just like
-we do in `std::set`. Arguably the tight specification helps programmers providing their own
-underlying containers: they know they just need to provide an ADL `swap` or the requirements
-of <a href="https://eel.is/c++draft/concept.swappable#2.3.sentence-1">[concept.swappable]/2.3</a>.
-But one might point out to those programmers that their underlying container
-must provide the API required in <a href="https://eel.is/c++draft/container.reqmts#49">[container.reqmts]/49–51</a>,
-so the vendor can use ADL `swap(c, y.c)` or `c.swap(y.c)` if they want to.
-
-libc++'s implementation currently uses ADL `swap(c, y.c)`, which is equivalent to `ranges::swap`
-for all containers satisfying <a href="https://eel.is/c++draft/container.reqmts#51">[container.reqmts]/51</a>;
-but the difference between `swap(compare, y.compare)` and `ranges::swap(compare, y.compare)` is probably observable.
-
-## Allocator-extended container constructors lack move semantics ## {#lwg-3802}
-
-(This whole section would be mooted by [[#deceptive-remove]].)
-
-libc++ has implemented move-semantic allocator-extended constructors for all four flat containers
+But C++ doesn't use this pattern anywhere else; and it's inconsistent with the container constructors,
+which do take by value and happily allow passing in lvalue containers by copy.
+
+<small><table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td colspan="2"><pre>
+std::vector&lt;int> v = {1,2,3};
+std::flat_set&lt;int> fs;
+</pre></td></tr>
+<tr><td><pre>
+fs = std::flat_set(v);
+  // OK, copy-construct + sort + move-assign
+fs = std::flat_set(std::sorted_unique, v);
+  // OK, copy-construct + move-assign
+</pre></td><td><pre>
+fs.replace(v);
+  // OK, copy-construct + sort + move-assign
+fs.replace(std::sorted_unique, v);
+  // OK, copy-construct + move-assign
+</pre></td></tr>
+<tr><td><pre>
+fs.replace(auto(v));
+  // OK, copy-construct + move-assign
+</pre></td><td><pre>
+fs.replace(std::sorted_unique, v);
+  // OK, copy-construct + move-assign
+</pre></td></tr>
+<tr><td><pre>
+fs.replace(std::move(v));
+  // OK, move-assign
+</pre></td><td><pre>
+fs.replace(std::sorted_unique, std::move(v));
+  // OK, move-construct + move-assign
+</pre></td></tr>
+</table></small>
+
+## (LWG3802) Allocator-extended container ctors lack move semantics ## {#lwg-3802}
+
+Arthur's libc++ has implemented move-semantic allocator-extended constructors for all four flat containers
 (<a href="https://godbolt.org/z/We7K1K6bE">Godbolt</a>). This is [[LWG3802]].
 
 ```c++
-    template<class T, class C = std::less<T>>
-    using PmrFlatSet = std::flat_set<T, C, std::pmr::vector<T>>;
+    template<class K, class V, class C = std::less<K>>
+    using PmrFlatMap = std::flat_map<K, V, C, std::pmr::vector<K>, std::pmr::vector<V>>;
 
     std::pmr::monotonic_buffer_resource mr;
-    auto sets = std::pmr::vector<PmrFlatSet<int>>(&mr);
-    auto cont1 = std::pmr::vector<int>({1,2,3}, &mr);
-    sets.emplace_back(std::move(cont1));
-      // Before: Makes copies of all the data
-      // After: Takes ownership of the existing data
+    auto keys = std::pmr::vector<int>({1,2,3}, &mr);
+    auto values = std::pmr::vector<int>({1,2,3}, &mr);
+    auto maps = std::pmr::vector<PmrFlatMap<int, int>>(&mr);
+    maps.emplace_back(std::move(keys), values);
+      // Before: Makes copies of both keys and values
+      // After: Moves-from keys; copies values
 
-    auto cont2 = std::pmr::vector<std::unique_ptr<int>>();
-    auto fs = std::flat_set(std::move(cont2));
+    auto keys2 = std::pmr::vector<std::unique_ptr<int>>();
+    auto sets = std::pmr::vector<PmrFlatSet<std::unique_ptr<int>>>();
+    sets.emplace_back(std::move(keys2));
       // Before: Ill-formed
-      // After: OK
+      // After: OK, moves-from keys2
 ```
 
-The wording patch for this (based on top of P2767's editorial refactoring)
-would look something like this. I haven't written wording for this yet, but can do so,
-if LWG is interested, after P2767's editorial refactoring is merged.
+To make this work, we'd have to add 12 new constructors to `flat_map`, like this.
+But I propose that instead of bloating the existing overload set, we shrink it
+by removing the container constructors altogether.
 
 <small><blockquote>
 <pre>
@@ -1887,331 +2223,8 @@ if LWG is interested, after P2767's editorial refactoring is merged.
 </pre>
 </blockquote></small>
 
-# Heterogeneous `multiset::insert` # {#heterogeneous-insert-multiset}
 
-[[P2363]] <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2363r5.html#ins">explains</a>
-why the node-based `multiset` still lacks a heterogeneous `insert(K&&)`:
-
-> Adding heterogeneous `insert` overload makes no sense for associative containers with non-unique keys (`std::multimap`, `std::multiset`,
-> `std::unordered_multimap` and `std::unordered_multiset`) because the insertion will be successful in any case and the key would be always
-> constructed. All additional overheads introduced by `insert` can be mitigated by using `emplace`.
-
-For `flat_multiset`, the last sentence is false; generic `emplace` is unusable for PMR allocators, because it
-must first construct `t` using the default allocator. Therefore we also propose to add a heterogeneous-comparison
-overload of `flat_multiset::insert`.
-
-```c++
-    template<class T, class C = std::less<T>>
-    using PmrFlatMultiset = std::flat_multiset<T, C, std::pmr::vector<T>>;
-
-    std::pmr::monotonic_buffer_resource mr(1'000'000);
-    std::pmr::set_default_resource(std::pmr::null_memory_resource());
-    const char s[] = "too long to fit in the small string buffer";
-
-    auto m = std::pmr::multiset<std::pmr::string>(&mr);
-    m.emplace(s); // OK
-    m.insert(s); // runtime abort, cannot default-allocate x
-
-    auto fm = PmrFlatMultiset<std::pmr::string>(&mr);
-    fm.emplace(s); // runtime abort, cannot default-allocate t
-    fm.insert(s); // runtime abort, cannot default-allocate x
-
-    auto m2 = std::pmr::multiset<std::pmr::string, std::less<>>(&mr);
-    m2.emplace(s); // OK
-    m2.insert(s); // runtime abort, cannot default-allocate x
-
-    auto fm2 = PmrFlatMultiset<std::pmr::string, std::less<>>(&mr);
-    fm2.emplace(s); // runtime abort, cannot default-allocate t
-    fm2.insert(s);
-      // Before: runtime abort, cannot default-allocate x
-      // After: OK
-```
-
-Notice the asymmetry between `fm2.insert(s)` and `m2.insert(s)`. Arthur thinks it would be
-nice to support heterogeneous `insert` for node-based `multiset` and `unordered_multiset`
-(*contra* P2363's reasoning),
-but that's out of scope for this particular paper P2767. For P2767's purposes, we're satisfied
-once there exists *some* way of inserting `s` into `fm2`. We don't mind that the working approaches
-use different spellings: `m2.emplace(s)` versus `fm2.insert(s)`.
-
-## Wording ## {#wording-heterogeneous-insert-multiset}
-
-Note: This diff assumes [[#wording-insert-emplace]] as the starting point.
-
-Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    // [flat.multiset.modifiers], modifiers
-    template&lt;class... Args> iterator emplace(Args&&... args)
-      { return insert(value_type(std::forward&lt;Args>(args)...)); }
-    template&lt;class... Args>
-      iterator emplace_hint(const_iterator position, Args&&... args)
-        { return insert(position, value_type(std::forward&lt;Args>(args)...)); }
-
-    iterator insert(const value_type& x);
-    iterator insert(value_type&& x);
-    <ins>template&lt;class K> iterator insert(K&& x);</ins>
-    iterator insert(const_iterator position, const value_type& x);
-    iterator insert(const_iterator position, value_type&& x);
-    <ins>template&lt;class K> iterator insert(const_iterator hint, K&& x);</ins>
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multiset.modifiers">[flat.multiset.modifiers]</a> as follows:
-
-<small><blockquote>
-<pre>
-iterator insert(const value_type& x);
-iterator insert(value_type&& x);
-</pre>
-x․ Effects: Inserts a new element as if by:
-<pre>
-auto it = ranges::upper_bound(c, x, compare);
-c.insert(it, x);
-</pre>
-for the first overload or
-<pre>
-auto it = ranges::upper_bound(c, x, compare);
-c.insert(it, std::move(x));
-</pre>
-for the second overload.
-
-<p>x․ Returns: An iterator that points to the inserted element.
-
-<pre>
-<ins>template&lt;class K> iterator insert(K&& x);</ins>
-</pre>
-
-<ins>x․ Constraints: The *qualified-id* `Compare::is_transparent` is valid and denotes a type.
-`is_constructible_v<value_type, K>` is `true`.
-For the second overload, `is_convertible_v<K&&, const_iterator>` and `is_convertible_v<K&&, iterator>` are both `false`.</ins>
-
-<p><ins>x․ Preconditions: The conversion from `x` into `value_type` constructs an object `u` for which `upper_bound(x) == upper_bound(u)` is `true`.</ins>
-
-<p><ins>x․ Effects: Inserts a new element as if by</ins>
-<pre>
-<ins>auto it = ranges::upper_bound(<i>c</i>, x, <i>compare</i>);</ins>
-<ins>c.emplace(it, std::forward&lt;K>(x));</ins>
-</pre>
-
-<p><ins>x․ Returns: An iterator that points to the inserted element.</ins>
-</blockquote></small>
-
-# Non-explicit constructor from two containers # {#deceptive}
-
-Arthur has observed [in a blog post](https://quuxplusone.github.io/blog/2023/04/28/flat-map-constructors/)
-that `flat_map`'s non-explicit constructor from two containers is deceptive when used with braced initializers.
-
-```c++
-    void print_map(std::flat_multimap<int, int>);
-
-    // Test the two-container constructor... or is it?
-
-    print_map({ {1, 2, 3}, {10, 20, 30} }); // {1,10}, {2,20}, {3,30}
-    print_map({ {1, 2},    {10, 20} });     // {1,2}, {10,20}
-    print_map({ {1},       {10} });         // {1,10}
-    print_map({ {},        {} });           // {0,0}, {0,0}
-```
-
-## Make the container constructors explicit? ## {#deceptive-explicit}
-
-To address this issue (if we wanted to), we could make one of the relevant constructors `explicit`.
-We obviously can't prevent `vector`'s construction from a braced list
-of elements, nor `pair`'s from a braced list of (exactly two) elements, nor (in practice)
-`pair`'s construction from `{}`; so the only constructor we could explicify to address this
-would be `flat_multimap`'s own constructor from a braced list of (exactly two) containers.
-
-`flat_set` and `flat_multiset`'s container constructors don't suffer from deceptiveness,
-so they wouldn't be changed by this modest patch.
-
-Arthur thinks this change would be appreciated by programmers in practice (or rather, if we *don't*
-make this change, then programmers will only ever notice this overload set unfavorably, when it bites them,
-and never favorably).
-
-We recently made some constructors `explicit` in
-<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2711r1.html">P2711 "Making multi-param constructors of views explicit,"</a>
-but that paper's goal was to *increase* uniformity and symmetry, not to decrease it.
-
-It would be surprisingly asymmetric to explicify only this one constructor. The small benefit
-probably does not justify the asymmetry. Go on to the next section to see Arthur's preferred
-solution, which is much more ambitious.
-
-### Possible wording for explicit ctor ### {#wording-deceptive-explicit}
-
-Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    <ins>explicit flat_map(key_container_type key_cont, mapped_container_type mapped_cont)</ins>
-      <ins>: flat_map(std::move(key_cont), std::move(mapped_cont), key_compare()) {}</ins>
-    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
-             const key_compare& comp <del>= key_compare()</del>);
-    flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,
-             const key_compare& comp = key_compare());
-[...]
-    template&lt;class Allocator>
-      flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
-               const Allocator& a);
-    template&lt;class Allocator>
-      flat_map(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
-               const key_compare& comp, const Allocator& a);
-    template&lt;class Allocator>
-      flat_map(sorted_unique_t, const key_container_type& key_cont,
-               const mapped_container_type& mapped_cont, const Allocator& a);
-    template&lt;class Allocator>
-      flat_map(sorted_unique_t, const key_container_type& key_cont,
-               const mapped_container_type& mapped_cont,
-               const key_compare& comp, const Allocator& a);
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.map.cons">[flat.map.cons]</a> as follows:
-
-<small><blockquote>
-<p><pre>
-flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
-         const key_compare& comp <del>= key_compare()</del>);
-</pre>
-<p>1․ <i>Effects:</i> Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`, and `compare` with `comp`;
-sorts the range [`begin()`, `end()`) with respect to `value_comp()`; and finally
-erases the duplicate elements as if by:
-<pre>
-auto zv = views::zip(c.keys, c.values);
-auto it = ranges::unique(zv, key_equiv(compare)).begin();
-auto dist = distance(zv.begin(), it);
-c.keys.erase(c.keys.begin() + dist, c.keys.end());
-c.values.erase(c.values.begin() + dist, c.values.end());
-</pre>
-<p>2․ <i>Complexity:</i> Linear in <i>N</i> if the container arguments are already sorted with respect to `value_comp()`
-and otherwise <i>N</i> log <i>N</i>, where <i>N</i> is the value of `key_cont.size()` before this call.
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
-
-<small><blockquote>
-<pre>
-    <ins>explicit flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont)</ins>
-      <ins>: flat_multimap(std::move(key_cont), std::move(mapped_cont), key_compare()) {}</ins>
-    flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
-                  const key_compare& comp <del>= key_compare()</del>);
-    flat_multimap(sorted_equivalent_t,
-                  key_container_type key_cont, mapped_container_type mapped_cont,
-                  const key_compare& comp = key_compare());
-[...]
-    template&lt;class Allocator>
-      flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
-                    const Allocator& a);
-    template&lt;class Allocator>
-      flat_multimap(const key_container_type& key_cont, const mapped_container_type& mapped_cont,
-                    const key_compare& comp, const Allocator& a);
-    template&lt;class Allocator>
-      flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,
-                    const mapped_container_type& mapped_cont, const Allocator& a);
-    template&lt;class Allocator>
-      flat_multimap(sorted_equivalent_t, const key_container_type& key_cont,
-                    const mapped_container_type& mapped_cont,
-                    const key_compare& comp, const Allocator& a);
-</pre>
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multimap.cons">[flat.multimap.cons]</a> as follows:
-
-<small><blockquote>
-<p><pre>
-flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
-              const key_compare& comp <del>= key_compare()</del>);
-</pre>
-<p>1․ <i>Effects:</i> Initializes `c.keys` with `std::move(key_cont)`, `c.values` with `std::move(mapped_cont)`, and `compare` with `comp`;
-sorts the range [`begin()`, `end()`) with respect to `value_comp()`.
-<p>2․<i>Complexity:</i> Linear in <i>N</i> if the container arguments are already sorted with respect to `value_comp()`
-and otherwise <i>N</i> log <i>N</i>, where <i>N</i> is the value of `key_cont.size()` before this call.
-</blockquote></small>
-
-## Remove the container constructors; make `replace` sort by default ## {#deceptive-remove}
-
-A more ambitious alternative would be to eliminate the container constructors entirely,
-and say that the only way to move containers into a flat container at all is via `.replace`,
-after the initial construction has already happened. This would be analogous to `vector::reserve`
-or `unordered_map::max_load_factor` — a feature with no associated constructor, just a setter
-after the fact. This would be really bold. But eliminating these constructors would solve
-[[LWG3802]] ([[#lwg-3802]]) in one fell swoop, and reduce `flat_map`'s constructor overload
-set from 38 constructors down to 20.
-
-But removing the container constructors introduces a new problem:
-Today's untagged (narrow-contract) `replace` can easily replace today's tagged (narrow-contract)
-container constructor. But removing the untagged (wide-contract) container constructor is annoying
-for the programmer because it's tedious to reproduce the effect of the wide-contract container constructor
-using only narrow-contract `replace`!
-
-```c++
-    // Before:
-    FS fs2 = FS(std::move(ks));
-
-    // After (hypothetically):
-    FS fs2 = FS(ks.get_allocator());
-    std::ranges::sort(ks);
-    ks.erase(std::ranges::unique(ks).begin(), ks.end());
-    fs2.replace(std::move(ks));
-
-    // After (hypothetically), if you can afford one extra allocation:
-    FS fs2 = FS(std::from_range, ks | std::views::as_rvalue, ks.get_allocator());
-```
-
-We boldly address this by giving `replace` two overloads. We change the meaning of untagged `fs.replace(ks)`
-to mean the wide contract, and we add a tagged `fs.replace(sorted_unique, ks)` for the narrow contract.
-This makes the interface more symmetric, too, because the semantic precondition will now be 100% always indicated
-by the presence of the syntactic tag `sorted_unique`.
-
-```c++
-    auto ks = std::pmr::vector<int>({1,2,3}, &mr1);
-    auto vs = std::pmr::vector<int>({1,2,3}, &mr2);
-
-    using FS = std::flat_set<int, std::less<>, decltype(ks)>;
-    // Before:
-    FS fs1 = FS(std::move(ks)); // wide contract, sorts
-    // After the full patch:
-    FS fs1 = FS(ks.get_allocator());
-    fs1.replace(std::move(ks)); // wide contract, sorts
-
-    using FM = std::flat_map<int, int, std::less<>, decltype(ks), decltype(vs)>;
-    // Before:
-    FM fm1 = FM(std::sorted_unique, std::move(ks), std::move(vs));
-      // Two different allocators in the same adaptor.
-      // Almost certainly there is no valid reason to do this.
-    // After:
-    FM fm2 = FM(ks.get_allocator());
-    fm2.replace(std::sorted_unique, { std::move(ks), std::move(vs) });
-      // The data from vs is copied into arena mr1.
-      // This is less performant, but more sane.
-      // It becomes physically impossible to create the equivalent of fm1 above.
-```
-
-It is very late in the game to be doing design work; but this particular redesign
-does seem to have a lot of varied benefits for vendors and programmers, with only
-the one procedural downside.
-
-- Reduces `flat_map`'s constructor overload set from 26 (pre-LWG3802) down to 20
-- Reduces `flat_map`'s deduction guide set from 12 down to 6
-- Solves [[LWG3802]], which otherwise would require adding 12 <i>more</i> constructors to `flat_map`
-- Solves [[#sorting-complexity]]
-- Eliminates the cause of users' surprise at `flat_map<int, int> fm = {{}, {}}`
-- Prevents accidentally constructing a `flat_map` that straddles two different allocators
-- Eliminates some questionable "<i>Complexity:</i> Linear" elements that would otherwise need to be revisited by LWG
-- Makes all narrow-contract functions uniformly take the `sorted_unique` tag
-- With <a href="#insert-range-sorted-unique">§8 `insert_range`</a>, makes all mutators uniformly come in tagged (narrow-contract) and untagged (wide-contract) flavors
-- Provides a wide-contract version of `replace`, which didn't exist before
-- Since no vendor has shipped flat containers yet, this patch reduces rather than increases vendors' workload
-
-The procedural downside is:
-
-- Technically, C++23 has already shipped. This is an unusually big change to make as a DR.
-    (But, as I said above, this is not a hardship for vendors because no vendor has yet
-    started to implement `flat_set`, except for libc++, and libc++ wants this change.)
-
-### Wording for tagged `replace` ### {#wording-deceptive-remove}
-
-Note: This wording is based on top of the editorial refactoring from §3.
+## Monolithic wording ## {#wording-monolith}
 
 Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
 
@@ -3136,185 +3149,13 @@ consecutive equivalent elements.</ins>
 <p>17․ <i>Effects:</i> Equivalent to: `c = std::move(cont);`
 </blockquote></small>
 
-# Zero-initialization of containers # {#zero-initialization}
-
-Jean-Philippe Boivin points out that the flat containers currently specify their constructors
-as value-initializing, rather than default-initializing, the `keys` and `values` containers.
-This is extremely expensive for in-place containers such as
-<a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html">P0843</a> `std::inplace_vector` (proposed for C++26).
-A reduced example looks like this ([Godbolt](https://godbolt.org/z/aWoYxEfve)):
-
-```c++
-    struct flat_set {
-        using key_compare = std::less<int>;
-        using container_type = std::inplace_vector<int, 1024>;
-
-        flat_set() : flat_set(key_compare()) { }
-        explicit flat_set(const key_compare& comp)
-          : c_(), compare_(comp) { }
-    private:
-        [[no_unique_address]] key_compare compare_;
-        container_type c_;
-    };
-```
-
-The value-initialization of `c_` zeroes the memory footprint of `c_` and then calls `inplace_vector`'s
-default constructor (which initializes `size_` but is otherwise trivial). This involves a 4096-byte `memset`.
-On the other hand, if `flat_set`'s constructors were defined as
-
-```c++
-        flat_set() = default;
-        explicit flat_set(const key_compare& comp)
-          : compare_(comp) { }
-```
-
-then there would be no 4096-byte `memset`. This would make `flat_set` more suitable for embedded programming,
-where every cycle counts.
-
-We don't care about the cost of zero-initializing the comparator, since
-comparators are usually empty types, or at least small.
-
-## Proposed wording ## {#wording-zero-initialization}
-
-Note: This wording is based on top of the editorial refactoring from §3.
-
-Change <a href="https://eel.is/c++draft/flat.map.defn">[flat.map.defn]</a> as follows:
-
-<small><blockquote>
-[...]
-<pre>
-    // [flat.map.cons], constructors
-    <del>flat_map() : flat_map(key_compare()) { }</del>
-    <ins>flat_map() = default;</ins>
-    explicit flat_map(const key_compare& comp)
-      : <del>c(),</del> compare(comp) { }
-    flat_map(key_container_type key_cont, mapped_container_type mapped_cont,
-             const key_compare& comp = key_compare());
-    flat_map(sorted_unique_t, key_container_type key_cont, mapped_container_type mapped_cont,
-             const key_compare& comp = key_compare());
-    template&lt;class InputIterator>
-      flat_map(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
-        : <del>c(),</del> compare(comp) { insert(first, last); }
-    template&lt;class InputIterator>
-      flat_map(sorted_unique_t s, InputIterator first, InputIterator last,
-               const key_compare& comp = key_compare())
-        : <del>c(),</del> compare(comp) { insert(s, first, last); }
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_map(from_range_t fr, R&& rg)
-        : flat_map(fr, std::forward&lt;R>(rg), key_compare()) { }
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_map(from_range_t, R&& rg, const key_compare& comp)
-        : flat_map(comp) { insert_range(std::forward&lt;R>(rg)); }
-</pre>
-[...]
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multimap.defn">[flat.multimap.defn]</a> as follows:
-
-<small><blockquote>
-[...]
-<pre>
-    // [flat.multimap.cons], constructors
-    <del>flat_multimap() : flat_multimap(key_compare()) { }</del>
-    <ins>flat_multimap() = default;</ins>
-    explicit flat_multimap(const key_compare& comp)
-      : <del>c(),</del> compare(comp) { }
-    flat_multimap(key_container_type key_cont, mapped_container_type mapped_cont,
-                  const key_compare& comp = key_compare());
-    flat_multimap(sorted_equivalent_t, key_container_type key_cont, mapped_container_type mapped_cont,
-                  const key_compare& comp = key_compare());
-    template&lt;class InputIterator>
-      flat_multimap(InputIterator first, InputIterator last, const key_compare& comp = key_compare())
-        : <del>c(),</del> compare(comp) { insert(first, last); }
-    template&lt;class InputIterator>
-      flat_multimap(sorted_equivalent_t s, InputIterator first, InputIterator last,
-                    const key_compare& comp = key_compare())
-        : <del>c(),</del> compare(comp) { insert(s, first, last); }
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_multimap(from_range_t fr, R&& rg)
-        : flat_multimap(fr, std::forward&lt;R>(rg), key_compare()) { }
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_multimap(from_range_t, R&& rg, const key_compare& comp)
-        : flat_multimap(comp) { insert_range(std::forward&lt;R>(rg)); }
-</pre>
-[...]
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.multiset.defn">[flat.multiset.defn]</a> as follows:
-
-<small><blockquote>
-[...]
-<pre>
-    // [flat.multiset.cons], constructors
-    <del>flat_multiset() : flat_multiset(key_compare()) { }</del>
-    <ins>flat_multiset() = default;</ins>
-    explicit flat_multiset(const key_compare& comp)
-      : <del>c(),</del> compare(comp) { }
-    explicit flat_multiset(container_type cont, const key_compare& comp = key_compare());
-    flat_multiset(sorted_equivalent_t, container_type cont,
-                  const key_compare& comp = key_compare())
-      : <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }
-    template&lt;class InputIterator>
-      flat_multiset(InputIterator first, InputIterator last,
-                    const key_compare& comp = key_compare())
-        : <del><i>c</i>(),</del> <i>compare</i>(comp)
-        { insert(first, last); }
-    template&lt;class InputIterator>
-      flat_multiset(sorted_equivalent_t, InputIterator first, InputIterator last,
-                    const key_compare& comp = key_compare())
-        : <i>c</i>(first, last), <i>compare</i>(comp) { }
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_multiset(from_range_t fr, R&& rg)
-        : flat_multiset(fr, std::forward&lt;R>(rg), key_compare()) { }
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_multiset(from_range_t, R&& rg, const key_compare& comp)
-        : flat_multiset(comp)
-        { insert_range(std::forward&lt;R>(rg)); }
-</pre>
-[...]
-</blockquote></small>
-
-Change <a href="https://eel.is/c++draft/flat.set.defn">[flat.set.defn]</a> as follows:
-
-<small><blockquote>
-[...]
-<pre>
-    // [flat.set.cons], constructors
-    <del>flat_set() : flat_set(key_compare()) { }</del>
-    <ins>flat_set() = default;</ins>
-    explicit flat_set(const key_compare& comp)
-      : <del>c(),</del> compare(comp) { }
-    explicit flat_set(container_type cont, const key_compare& comp = key_compare());
-    flat_set(sorted_unique_t, container_type cont,
-             const key_compare& comp = key_compare())
-      : <i>c</i>(std::move(cont)), <i>compare</i>(comp) { }
-    template&lt;class InputIterator>
-      flat_set(InputIterator first, InputIterator last,
-               const key_compare& comp = key_compare())
-        : <del><i>c</i>(),</del> <i>compare</i>(comp)
-        { insert(first, last); }
-    template&lt;class InputIterator>
-      flat_set(sorted_unique_t, InputIterator first, InputIterator last,
-               const key_compare& comp = key_compare())
-        : <i>c</i>(first, last), <i>compare</i>(comp) { }
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_set(from_range_t fr, R&& rg)
-        : flat_set(fr, std::forward&lt;R>(rg), key_compare()) { }
-    template&lt;<i>container-compatible-range</i>&lt;value_type> R>
-      flat_set(from_range_t, R&& rg, const key_compare& comp)
-        : flat_set(comp)
-        { insert_range(std::forward&lt;R>(rg)); }
-</pre>
-[...]
-</blockquote></small>
-
 
 # Implementation experience # {#experience}
 
 I have implemented all of [[P0429]]/[[P1222]] and all of this proposal
 as a series of patches against libc++ trunk; see [[Patch]].
 You can experiment with it <a href="https://godbolt.org/z/Trneaj4Mo">on Godbolt Compiler Explorer</a>;
-just use the P1144 branch of Clang, which uses this patched libc++ by default.
+just use the P1144 branch of Clang, which uses Arthur's patched libc++ by default.
 
 
 # Acknowledgments # {#acknowledgments}
@@ -3373,6 +3214,14 @@ just use the P1144 branch of Clang, which uses this patched libc++ by default.
     ],
     "href": "https://cplusplus.github.io/LWG/issue3884",
     "date": "February 2023"
+  },
+  "LWG4000": {
+    "title": "flat_map::insert_range's Effects is not quite right",
+    "authors": [
+      "Hewill Kang"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue4000",
+    "date": "October 2023"
   },
   "P0429": {
     "title": "A standard flat_map",
