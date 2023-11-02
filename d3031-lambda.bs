@@ -2,7 +2,7 @@
 Title: Resolve CWG2561, conversion function for lambda with explicit object parameter
 Shortname: D3031
 Revision: 0
-!Draft Revision: 3
+!Draft Revision: 4
 Audience: EWG, CWG
 Status: D
 Group: WG21
@@ -17,7 +17,7 @@ Abstract:
   but (non-conformingly and awkwardly) accepts `void (*pf)(T, int) = T()`.
   Contrary to the (February 2022) P/R of CWG2561, this paper proposes
   to resolve CWG2561 in the more user-friendly and consistent direction taken by Microsoft.
-Date: 2023-10-31
+Date: 2023-11-02
 </pre>
 
 <style>
@@ -151,9 +151,81 @@ auto pb3 = +b; // MSVC: OK; Generic+Clang: error
 ```
 
 This suggests that a `this auto` parameter shouldn't suffice to make a lambda "generic."
+But see the next section.
 
-But now consider this case, which (having a placeholder non-object parameter) is clearly
-a generic lambda:
+### Is `this auto` different from `this T`? ### {#generic-paramlist}
+
+Zhihao Yuan argues that it is counterintuitive for MSVC to treat these two spellings
+differently:
+```c++
+auto a = [](this auto) {}; // "non-generic" on MSVC
+auto b = []<class T>(this T) {}; // generic
+
+auto pa = +a; // OK on MSVC
+auto pb = +b; // error on MSVC
+void (*qa)() = a; // OK on MSVC
+void (*qb)() = b; // error on MSVC
+```
+If `[]<class T>(this T){}` is considered generic, then so should be `[](this auto){}`; we shouldn't
+carve out an exception for the latter.
+
+
+### This lambda can only be called when derived-from ### {#generic-derived}
+
+Gašper Ažman provides this example of a lambda that can't be called directly:
+```c++
+auto c = [](this auto self) -> int { return self.value; };
+using C = decltype(c);
+
+struct Derived : C { int value = 2; };
+```
+Here it is a (SFINAE-unfriendly) error to instantiate `C::operator()<C>`,
+but it is OK to instantiate `C::operator()<Derived>`. Therefore both `c()` and `+c`
+are errors, but this is OK:
+```c++
+static_assert(std::is_convertible_v<C, int(*)()>); // OK on MSVC
+static_assert(std::is_convertible_v<C, int(*)(C)>); // OK on Clang
+
+Derived d;
+int two = d(); // OK
+int (*p)() = d; // error on Clang+MSVC
+int (*p)(Derived) = d; // OK on Clang, error on MSVC
+```
+
+On Clang, `+d` fails to deduce the template parameter to `C`'s conversion function template (SFINAE-friendly).
+On MSVC, `+d` unambiguously calls the non-template conversion function inherited from `C`,
+which hard-errors during instantiation of `C::operator()<C>`.
+
+A more problematic example is:
+```c++
+auto c2 = [](this auto self) { return sizeof(self); };
+struct Derived2 : decltype(c2) { int value; } d2;
+struct Derived3 : decltype(c2) { int value[10]; } d3;
+```
+Here `d2() == 4` and `d3() == 40`, but both `+d2` and `+d3` point to a function that returns `1`.
+This example suggests that either the conversion function itself should be an explicit-object member function
+that default-constructs an object of its own type instead of the lambda's (but that fails if the
+derived type has state and/or has no default constructor), or else the conversion function should
+not exist for explicit-object lambdas (i.e., the "Punt" wording option below).
+
+Richard Smith suggests another possibility: The conversion function for `c2` could be an explicit-object
+member function constrained to require that its `this` parameter be of type (cvref-qualified) `decltype(c2)`.
+This avoids `c2` above, but still won't stop this example:
+```c++
+auto c3 = [](this auto&& self) { return std::is_rvalue_reference_v<decltype(self)>; };
+assert(c3() == false);
+assert((+c3)() == true);
+```
+Maybe that's an obscure enough problem that we don't care? Or, on the other hand, maybe
+we should make a solid rule that *whenever `(+lambda)()` is well-formed, it is guaranteed to have the same behavior
+as `lambda()`.* Lambdas having `this auto` cannot provide that guarantee, and therefore we cannot give them conversion functions.
+This would be yet a fourth wording option, distinct from "Punt," because it would give
+`[](this Any){}` a conversion function and `[](this Any, auto){}` a conversion function template.
+
+
+### This lambda can only be passed its own type ### {#generic-constrained}
+
+Consider this case, which (having a *template-parameter-list*) is clearly a generic lambda:
 ```c++
 auto c = []<class T>(this T self, T x) { std::cout << x; };
 ```
