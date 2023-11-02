@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D3031R0<br>Resolve CWG2561, conversion function for lambda with explicit object parameter</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-11-02">2023-11-02</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-11-03">2023-11-03</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2105,7 +2105,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>4
+     <dd>6
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2119,8 +2119,10 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   Microsoft (non-conformingly) treats that expression the same as <code class="highlight"><c- o>+</c-><c- p>[](</c-><c- b>int</c-><c- p>){}</c-></code>.
   Clang (conformingly) treats the lambda as a generic lambda and <code class="highlight"><c- o>+</c-><c- n>T</c-><c- p>()</c-></code> as ill-formed,
   but (non-conformingly and awkwardly) accepts <code class="highlight"><c- b>void</c-> <c- p>(</c-><c- o>*</c-><c- n>pf</c-><c- p>)(</c-><c- n>T</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-> <c- o>=</c-> <c- n>T</c-><c- p>()</c-></code>.
-  Contrary to the (February 2022) P/R of CWG2561, this paper proposes
-  to resolve CWG2561 in the more user-friendly and consistent direction taken by Microsoft.</p>
+  The (February 2022) P/R of CWG2561 proposes Clang’s direction, but this paper proposes
+  either the more user-friendly and consistent direction taken by Microsoft, or
+  else to eliminate the function-pointer conversion for explicit-object lambdas
+  altogether.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -2133,7 +2135,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
        <a href="#generic"><span class="secno">2.1</span> <span class="content">Is <code class="highlight"><c- p>[](</c-><c- k>this</c-> <c- k>auto</c-><c- p>){}</c-></code> generic?</span></a>
        <ol class="toc">
         <li><a href="#generic-paramlist"><span class="secno">2.1.1</span> <span class="content">Is <code class="highlight"><c- k>this</c-> <c- k>auto</c-></code> different from <code class="highlight"><c- k>this</c-> <c- n>T</c-></code>?</span></a>
-        <li><a href="#generic-derived"><span class="secno">2.1.2</span> <span class="content">This lambda can only be called when derived-from</span></a>
+        <li><a href="#act-different"><span class="secno">2.1.2</span> <span class="content">Should we allow <code class="highlight"><c- p>(</c-><c- o>+</c-><c- n>c</c-><c- p>)()</c-></code> to act differently from <code class="highlight"><c- n>c</c-><c- p>()</c-></code>?</span></a>
         <li><a href="#generic-constrained"><span class="secno">2.1.3</span> <span class="content">This lambda can only be passed its own type</span></a>
        </ol>
      </ol>
@@ -2254,7 +2256,6 @@ considered a generic lambda.</p>
 <c- p>};</c->
 
 <c- k>struct</c-> <c- nc>B_MSVC</c-> <c- p>{</c->
-  <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c-> <c- k>static</c-> <c- b>int</c-> <c- n>f</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;&amp;</c-><c- p>,</c-> <c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- o>+</c-><c- mi>1</c-><c- p>;</c-> <c- p>}</c->
   <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c-> <c- b>int</c-> <c- n>operator</c-><c- p>()(</c-><c- n>this</c-> <c- n>T</c-> <c- n>self</c-><c- p>,</c-> <c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>x</c-><c- o>+</c-><c- mi>1</c-><c- p>;</c-> <c- p>}</c->
   <c- n>operator</c-> <c- n>Just</c-><c- o>&lt;</c-><c- b>int</c-><c- p>(</c-><c- o>*</c-><c- p>)(</c-><c- b>int</c-><c- p>)</c-><c- o>></c-><c- p>()</c-> <c- k>const</c-> <c- p>{</c-> <c- k>return</c-> <c- o>+</c-><c- p>[](</c-><c- b>int</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>B_MSVC</c-><c- p>()(</c-><c- n>x</c-><c- p>);</c-> <c- p>};</c-> <c- p>}</c-> 
 <c- p>};</c->
@@ -2280,7 +2281,7 @@ differently:</p>
 </pre>
    <p>If <code class="highlight"><c- p>[]</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-><c- p>(</c-><c- k>this</c-> <c- n>T</c-><c- p>){}</c-></code> is considered generic, then so should be <code class="highlight"><c- p>[](</c-><c- k>this</c-> <c- k>auto</c-><c- p>){}</c-></code>; we shouldn’t
 carve out an exception for the latter.</p>
-   <h4 class="heading settled" data-level="2.1.2" id="generic-derived"><span class="secno">2.1.2. </span><span class="content">This lambda can only be called when derived-from</span><a class="self-link" href="#generic-derived"></a></h4>
+   <h4 class="heading settled" data-level="2.1.2" id="act-different"><span class="secno">2.1.2. </span><span class="content">Should we allow <code class="highlight"><c- p>(</c-><c- o>+</c-><c- n>c</c-><c- p>)()</c-></code> to act differently from <code class="highlight"><c- n>c</c-><c- p>()</c-></code>?</span><a class="self-link" href="#act-different"></a></h4>
    <p>Gašper Ažman provides this example of a lambda that can’t be called directly:</p>
 <pre class="language-c++ highlight"><c- k>auto</c-> <c- n>c</c-> <c- o>=</c-> <c- p>[](</c-><c- n>this</c-> <c- k>auto</c-> <c- n>self</c-><c- p>)</c-> <c- o>-></c-> <c- b>int</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>.</c-><c- n>value</c-><c- p>;</c-> <c- p>};</c->
 <c- n>using</c-> <c- n>C</c-> <c- o>=</c-> <c- n>decltype</c-><c- p>(</c-><c- n>c</c-><c- p>);</c->
@@ -2300,27 +2301,31 @@ but it is OK to instantiate <code class="highlight"><c- n>C</c-><c- o>::</c-><c-
    <p>On Clang, <code class="highlight"><c- o>+</c-><c- n>d</c-></code> fails to deduce the template parameter to <code class="highlight"><c- n>C</c-></code>’s conversion function template (SFINAE-friendly).
 On MSVC, <code class="highlight"><c- o>+</c-><c- n>d</c-></code> unambiguously calls the non-template conversion function inherited from <code class="highlight"><c- n>C</c-></code>,
 which hard-errors during instantiation of <code class="highlight"><c- n>C</c-><c- o>::</c-><c- k>operator</c-><c- p>()</c-><c- o>&lt;</c-><c- n>C</c-><c- o>></c-></code>.</p>
-   <p>A more problematic example is:</p>
+   <p>A more problematic variation is:</p>
 <pre class="language-c++ highlight"><c- k>auto</c-> <c- n>c2</c-> <c- o>=</c-> <c- p>[](</c-><c- n>this</c-> <c- k>auto</c-> <c- n>self</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- k>sizeof</c-><c- p>(</c-><c- n>self</c-><c- p>);</c-> <c- p>};</c->
-<c- k>struct</c-> <c- nc>Derived2</c-> <c- o>:</c-> <c- n>decltype</c-><c- p>(</c-><c- n>c2</c-><c- p>)</c-> <c- p>{</c-> <c- b>int</c-> <c- n>value</c-><c- p>;</c-> <c- p>}</c-> <c- n>d2</c-><c- p>;</c->
-<c- k>struct</c-> <c- nc>Derived3</c-> <c- o>:</c-> <c- n>decltype</c-><c- p>(</c-><c- n>c2</c-><c- p>)</c-> <c- p>{</c-> <c- b>int</c-> <c- n>value</c-><c- p>[</c-><c- mi>10</c-><c- p>];</c-> <c- p>}</c-> <c- n>d3</c-><c- p>;</c->
+<c- k>struct</c-> <c- nc>Derived2</c-> <c- o>:</c-> <c- n>decltype</c-><c- p>(</c-><c- n>c2</c-><c- p>)</c-> <c- p>{</c-> <c- b>int</c-> <c- n>pad</c-><c- p>;</c-> <c- p>}</c-> <c- n>d2</c-><c- p>;</c->
+<c- n>assert</c-><c- p>(</c-><c- n>d2</c-><c- p>()</c-> <c- o>==</c-> <c- mi>4</c-><c- p>);</c->
+<c- n>assert</c-><c- p>((</c-><c- o>+</c-><c- n>d2</c-><c- p>)()</c-> <c- o>==</c-> <c- mi>1</c-><c- p>);</c->
 </pre>
-   <p>Here <code class="highlight"><c- n>d2</c-><c- p>()</c-> <c- o>==</c-> <c- mi>4</c-></code> and <code class="highlight"><c- n>d3</c-><c- p>()</c-> <c- o>==</c-> <c- mi>40</c-></code>, but both <code class="highlight"><c- o>+</c-><c- n>d2</c-></code> and <code class="highlight"><c- o>+</c-><c- n>d3</c-></code> point to a function that returns <code class="highlight"><c- mi>1</c-></code>.
-This example suggests that either the conversion function itself should be an explicit-object member function
-that default-constructs an object of its own type instead of the lambda’s (but that fails if the
-derived type has state and/or has no default constructor), or else the conversion function should
+   <p>Here <code class="highlight"><c- n>d2</c-><c- p>()</c-> <c- o>==</c-> <c- mi>4</c-></code>, but <code class="highlight"><c- o>+</c-><c- n>d2</c-></code> points to a function that returns <code class="highlight"><c- mi>1</c-></code>.
+This example suggests that the conversion function should
 not exist for explicit-object lambdas (i.e., the "Punt" wording option below).</p>
-   <p>Richard Smith suggests another possibility: The conversion function for <code class="highlight"><c- n>c2</c-></code> could be an explicit-object
-member function constrained to require that its <code class="highlight"><c- k>this</c-></code> parameter be of type (cvref-qualified) <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- n>c2</c-><c- p>)</c-></code>.
-This avoids <code class="highlight"><c- n>c2</c-></code> above, but still won’t stop this example:</p>
+   <p>Two other problematic cases are <code class="highlight"><c- n>c3</c-></code> (no inheritance):</p>
 <pre class="language-c++ highlight"><c- k>auto</c-> <c- n>c3</c-> <c- o>=</c-> <c- p>[](</c-><c- n>this</c-> <c- k>auto</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>std</c-><c- o>::</c-><c- n>is_rvalue_reference_v</c-><c- o>&lt;</c-><c- n>decltype</c-><c- p>(</c-><c- n>self</c-><c- p>)</c-><c- o>></c-><c- p>;</c-> <c- p>};</c->
 <c- n>assert</c-><c- p>(</c-><c- n>c3</c-><c- p>()</c-> <c- o>==</c-> false<c- p>);</c->
 <c- n>assert</c-><c- p>((</c-><c- o>+</c-><c- n>c3</c-><c- p>)()</c-> <c- o>==</c-> true<c- p>);</c->
 </pre>
-   <p>Maybe that’s an obscure enough problem that we don’t care? Or, on the other hand, maybe
-we should make a solid rule that *whenever <code class="highlight"><c- p>(</c-><c- o>+</c-><c- n>lambda</c-><c- p>)()</c-></code> is well-formed, it is guaranteed to have the same behavior
-as <code class="highlight"><c- n>lambda</c-><c- p>()</c-></code>.* Lambdas having <code class="highlight"><c- k>this</c-> <c- k>auto</c-></code> cannot provide that guarantee, and therefore we cannot give them conversion functions.
-This would be yet a fourth wording option, distinct from "Punt," because it would give <code class="highlight"><c- p>[](</c-><c- k>this</c-> <c- n>Any</c-><c- p>){}</c-></code> a conversion function and <code class="highlight"><c- p>[](</c-><c- k>this</c-> <c- n>Any</c-><c- p>,</c-> <c- k>auto</c-><c- p>){}</c-></code> a conversion function template.</p>
+   <p>and <code class="highlight"><c- n>d4</c-></code> (a non-generic lambda):</p>
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Evil</c-> <c- p>{</c-> <c- b>int</c-> <c- n>i</c-><c- p>;</c-> <c- n>Evil</c-><c- p>(</c-><c- k>auto</c-> <c- n>x</c-><c- p>)</c-> <c- o>:</c-> <c- n>i</c-><c- p>(</c-><c- k>sizeof</c-><c- p>(</c-><c- n>x</c-><c- p>))</c-> <c- p>{}</c-> <c- p>};</c->
+<c- k>auto</c-> <c- n>c4</c-> <c- o>=</c-> <c- p>[](</c-><c- n>this</c-> <c- n>Evil</c-> <c- n>self</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- p>};</c->
+<c- k>struct</c-> <c- nc>Derived4</c-> <c- o>:</c-> <c- n>decltype</c-><c- p>(</c-><c- n>c4</c-><c- p>)</c-> <c- p>{</c-> <c- b>int</c-> <c- n>pad</c-><c- p>;</c-> <c- p>}</c-> <c- n>d4</c-><c- p>;</c->
+<c- n>assert</c-><c- p>(</c-><c- n>d4</c-><c- p>()</c-> <c- o>==</c-> <c- mi>4</c-><c- p>);</c->
+<c- n>assert</c-><c- p>((</c-><c- o>+</c-><c- n>d4</c-><c- p>)()</c-> <c- o>==</c-> <c- mi>1</c-><c- p>);</c->
+</pre>
+   <p>Maybe these are obscure enough problems that we don’t care? Or, on the other hand, maybe
+we should make a solid rule that <em>whenever <code class="highlight"><c- p>(</c-><c- o>+</c-><c- n>lambda</c-><c- p>)()</c-></code> is well-formed, it is guaranteed to have the same behavior
+as <code class="highlight"><c- n>lambda</c-><c- p>()</c-></code>.</em> Explicit-object lambdas cannot provide that guarantee, and therefore we cannot give them conversion functions
+(i.e., the "Punt" wording option below).</p>
    <h4 class="heading settled" data-level="2.1.3" id="generic-constrained"><span class="secno">2.1.3. </span><span class="content">This lambda can only be passed its own type</span><a class="self-link" href="#generic-constrained"></a></h4>
    <p>Consider this case, which (having a <em>template-parameter-list</em>) is clearly a generic lambda:</p>
 <pre class="language-c++ highlight"><c- k>auto</c-> <c- n>c</c-> <c- o>=</c-> <c- p>[]</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c-><c- p>(</c-><c- n>this</c-> <c- n>T</c-> <c- n>self</c-><c- p>,</c-> <c- n>T</c-> <c- n>x</c-><c- p>)</c-> <c- p>{</c-> <c- n>std</c-><c- o>::</c-><c- n>cout</c-> <c- o>&lt;&lt;</c-> <c- n>x</c-><c- p>;</c-> <c- p>};</c->
@@ -2350,8 +2355,9 @@ of the closure type" — that wouldn’t compile! Do we need the conversion func
 to be constrained? and if so, should it be constrained as in <code class="highlight"><c- n>C_Constrained</c-></code>, or otherwise?</p>
    <h2 class="heading settled" data-level="3" id="experience"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>As far as I can tell, we have implementation experience of both Clang’s approach (in Clang)
-and MSVC’s approach (in MSVC) — although I don’t fully understand what MSVC might be doing
-internally. MSVC’s approach seems to be implementable, since it’s been implemented.</p>
+and MSVC’s approach (in MSVC) — although I don’t fully understand what MSVC is doing
+internally to avoid the overload-resolution ambiguity.
+But MSVC’s approach seems to be implementable, since it’s been implemented.</p>
    <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Options for proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <p class="note" role="note"><span class="marker">Note:</span> Throughout, the Standard’s chosen examples rarely seem on-point. I’d like to add more
 relevant examples and eliminate some of the examples already present.</p>
