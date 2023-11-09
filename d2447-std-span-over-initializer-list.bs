@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: <code>std::span</code> over an initializer list
 Shortname: D2447
-Revision: 5
-!Draft Revision: 7
+Revision: 6
+!Draft Revision: 8
 Audience: LWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   can replace <code>const string&amp;</code>. While <code>"abc"</code> binds to a <code>string_view</code>
   function parameter, <code>{1,2,3}</code> fails to bind to a <code>span&lt;const int&gt;</code> function parameter.
   We show why this gap is undesirable, and propose to close it, ideally as a DR.
-Date: 2023-09-12
+Date: 2023-11-09
 </pre>
 
 <style>
@@ -27,6 +27,11 @@ td {font-size: smaller;}
 </style>
 
 # Changelog # {#changelog}
+
+- R6 (post-Kona 2023):
+
+    - Remove the constructor's `noexcept`, because it has a precondition.
+        An LWG issue will be filed to remove the `noexcept` on [[span.cons]/20](https://eel.is/c++draft/span.cons#20).
 
 - R5 (post-LEWG 2023):
 
@@ -299,7 +304,7 @@ Modify <a href="https://eel.is/c++draft/span.overview">[span.overview]</a> as fo
     constexpr span(const array&lt;T, N>&amp; arr) noexcept;
   template&lt;class R>
     constexpr explicit(extent != dynamic_extent) span(R&amp;&amp; r);
-  <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list&lt;value_type> il) noexcept;</ins>
+  <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list&lt;value_type> il);</ins>
   constexpr span(const span&amp; other) noexcept = default;
   template&lt;class OtherElementType, size_t OtherExtent>
     constexpr explicit(<i>see below</i>) span(const span&lt;OtherElementType, OtherExtent>&amp; s) noexcept;
@@ -309,7 +314,7 @@ Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:
 
 <small><blockquote>
 <pre>
-  <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list&lt;value_type> il) noexcept;</ins>
+  <ins>constexpr explicit(extent != dynamic_extent) span(std::initializer_list&lt;value_type> il);</ins>
 </pre>
 <p><ins><i>Constraints:</i> `is_const_v<element_type>` is `true`.</ins>
 <p><ins><i>Preconditions:</i> If `extent` is not equal to `dynamic_extent`, then `il.size()` is equal to `extent`.</ins>
