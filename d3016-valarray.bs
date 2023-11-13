@@ -2,8 +2,8 @@
 Title: Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists
 Shortname: D3016
 Revision: 1
-!Draft Revision: 4
-Audience: LEWG, EWG
+!Draft Revision: 5
+Audience: LEWG
 Status: D
 Group: WG21
 URL:
@@ -14,7 +14,7 @@ Abstract:
   applied to `valarray` and to braced initializer lists were caused by
   C++0x uncertainty around [stmt.ranged], and resolve these inconsistencies
   for C++26.
-Date: 2023-11-08
+Date: 2023-11-12
 </pre>
 
 <style>
@@ -27,13 +27,18 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 
 - R1:
 
-    - Wording review by CWG; [stmt.ranged] is now going to be a core issue instead of in this paper.
+    - Split [[CWG2825]] from this paper; this paper is now library-only.
+
+    - Add discussion of `.data()` and `.empty()` overloads (proposed but undiscussed in R0).
+
+    - Add wording for ".data+.size cleanup."
 
 
 # Motivation and proposal # {#proposal}
 
-Casey Carter points out that the following program is supported by libstdc++
-but not libc++ nor Microsoft ([Godbolt](https://godbolt.org/z/WK37KbGss)):
+Casey Carter [points out](https://lists.isocpp.org/lib/2023/10/26795.php)
+that the following program is supported by libstdc++ but not libc++ nor Microsoft
+([Godbolt](https://godbolt.org/z/WK37KbGss)):
 
 ```c++
 #include <iterator>
@@ -79,9 +84,76 @@ on <em>an object of type `initializer_list`</em> (helpful!) from calling it on <
 (harmful).
 
 We propose to resolve `valarray`’s `begin`/`cbegin` inconsistency in favor of "make it work"
-and to resolve *braced-initializer-list*’s similar inconsistency in favor of "make it ill-formed."
+and to resolve *braced-initializer-list*’s inconsistency in favor of "make it ill-formed."
 
-# Committee history # {#history}
+## .data and .empty ## {#data-empty}
+
+We also propose two additional member functions for `std::initializer_list`: `data()` and `empty()`.
+`data()` is conspicuously missing. Many places in the library clauses would like to operate on
+the contiguous data of an `initializer_list` using the "data + size" idiom, but since `initializer_list`
+lacks `.data()`, they're forced to use an awkward "begin + size" approach instead. This (1) looks unnatural
+and (2) causes extra mental effort for library writers. Part of P3016's proposed wording is to update
+these places in the library. For example:
+
+<small><blockquote>
+<pre>
+constexpr basic_string& append(const basic_string& str);
+</pre>
+<p>1. *Effects:* Equivalent to <code>return append(str.data(), str.size());</code>
+<p>[...]
+<p><pre>
+constexpr basic_string& append(initializer_list&lt;charT> il);
+</pre>
+<p>16. *Effects:* Equivalent to <code>return append(<ins>il.data(), il.size()</ins> <del>il.begin(), il.size()</del>);</code>
+</blockquote></small>
+
+As for `.empty()`, it is generally recognized these days that ranges providing `.size()` should also
+provide `.empty()`. For example see [[LWG4001]] adding member `.empty()` to `iota_view`.
+(As of 2023-11-12, LWG4001 is still officially unprioritized, but on its prioritization poll on 2023-10-30
+received 7 votes for P0 and no objections, so I think it's going to happen.)
+
+By making `il.data()` and `il.empty()` well-formed for `std::initializer_list` objects, we satisfy the SFINAE
+conditions of the primary templates for `std::data(il)` and `std::empty(il)`, meaning that we can eliminate
+their special overloads for `initializer_list` arguments.
+
+<table>
+<tr>
+<td>
+```c++
+  std::initializer_list<int> il = {1,2,3};
+  const int *p = std::data(il);
+    // OK, calls the initializer_list overload
+    // specially provided in <iterator>
+```
+</td>
+<td>
+```c++
+  std::initializer_list<int> il = {1,2,3};
+  const int *p = std::data(il);
+    // OK, calls the primary template
+```
+</td>
+</tr>
+<tr>
+<td>
+```c++
+  const int *p = std::data({1,2,3});
+    // calls the initializer_list overload
+    // specially provided in <iterator>,
+    // and immediately dangles
+```
+</td>
+<td>
+```c++
+  const int *p = std::data({1,2,3});
+    // does not compile
+```
+</td>
+</tr>
+</table>
+
+
+# Historical background # {#history}
 
 [[N2930]] "Range-Based For Loop Wording (Without Concepts)" (2009) proposed that
 <a href="https://eel.is/c++draft/stmt.ranged">[stmt.ranged]</a> should consider only free function `begin(x)` plus a special case
@@ -113,21 +185,11 @@ This change meant that `std::initializer_list` no longer needed to provide
 free `begin`/`end`: The new second bullet lets us use `il.begin()` and `il.end()`,
 so the third bullet is never reached when `decltype(__range)` is `initializer_list`.
 
-However, [stmt.ranged] had not yet quite internalized the fact that the *for-range-initializer*
-might not be an expression at all (i.e., it could be a *braced-initializer-list*); it used
-the name `_RangeT` interchangeably for the type of the *expression* (which might not exist)
-and the type of `__range` (which always exists). This wording was cleaned up by [[CWG1274]],
-but in the wrong direction: the now-current wording branches on the type of the *for-range-initializer*,
-not on the type of `__range`. This affects loops of the form `for (int i : {1,2,3})`,
-where the *for-range-initializer* has no type. Thus we fail to look up `begin` as a member,
-but the third bullet's `begin(__range)` would be perfectly able to use the primary template
-of `std::begin` even if the overloads for `std::initializer_list` didn't exist.
-
-Of the Big Four compilers, only Microsoft gets the current subtle wording correct
-([Godbolt](https://godbolt.org/z/7o8bfWEr8)). EDG, GCC, and Clang all branch on the type
-of `__range`, not on the type of the *for-range-initializer*, thus enter the second bullet
-and use `initializer_list`'s member `begin` instead of the free function `std::begin(initializer_list<E>)`.
-(P3016 proposes to make the majority rule in this case.)
+There was a subtlety with loops of the form `for (int i : {1,2,3})`, whose *for-range-initializer*
+is a *braced-initializer-list* with no type. [[CWG1274]] forced such loops to use the free
+`std::begin(__range)`; but (1) this would still have worked even without the custom overload
+for `std::begin(initializer_list<T>)`, and (2) Clang/GCC/EDG all use member `initializer_list<T>::begin()`
+for this kind of loop anyway. [[CWG2825]] will soon resolve this wording defect.
 
 Meanwhile, since the prioritized customization point in [stmt.ranged] had shifted from
 non-member `begin` to member `begin`, it would have made sense for `std::valarray`'s `begin`
@@ -177,9 +239,6 @@ However, notice that LWG2128 did *not* add two things:
 
 
 # Implementation experience # {#experience}
-
-Notice that [[#wording-stmt.ranged]] is already implemented by three of the four
-major compiler vendors.
 
 Arthur has implemented [[#wording]] in his fork of libc++, and used it to compile
 both LLVM/Clang/libc++ and another large C++17 codebase. Naturally, it caused
@@ -249,6 +308,22 @@ Of course P3016 preserves that `ranges::begin(il)` is noexcept.
 <tr>
 <td>
 ```c++
+  bool b = std::empty({1,2,3});
+    // calls the initializer_list overload
+    // specially provided in <iterator>,
+    // yielding false
+```
+</td>
+<td>
+```c++
+  bool b = std::empty({1,2,3});
+    // does not compile
+```
+</td>
+</tr>
+<tr>
+<td>
+```c++
   #include <valarray>
   #include <utility>
   std::valarray<int> va;
@@ -267,50 +342,6 @@ Of course P3016 preserves that `ranges::begin(il)` is noexcept.
 </table>
 
 # Proposed wording # {#wording}
-
-## [stmt.ranged] ## {#wording-stmt.ranged}
-
-Modify <a href="https://eel.is/c++draft/stmt.ranged">[stmt.ranged]</a> as follows:
-
-<small><blockquote>
-1․ The range-based `for` statement
-<blockquote>
-`for` `(` <i>init-statement<sub>opt</sub></i><br>
-&nbsp; <i>for-range-declaration</i> `:` <i>for-range-initializer</i> `)` <i>statement</i>
-</blockquote>
-is equivalent to
-<blockquote>
-`{`<br>
-   <i>init-statement<sub>opt</sub></i><br>
-   <code>auto&& <i>range</i> =</code> *for-range-initializer* `;`<br>
-   <code>auto <i>begin</i> =</code> *begin-expr* `;`<br>
-   <code>auto <i>end</i> =</code> *end-expr* `;`<br>
-   <code>for ( ; <i>begin</i> != <i>end</i>; ++<i>begin</i> ) {</code><br>
-   &nbsp;   *for-range-declaration* <code>= * <i>begin</i> ;</code><br>
-   &nbsp;   *statement*<br>
-   <code>}</code><br>
-`}`
-</blockquote>
-where<br>
-- (1.1) if the *for-range-initializer* is an *expression*, it is regarded as if it were surrounded by parentheses
-    (so that a comma operator cannot be reinterpreted as delimiting two *init-declarators*);
-
-- (1.2) <code><i>range</i></code>, <code><i>begin</i></code>, and <code><i>end</i></code> are variables defined for exposition only; and
-
-- (1.3) *begin-expr* and *end-expr* are determined as follows:
-
-    - (1.3.1) if <del>the *for-range-initializer* is an expression of array type `R`,</del> <ins><i><code>range</code></i> is
-        of type "reference to array type `R`,"</ins> *begin-expr* and *end-expr* are <i><code>range</code></i> and
-        <code><i>range</i> + N</code>, respectively, where `N` is the array bound.
-        If `R` is an array of unknown bound or an array of incomplete type, the program is ill-formed;
-    - (1.3.2) if <del>the *for-range-initializer* is an expression of class type `C`,</del> <ins><i><code>range</code></i> is
-        of type "reference to class type `C`,"</ins> and searches in the scope of `C` ([class.member.lookup]) for the names `begin` and `end`
-        each find at least one declaration, *begin-expr* and *end-expr* are <code><i>range</i>.begin()</code> and <code><i>range</i>.end()</code>, respectively;<br>
-    - (1.3.3) otherwise, *begin-expr* and *end-expr* are <code>begin(<i>range</i>)</code> and <code>end(<i>range</i>)</code>, respectively,
-        where `begin` and `end` undergo argument-dependent lookup ([basic.lookup.argdep]).
-        [<i>Note: Ordinary unqualified lookup ([basic.lookup.unqual]) is not performed. — end note</i>]
-
-</blockquote></small>
 
 ## [valarray.syn] ## {#wording-valarray.syn}
 
@@ -612,20 +643,87 @@ Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as 
 <p><del>25․ Returns: `il.begin()`.</del>
 </blockquote></small>
 
+## .data+.size cleanup ## {#wording-cleanup}
+### [string.cons] ### {#wording-string.cons}
+
+Modify <a href="https://eel.is/c++draft/string.cons">[string.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+constexpr basic_string& operator=(initializer_list&lt;charT> il);
+</pre>
+36․ *Effects:* Equivalent to:<br>
+<pre> return *this = basic_string_view&lt;charT, traits>(<del>il.begin()</del> <ins>il.data()</ins>, il.size());</pre>
+</blockquote></small>
+
+### [string.append] ### {#wording-string.append}
+
+Modify <a href="https://eel.is/c++draft/string.append">[string.append]</a> as follows:
+
+<small><blockquote>
+<pre>
+constexpr basic_string& append(initializer_list&lt;charT> il);
+</pre>
+16․ *Effects:* Equivalent to: <code>return append(<del>il.begin()</del> <ins>il.data()</ins>, il.size());</code>
+</blockquote></small>
+
+### [string.assign] ### {#wording-string.assign}
+
+Modify <a href="https://eel.is/c++draft/string.assign">[string.assign]</a> as follows:
+
+<small><blockquote>
+<pre>
+constexpr basic_string& assign(initializer_list&lt;charT> il);
+</pre>
+12․ *Effects:* Equivalent to: <code>return assign(<del>il.begin()</del> <ins>il.data()</ins>, il.size());</code>
+</blockquote></small>
+
+### [string.replace] ### {#wording-string.replace}
+
+Modify <a href="https://eel.is/c++draft/string.replace">[string.replace]</a> as follows:
+
+<small><blockquote>
+<pre>
+constexpr basic_string& replace(const_iterator i1, const_iterator i2, initializer_list&lt;charT> il);
+</pre>
+12․ *Effects:* Equivalent to: <code>return replace(i1, i2, <del>il.begin()</del> <ins>il.data()</ins>, il.size());</code>
+</blockquote></small>
+
+### [span.cons] ### {#wording-span.cons}
+
+Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+constexpr explicit(extent != dynamic_extent) span(std::initializer_list<value_type> il);
+</pre>
+<p>18․ *Constraints:* `is_const_v<element_type>` is `true`.
+<p>19․ *Preconditions:* If `extent` is not equal to `dynamic_extent`, then `il.size()` is equal to `extent`.
+<p>20․ *Effects:* Initializes <i>`data_`</i> with <del>`il.begin()`</del> <ins>`il.data()`</ins> and <i>`size_`</i> with `il.size()`.
+</blockquote></small>
+
+### [valarray.cons] ### {#wording-valarray.cons}
+
+Modify <a href="https://eel.is/c++draft/valarray.cons">[valarray.cons]</a> as follows:
+
+<small><blockquote>
+<pre>
+valarray(initializer_list&lt;T> il);
+</pre>
+9․ *Effects:* Equivalent to <code>valarray(<del>il.begin()</del> <ins>il.data()</ins>, il.size())</code>.
+</blockquote></small>
+
 # Proposed straw polls # {#straw-polls}
 
-The next revision of this paper (if any) will be guided by the outcomes of these three straw polls.
+The next revision of this paper (if any) will be guided by the outcomes of these two straw polls.
 
 <table class="def">
 <tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
 
-<tr><th><small>Pursue the core-language change in [stmt.ranged].</th>
+<tr><th><small>Pursue the `initializer_list` changes and associated library-clause cleanup.</th>
 <th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
 
-<tr><th><small>Pursue the `initializer_list` cleanup (depends on the core-language change).</th>
-<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
-
-<tr><th><small>Pursue the `valarray` cleanup.</th>
+<tr><th><small>Pursue the `valarray` changes.</th>
 <th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
 </table>
 
@@ -638,6 +736,14 @@ The next revision of this paper (if any) will be guided by the outcomes of these
     ],
     "href": "https://cplusplus.github.io/CWG/issues/1274.html",
     "date": "March 2011–October 2015"
+  },
+  "CWG2825": {
+    "title": "Range-based for statement using a braced-init-list",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://cplusplus.github.io/CWG/issues/2825.html",
+    "date": "November 2023"
   },
   "LWG2058": {
     "title": "valarray and begin/end",
@@ -654,6 +760,14 @@ The next revision of this paper (if any) will be guided by the outcomes of these
     ],
     "href": "https://cplusplus.github.io/LWG/issue2128",
     "date": "January 2012–January 2016"
+  },
+  "LWG4001": {
+    "title": "iota_view should provide empty",
+    "authors": [
+      "Hewill Kang"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue4001",
+    "date": "October 2023"
   },
   "N2930": {
     "title": "Range-Based For Loop Wording (Without Concepts)",
