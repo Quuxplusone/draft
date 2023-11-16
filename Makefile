@@ -18,7 +18,8 @@ all: \
     d2952-auto-operators.html \
     d2953-forbid-defaulting-rr-assignment.html \
     d3016-valarray.html \
-    d3031-lambda.html
+    d3031-lambda.html \
+    d3055-relocation.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
