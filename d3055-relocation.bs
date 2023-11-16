@@ -1,0 +1,504 @@
+<pre class='metadata'>
+Title: Relax wording to permit relocation optimizations in the STL
+Shortname: D3055
+Revision: 0
+!Draft Revision: 1
+Audience: LEWG
+Status: D
+Group: WG21
+URL:
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  We catalog the STL containers and algorithms that could benefit from
+  optimizations related to relocation (P1144, P2786), and propose to loosen
+  their current overspecification so that such optimizations become legal
+  (but not mandatory).
+Date: 2023-11-16
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins     {background-color: #CCFFCC; text-decoration: underline;}
+del     {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0:
+
+    - Initial revision.
+
+
+# Motivation and proposal # {#proposal}
+
+We have two largely similar active proposals for "trivial relocation" in C++: Arthur's [[P1144]],
+and Bloomberg's [[P2786]] / [[P2959]] / [[P2967]]. We also have two relatively recent proposals
+for "non-trivial relocation" as a new fundamental operation: Bloomberg's [[P2839]] (rejected by EWG
+in Varna) and Bini and Catmur's [[P2785]] (still active).
+
+One major motivation for "(trivial) relocation" is that it allows library authors to choose "fast paths"
+for (trivially) relocatable types. For example, `vector::erase(it)` for a non-relocatable type must
+use `operator=` in a loop (represented here by `std::move`), but for a trivially relocatable type
+such as `unique_ptr` it can avoid `operator=` and use the moral equivalent of memcpy
+(represented here by P1144 `std::uninitialized_relocate`).
+
+```c++
+    void erase(iterator it) {
+        if constexpr (std::is_trivially_relocatable_v<value_type>) {
+            std::destroy_at(it);
+            std::uninitialized_relocate(it + 1, end_, it);
+        } else {
+            std::move(it + 1, end_, it); // operator=
+            std::destroy_at(end_ - 1);
+        }
+        --end_;
+    }
+```
+
+The exact details of this code snippet are up for debate: should the library provide a trait
+`is_nothrow_relocatable_v`? should `uninitialized_relocate` be guaranteed, or merely encouraged,
+to use memcpy instead of move-and-destroy-in-a-loop? and so on. This paper P3055 considers all
+those little details to be "out of scope"; they don't affect the gist of this paper.
+
+This paper concerns itself with the gigantic problem — anything like the above implementation
+is,formally, forbidden by the current Standard! To permit the above implementation, we must
+loosen the specification of `vector::erase`
+(<a href="https://eel.is/c++draft/vector.modifiers">[vector.modifiers]/3</a>)
+along these lines:
+
+<small><blockquote>
+<pre>
+constexpr iterator erase(const_iterator position);
+constexpr iterator erase(const_iterator first, const_iterator last);
+constexpr void pop_back();
+</pre>
+<p>3․ <i>Effects:</i> Invalidates iterators and references at or after the point of the erase.
+<p>4․ <i>Throws:</i> Nothing unless an exception is thrown by the assignment operator or move assignment operator of `T`.
+<p>5․ <i>Complexity:</i> <del>The destructor of `T` is called the number of times equal to the number of the elements erased,
+but the assignment operator of `T` is called the number of times equal to the number of elements in the vector after the
+erased elements.</del> <ins>Linear in the number of elements following the first erased element in the original vector.</ins>
+</blockquote></small>
+
+This change would be consistent with LWG's wording choices in the modern era:
+it specifies the complexity only in terms of big-O, and does not directly mandate any particular implementation
+strategy. So for example it would become legal for the implementation to do just this:
+
+```c++
+    void erase(iterator it) {
+        std::rotate(it, it + 1, end_);
+        std::destroy_at(end_ - 1);
+        --end_;
+    }
+```
+
+according to `std::rotate`'s current wording. But furthermore, we propose to loosen `std::rotate`'s wording
+(<a href="https://eel.is/c++draft/alg.rotate">[alg.rotate]</a>) too:
+
+<small><blockquote>
+<p>1․ <i>Preconditions:</i> `[first, middle)` and `[middle, last)` are valid ranges.
+For the overloads in namespace `std`, `ForwardIterator` meets the *Cpp17ValueSwappable* requirements ([swappable.requirements]),
+and the type of `*first` meets the *Cpp17MoveConstructible* (Table 31) and *Cpp17MoveAssignable* (Table 33) requirements.
+<p>2․ <i>Effects:</i> For each non-negative integer `i < (last - first)`, places the element from the position `first + i`
+into position `first + (i + (last - middle)) % (last - first)`. [<i>Note:</i> This is a left rotate. <i>— end note</i>]
+<p>3․ <i>Returns:</i>
+
+* `first + (last - middle)` for the overloads in namespace `std`.
+* `{first + (last - middle), last}` for the overload in namespace `ranges`.
+
+<p>4․ <i>Complexity:</i> <del>At most `last - first` swaps.</del> <ins>Linear in `last - first`.</ins>
+</blockquote></small>
+
+`std::rotate`'s previous wording was defined in terms of "swaps." Look at the specification for `std::swap`
+(<a href="https://eel.is/c++draft/utility.swap">[utility.swap]</a>):
+
+<small><blockquote>
+<pre>
+template&lt;class T>
+  constexpr void swap(T& a, T& b) noexcept(<i>see below</i>);
+</pre>
+<p>1․ <i>Constraints:</i> `is_move_constructible_v<T>` is `true` and `is_move_assignable_v<T>` is `true`.
+<p>2․ <i>Preconditions:</i> Type `T` meets the *Cpp17MoveConstructible* (Table 31) and *Cpp17MoveAssignable* (Table 33) requirements.
+<p>3․ <i>Effects:</i> Exchanges values stored in two locations.
+<p>4․ <i>Remarks:</i> The exception specification is equivalent to:
+`is_nothrow_move_constructible_v<T> && is_nothrow_move_assignable_v<T>`.
+</blockquote></small>
+
+Here the status quo is sufficiently loose to permit an efficient implementation by means of relocation,
+and in fact Arthur's libc++ fork does exactly that
+([source](https://github.com/Quuxplusone/llvm-project/blob/trivially-relocatable-v88/libcxx/include/__utility/swap.h#L67-L86),
+[Godbolt](https://godbolt.org/z/EWzKqq5s3)). The following code omits details such as `std::is_constant_evaluated()`
+which are present in the actual library.
+
+```c++
+    void swap(T& a, T& b)
+        noexcept(is_nothrow_move_constructible_v<T> && is_nothrow_move_assignable_v<T>)
+    {
+        if constexpr (std::is_trivially_relocatable_v<T>) {
+            __builtin_memswap(&a, &b, __datasizeof(T));
+        } else {
+            T temp = std::move(a);
+            a = std::move(b);
+            b = std::move(temp);
+        }
+    }
+```
+
+As [the above Godbolt](https://godbolt.org/z/EWzKqq5s3) shows,
+trivial relocation is an "infinitely valuable optimization"
+in the same sense as C++11 move semantics. For the following type `S`,
+mainline libc++ compiles `std::swap` into 74 lines of assembly;
+Arthur's P1144 fork of libc++ compiles it into 18 lines.
+
+    struct S {
+        S();
+        std::unique_ptr<int> p;
+        std::shared_ptr<int> q;
+        bool b;
+    };
+
+    void test(S& a, S& b) {
+        std::swap(a, b);
+    }
+
+This propagates back up the call-stack as high as we're willing to let it propagate.
+Arthur's libc++ effectively applies this paper P3055's proposed wording already,
+permitting `rotate` to be implemented in terms of `swap` and `erase` to be implemented
+in terms of `rotate`.
+
+<table>
+<tr><th>Operation</th><th>Mainline libc++ LOC</th><th>P1144 libc++ LOC</th></tr>
+<tr><td><a href="https://godbolt.org/z/EWzKqq5s3"><pre>std::swap(S&, S&)</pre></a></td><td>74</td><td>18</td></tr>
+<tr><td><a href="https://godbolt.org/z/7cs1WrvjP"><pre>std::rotate(S*, S*, S*)</pre></a></td><td>145</td><td>122</td></tr>
+<tr><td><a href="https://godbolt.org/z/E5vobhhd1"><pre>vector&lt;S>::erase(it)</pre></a></td><td>108</td><td>39</td></tr>
+</table>
+
+# Breakage of existing code # {#breakage}
+
+Since the proposed wording is looser than the existing wording, all vendors already conform to it by definition;
+we're not asking any vendor to change their implementation for C++26. However, a vendor who takes advantage of
+the new freedom may change the behavior of certain algorithms and containers for non-regular types.
+Following [[P2959]], we'll use `tuple<int&>` as our canonical example. `tuple<int&>` assigns-through on
+assignment and swap; it never rebinds (except on initial construction). This is the polar opposite of
+`reference_wrapper<int>`, which rebinds on assignment and swap, and never assigns-through. In P1144's
+terminology, `reference_wrapper<int>` is trivially relocatable and `tuple<int&>` is not trivially relocatable.
+([Godbolt.](https://godbolt.org/z/4nqY1GTrx))
+
+Recall that `swap` is already loosely specified — it "exchanges the values"  of its arguments — so
+our proposal leaves the following example untouched:
+
+```c++
+    int i = 1, j = 2;
+    std::tuple<int&> a = {i}, b = {j};
+    std::swap(a, b);
+    assert(i == 2 && j == 1);
+```
+
+`std::rotate`'s <i>Effects</i> are specified via the phrase "places the element from position *x* into position *y*";
+its semantics are coupled to `swap` only through the phrase "At most *n* swaps" in the <i>Complexity</i> element,
+which we propose to remove. After that change, a vendor might reasonably construe that this old behavior...
+
+```c++
+    int a[3] = {1,2,3};
+    std::tuple<int&> ts[3] = {{a[0]}, {a[1]}, {a[2]}};
+    std::rotate(ts, ts+1, ts+3);
+    assert(a[0] == 2 && a[1] == 3 && a[2] == 1);
+```
+
+...was no longer strictly mandated. They might choose to rotate the `tuple<int&>`s as-if-by relocation, rebinding
+each `tuple<int&>` and leaving the array `a` untouched. (However, Arthur's libc++ doesn't change this behavior,
+because Arthur's libc++ optimizes only trivially relocatable types, and `tuple<int&>` is not trivially relocatable.)
+
+Consider `vector::erase`, whose semantics are coupled to `operator=` only through wording in its <i>Complexity</i> element
+which we propose to remove. After that change, a vendor might reasonably construe that this old behavior...
+
+```c++
+    int a[3] = {1,2,3};
+    std::vector<std::tuple<int&>> ts = {{a[0]}, {a[1]}, {a[2]}};
+    ts.erase(ts.begin());
+    assert(a[0] == 2 && a[1] == 3 && a[2] == 3);
+```
+
+...was no longer strictly mandated. They might choose to "erase the element pointed to"
+(<a href="https://eel.is/c++draft/sequence.reqmts#47">[sequence.reqmts]/47</a>) as-if-by relocation,
+rebinding each `tuple<int&>` and leaving the array `a` untouched. As [[P2959]] points out, this is
+exactly what happens anyway if you switch out `vector` for `list`. (Again, Arthur's libc++ doesn't change
+this behavior, because `tuple<int&>` is not trivially relocatable; but we certainly have no desire to
+continue mandating this behavior.)
+
+
+# Implementation experience # {#experience}
+
+Since the proposed wording is looser than the existing wording, all vendors already conform to it
+by definition; we're not asking any vendor to change their implementation for C++26.
+
+Arthur has implemented trivial-relocation optimizations in his fork of libc++, and used it to compile
+both LLVM/Clang/libc++ and another large C++17 codebase. No problems were found (naturally).
+
+
+# Proposed wording # {#wording}
+
+Note: We're trying to eliminate places where the <i>Effects</i> and <i>Complexity</i> elements specifically mention
+assignment. We don't mind e.g. when [deque.modifiers] specifies that `push_back` "causes a single call to a constructor of `T`,"
+because that's still correct even if we're optimizing trivially relocatable types. We don't even mind when
+[vector.modifiers] specifies that `erase` calls `T`'s destructor "the number of times equal to the number of the elements erased,"
+because of course it does; but we propose to remove that sentence anyway because it is redundant. We also don't
+mind when an operation says "<i>Throws:</i> Nothing unless an exception is thrown from the assignment operator
+of `T`," because our new trivial-relocation "happy path" will never throw. Such a <i>Throws</i> element continues
+to describe the circumstances under which the operation <i>might</i> throw. We never propose to loosen any
+<i>Throws</i> element.
+
+ 
+## [vector.modifiers] ## {#wording-vector.modifiers}
+
+Modify <a href="https://eel.is/c++draft/vector.modifiers">[vector.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+constexpr iterator insert(const_iterator position, const T& x);
+constexpr iterator insert(const_iterator position, T&& x);
+constexpr iterator insert(const_iterator position, size_type n, const T& x);
+template&lt;class InputIterator>
+  constexpr iterator insert(const_iterator position, InputIterator first, InputIterator last);
+template&lt;<i>container-compatible-range</i>&lt;T> R>
+  constexpr iterator insert_range(const_iterator position, R&& rg);
+constexpr iterator insert(const_iterator position, initializer_list&lt;T>);
+
+template&lt;class... Args> constexpr reference emplace_back(Args&&... args);
+template&lt;class... Args> constexpr iterator emplace(const_iterator position, Args&&... args);
+constexpr void push_back(const T& x);
+constexpr void push_back(T&& x);
+template&lt;<i>container-compatible-range</i>&lt;T> R>
+  constexpr void append_range(R&& rg);
+</pre>
+<p>1. <i>Complexity:</i> If reallocation happens, linear in the number of elements of the resulting vector;
+otherwise, linear in the number of elements inserted plus the distance to the end of the vector.
+<p>2. *Remarks:* Causes reallocation if the new size is greater than the old capacity. Reallocation invalidates
+all the references, pointers, and iterators referring to the elements in the sequence, as well as the past-the-end iterator.
+If no reallocation happens, then references, pointers, and iterators before the insertion point remain valid but those at
+or after the insertion point, including the past-the-end iterator, are invalidated. If an exception is thrown other than
+by the copy constructor, move constructor, assignment operator, or move assignment operator of `T` or by any `InputIterator`
+operation there are no effects. If an exception is thrown while inserting a single element at the end and `T` is
+*Cpp17CopyInsertable* or `is_nothrow_move_constructible_v<T>` is `true`, there are no effects.
+Otherwise, if an exception is thrown by the move constructor of a non-<i>Cpp17CopyInsertable</i> `T`, the effects are unspecified.
+
+<pre>
+constexpr iterator erase(const_iterator position);
+constexpr iterator erase(const_iterator first, const_iterator last);
+constexpr void pop_back();
+</pre>
+<p>3. *Effects:* Invalidates iterators and references at or after the point of the erase.
+<p>4. *Throws:* Nothing unless an exception is thrown by the assignment operator or move assignment operator of `T`.
+<p>5. *Complexity:* <del>The destructor of `T` is called the number of times equal to the number of the elements erased,
+but the assignment operator of `T` is called the number of times equal to the number of elements in the vector after
+the erased elements.</del> <ins>Linear in the number of elements after the first erased element in the original vector.</ins>
+</blockquote></small>
+
+## [deque.modifiers] ## {#wording-deque.modifiers}
+
+Modify <a href="https://eel.is/c++draft/deque.modifiers">[deque.modifiers]</a> as follows:
+
+<small><blockquote>
+<pre>
+iterator insert(const_iterator position, const T& x);
+iterator insert(const_iterator position, T&& x);
+iterator insert(const_iterator position, size_type n, const T& x);
+template&lt;class InputIterator>
+  iterator insert(const_iterator position,
+                  InputIterator first, InputIterator last);
+template&lt;<i>container-compatible-range</i>&lt;T> R>
+  iterator insert_range(const_iterator position, R&& rg);
+iterator insert(const_iterator position, initializer_list&lt;T>);
+
+template&lt;class... Args> reference emplace_front(Args&&... args);
+template&lt;class... Args> reference emplace_back(Args&&... args);
+template&lt;class... Args> iterator emplace(const_iterator position, Args&&... args);
+void push_front(const T& x);
+void push_front(T&& x);
+template&lt;<i>container-compatible-range</i>&lt;T> R>
+  void prepend_range(R&& rg);
+void push_back(const T& x);
+void push_back(T&& x);
+template&lt;<i>container-compatible-range</i>&lt;T> R>
+  void append_range(R&& rg);
+</pre>
+<p>1. <i>Effects:</i> An insertion in the middle of the deque invalidates all the iterators and references to elements of the deque.
+An insertion at either end of the deque invalidates all the iterators to the deque, but has no effect on the validity of references to elements of the deque.
+<p>2. <i>Complexity:</i> <del>The complexity is linear</del> <ins>Linear</ins> in the number of elements inserted plus the lesser of the distances
+to the beginning and end of the deque. Inserting a single element at either the beginning or end of a deque always takes constant time
+and causes a single call to a constructor of `T`.
+<p>3. <i>Remarks:</i> If an exception is thrown other than by the copy constructor, move constructor, assignment operator, or move assignment operator of `T`
+there are no effects. If an exception is thrown while inserting a single element at either end, there are no effects. Otherwise, if an exception is thrown
+by the move constructor of a non-<i>Cpp17CopyInsertable</i> `T`, the effects are unspecified.
+
+<pre>
+iterator erase(const_iterator position);
+iterator erase(const_iterator first, const_iterator last);
+void pop_front();
+void pop_back();
+</pre>
+<p>4. <i>Effects:</i> An erase operation that erases the last element of a deque invalidates only the past-the-end iterator
+and all iterators and references to the erased elements. An erase operation that erases the first element of a deque but not
+the last element invalidates only iterators and references to the erased elements. An erase operation that erases neither the
+first element nor the last element of a deque invalidates the past-the-end iterator and all iterators and references to all the elements of the deque.
+[<i>Note:</i> `pop_front` and `pop_back` are erase operations. <i>— end note</i>]
+<p>5. <i>Throws:</i> Nothing unless an exception is thrown by the assignment operator of `T`.
+<p>6. <i>Complexity:</i> <del>The number of calls to the destructor of `T` is the same as the number of elements erased,
+but the number of calls to the assignment operator of `T` is no more than the lesser of the number of elements before the erased elements
+and the number of elements after the erased elements.</del> <ins>Linear in the lesser of the number of elements after the first erased element
+and the number of elements before the last erased element in the original deque.</ins>
+</blockquote></small>
+
+## [alg.rotate] ## {#wording-alg.rotate}
+
+Modify <a href="https://eel.is/c++draft/alg.rotate">[alg.rotate]</a> as follows:
+
+<small><blockquote>
+<pre>
+template&lt;class ForwardIterator>
+  constexpr ForwardIterator
+    rotate(ForwardIterator first, ForwardIterator middle, ForwardIterator last);
+template&lt;class ExecutionPolicy, class ForwardIterator>
+  ForwardIterator
+    rotate(ExecutionPolicy&& exec,
+           ForwardIterator first, ForwardIterator middle, ForwardIterator last);
+template&lt;permutable I, sentinel_for&lt;I> S>
+  constexpr subrange&lt;I> ranges::rotate(I first, I middle, S last);
+</pre>
+<p>1. <i>Preconditions:</i> `[first, middle)` and `[middle, last)` are valid ranges. For the overloads in namespace `std`,
+`ForwardIterator` meets the Cpp17ValueSwappable requirements ([swappable.requirements]), and the type of `*first` meets
+the *Cpp17MoveConstructible* (Table 31) and *Cpp17MoveAssignable* (Table 33) requirements.
+<p>2. <i>Effects:</i> For each non-negative integer `i < (last - first)`, places the element from the position `first + i` into
+position `first + (i + (last - middle)) % (last - first)`. [<i>Note:</i> This is a left rotate. <i>— end note</i>]
+<p>3. Returns:
+
+* `first + (last - middle)` for the overloads in namespace `std`.
+* `{first + (last - middle), last}` for the overload in namespace `ranges`.
+
+<p>4. <i>Complexity:</i> <del>At most `last - first` swaps.</del> <ins>Linear in `last - first`.</ins>
+</blockquote></small>
+
+## [utility.swap] (unchanged) ## {#wording-utility.swap}
+
+<a href="https://eel.is/c++draft/utility.swap">[utility.swap]</a> does not seem to require any changes:
+
+<small><blockquote>
+<pre>
+template&lt;class T>
+  constexpr void swap(T& a, T& b) noexcept(<i>see below</i>);
+</pre>
+<p>1. <i>Constraints:</i> `is_move_constructible_v<T>` is `true` and `is_move_assignable_v<T>` is `true`.
+<p>2. <i>Preconditions:</i> Type `T` meets the *Cpp17MoveConstructible* (Table 31) and *Cpp17MoveAssignable* (Table 33) requirements.
+<p>3. <i>Effects:</i> Exchanges values stored in two locations.
+<p>4. <i>Remarks:</i> The exception specification is equivalent to:
+`is_nothrow_move_constructible_v<T> && is_nothrow_move_assignable_v<T>`
+
+<pre>
+template&lt;class T, size_t N>
+  constexpr void swap(T (&a)\[N], T (&b)\[N]) noexcept(is_nothrow_swappable_v&lt;T>);
+</pre>
+<p>5. <i>Constraints:</i> `is_swappable_v<T>` is `true`.
+<p>6. <i>Preconditions:</i> `a[i]` is swappable with ([swappable.requirements]) `b[i]` for all `i` in the range `[0, N)`.
+<p>7. <i>Effects:</i> As if by `swap_ranges(a, a + N, b)`.
+</blockquote></small>
+
+## [alg.swap] ## {#wording-alg.swap}
+
+Modify <a href="https://eel.is/c++draft/alg.swap">[alg.swap]</a> as follows:
+
+<small><blockquote>
+<pre>
+template&lt;class ForwardIterator1, class ForwardIterator2>
+  constexpr ForwardIterator2
+    swap_ranges(ForwardIterator1 first1, ForwardIterator1 last1,
+                ForwardIterator2 first2);
+template&lt;class ExecutionPolicy, class ForwardIterator1, class ForwardIterator2>
+  ForwardIterator2
+    swap_ranges(ExecutionPolicy&& exec,
+                ForwardIterator1 first1, ForwardIterator1 last1,
+                ForwardIterator2 first2);
+
+template&lt;input_iterator I1, sentinel_for&lt;I1> S1, input_iterator I2, sentinel_for&lt;I2> S2>
+  requires indirectly_swappable&lt;I1, I2>
+  constexpr ranges::swap_ranges_result&lt;I1, I2>
+    ranges::swap_ranges(I1 first1, S1 last1, I2 first2, S2 last2);
+template&lt;input_range R1, input_range R2>
+  requires indirectly_swappable&lt;iterator_t&lt;R1>, iterator_t&lt;R2>>
+  constexpr ranges::swap_ranges_result&lt;borrowed_iterator_t&lt;R1>, borrowed_iterator_t&lt;R2>>
+    ranges::swap_ranges(R1&& r1, R2&& r2);
+</pre>
+<p>1. Let:
+
+- `last2` be `first2 + (last1 - first1)` for the overloads with no parameter named `last2`;
+- *M* be `min(last1 - first1,  last2 - first2)`.
+
+<p>2. <i>Preconditions:</i> The two ranges `[first1, last1)` and `[first2, last2)` do not overlap.
+For the overloads in namespace `std`, `*(first1 + n)` is swappable with ([swappable.requirements]) `*(first2 + n)` <ins>for all `n` in the range `[0, M)`</ins>.
+<p>3. <i>Effects:</i> For each non-negative integer *n* &lt; *M* <del>performs</del> :
+
+- <del>`swap(*(first1 + n), *(first2 + n))`</del> <ins>exchanges the values of `*(first1 + n)` and `*(first2 + n)`</ins> for the overloads in namespace `std`;
+- <ins>performs</ins> `ranges::iter_swap(first1 + n, first2 + n)` for the overloads in namespace `ranges`.
+
+<p>4. <i>Returns:</i>
+
+- `last2` for the overloads in namespace `std`.
+- `{first1 + M, first2 + M}` for the overloads in namespace `ranges`.
+
+<p>5. <i>Complexity:</i> Exactly *M* swaps.
+</blockquote></small>
+
+<pre class=biblio>
+{
+  "P1144": {
+    "title": "std::is_trivially_relocatable",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r9.html",
+    "date": "October 2023"
+  },
+  "P2785": {
+    "title": "Relocating prvalues",
+    "authors": [
+      "Sébastien Bini",
+      "Ed Catmur"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2785r3.html",
+    "date": "June 2023"
+  },
+  "P2786": {
+    "title": "Trivial relocatability for C++26",
+    "authors": [
+      "Mungo Gill",
+      "Alisdair Meredith"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r3.pdf",
+    "date": "October 2023"
+  },
+  "P2839": {
+    "title": "Non-trivial relocation via a new owning reference type",
+    "authors": [
+      "Brian Bi",
+      "Joshua Berne"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2839r0.html",
+    "date": "May 2023"
+  },
+  "P2959": {
+    "title": "Relocation within containers",
+    "authors": [
+      "Alisdair Meredith"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2959r0.html",
+    "date": "October 2023"
+  },
+  "P2967": {
+    "title": "Relocation has a library interface",
+    "authors": [
+      "Alisdair Meredith"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2967r0.pdf",
+    "date": "October 2023"
+  }
+}
+</pre>
