@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D1144R9: std::is_trivially_relocatable</title>
+  <title>D1144R10: std::is_trivially_relocatable</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -2146,8 +2146,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D1144R9<br>std::is_trivially_relocatable</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-10-12">2023-10-12</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D1144R10<br>std::is_trivially_relocatable</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-11-20">2023-11-20</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Issue Tracking:
@@ -2159,7 +2159,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>54
+     <dd>55
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2172,7 +2172,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   For many C++ types, this is implementable "trivially," as a single <code class="highlight"><c- n>memcpy</c-></code>.
   We propose a standard trait so library writers can detect such types.
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
-  Finally, we propose a standard syntax for a user-defined type (e.g. <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>movelib</c-><c- o>::</c-><c- n>unique_ptr</c-></code>) to warrant
+  Finally, we propose a standard syntax for a user-defined type (e.g. <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>container</c-><c- o>::</c-><c- n>static_vector</c-></code>) to warrant
   to the implementation that it is trivially relocatable.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
@@ -2255,6 +2255,12 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <main>
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
+    <li data-md>
+     <p>R10:</p>
+     <ul>
+      <li data-md>
+       <p>Added implementation experience with <a data-link-type="biblio" href="#biblio-hpx" title="Relocation Semantics in the HPX Library">[HPX]</a>, <a data-link-type="biblio" href="#biblio-parlaylib" title="ParlayLib, a toolkit for programming parallel algorithms on shared-memory multicore machines">[ParlayLib]</a>, and <a data-link-type="biblio" href="#biblio-stdxerror" title="Implementation of std::error as proposed by Herb Sutter in P0709R0">[StdxError]</a>.</p>
+     </ul>
     <li data-md>
      <p>R9 (pre-Kona 2023):</p>
      <ul>
@@ -2425,6 +2431,8 @@ in <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rotate</c-></code> w
    <p>Some data structures might reasonably assert the trivial relocatability of
 their elements, just as they sometimes assert the stronger property of trivial <em>copyability</em> today.
 This might help them guarantee reasonable performance, or guarantee exception-safety.</p>
+   <p>For an example of how <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable</c-></code> is being used this way in practice,
+see <a data-link-type="biblio" href="#biblio-stdxerror" title="Implementation of std::error as proposed by Herb Sutter in P0709R0">[StdxError]</a>.</p>
    <h3 class="heading settled" data-level="2.3" id="doing-it-wrong"><span class="secno">2.3. </span><span class="content">Eliminate manual warrants, improve safety</span><a class="self-link" href="#doing-it-wrong"></a></h3>
    <p>Many real-world codebases contain templates which require
 trivial relocatability of their template parameters, but cannot today <em>verify</em> trivial relocatability. For example, until 2012 <a data-link-type="biblio" href="#biblio-folly" title="Folly documentation on &quot;Object Relocation&quot;">[Folly]</a> <a href="https://github.com/facebook/folly/blob/93b0f543f20b8ef3a4c1e34591370011e2dc7168/folly/FBVector.h#L337-L348">required</a> the programmer to warrant the trivial relocatability of any type stored in a <code class="highlight"><c- n>folly</c-><c- o>::</c-><c- n>fbvector</c-></code>:</p>
@@ -2462,11 +2470,11 @@ can even find real bugs. <a href="https://p1144.godbolt.org/z/7b8893sjr">Example
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Gadget</c-><c- o>></c-><c- p>);</c->  <c- c1>// correctly ERRORS</c->
 </pre>
-   <p>The improvement in user experience and safety in real-world codebases (<a data-link-type="biblio" href="#biblio-folly" title="Folly documentation on &quot;Object Relocation&quot;">[Folly]</a>, <a data-link-type="biblio" href="#biblio-bsl" title="bslmf::IsBitwiseMoveable: bitwise moveable trait metafunction">[BSL]</a>, <a data-link-type="biblio" href="#biblio-qt" title="Qt Base">[Qt]</a>, <a data-link-type="biblio" href="#biblio-hpx" title="Relocation Semantics in the HPX Library">[HPX]</a>, etc.)
+   <p>The improvement in user experience and safety in real-world codebases (<a data-link-type="biblio" href="#biblio-folly" title="Folly documentation on &quot;Object Relocation&quot;">[Folly]</a>, <a data-link-type="biblio" href="#biblio-bsl" title="bslmf::IsBitwiseMoveable: bitwise moveable trait metafunction">[BSL]</a>, <a data-link-type="biblio" href="#biblio-qt" title="Qt Base">[Qt]</a>, <a data-link-type="biblio" href="#biblio-hpx" title="Relocation Semantics in the HPX Library">[HPX]</a>, <a data-link-type="biblio" href="#biblio-parlaylib" title="ParlayLib, a toolkit for programming parallel algorithms on shared-memory multicore machines">[ParlayLib]</a>, etc.)
 is the most important benefit to be gained by this proposal.</p>
    <h2 class="heading settled" data-level="3" id="design-goals"><span class="secno">3. </span><span class="content">Design goals</span><a class="self-link" href="#design-goals"></a></h2>
    <p>For the former, longer, contents of this section, see <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r7.html#design-goals">P1144R7 §3</a>.</p>
-   <p>Briefly: We want to support all five of the following use-cases (<a href="https://godbolt.org/z/4WGq7ddWh">Godbolt</a>).</p>
+   <p>Briefly: We want to support all five of the following use-cases (<a href="https://godbolt.org/z/6Mfb1sfnY">Godbolt</a>).</p>
 <pre class="language-c++ highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>);</c-> <c- c1>// #1</c->
 
 <c- k>struct</c-> <c- nc>RuleOfZero</c-> <c- p>{</c-> <c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>p_</c-><c- p>;</c-> <c- p>};</c->
@@ -2480,8 +2488,8 @@ is the most important benefit to be gained by this proposal.</p>
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>RuleOf3</c-><c- o>></c-><c- p>);</c-> <c- c1>// #3</c->
 
 <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>Wrap0</c-> <c- p>{</c->
-    <c- n>boost</c-><c- o>::</c-><c- n>movelib</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>p_</c-><c- p>;</c->
-    <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>decltype</c-><c- p>(</c-><c- n>p_</c-><c- p>)</c-><c- o>></c-><c- p>);</c->
+    <c- n>boost</c-><c- o>::</c-><c- n>container</c-><c- o>::</c-><c- n>static_vector</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- mi>10</c-><c- o>></c-> <c- n>v_</c-><c- p>;</c->
+    <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>decltype</c-><c- p>(</c-><c- n>v_</c-><c- p>)</c-><c- o>></c-><c- p>);</c->
         <c- c1>// it’s not annotated, but we know it’s actually trivial</c->
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Wrap0</c-><c- o>></c-><c- p>);</c-> <c- c1>// #4</c->
@@ -2970,12 +2978,14 @@ all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. S
    <p><a href="https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable">Arthur’s fork of libc++</a> implements
 all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. See it in action <a href="https://p1144.godbolt.org/z/jf67zx5hq">on godbolt.org</a>, under the name "x86-64 clang (experimental P1144)."
 (<a href="https://p1144.godbolt.org/z/t28saC">Here</a> is another example showing P1144’s interaction with fancy allocators.)</p>
+   <p>Since October 2020, Carnegie Mellon’s ParlayLib implements <code class="highlight"><c- n>uninitialized_relocate</c-><c- p>{,</c-><c- n>_n</c-><c- p>}</c-></code> in the <code class="highlight"><c- n>parlay</c-></code> namespace.
+See <a data-link-type="biblio" href="#biblio-parlaylib" title="ParlayLib, a toolkit for programming parallel algorithms on shared-memory multicore machines">[ParlayLib]</a>.</p>
    <p>Since September 2023, Stellar HPX implements <code class="highlight"><c- n>relocate_at</c-></code> and <code class="highlight"><c- n>uninitialized_relocate</c-><c- p>{,</c-><c- n>_n</c-><c- p>}</c-></code> in the <code class="highlight"><c- n>hpx</c-><c- o>::</c-><c- n>experimental</c-></code> namespace. This was a GSoC project. See <a data-link-type="biblio" href="#biblio-hpx" title="Relocation Semantics in the HPX Library">[HPX]</a>.</p>
    <p><a data-link-type="biblio" href="#biblio-qt" title="Qt Base">[Qt]</a> implements <code class="highlight"><c- n>q_uninitialized_relocate_n</c-></code> in the <code class="highlight"><c- n>QtPrivate</c-></code> namespace, but (unlike P1144’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate_n</c-></code>)
 does not support overlap; it optimizes to <code class="highlight"><c- n>memcpy</c-></code>. Qt also provides <code class="highlight"><c- n>q_relocate_overlap_n</c-></code>, which optimizes to <code class="highlight"><c- n>memmove</c-></code>.</p>
    <p>Since November 2018, libstdc++ optimizes <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>reserve</c-></code> for types that manually specialize <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>__is_bitwise_relocatable</c-></code>.
 (<a href="https://godbolt.org/z/f7971hEcG">Godbolt.</a>)
-As of October 2023, the only libstdc++ library type for which <code class="highlight"><c- n>__is_bitwise_relocatable</c-></code> has
+As of November 2023, the only libstdc++ library type for which <code class="highlight"><c- n>__is_bitwise_relocatable</c-></code> has
 been specialized is <code class="highlight"><c- n>deque</c-></code>. See <a data-link-type="biblio" href="#biblio-deque" title="Improve relocation ... (__is_trivially_relocatable): Specialize for deque">[Deque]</a>.</p>
    <p><a data-link-type="biblio" href="#biblio-hpx" title="Relocation Semantics in the HPX Library">[HPX]</a>, <a data-link-type="biblio" href="#biblio-qt" title="Qt Base">[Qt]</a>, <a data-link-type="biblio" href="#biblio-folly" title="Folly documentation on &quot;Object Relocation&quot;">[Folly]</a>, and <a data-link-type="biblio" href="#biblio-bsl" title="bslmf::IsBitwiseMoveable: bitwise moveable trait metafunction">[BSL]</a> all provide "type traits" that are intended
 to be manually specialized by the client programmer.</p>
@@ -3170,12 +3180,16 @@ to be manually specialized by the client programmer.</p>
    <dd>Mungo Gill; Alisdair Meredith. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r2.pdf"><cite>Trivial relocatability options</cite></a>. June 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r2.pdf">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r2.pdf</a>
    <dt id="biblio-p2814r1">[P2814R1]
    <dd>Mungo Gill; Alisdair Meredith. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2814r1.pdf"><cite>Trivial relocatability — comparing P2786 with P1144</cite></a>. May 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2814r1.pdf">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2814r1.pdf</a>
+   <dt id="biblio-parlaylib">[ParlayLib]
+   <dd>Daniel Anderson; Guy Blelloch. <a href="https://github.com/cmuparlay/parlaylib/blob/4579f39/include/parlay/relocation.h"><cite>ParlayLib, a toolkit for programming parallel algorithms on shared-memory multicore machines</cite></a>. October 2020. URL: <a href="https://github.com/cmuparlay/parlaylib/blob/4579f39/include/parlay/relocation.h">https://github.com/cmuparlay/parlaylib/blob/4579f39/include/parlay/relocation.h</a>
    <dt id="biblio-polymorphic">[Polymorphic]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2023/06/24/polymorphic-types-arent-trivially-relocatable/"><cite>Polymorphic types aren't trivially relocatable</cite></a>. June 2023. URL: <a href="https://quuxplusone.github.io/blog/2023/06/24/polymorphic-types-arent-trivially-relocatable/">https://quuxplusone.github.io/blog/2023/06/24/polymorphic-types-arent-trivially-relocatable/</a>
    <dt id="biblio-qt">[Qt]
    <dd><a href="https://github.com/qt/qtbase/"><cite>Qt Base</cite></a>. February 2023. URL: <a href="https://github.com/qt/qtbase/">https://github.com/qt/qtbase/</a>
    <dt id="biblio-stdrelocateiscute">[StdRelocateIsCute]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2022/05/18/std-relocate/"><cite>std::relocate's implementation is cute</cite></a>. May 2022. URL: <a href="https://quuxplusone.github.io/blog/2022/05/18/std-relocate/">https://quuxplusone.github.io/blog/2022/05/18/std-relocate/</a>
+   <dt id="biblio-stdxerror">[StdxError]
+   <dd>Charles Salvia. <a href="https://github.com/charles-salvia/std_error/"><cite>Implementation of std::error as proposed by Herb Sutter in P0709R0</cite></a>. October 2023. URL: <a href="https://github.com/charles-salvia/std_error/">https://github.com/charles-salvia/std_error/</a>
    <dt id="biblio-subobjects">[Subobjects]
    <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/"><cite>When is a trivially copyable object not trivially copyable?</cite></a>. July 2018. URL: <a href="https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/">https://quuxplusone.github.io/blog/2018/07/13/trivially-copyable-corner-cases/</a>
    <dt id="biblio-subspace">[Subspace]
