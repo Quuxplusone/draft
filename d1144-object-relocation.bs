@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: std::is_trivially_relocatable
 Shortname: D1144
-Revision: 9
-!Draft Revision: 54
+Revision: 10
+!Draft Revision: 55
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -14,9 +14,9 @@ Abstract:
   For many C++ types, this is implementable "trivially," as a single <code>memcpy</code>.
   We propose a standard trait so library writers can detect such types.
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
-  Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::movelib::unique_ptr</code>) to warrant
+  Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2023-10-12
+Date: 2023-11-20
 </pre>
 
 <style>
@@ -26,6 +26,10 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 
 # Changelog # {#changelog}
+
+- R10:
+
+    - Added implementation experience with [[HPX]], [[ParlayLib]], and [[StdxError]].
 
 - R9 (pre-Kona 2023):
 
@@ -236,6 +240,9 @@ Some data structures might reasonably assert the trivial relocatability of
 their elements, just as they sometimes assert the stronger property of trivial *copyability* today.
 This might help them guarantee reasonable performance, or guarantee exception-safety.
 
+For an example of how `std::is_trivially_relocatable` is being used this way in practice,
+see [[StdxError]].
+
 
 ## Eliminate manual warrants, improve safety ## {#doing-it-wrong}
 
@@ -290,7 +297,7 @@ can even find real bugs. [Example:](https://p1144.godbolt.org/z/7b8893sjr)
     static_assert(std::is_trivially_relocatable_v<Gadget>);  // correctly ERRORS
 ```
 
-The improvement in user experience and safety in real-world codebases ([[Folly]], [[BSL]], [[Qt]], [[HPX]], etc.)
+The improvement in user experience and safety in real-world codebases ([[Folly]], [[BSL]], [[Qt]], [[HPX]], [[ParlayLib]], etc.)
 is the most important benefit to be gained by this proposal.
 
 # Design goals # {#design-goals}
@@ -298,7 +305,7 @@ is the most important benefit to be gained by this proposal.
 For the former, longer, contents of this section, see
 <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r7.html#design-goals">P1144R7 §3</a>.
 
-Briefly: We want to support all five of the following use-cases ([Godbolt](https://godbolt.org/z/4WGq7ddWh)).
+Briefly: We want to support all five of the following use-cases ([Godbolt](https://godbolt.org/z/6Mfb1sfnY)).
 
 ```c++
     static_assert(std::is_trivially_relocatable_v<std::unique_ptr<int>>); // #1
@@ -314,8 +321,8 @@ Briefly: We want to support all five of the following use-cases ([Godbolt](https
     static_assert(std::is_trivially_relocatable_v<RuleOf3>); // #3
 
     struct [[trivially_relocatable]] Wrap0 {
-        boost::movelib::unique_ptr<int> p_;
-        static_assert(!std::is_trivially_relocatable_v<decltype(p_)>);
+        boost::container::static_vector<int, 10> v_;
+        static_assert(!std::is_trivially_relocatable_v<decltype(v_)>);
             // it's not annotated, but we know it's actually trivial
     };
     static_assert(std::is_trivially_relocatable_v<Wrap0>); // #4
@@ -1039,6 +1046,9 @@ all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. S
 [on godbolt.org](https://p1144.godbolt.org/z/jf67zx5hq), under the name "x86-64 clang (experimental P1144)."
 ([Here](https://p1144.godbolt.org/z/t28saC) is another example showing P1144's interaction with fancy allocators.)
 
+Since October 2020, Carnegie Mellon's ParlayLib implements `uninitialized_relocate{,_n}` in the `parlay` namespace.
+See [[ParlayLib]].
+
 Since September 2023, Stellar HPX implements `relocate_at` and `uninitialized_relocate{,_n}`
 in the `hpx::experimental` namespace. This was a GSoC project. See [[HPX]].
 
@@ -1048,7 +1058,7 @@ does not support overlap; it optimizes to `memcpy`. Qt also provides `q_relocate
 Since November 2018, libstdc++ optimizes `vector::reserve`
 for types that manually specialize `std::__is_bitwise_relocatable`.
 ([Godbolt.](https://godbolt.org/z/f7971hEcG))
-As of October 2023, the only libstdc++ library type for which `__is_bitwise_relocatable` has
+As of November 2023, the only libstdc++ library type for which `__is_bitwise_relocatable` has
 been specialized is `deque`. See [[Deque]].
 
 [[HPX]], [[Qt]], [[Folly]], and [[BSL]] all provide "type traits" that are intended
@@ -1272,6 +1282,15 @@ See [[#applications|table §2.1]] for more details on [[Qt]], [[Folly]], and [[B
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r2.pdf",
     "date": "June 2023"
   },
+  "ParlayLib": {
+    "authors": [
+      "Daniel Anderson",
+      "Guy Blelloch"
+    ],
+    "title": "ParlayLib, a toolkit for programming parallel algorithms on shared-memory multicore machines",
+    "href": "https://github.com/cmuparlay/parlaylib/blob/4579f39/include/parlay/relocation.h",
+    "date": "October 2020"
+  },
   "Polymorphic": {
     "authors": [
       "Arthur O'Dwyer"
@@ -1292,6 +1311,14 @@ See [[#applications|table §2.1]] for more details on [[Qt]], [[Folly]], and [[B
     "title": "std::relocate's implementation is cute",
     "href": "https://quuxplusone.github.io/blog/2022/05/18/std-relocate/",
     "date": "May 2022"
+  },
+  "StdxError": {
+    "authors": [
+      "Charles Salvia"
+    ],
+    "title": "Implementation of std::error as proposed by Herb Sutter in P0709R0",
+    "href": "https://github.com/charles-salvia/std_error/",
+    "date": "October 2023"
   },
   "Subobjects": {
     "authors": [
