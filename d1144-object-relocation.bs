@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 10
-!Draft Revision: 56
+!Draft Revision: 57
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -31,7 +31,8 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
     - Added implementation experience with [[HPX]], [[ParlayLib]], and [[StdxError]].
 
-    - Wording for `ExecutionPolicy` and `ranges` overloads of the specialized algorithms.
+    - Wording for `ExecutionPolicy` overloads of the specialized algorithms. Explain why
+            there are no `ranges` overloads.
 
     - Moved "trivially relocatable class" wording into [class.prop], and increased the similarity
             between `[[trivially_relocatable]]` and `[[no_unique_address]]`.
@@ -701,6 +702,11 @@ Note: Compare to <a href="https://eel.is/c++draft/uninitialized.move">[uninitial
 <a href="https://eel.is/c++draft/alg.copy">[alg.copy]</a>. The <i>Remarks</i> allude to blanket wording
 in <a href="http://eel.is/c++draft/specialized.algorithms#general-2">[specialized.algorithms.general]/2</a>.
 
+Note: I don't propose `ranges::uninitialized_relocate`, because if it worked like `ranges::uninitialized_move`
+then it would take two ranges (of possibly different lengths). On success, it would relocate-out-of only
+`distance(OR)` elements of `IR`; but if an exception were thrown, it would destroy all the elements of `IR`.
+That's a bad contract. Therefore, we omit the `ranges` overloads until someone presents a suitable design.
+
 Modify <a href="http://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:
 
 <small><blockquote>
@@ -775,47 +781,6 @@ Modify <a href="http://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:
                                       <ins>BidirectionalIterator first, BidirectionalIterator last,</ins>
                                       <ins>NoThrowBidirectionalIterator result);</ins>         <ins>// freestanding</ins>
 
-  <ins>namespace ranges {</ins>
-    <ins>template&lt;class I, class O></ins>
-      <ins>using uninitialized_relocate_result = in_out_result&lt;I, O>;</ins>                    <ins>// freestanding</ins>
-    <ins>template&lt;input_iterator I, sentinel_for&lt;I> S1,</ins>
-             <ins><i>nothrow-forward-iterator</i> O, <i>nothrow-sentinel-for</i>&lt;O> S2></ins>
-      <ins>requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>> &&</ins>
-               <ins>destructible&lt;iter_value_t&lt;I>></ins>
-        <ins>uninitialized_relocate_result&lt;I, O></ins>
-          <ins>uninitialized_relocate(I ifirst, S1 ilast, O ofirst, S2 olast);</ins>           <ins>// freestanding</ins>
-    <ins>template&lt;input_range IR, <i>nothrow-forward-range</i> OR></ins>
-      <ins>requires constructible_from&lt;range_value_t&lt;OR>, range_rvalue_reference_t&lt;IR>> &&</ins>
-               <ins>destructible&lt;range_value_t&lt;IR>></ins>
-        <ins>uninitialized_relocate_result&lt;borrowed_iterator_t&lt;IR>, borrowed_iterator_t&lt;OR>></ins>
-          <ins>uninitialized_relocate(IR&& in_range, OR&& out_range);</ins>                    <ins>// freestanding</ins>
-
-    <ins>template&lt;class I, class O></ins>
-      <ins>using uninitialized_relocate_n_result = in_out_result&lt;I, O>;</ins>                  <ins>// freestanding</ins>
-    <ins>template&lt;input_iterator I,</ins>
-             <ins><i>nothrow-forward-iterator</i> O, <i>nothrow-sentinel-for</i>&lt;O> S></ins>
-      <ins>requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>> &&</ins>
-               <ins>destructible&lt;iter_value_t&lt;I>></ins>
-        <ins>uninitialized_relocate_n_result&lt;I, O></ins>
-          <ins>uninitialized_relocate_n(I ifirst, iter_difference_t&lt;I> n,</ins>
-                                   <ins>O ofirst, S olast);</ins>                              <ins>// freestanding</ins>
-
-
-    <ins>template&lt;class I, class O></ins>
-      <ins>using uninitialized_relocate_backward_result = in_out_result&lt;I, O>;</ins>           <ins>// freestanding</ins>
-    <ins>template&lt;bidirectional_iterator I, sentinel_for&lt;I> S1,</ins>
-             <ins><i>nothrow-bidirectional-iterator</i> O></ins>
-      <ins>requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>> &&</ins>
-               <ins>destructible&lt;iter_value_t&lt;I>></ins>
-      <ins>uninitialized_relocate_backward_result&lt;I, O></ins>
-        <ins>uninitialized_relocate_backward(I ifirst, S1 ilast, O ofirst);</ins>              <ins>// freestanding</ins>
-    <ins>template&lt;bidirectional_range IR, <i>nothrow-bidirectional-iterator</i> O></ins>
-      <ins>requires constructible_from&lt;iter_value_t&lt;O>, range_rvalue_reference_t&lt;IR>> &&</ins>
-               <ins>destructible&lt;range_value_t&lt;IR>></ins>
-        <ins>uninitialized_relocate_backward_result&lt;iterator_t&lt;IR>, O></ins>
-          <ins>uninitialized_relocate_backward(R&& r, O ofirst);</ins>                         <ins>// freestanding</ins>
-  <ins>}</ins>
-
   template&lt;class NoThrowForwardIterator, class T>
     void uninitialized_fill(NoThrowForwardIterator first,                           // freestanding
                             NoThrowForwardIterator last, const T& x);
@@ -827,18 +792,17 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
 
 <small><blockquote>
 <b><code>uninitialized_relocate</code> [uninitialized.relocate]</b>
-<xmp>
-  template<class InputIterator, class NoThrowForwardIterator>
+<pre>
+  template&lt;class InputIterator, class NoThrowForwardIterator>
   NoThrowForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,
                                                 NoThrowForwardIterator result);
-</xmp>
-
-1․ *Effects:* Equivalent to:
-<xmp>
+</pre>
+<p>1․ *Effects:* Equivalent to:
+<pre>
   try {
     for (; first != last; ++result, (void)++first) {
-      ::new (voidify(*result))
-        typename iterator_traits<NoThrowForwardIterator>::value_type(std::move(*first));
+      ::new (<i>voidify</i>(*result))
+        typename iterator_traits&lt;NoThrowForwardIterator>::value_type(std::move(*first));
       destroy_at(addressof(*first));
     }
     return result;
@@ -846,42 +810,10 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
     destroy(++first, last);
     throw;
   }
-</xmp>
-except that if the iterators' common value type is trivially relocatable, side effects
-associated with the relocation of the object's value might not happen.
-
-2․ *Remarks:* If an exception is thrown, all objects in both the source and destination
-ranges are destroyed.
-
-<pre>
-  namespace ranges {
-    template&lt;input_iterator I, sentinel_for&lt;I> S1,
-             <i>nothrow-forward-iterator</i> O, <i>nothrow-sentinel-for</i>&lt;O> S2>
-      requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>> &&
-               destructible&lt;iter_value_t&lt;I>>
-      uninitialized_relocate_result&lt;I, O>
-        uninitialized_relocate(I ifirst, S1 ilast, O ofirst, S2 olast);
-    template&lt;input_range IR, <i>nothrow-forward-range</i> OR>
-      requires constructible_from&lt;range_value_t&lt;OR>, range_rvalue_reference_t&lt;IR>> &&
-               destructible&lt;range_value_t&lt;IR>>
-      uninitialized_relocate_result&lt;borrowed_iterator_t&lt;IR>, borrowed_iterator_t&lt;OR>>
-        uninitialized_relocate(IR&& in_range, OR&& out_range);
-}
-</pre>
-
-3․ *Effects:* Equivalent to:
-<pre>
-  for (; ifirst != ilast && ofirst != olast; ++ofirst, (void)++ifirst) {
-    ::new (<i>voidify</i>(*ofirst))
-      remove_reference_t&lt;iter_reference_t&lt;O>>(ranges::iter_move(ifirst));
-    destroy_at(addressof(*first));
-  }
-  return {std::move(ifirst), ofirst};
 </pre>
 except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.
-
-4․ *Remarks:* If an exception is thrown, all objects in both the source and destination
+<p>2․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.
 
 <pre>
@@ -890,11 +822,11 @@ ranges are destroyed.
       uninitialized_relocate_n(InputIterator first, Size n, NoThrowForwardIterator result);
 </pre>
 
-5․ *Effects:* Equivalent to:
+3․ *Effects:* Equivalent to:
 <pre>
   try {
     for (; n > 0; ++result, (void)++first, --n) {
-      ::new (voidify(*result))
+      ::new (<i>voidify</i>(*result))
         typename iterator_traits&lt;NoThrowForwardIterator>::value_type(std::move(*first));
       destroy_at(addressof(*first));
     }
@@ -907,23 +839,23 @@ ranges are destroyed.
 except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.
 
-6․ *Remarks:* If an exception is thrown, all objects in both the source and destination
+4․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.
 
-<xmp>
-  template<class BidirectionalIterator, class NoThrowBidirectionalIterator>
+<pre>
+  template&lt;class BidirectionalIterator, class NoThrowBidirectionalIterator>
     NoThrowBidirectionalIterator
       uninitialized_relocate_backward(BidirectionalIterator first, BidirectionalIterator last,
                                       NoThrowBidirectionalIterator result);
-</xmp>
+</pre>
 
-7․ *Effects:* Equivalent to:
+5․ *Effects:* Equivalent to:
 <pre>
   try {
     for (; last != first; ) {
       --last;
       --result;
-      ::new (voidify(*result))
+      ::new (<i>voidify</i>(*result))
         typename iterator_traits&lt;NoThrowBidirectionalIterator>::value_type(std::move(*last));
       destroy_at(addressof(*last));
     }
@@ -936,7 +868,7 @@ ranges are destroyed.
 except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.
 
-8․ *Remarks:* If an exception is thrown, all objects in both the source and destination
+6․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.
 </blockquote></small>
 
@@ -954,7 +886,7 @@ In Issaquah (February 2023), <a href="https://www.open-std.org/jtc1/sc22/wg21/do
 suggested a very similar design to `[[clang::maybe_trivially_relocatable]]`.
 EWGI took a three-way straw poll on `[[trivially_relocatable]]` versus `[[maybe_trivially_relocatable]]`,
 with an inconclusive 7–5–6 vote (the author of P1144 voting "For" and the three representatives of P2786
-presumably voting "Against").
+voting "Against").
 
 For discussion of `[[maybe_trivially_relocatable]]` and why I don't think it's the right thing
 to standardize, see
@@ -1214,13 +1146,16 @@ Appendix D: Implementation experience {#implementation}
 
 Clang trunk provides a compiler builtin `__is_trivially_relocatable(T)`
 (see [[D114732]]), which is largely the same as the trait proposed in this paper. (There are slight
-differences; [e.g.](https://p1144.godbolt.org/z/bKGo9cKna), Clang incorrectly reports function types and
-reference types as trivially relocatable. This is [Clang bug 67498](https://github.com/llvm/llvm-project/issues/67498).)
+differences; [e.g.](https://p1144.godbolt.org/z/bKGo9cKna), Clang incorrectly reports `volatile` types
+as "trivially copyable but not trivially relocatable" and incorrectly reports types with
+user-provided `operator=` as "trivially relocatable"; see also the recently fixed
+[Clang bug 67498](https://github.com/llvm/llvm-project/issues/67498).)
+
 Clang trunk has no equivalent of the `[[trivially_relocatable]]`
 attribute, so `__is_trivially_relocatable(T)` is true only when `T` is
 trivially copyable or marked with the `[[clang::trivial_abi]]`
 attribute. As of October 2023, Clang trunk has no conception of a type which is non-trivial for purposes of calls
-yet is trivially relocatable. But Clang's current status is compatible with P1144 (modulo the
+yet still trivially relocatable. But Clang's current status is compatible with P1144 (modulo the
 few unintentional differences in `__is_trivially_relocatable` mentioned above).
 
 [Arthur's fork of Clang](https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable) implements
@@ -1234,11 +1169,10 @@ all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. S
 [on godbolt.org](https://p1144.godbolt.org/z/jf67zx5hq), under the name "x86-64 clang (experimental P1144)."
 ([Here](https://p1144.godbolt.org/z/t28saC) is another example showing P1144's interaction with fancy allocators.)
 
-Since October 2020, Carnegie Mellon's ParlayLib implements `uninitialized_relocate{,_n}` in the `parlay` namespace.
-See [[ParlayLib]].
+Since October 2020, Carnegie Mellon's [[ParlayLib]] implements `uninitialized_relocate{,_n}` in the `parlay` namespace.
 
-Since September 2023, Stellar HPX implements `relocate_at` and `uninitialized_relocate{,_n}`
-in the `hpx::experimental` namespace. This was a GSoC project. See [[HPX]].
+Since September 2023, Stellar [[HPX]] implements `relocate_at` and `uninitialized_relocate{,_n}`
+in the `hpx::experimental` namespace. This was a GSoC project.
 
 [[Qt]] implements `q_uninitialized_relocate_n` in the `QtPrivate` namespace, but (unlike P1144's `std::uninitialized_relocate_n`)
 does not support overlap; it optimizes to `memcpy`. Qt also provides `q_relocate_overlap_n`, which optimizes to `memmove`.
@@ -1249,8 +1183,10 @@ for types that manually specialize `std::__is_bitwise_relocatable`.
 As of November 2023, the only libstdc++ library type for which `__is_bitwise_relocatable` has
 been specialized is `deque`. See [[Deque]].
 
-[[HPX]], [[Qt]], [[Folly]], and [[BSL]] all provide "type traits" that are intended
-to be manually specialized by the client programmer.
+[[ParlayLib]], [[HPX]], [[Qt]], [[Folly]], and [[BSL]] all provide "type traits" that are intended
+to be manually specialized by the client programmer. When compiled with a P1144-compliant compiler,
+[[HPX]] and [[ParlayLib]] do not require (in fact, they forbid) the client programmer to specialize
+these type traits.
 
 See [[#applications|table §2.1]] for more details on [[Qt]], [[Folly]], and [[BSL]].
 
