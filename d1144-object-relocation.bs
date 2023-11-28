@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 10
-!Draft Revision: 55
+!Draft Revision: 56
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
   Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2023-11-20
+Date: 2023-11-28
 </pre>
 
 <style>
@@ -30,6 +30,11 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 - R10:
 
     - Added implementation experience with [[HPX]], [[ParlayLib]], and [[StdxError]].
+
+    - Wording for `ExecutionPolicy` and `ranges` overloads of the specialized algorithms.
+
+    - Moved "trivially relocatable class" wording into [class.prop], and increased the similarity
+            between `[[trivially_relocatable]]` and `[[no_unique_address]]`.
 
 - R9 (pre-Kona 2023):
 
@@ -95,7 +100,7 @@ the phrase "<b><i>relocate</i></b> a `T` from `src` to `dst`" means
 
 Any type which is both move-constructible and destructible is <b><i>relocatable</i></b>.
 A type is <b><i>nothrow relocatable</i></b> if its relocation operation is noexcept, and a type
-is <b><i>[$trivially relocatable$]</i></b> if its relocation operation is trivial (which,
+is <b><i>trivially relocatable</i></b> if its relocation operation is trivial (which,
 just like trivial move-construction and trivial copy-construction, means
 "tantamount to `memcpy`").
 
@@ -409,7 +414,7 @@ its relocation constructor. P1144 can't do that, and anyway wants to support `Wr
 
 # Proposed wording for C++26 # {#wording}
 
-The wording in this section is relative to the current working draft ([[!N4958]]).
+The wording in this section is relative to the current working draft.
 
 Note: There is no difficulty in changing the attribute syntax to a contextual-keyword syntax;
 the only downsides are aesthetic. We can defer that decision to the last minute, according
@@ -421,13 +426,13 @@ and `__cpp_impl_three_way_comparison`+`__cpp_lib_three_way_comparison`.
 ## Predefined macro names [cpp.predefined] ## {#wording-cpp.predefined}
 
 Add a feature-test macro to the table in
-<a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:
+<a href="https://eel.is/c++draft/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:
 
 <small><blockquote>
 <pre>
 __cpp_impl_three_way_comparison   201907L
 <ins>__cpp_impl_trivially_relocatable  YYYYMML</ins>
-__cpp_inheriting_constructors     201511L
+__cpp_implicit_move               202207L
 </pre>
 </blockquote></small>
 
@@ -438,98 +443,116 @@ Add a feature-test macro to <a href="https://eel.is/c++draft/version.syn">[versi
 
 <small><blockquote>
 <pre>
-#define __cpp_lib_transparent_operators   201510L // also in &lt;memory>, &lt;functional>
-<ins>#define __cpp_lib_trivially_relocatable   YYYYMML // also in &lt;memory>, &lt;type_traits></ins>
-#define __cpp_lib_tuple_element_t         201402L // also in &lt;tuple>
+#define __cpp_lib_transparent_operators   201510L // freestanding, also in &lt;memory>, &lt;functional>
+<ins>#define __cpp_lib_trivially_relocatable   YYYYMML // freestanding, also in &lt;memory>, &lt;type_traits></ins>
+#define __cpp_lib_tuple_element_t         201402L // freestanding, also in &lt;tuple>
 </pre>
 </blockquote></small>
 
 
 ## Relocation operation [defns.relocation] ## {#wording-defns.relocation}
 
-Add a new section in <a href="http://eel.is/c++draft/definitions">[intro.defs]</a>:
+Add a new section in <a href="http://eel.is/c++draft/intro.defs">[intro.defs]</a>:
 
 <small><blockquote>
-
-: <dfn dfn-type="abstract-op">relocation operation</dfn>
-
-:: the homogeneous binary operation performed by `std::relocate_at`, consisting of a move construction immediately followed by a destruction of the source object
-
+<ins><b>relocation operation [defns.relocation]</b></ins>
+<p>&nbsp; <ins>the homogeneous binary operation performed by `std::relocate_at`,
+consisting of a move construction immediately followed by a destruction of the source object</ins>
 </blockquote></small>
 
+
+## Trivially relocatable class [class.prop] ## {#wording-class.prop}
+
+Note: For the "if supported" wording, compare <a href="https://eel.is/c++draft/dcl.attr.nouniqueaddr#2.sentence-2">[dcl.attr.nouniqueaddr]/2</a>
+and <a href="https://eel.is/c++draft/cpp.cond#5.sentence-1">[cpp.cond]/5</a>.
+
+Modify <a href="http://eel.is/c++draft/class.prop">[class.prop]</a> as follows:
+
+<small><blockquote>
+<p>1․ A <i>trivially copyable class</i> is a class:
+- that has at least one eligible copy constructor, move constructor, copy assignment operator, or move assignment operator ([special], [class.copy.ctor], [class.copy.assign]),
+- where each eligible copy constructor, move constructor, copy assignment operator, and move assignment operator is trivial, and
+- that has a trivial, non-deleted destructor ([class.dtor]).
+
+<p>2․ A <i>trivial class</i> is a class that is trivially copyable and has one or more eligible default constructors ([class.default.ctor]), all of which are trivial.
+[*Note:* In particular, a trivially copyable or trivial class does not have virtual functions or virtual base classes. *— end note*]
+
+<p><ins>x․ A <i>trivially relocatable class</i> is a class:
+- <ins>where no eligible copy constructor, move constructor, copy assignment operator, move assignment operator, or destructor is user-provided,</ins>
+- <ins>which has no virtual member functions or virtual base classes,</ins>
+- <ins>all of whose members are either of reference type or of trivially relocatable type (<a href="#wording-basic.types.general">[basic.types.general]</a>), and</ins>
+- <ins>all of whose base classes are of trivially relocatable type;</ins>
+
+<ins>or a class that is declared with a `trivially_relocatable` attribute with value `true` (<a href="#wording-dcl.attr.trivreloc">[dcl.attr.trivreloc]</a>)
+if that attribute is supported by the implementation ([cpp.cond]).</ins>
+
+<p>3․ A class `S` is a <i>standard-layout class</i> if it: [...]
+</blockquote></small>
 
 ## Trivially relocatable type [basic.types.general] ## {#wording-basic.types.general}
 
 Add a new section in <a href="http://eel.is/c++draft/basic.types.general">[basic.types.general]</a>:
 
 <small><blockquote>
-An object type `T` is a <dfn dfn-type="abstract-op">trivially relocatable</dfn> type if it is:
+9․ Arithmetic types ([basic.fundamental]), enumeration types, pointer types, pointer-to-member types ([basic.compound]),
+`std::nullptr_t`, and <i>cv</i>-qualified versions of these types are collectively called <i>scalar types</i>.
+Scalar types, trivially copyable class types ([class.prop]), arrays of such types, and <i>cv</i>-qualified versions
+of these types are collectively called <i>trivially copyable types</i>.
+Scalar types, trivial class types ([class.prop]), arrays of such types, and <i>cv</i>-qualified versions of these types
+are collectively called <i>trivial types</i>. Scalar types, standard-layout class types ([class.prop]), arrays of such types,
+and <i>cv</i>-qualified versions of these types are collectively called <i>standard-layout types</i>.
+Scalar types, implicit-lifetime class types ([class.prop]), array types, and <i>cv</i>-qualified versions of these types
+are collectively called <i>implicit-lifetime types</i>.
 
-  - a trivially copyable type, or
+<p><ins>x․ Trivially copyable types, trivially relocatable class types ([class.prop]), arrays of such types,
+and <i>cv</i>-qualified versions of these types are collectively called <i>trivially relocatable types</i>.
 
-  - an array of trivially relocatable type, or
+<p><ins>[*Note:* For a trivially relocatable type, the relocation operation ([defns.relocation]) as performed by,
+for example, `std::swap_ranges` or `std::vector::reserve`, is tantamount
+to a simple copy of the underlying bytes. *—end note*]</ins>
 
-  - a (possibly cv-qualified) class type declared with a `trivially_relocatable` attribute
-    with value `true` <a href="#wording-dcl.attr.trivreloc">[dcl.attr.trivreloc]</a>, or
+<p><ins>[*Note:* It is intended that most standard library types be trivially relocatable types. *—end note*]</ins>
 
-  - a (possibly cv-qualified) class type which:
-
-    - has no user-provided move constructors or move assignment operators,
-
-    - has no user-provided copy constructors or copy assignment operators,
-
-    - has no user-provided destructors,
-
-    - has no virtual member functions,
-
-    - has no virtual base classes,
-
-    - all of whose members are either of reference type or of trivially relocatable type, and
-
-    - all of whose base classes are of trivially relocatable type.
-
-[*Note:* For a trivially relocatable type, the [$relocation operation$] (as performed by,
-for example, `std::swap_ranges` or `std::vector::reserve`) is tantamount
-to a simple copy of the underlying bytes. *—end note*]
-
-[*Note:* It is intended that most standard library types be trivially relocatable types. *—end note*]
-
+10․ A type is a <i>literal type</i> if it is: [...]
 </blockquote></small>
-
-Note: Polymorphic types are disallowed from "natural" trivial relocatability (see [[Polymorphic]]).
-Volatile members are not disallowed (see [[Subobjects]]).
 
 
 ## Trivially relocatable attribute [dcl.attr.trivreloc] ## {#wording-dcl.attr.trivreloc}
 
+Note: For the "Recommended practice" wording, compare <a href="https://eel.is/c++draft/dcl.attr.nouniqueaddr#2.sentence-2">[dcl.attr.nouniqueaddr]/2</a>.
+
 Add a new section after <a href="http://eel.is/c++draft/dcl.attr.nouniqueaddr">[dcl.attr.nouniqueaddr]</a>:
 
 <small><blockquote>
-The *attribute-token* `trivially_relocatable` specifies that a class type's relocation operation has no
+<ins>1․ The *attribute-token* `trivially_relocatable` specifies that a class type's relocation operation has no
 visible side-effects other than a copy of the underlying bytes, as if by the library function `std::memcpy`.
 It may be applied to the definition of a class. It shall appear at most once in each *attribute-list*.
-An *attribute-argument-clause* may be present and, if present, shall have the form
-```
-    ( constant-expression )
-```
-The *constant-expression* shall be an integral constant expression of type `bool`.
+An *attribute-argument-clause* may be present and, if present, shall have the form</ins>
+<pre>
+    <ins>( <i>constant-expression</i> )</ins>
+</pre>
+<ins>The *constant-expression* shall be an integral constant expression of type `bool`.
 If no *attribute-argument-clause* is present, it has the same effect as an *attribute-argument-clause*
-of `(true)`.
+of `(true)`.</ins>
 
-If any definition of a class type has a `trivially_relocatable` attribute with value *V*, then each
+<p><ins>2․ If any definition of a class type has a `trivially_relocatable` attribute with value *V*, then each
 definition of the same class type shall have a `trivially_relocatable` attribute with value *V*.
 No diagnostic is required if definitions in different translation units have
-mismatched `trivially_relocatable` attributes.
+mismatched `trivially_relocatable` attributes.</ins>
 
-If a class type is declared with the `trivially_relocatable` attribute, and the program relies on
-observable side-effects of its relocation other than a copy of the underlying bytes, the behavior is undefined.
+<p><ins>3․ If a class type is declared with the `trivially_relocatable` attribute, and the program relies on
+observable side-effects of its relocation other than a copy of the underlying bytes, the behavior is undefined.</ins>
+
+<p><ins>4․ *Recommended practice:* The value of a <i>has-attribute-expression</i> for
+the `trivially_relocatable` attribute should be `0` for a given implementation unless this attribute
+can cause a class type to be trivially relocatable ([class.prop]).</ins>
 </blockquote></small>
 
 
 ### `__has_cpp_attribute` entry [cpp.cond] ### {#wording-cpp.cond}
 
 Add a new entry to the table of supported attributes in
-<a href="https://timsong-cpp.github.io/cppwp/n4861/cpp.predefined#tab:cpp.cond.ha">[cpp.cond]</a>:
+<a href="https://eel.is/c++draft/cpp.cond">[cpp.cond]</a>:
 
 <small><blockquote>
 <pre>
@@ -545,28 +568,29 @@ unlikely              201803L
 Add a new section after <a href="http://eel.is/c++draft/concept.copyconstructible">[concept.copyconstructible]</a>:
 
 <small><blockquote>
-<xmp>
-  template<class T>
-    concept relocatable = move_constructible<T>;
-</xmp>
+<ins><b>`relocatable` concept [concept.relocatable]</b></ins>
 
-If `T` is an object type, then let `rv` be an rvalue of type `T`, `lv` an lvalue of type `T` equal to `rv`,
+<p><pre>
+  <ins>template&lt;class T></ins>
+    <ins>concept relocatable = move_constructible&lt;T>;</ins>
+</pre>
+<p><ins>1․ If `T` is an object type, then let `rv` be an rvalue of type `T`, `lv` an lvalue of type `T` equal to `rv`,
 and `u2` a distinct object of type `T` equal to `rv`.
-`T` models `relocatable` only if
+`T` models `relocatable` only if</ins>
 
-  - After the definition `T u = rv;`, `u` is equal to `u2`.
+  - <ins>After the definition `T u = rv;`, `u` is equal to `u2`.</ins>
 
-  - `T(rv)` is equal to `u2`.
+  - <ins>`T(rv)` is equal to `u2`.</ins>
 
-  - If the expression `u2 = rv` is well-formed, then the expression has the same semantics as
-    `u2.~T(); ::new ((void*)std::addressof(u2)) T(rv);`
+  - <ins>If the expression `u2 = rv` is well-formed, then the expression has the same semantics as
+    `u2.~T(); ::new ((void*)std::addressof(u2)) T(rv);`</ins>
 
-  - If the definition `T u = lv;` is well-formed, then after the definition `u` is equal to `u2`.
+  - <ins>If the definition `T u = lv;` is well-formed, then after the definition `u` is equal to `u2`.</ins>
 
-  - If the expression `T(lv)` is well-formed, then the expression's result is equal to `u2`.
+  - <ins>If the expression `T(lv)` is well-formed, then the expression's result is equal to `u2`.</ins>
 
-  - If the expression `u2 = lv` is well-formed, then the expression has the same semantics as
-    `u2.~T(); ::new ((void*)std::addressof(u2)) T(lv);`
+  - <ins>If the expression `u2 = lv` is well-formed, then the expression has the same semantics as
+    `u2.~T(); ::new ((void*)std::addressof(u2)) T(lv);`</ins>
 
 </blockquote></small>
 
@@ -588,49 +612,57 @@ Add a new entry to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">
 <table>
 <tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr>
 <tr>
-<td>`template<class T> struct is_trivially_relocatable;`</td>
-<td>`T` is a [$trivially relocatable$] type.</td>
+<td>`template<class T> struct is_trivially_copyable;`</td>
+<td>`T` is a trivially copyable type ([basic.types.general])</td>
+<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
+</tr>
+<tr>
+<td><ins>`template<class T> struct is_trivially_relocatable;`</ins></td>
+<td><ins>`T` is a trivially relocatable type (<a href="#wording-basic.types.general">[basic.types.general]</a>)</ins></td>
+<td><ins>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</ins></td>
+</tr>
+<tr>
+<td>`template<class T> struct is_standard_layout;`</td>
+<td>`T` is a standard-layout type ([basic.types.general])</td>
 <td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
 </tr>
 </table>
 </blockquote></small>
 
 
-## `relocate_at` and `relocate` [specialized.relocate] ## {#wording-relocate}
+## `relocate_at` and `relocate` ## {#wording-specialized.relocate}
 
 Add a new section after <a href="http://eel.is/c++draft/specialized.destroy">[specialized.destroy]</a>:
 
 <small><blockquote>
-<xmp>
-  template<class T>
-  T *relocate_at(T* source, T* dest);
-</xmp>
+<ins><b>`relocate` [specialized.relocate]</b></ins>
 
-*Mandates:* `T` is a complete non-array object type.
+<p><pre>
+  <ins>template&lt;class T></ins>
+  <ins>T *relocate_at(T* source, T* dest);</ins>
+</pre>
+<p><ins>1․ *Mandates:* `T` is a complete non-array object type.</ins>
+<p><ins>2․ *Effects:* Equivalent to:</ins>
+<pre>
+  <ins>struct guard { T *t; ~guard() { destroy_at(t); } } g(source);</ins>
+  <ins>return ::new (<i>voidify</i>(*dest)) T(std::move(*source));</ins>
+</pre>
+<ins>except that if `T` is trivially relocatable ([basic.types.general]), side effects
+associated with the relocation of the value of `*source` might not happen.</ins>
 
-*Effects:* Equivalent to:
-<xmp>
-  struct guard { T *t; ~guard() { destroy_at(t); } } g(source);
-  return ::new (voidify(*dest)) T(std::move(*source));
-</xmp>
-except that if `T` is trivially relocatable <i>[basic.types]</i>, side effects
-associated with the relocation of the value of `*source` might not happen.
-
-<xmp>
-  template<class T>
-  [[nodiscard]] remove_cv_t<T> relocate(T* source);
-</xmp>
-
-*Mandates:* `T` is a complete non-array object type.
-
-*Effects:* Equivalent to:
-<xmp>
-  remove_cv_t<T> t = std::move(source);
-  destroy_at(source);
-  return t;
-</xmp>
-except that if `T` is trivially relocatable <i>[basic.types]</i>, side effects
-associated with the relocation of the object's value might not happen.
+<pre>
+  <ins>template&lt;class T></ins>
+  <ins>[[nodiscard]] remove_cv_t&lt;T> relocate(T* source);</ins>
+</pre>
+<p><ins>3․ *Mandates:* `T` is a complete non-array object type.</ins>
+<p><ins>4․ *Effects:* Equivalent to:</ins>
+<pre>
+  <ins>remove_cv_t<&lt;T> t = std::move(source);</ins>
+  <ins>destroy_at(source);</ins>
+  <ins>return t;</ins>
+</pre>
+<ins>except that if `T` is trivially relocatable ([basic.types]), side effects
+associated with the relocation of the object's value might not happen.</ins>
 </blockquote></small>
 
 Note:
@@ -665,16 +697,143 @@ Modify <a href="https://eel.is/c++draft/algorithms.requirements">[algorithms.req
 
 ## `uninitialized_relocate`, `uninitialized_relocate_n`, `uninitialized_relocate_backward` [uninitialized.relocate] ## {#wording-uninitialized.relocate}
 
+Note: Compare to <a href="https://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a> and
+<a href="https://eel.is/c++draft/alg.copy">[alg.copy]</a>. The <i>Remarks</i> allude to blanket wording
+in <a href="http://eel.is/c++draft/specialized.algorithms#general-2">[specialized.algorithms.general]/2</a>.
+
+Modify <a href="http://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:
+
+<small><blockquote>
+<pre>
+  template&lt;class InputIterator, class NoThrowForwardIterator>
+    NoThrowForwardIterator uninitialized_move(InputIterator first,                  // freestanding
+                                              InputIterator last,
+                                              NoThrowForwardIterator result);
+  template&lt;class ExecutionPolicy, class ForwardIterator, class NoThrowForwardIterator>
+    NoThrowForwardIterator uninitialized_move(ExecutionPolicy&& exec,               // see [algorithms.parallel.overloads]
+                                              ForwardIterator first, ForwardIterator last,
+                                              NoThrowForwardIterator result);
+  template&lt;class InputIterator, class Size, class NoThrowForwardIterator>
+    pair&lt;InputIterator, NoThrowForwardIterator>
+      uninitialized_move_n(InputIterator first, Size n,                             // freestanding
+                           NoThrowForwardIterator result);
+  template&lt;class ExecutionPolicy, class ForwardIterator, class Size,
+           class NoThrowForwardIterator>
+    pair&lt;ForwardIterator, NoThrowForwardIterator>
+      uninitialized_move_n(ExecutionPolicy&& exec,                                  // see [algorithms.parallel.overloads]
+                           ForwardIterator first, Size n, NoThrowForwardIterator result);
+
+  namespace ranges {
+    template&lt;class I, class O>
+      using uninitialized_move_result = in_out_result&lt;I, O>;                        // freestanding
+    template&lt;input_iterator I, sentinel_for&lt;I> S1,
+             <i>nothrow-forward-iterator</i> O, <i>nothrow-sentinel-for</i>&lt;O> S2>
+      requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>>
+        uninitialized_move_result&lt;I, O>
+          uninitialized_move(I ifirst, S1 ilast, O ofirst, S2 olast);               // freestanding
+    template&lt;input_range IR, <i>nothrow-forward-range</i> OR>
+      requires constructible_from&lt;range_value_t&lt;OR>, range_rvalue_reference_t&lt;IR>>
+        uninitialized_move_result&lt;borrowed_iterator_t&lt;IR>, borrowed_iterator_t&lt;OR>>
+          uninitialized_move(IR&& in_range, OR&& out_range);                        // freestanding
+
+    template&lt;class I, class O>
+      using uninitialized_move_n_result = in_out_result&lt;I, O>;                      // freestanding
+    template&lt;input_iterator I,
+             <i>nothrow-forward-iterator</i> O, <i>nothrow-sentinel-for</i>&lt;O> S>
+      requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>>
+        uninitialized_move_n_result&lt;I, O>
+          uninitialized_move_n(I ifirst, iter_difference_t&lt;I> n,                    // freestanding
+                               O ofirst, S olast);
+  }
+
+  <ins>template&lt;class InputIterator, class NoThrowForwardIterator></ins>
+    <ins>NoThrowForwardIterator uninitialized_relocate(InputIterator first,</ins>
+                                                  <ins>InputIterator last,</ins>
+                                                  <ins>NoThrowForwardIterator result);</ins>  <ins>// freestanding</ins>
+  <ins>template&lt;class ExecutionPolicy, class ForwardIterator, class NoThrowForwardIterator></ins>
+    <ins>NoThrowForwardIterator uninitialized_relocate(ExecutionPolicy&& exec,</ins>           <ins>// see [algorithms.parallel.overloads]</ins>
+                                                  <ins>ForwardIterator first, ForwardIterator last,</ins>
+                                                  <ins>NoThrowForwardIterator result);</ins>
+
+  <ins>template&lt;class InputIterator, class Size, class NoThrowForwardIterator></ins>
+    <ins>pair&lt;InputIterator, NoThrowForwardIterator></ins>
+      <ins>uninitialized_relocate_n(InputIterator first, Size n,</ins>
+                               <ins>NoThrowForwardIterator result);</ins>                      <ins>// freestanding</ins>
+  <ins>template&lt;class ExecutionPolicy, class ForwardIterator, class Size,</ins>
+           <ins>class NoThrowForwardIterator></ins>
+    <ins>pair&lt;ForwardIterator, NoThrowForwardIterator></ins>
+      <ins>uninitialized_relocate_n(ExecutionPolicy&& exec,</ins>                              <ins>// see [algorithms.parallel.overloads]</ins>
+                               <ins>ForwardIterator first, Size n, NoThrowForwardIterator result);</ins>
+
+  <ins>template&lt;class BidirectionalIterator, class NoThrowBidirectionalIterator></ins>
+    <ins>NoThrowBidirectionalIterator</ins>
+      <ins>uninitialized_relocate_backward(BidirectionalIterator first, BidirectionalIterator last,</ins>
+                                      <ins>NoThrowBidirectionalIterator result);</ins>         <ins>// freestanding</ins>
+  <ins>template&lt;class ExecutionPolicy, class BidirectionalIterator, class NoThrowBidirectionalIterator></ins>
+    <ins>NoThrowBidirectionalIterator</ins>
+      <ins>uninitialized_relocate_backward(ExecutionPolicy&& exec,</ins>
+                                      <ins>BidirectionalIterator first, BidirectionalIterator last,</ins>
+                                      <ins>NoThrowBidirectionalIterator result);</ins>         <ins>// freestanding</ins>
+
+  <ins>namespace ranges {</ins>
+    <ins>template&lt;class I, class O></ins>
+      <ins>using uninitialized_relocate_result = in_out_result&lt;I, O>;</ins>                    <ins>// freestanding</ins>
+    <ins>template&lt;input_iterator I, sentinel_for&lt;I> S1,</ins>
+             <ins><i>nothrow-forward-iterator</i> O, <i>nothrow-sentinel-for</i>&lt;O> S2></ins>
+      <ins>requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>> &&</ins>
+               <ins>destructible&lt;iter_value_t&lt;I>></ins>
+        <ins>uninitialized_relocate_result&lt;I, O></ins>
+          <ins>uninitialized_relocate(I ifirst, S1 ilast, O ofirst, S2 olast);</ins>           <ins>// freestanding</ins>
+    <ins>template&lt;input_range IR, <i>nothrow-forward-range</i> OR></ins>
+      <ins>requires constructible_from&lt;range_value_t&lt;OR>, range_rvalue_reference_t&lt;IR>> &&</ins>
+               <ins>destructible&lt;range_value_t&lt;IR>></ins>
+        <ins>uninitialized_relocate_result&lt;borrowed_iterator_t&lt;IR>, borrowed_iterator_t&lt;OR>></ins>
+          <ins>uninitialized_relocate(IR&& in_range, OR&& out_range);</ins>                    <ins>// freestanding</ins>
+
+    <ins>template&lt;class I, class O></ins>
+      <ins>using uninitialized_relocate_n_result = in_out_result&lt;I, O>;</ins>                  <ins>// freestanding</ins>
+    <ins>template&lt;input_iterator I,</ins>
+             <ins><i>nothrow-forward-iterator</i> O, <i>nothrow-sentinel-for</i>&lt;O> S></ins>
+      <ins>requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>> &&</ins>
+               <ins>destructible&lt;iter_value_t&lt;I>></ins>
+        <ins>uninitialized_relocate_n_result&lt;I, O></ins>
+          <ins>uninitialized_relocate_n(I ifirst, iter_difference_t&lt;I> n,</ins>
+                                   <ins>O ofirst, S olast);</ins>                              <ins>// freestanding</ins>
+
+
+    <ins>template&lt;class I, class O></ins>
+      <ins>using uninitialized_relocate_backward_result = in_out_result&lt;I, O>;</ins>           <ins>// freestanding</ins>
+    <ins>template&lt;bidirectional_iterator I, sentinel_for&lt;I> S1,</ins>
+             <ins><i>nothrow-bidirectional-iterator</i> O></ins>
+      <ins>requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>> &&</ins>
+               <ins>destructible&lt;iter_value_t&lt;I>></ins>
+      <ins>uninitialized_relocate_backward_result&lt;I, O></ins>
+        <ins>uninitialized_relocate_backward(I ifirst, S1 ilast, O ofirst);</ins>              <ins>// freestanding</ins>
+    <ins>template&lt;bidirectional_range IR, <i>nothrow-bidirectional-iterator</i> O></ins>
+      <ins>requires constructible_from&lt;iter_value_t&lt;O>, range_rvalue_reference_t&lt;IR>> &&</ins>
+               <ins>destructible&lt;range_value_t&lt;IR>></ins>
+        <ins>uninitialized_relocate_backward_result&lt;iterator_t&lt;IR>, O></ins>
+          <ins>uninitialized_relocate_backward(R&& r, O ofirst);</ins>                         <ins>// freestanding</ins>
+  <ins>}</ins>
+
+  template&lt;class NoThrowForwardIterator, class T>
+    void uninitialized_fill(NoThrowForwardIterator first,                           // freestanding
+                            NoThrowForwardIterator last, const T& x);
+
+</pre>
+</blockquote></small>
+
 Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:
 
 <small><blockquote>
+<b><code>uninitialized_relocate</code> [uninitialized.relocate]</b>
 <xmp>
   template<class InputIterator, class NoThrowForwardIterator>
   NoThrowForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,
                                                 NoThrowForwardIterator result);
 </xmp>
 
-*Effects:* Equivalent to:
+1․ *Effects:* Equivalent to:
 <xmp>
   try {
     for (; first != last; ++result, (void)++first) {
@@ -691,21 +850,52 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
 except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.
 
-*Remarks:* If an exception is thrown, all objects in both the source and destination
+2․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.
 
-<xmp>
-  template<class InputIterator, class Size, class NoThrowForwardIterator>
-    pair<InputIterator, NoThrowForwardIterator>
-      uninitialized_relocate_n(InputIterator first, Size n, NoThrowForwardIterator result);
-</xmp>
+<pre>
+  namespace ranges {
+    template&lt;input_iterator I, sentinel_for&lt;I> S1,
+             <i>nothrow-forward-iterator</i> O, <i>nothrow-sentinel-for</i>&lt;O> S2>
+      requires constructible_from&lt;iter_value_t&lt;O>, iter_rvalue_reference_t&lt;I>> &&
+               destructible&lt;iter_value_t&lt;I>>
+      uninitialized_relocate_result&lt;I, O>
+        uninitialized_relocate(I ifirst, S1 ilast, O ofirst, S2 olast);
+    template&lt;input_range IR, <i>nothrow-forward-range</i> OR>
+      requires constructible_from&lt;range_value_t&lt;OR>, range_rvalue_reference_t&lt;IR>> &&
+               destructible&lt;range_value_t&lt;IR>>
+      uninitialized_relocate_result&lt;borrowed_iterator_t&lt;IR>, borrowed_iterator_t&lt;OR>>
+        uninitialized_relocate(IR&& in_range, OR&& out_range);
+}
+</pre>
 
-*Effects:* Equivalent to:
-<xmp>
+3․ *Effects:* Equivalent to:
+<pre>
+  for (; ifirst != ilast && ofirst != olast; ++ofirst, (void)++ifirst) {
+    ::new (<i>voidify</i>(*ofirst))
+      remove_reference_t&lt;iter_reference_t&lt;O>>(ranges::iter_move(ifirst));
+    destroy_at(addressof(*first));
+  }
+  return {std::move(ifirst), ofirst};
+</pre>
+except that if the iterators' common value type is trivially relocatable, side effects
+associated with the relocation of the object's value might not happen.
+
+4․ *Remarks:* If an exception is thrown, all objects in both the source and destination
+ranges are destroyed.
+
+<pre>
+  template&lt;class InputIterator, class Size, class NoThrowForwardIterator>
+    pair&lt;InputIterator, NoThrowForwardIterator>
+      uninitialized_relocate_n(InputIterator first, Size n, NoThrowForwardIterator result);
+</pre>
+
+5․ *Effects:* Equivalent to:
+<pre>
   try {
     for (; n > 0; ++result, (void)++first, --n) {
       ::new (voidify(*result))
-        typename iterator_traits<NoThrowForwardIterator>::value_type(std::move(*first));
+        typename iterator_traits&lt;NoThrowForwardIterator>::value_type(std::move(*first));
       destroy_at(addressof(*first));
     }
     return {first, result};
@@ -713,11 +903,11 @@ ranges are destroyed.
     destroy_n(++first, --n);
     throw;
   }
-</xmp>
+</pre>
 except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.
 
-*Remarks:* If an exception is thrown, all objects in both the source and destination
+6․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.
 
 <xmp>
@@ -727,14 +917,14 @@ ranges are destroyed.
                                       NoThrowBidirectionalIterator result);
 </xmp>
 
-*Effects:* Equivalent to:
-<xmp>
+7․ *Effects:* Equivalent to:
+<pre>
   try {
     for (; last != first; ) {
       --last;
       --result;
       ::new (voidify(*result))
-        typename iterator_traits<NoThrowBidirectionalIterator>::value_type(std::move(*last));
+        typename iterator_traits&lt;NoThrowBidirectionalIterator>::value_type(std::move(*last));
       destroy_at(addressof(*last));
     }
     return result;
@@ -742,15 +932,13 @@ ranges are destroyed.
     destroy(first, ++last);
     throw;
   }
-</xmp>
+</pre>
 except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.
 
-*Remarks:* If an exception is thrown, all objects in both the source and destination
+8․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.
 </blockquote></small>
-
-Note: The Remarks allude to blanket wording in <a href="http://eel.is/c++draft/specialized.algorithms#general-2">[specialized.algorithms.general]/2</a>.
 
 
 
