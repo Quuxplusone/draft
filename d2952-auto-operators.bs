@@ -2,7 +2,7 @@
 Title: auto& operator=(X&&) = default
 Shortname: D2952
 Revision: 1
-!Draft Revision: 13
+!Draft Revision: 14
 Audience: EWG
 Status: D
 Group: WG21
@@ -38,7 +38,10 @@ The current wording prohibits the use of placeholder types such as `auto&` to ex
 types, with the single exception of C++20's `operator<=>`. This leads to redundant repetition,
 such as in this real code from libc++'s test suite:
 
-```cpp
+<table>
+<tr><th>Today</th><th>After P2952</th></tr>
+<tr><td>
+<small><pre>
 struct ForwardDiffView {
   [...]
   ForwardDiffView(ForwardDiffView&&) = default;
@@ -47,40 +50,69 @@ struct ForwardDiffView {
   ForwardDiffView& operator=(const ForwardDiffView&) = default;
   [...]
 };
-```
-
-We'd prefer to write the following, but the language doesn't currently permit it:
-
-```cpp
+</pre></small>
+</td><td>
+<small><pre>
 struct ForwardDiffView {
   [...]
   ForwardDiffView(ForwardDiffView&&) = default;
   ForwardDiffView(const ForwardDiffView&) = default;
-  auto& operator=(ForwardDiffView&&) = default; // ill-formed C++23
-  auto& operator=(const ForwardDiffView&) = default; // ill-formed C++23
+  auto& operator=(ForwardDiffView&&) = default;
+  auto& operator=(const ForwardDiffView&) = default;
   [...]
 };
-```
+</pre></small>
+</td></tr>
+</table>
 
 The comparison operators are inconsistent among themselves: `operator<=>`
 can deduce `strong_ordering`, but the others cannot deduce `bool`.
 
-```cpp
-  auto operator<=>(const MyClass& rhs) const = default; // well-formed
-  auto operator==(const MyClass& rhs) const = default;  // ill-formed, must say 'bool'
-  auto operator<(const MyClass& rhs) const = default;  // ill-formed, must say 'bool'
-```
+<table>
+<tr><th>Today</th><th>After P2952</th></tr>
+<tr><td>
+<small><pre>
+auto operator<=>(const MyClass& rhs) const = default;
+bool operator==(const MyClass& rhs) const = default;
+bool operator<(const MyClass& rhs) const = default;
+</pre></small>
+</td><td>
+<small><pre>
+auto operator<=>(const MyClass& rhs) const = default;
+auto operator==(const MyClass& rhs) const = default;
+auto operator<(const MyClass& rhs) const = default;
+</pre></small>
+</td></tr>
+</table>
 
 The status quo is inconsistent between non-defaulted and defaulted functions,
 making it unnecessarily tedious to upgrade to `=default`:
 
-```cpp
-  auto& operator=(const MyClass& rhs) { i = rhs.i; return *this; } // well-formed
-  auto& operator=(const MyClass& rhs) = default; // ill-formed, must say 'MyClass&'
-
-  auto operator==(const MyClass& rhs) const { return i == rhs.i; } // well-formed
-  auto operator==(const MyClass& rhs) const = default; // ill-formed, must say 'bool'
-```
+<table>
+<tr><th>Today</th><th>After P2952</th></tr>
+<tr><td>
+<pre><small>
+<del>auto</del>& operator=(const MyClass& r) <del>{ i = r.i; return *this; }</del>
+<ins>MyClass</ins>& operator=(const MyClass& r) <ins>= default;</ins>
+</small></pre>
+</td><td>
+<pre><small>
+auto& operator=(const MyClass& r) <del>{ i = r.i; return *this; }</del>
+auto& operator=(const MyClass& r) <ins>= default;</ins>
+</small></pre>
+</td></tr>
+<tr><td>
+<pre><small>
+<del>auto</del> operator==(const MyClass& r) const <del>{ return i == r.i; }</del>
+<ins>bool</ins> operator==(const MyClass& r) const <ins>= default;</ins>
+</small></pre>
+</td><td>
+<pre><small>
+auto operator==(const MyClass& r) const <del>{ return i == r.i; }</del>
+auto operator==(const MyClass& r) const <ins>= default;</ins>
+</small></pre>
+</td></tr>
+</table>
 
 The ill-formedness of these declarations comes from overly restrictive wording in the standard,
 such as <a href="https://eel.is/c++draft/class.eq#1.sentence-1">[class.eq]/1</a>

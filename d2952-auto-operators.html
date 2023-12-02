@@ -2106,7 +2106,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>13
+     <dd>14
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2167,7 +2167,13 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
 The current wording prohibits the use of placeholder types such as <code class="highlight"><c- k>auto</c-><c- o>&amp;</c-></code> to express these return
 types, with the single exception of C++20’s <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code>. This leads to redundant repetition,
 such as in this real code from libc++'s test suite:</p>
-<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>ForwardDiffView</c-> <c- p>{</c->
+   <table>
+    <tbody>
+     <tr>
+      <th>Today
+      <th>After P2952
+     <tr>
+      <td> <small><pre class="highlight"><c- k>struct</c-> <c- nc>ForwardDiffView</c-> <c- p>{</c->
   <c- p>[...]</c->
   <c- n>ForwardDiffView</c-><c- p>(</c-><c- n>ForwardDiffView</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
   <c- n>ForwardDiffView</c-><c- p>(</c-><c- k>const</c-> <c- n>ForwardDiffView</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2175,30 +2181,59 @@ such as in this real code from libc++'s test suite:</p>
   <c- n>ForwardDiffView</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>ForwardDiffView</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
   <c- p>[...]</c->
 <c- p>};</c->
-</pre>
-   <p>We’d prefer to write the following, but the language doesn’t currently permit it:</p>
-<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>ForwardDiffView</c-> <c- p>{</c->
+</pre></small> 
+      <td> <small><pre class="highlight"><c- k>struct</c-> <c- nc>ForwardDiffView</c-> <c- p>{</c->
   <c- p>[...]</c->
   <c- n>ForwardDiffView</c-><c- p>(</c-><c- n>ForwardDiffView</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
   <c- n>ForwardDiffView</c-><c- p>(</c-><c- k>const</c-> <c- n>ForwardDiffView</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-  <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>ForwardDiffView</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// ill-formed C++23</c->
-  <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>ForwardDiffView</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// ill-formed C++23</c->
+  <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>ForwardDiffView</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+  <c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>ForwardDiffView</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
   <c- p>[...]</c->
 <c- p>};</c->
-</pre>
+</pre></small> 
+   </table>
    <p>The comparison operators are inconsistent among themselves: <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> can deduce <code class="highlight"><c- n>strong_ordering</c-></code>, but the others cannot deduce <code class="highlight"><c- b>bool</c-></code>.</p>
-<pre class="language-cpp highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// well-formed</c->
-<c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->  <c- c1>// ill-formed, must say 'bool'</c->
-<c- k>auto</c-> <c- k>operator</c-><c- o>&lt;</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->  <c- c1>// ill-formed, must say 'bool'</c->
-</pre>
+   <table>
+    <tbody>
+     <tr>
+      <th>Today
+      <th>After P2952
+     <tr>
+      <td> <small><pre class="highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- b>bool</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- b>bool</c-> <c- k>operator</c-><c- o>&lt;</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+</pre></small> 
+      <td> <small><pre class="highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- k>auto</c-> <c- k>operator</c-><c- o>&lt;</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+</pre></small> 
+   </table>
    <p>The status quo is inconsistent between non-defaulted and defaulted functions,
 making it unnecessarily tedious to upgrade to <code class="highlight"><c- o>=</c-><c- k>default</c-></code>:</p>
-<pre class="language-cpp highlight"><c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- p>{</c-> <c- n>i</c-> <c- o>=</c-> <c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// well-formed</c->
-<c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// ill-formed, must say 'MyClass&amp;'</c->
-
-<c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- p>{</c-> <c- k>return</c-> <c- n>i</c-> <c- o>==</c-> <c- n>rhs</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// well-formed</c->
-<c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// ill-formed, must say 'bool'</c->
-</pre>
+   <table>
+    <tbody>
+     <tr>
+      <th>Today
+      <th>After P2952
+     <tr>
+      <td>
+<pre class="highlight"><small><del><c- k>auto</c-></del><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <del><c- p>{</c-> <c- n>i</c-> <c- o>=</c-> <c- n>r</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-></del>
+<ins><c- n>MyClass</c-></ins><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <ins><c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+</small></pre>
+      <td>
+<pre class="highlight"><small><c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <del><c- p>{</c-> <c- n>i</c-> <c- o>=</c-> <c- n>r</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-></del>
+<c- k>auto</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <ins><c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+</small></pre>
+     <tr>
+      <td>
+<pre class="highlight"><small><del><c- k>auto</c-></del> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <c- k>const</c-> <del><c- p>{</c-> <c- k>return</c-> <c- n>i</c-> <c- o>==</c-> <c- n>r</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- p>}</c-></del>
+<ins><c- b>bool</c-></ins> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <c- k>const</c-> <ins><c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+</small></pre>
+      <td>
+<pre class="highlight"><small><c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <c- k>const</c-> <del><c- p>{</c-> <c- k>return</c-> <c- n>i</c-> <c- o>==</c-> <c- n>r</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- p>}</c-></del>
+<c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <c- k>const</c-> <ins><c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+</small></pre>
+   </table>
    <p>The ill-formedness of these declarations comes from overly restrictive wording in the standard,
 such as <a href="https://eel.is/c++draft/class.eq#1.sentence-1">[class.eq]/1</a> specifically requiring that a defaulted equality
 operator must have a <em>declared</em> return type of <code class="highlight"><c- b>bool</c-></code>, instead of simply specifying that its return type
