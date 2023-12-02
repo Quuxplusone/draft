@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: auto& operator=(X&&) = default
 Shortname: D2952
-Revision: 0
-!Draft Revision: 12
+Revision: 1
+!Draft Revision: 13
 Audience: EWG
 Status: D
 Group: WG21
@@ -15,7 +15,7 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2023-08-10
+Date: 2023-12-02
 </pre>
 
 <style>
@@ -26,9 +26,9 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R0:
+- R1:
 
-    - Initial revision.
+    - Add discussion of `void operator=(X&&) = default`, and of triviality, in [[#other-return-types]].
 
 
 # Motivation # {#motivation}
@@ -118,9 +118,10 @@ struct MyClass {
   auto& operator=(const MyClass&) = default;          // Proposed OK: deduces MyClass&
   decltype(auto) operator=(const MyClass&) = default; // Proposed OK: deduces MyClass&
   auto&& operator=(const MyClass&) = default;         // Proposed OK: deduces MyClass&
-  const auto& operator=(const MyClass&) = default;    // Still ill-formed: deduces const MyClass&
-  auto operator=(const MyClass&) = default;           // Still ill-formed: deduces MyClass
+  const auto& operator=(const MyClass&) = default;    // Still ill-formed: deduced const MyClass& is not MyClass&
+  auto operator=(const MyClass&) = default;           // Still ill-formed: deduced MyClass is not MyClass&
   auto* operator=(const MyClass&) = default;          // Still ill-formed: deduction fails
+  void operator=(const MyClass&) = default;           // Still ill-formed: void is not MyClass&
 };
 ```
 
@@ -130,7 +131,7 @@ For `operator==`, our proposal gives the following behavior:
 struct MyClass {
   auto operator==(const MyClass&) const = default;           // Proposed OK: deduces bool
   decltype(auto) operator==(const MyClass&) const = default; // Proposed OK: deduces bool
-  auto&& operator==(const MyClass&) const = default;         // Still ill-formed: deduces bool&&
+  auto&& operator==(const MyClass&) const = default;         // Still ill-formed: deduced bool&& is not bool
   auto& operator==(const MyClass&) const = default;          // Still ill-formed: deduction fails
 };
 ```
@@ -240,7 +241,7 @@ So there is a new burden on the specification of the defaultable operator, to sp
 return type deduction works for the implicitly defined operator.
 
 <div class="example">
-[[P1046]] proposed to make `operator++(int)` defaultable in the same way as a
+[[P1046R2]] proposed to make `operator++(int)` defaultable in the same way as a
 secondary comparison operator. It would presumably have done this by
 adding wording to <a href="https://eel.is/c++draft/over.oper#over.inc">[over.inc]</a>. After P2952, this
 added wording would need to include a sentence like:
@@ -257,7 +258,7 @@ If its declared return type contains a placeholder type, its return type is dedu
 
 [[P0847]] <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html#crtp">§5.2</a>'s
 example of `add_postfix_increment` ("CRTP without the C, R, or even T") involves an `operator++` with return
-type `auto`; but that `operator++` is not defaulted, and probably couldn't be defaulted even after [[P1046]], firstly
+type `auto`; but that `operator++` is not defaulted, and probably couldn't be defaulted even after [[P1046R2]], firstly
 because it is a template and secondly because its deduced return type is `Self` instead of `add_postfix_increment`.
 
 ```cpp
@@ -265,7 +266,7 @@ struct add_postfix_increment {
     template<class Self>
     auto operator++(this Self&, int) = default;
       // Today: ill-formed, can't default operator++
-      // After P1046: presumably still not OK, can't default a template
+      // After P1046R2: presumably still not OK, can't default a template
 };
 struct S : add_postfix_increment {
     int i;
@@ -277,6 +278,27 @@ S t = s++;
 ```
 </div>
  
+## Other return types are still forbidden ## {#other-return-types}
+
+Notice that returning any type other than `X&` from a defaulted `X::operator=` remains ill-formed.
+For example, we don't propose to accept:
+```cpp
+struct X {
+  void operator=(X&&) = default; // still ill-formed
+};
+```
+Any paper that did propose to permit defaulting `void operator=` would have to consider very carefully
+whether to call that operator "trivial." Today,
+`is_trivially_move_assignable_v<T>` is true only when
+`decltype(declval<T&>() = declval<T>())` is `T&`. It's just barely conceivable that existing
+user code *might* rely on that fact, and break when presented with a trivial assignment
+operator that returned `void` instead. And certainly the return-by-copy `X operator=(X&&) = default`
+shouldn't be considered "trivial" for non-trivially-copy-constructible `X`.
+
+But none of this is a problem for this proposal P2952, because we propose to continue rejecting
+a defaulted `X::operator=` that returns any type but `X&`. We merely propose to allow the programmer
+to *spell* that return type using a placeholder such as `auto&`.
+
 ## Existing corner cases ## {#corner-cases}
 
 There is vendor divergence in some corner cases. Here is a table of the divergences we found,
@@ -364,7 +386,6 @@ struct C {
     // Tomorrow: Well-formed, deleted
 };
 ```
-
 
 # Implementation experience # {#experience}
 
@@ -494,7 +515,8 @@ would be deleted, as in example `B` below.)
 
 Note: Arthur initially proposed that [class.copy.assign]/14 should say "...returns
 *an lvalue reference to* the object for which...", but Jens Maurer thought that wouldn't be
-an improvement from CWG's point of view.
+an improvement from CWG's point of view. Maybe it should say "...returns the assignment operator's
+object parameter (<a href="https://eel.is/c++draft/dcl.fct#def:parameter,object">[dcl.fct]</a>)" instead.
 
 Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
 
@@ -540,7 +562,7 @@ reference to the object for which the assignment operator is invoked.</ins>
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p0847r7.html",
     "date": "July 2021"
   },
-  "P1046": {
+  "P1046R2": {
     "title": "Automatically Generate More Operators",
     "authors": [
       "David Stone"
