@@ -2105,7 +2105,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>1
+     <dd>2
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2123,7 +2123,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
    <ol class="toc" role="directory">
     <li><a href="#changelog"><span class="secno">1</span> <span class="content">Changelog</span></a>
-    <li><a href="#proposal"><span class="secno">2</span> <span class="content">Motivation and proposal</span></a>
+    <li>
+     <a href="#proposal"><span class="secno">2</span> <span class="content">Motivation and proposal</span></a>
+     <ol class="toc">
+      <li><a href="#benchmark"><span class="secno">2.1</span> <span class="content">Benchmark</span></a>
+     </ol>
     <li><a href="#breakage"><span class="secno">3</span> <span class="content">Breakage of existing code</span></a>
     <li><a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
     <li>
@@ -2132,8 +2136,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#wording-vector.modifiers"><span class="secno">5.1</span> <span class="content">[vector.modifiers]</span></a>
       <li><a href="#wording-deque.modifiers"><span class="secno">5.2</span> <span class="content">[deque.modifiers]</span></a>
       <li><a href="#wording-alg.rotate"><span class="secno">5.3</span> <span class="content">[alg.rotate]</span></a>
-      <li><a href="#wording-utility.swap"><span class="secno">5.4</span> <span class="content">[utility.swap] (unchanged)</span></a>
-      <li><a href="#wording-alg.swap"><span class="secno">5.5</span> <span class="content">[alg.swap]</span></a>
+      <li><a href="#wording-alg.swap"><span class="secno">5.4</span> <span class="content">[alg.swap]</span></a>
+      <li><a href="#wording-utility.swap"><span class="secno">5.5</span> <span class="content">[utility.swap] (unchanged)</span></a>
+      <li><a href="#wording-iterator.cust.swap"><span class="secno">5.6</span> <span class="content">[iterator.cust.swap] (unchanged)</span></a>
      </ol>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
@@ -2154,7 +2159,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    </ul>
    <h2 class="heading settled" data-level="2" id="proposal"><span class="secno">2. </span><span class="content">Motivation and proposal</span><a class="self-link" href="#proposal"></a></h2>
    <p>We have two largely similar active proposals for "trivial relocation" in C++: Arthur’s <a data-link-type="biblio" href="#biblio-p1144" title="std::is_trivially_relocatable">[P1144]</a>,
-and Bloomberg’s <a data-link-type="biblio" href="#biblio-p2786" title="Trivial relocatability for C++26">[P2786]</a> / <a data-link-type="biblio" href="#biblio-p2959" title="Relocation within containers">[P2959]</a> / <a data-link-type="biblio" href="#biblio-p2967" title="Relocation has a library interface">[P2967]</a>. We also have two relatively recent proposals
+and Bloomberg’s <a data-link-type="biblio" href="#biblio-p2786" title="Trivial relocatability for C++26">[P2786]</a> / <a data-link-type="biblio" href="#biblio-p2959" title="Relocation within containers">[P2959]</a> / <a data-link-type="biblio" href="#biblio-p2967" title="Relocation has a library interface">[P2967]</a>. We also have two recent proposals
 for "non-trivial relocation" as a new fundamental operation: Bloomberg’s <a data-link-type="biblio" href="#biblio-p2839" title="Non-trivial relocation via a new owning reference type">[P2839]</a> (rejected by EWG
 in Varna) and Bini and Catmur’s <a data-link-type="biblio" href="#biblio-p2785" title="Relocating prvalues">[P2785]</a> (still active).</p>
    <p>One major motivation for "(trivial) relocation" is that it allows library authors to choose "fast paths"
@@ -2176,8 +2181,8 @@ such as <code class="highlight"><c- n>unique_ptr</c-></code> it can avoid <code 
    <p>The exact details of this code snippet are up for debate: should the library provide a trait <code class="highlight"><c- n>is_nothrow_relocatable_v</c-></code>? should <code class="highlight"><c- n>uninitialized_relocate</c-></code> be guaranteed, or merely encouraged,
 to use memcpy instead of move-and-destroy-in-a-loop? and so on. This paper P3055 considers all
 those little details to be "out of scope"; they don’t affect the gist of this paper.</p>
-   <p>This paper concerns itself with the gigantic problem — anything like the above implementation
-is,formally, forbidden by the current Standard! To permit the above implementation, we must
+   <p>This paper concerns itself with one giant problem — anything like the above implementation
+is, formally, forbidden by the current Standard! To permit the above implementation, we must
 loosen the specification of <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>erase</c-></code> (<a href="https://eel.is/c++draft/vector.modifiers">[vector.modifiers]/3</a>)
 along these lines:</p>
    <p><small></small></p>
@@ -2231,26 +2236,23 @@ and in fact Arthur’s libc++ fork does exactly that
     <c- p>}</c->
 <c- p>}</c->
 </pre>
+   <h3 class="heading settled" data-level="2.1" id="benchmark"><span class="secno">2.1. </span><span class="content">Benchmark</span><a class="self-link" href="#benchmark"></a></h3>
    <p>As <a href="https://godbolt.org/z/EWzKqq5s3">the above Godbolt</a> shows,
 trivial relocation is an "infinitely valuable optimization"
 in the same sense as C++11 move semantics. For the following type <code class="highlight"><c- n>S</c-></code>,
 mainline libc++ compiles <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code> into 74 lines of assembly;
 Arthur’s P1144 fork of libc++ compiles it into 18 lines.</p>
-   <p>
-    struct S {
-        S();
-        std::unique_ptr
-    <int>
-      p;
-        std::shared_ptr
-     <int> q;
-        bool b;
-    };</int>
-    </int>
-   </p>
-   <p>void test(S&amp; a, S&amp; b) {
-        std::swap(a, b);
-    }</p>
+<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>S</c-> <c- p>{</c->
+    <c- n>S</c-><c- p>();</c->
+    <c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>p</c-><c- p>;</c->
+    <c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>q</c-><c- p>;</c->
+    <c- b>bool</c-> <c- n>b</c-><c- p>;</c->
+<c- p>};</c->
+
+<c- b>void</c-> <c- nf>test</c-><c- p>(</c-><c- n>S</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>S</c-><c- o>&amp;</c-> <c- n>b</c-><c- p>)</c-> <c- p>{</c->
+    <c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- n>b</c-><c- p>);</c->
+<c- p>}</c->
+</pre>
    <p>This propagates back up the call-stack as high as we’re willing to let it propagate.
 Arthur’s libc++ effectively applies this paper P3055’s proposed wording already,
 permitting <code class="highlight"><c- n>rotate</c-></code> to be implemented in terms of <code class="highlight"><c- n>swap</c-></code> and <code class="highlight"><c- n>erase</c-></code> to be implemented
@@ -2421,18 +2423,7 @@ and the number of elements before the last erased element in the original deque.
 the <em>Cpp17MoveConstructible</em> (Table 31) and <em>Cpp17MoveAssignable</em> (Table 33) requirements. </p><p>2. <i>Effects:</i> For each non-negative integer <code class="highlight"><c- n>i</c-> <c- o>&lt;</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-></code>, places the element from the position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- n>i</c-></code> into
 position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- p>(</c-><c- n>i</c-> <c- o>+</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>middle</c-><c- p>))</c-> <c- o>%</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-></code>. [<i>Note:</i> This is a left rotate. <i>— end note</i>] </p><p>3. Returns: </p><ul><li data-md><p><code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>middle</c-><c- p>)</c-></code> for the overloads in namespace <code class="highlight"><c- n>std</c-></code>.</p> </li><li data-md><p><code class="highlight"><c- p>{</c-><c- n>first</c-> <c- o>+</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>middle</c-><c- p>),</c-> <c- n>last</c-><c- p>}</c-></code> for the overload in namespace <code class="highlight"><c- n>ranges</c-></code>.</p> </li></ul> <p>4. <i>Complexity:</i> <del>At most <code class="highlight"><c- n>last</c-> <c- o>-</c-> <c- n>first</c-></code> swaps.</del> <ins>Linear in <code class="highlight"><c- n>last</c-> <c- o>-</c-> <c- n>first</c-></code>.</ins> </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.4" id="wording-utility.swap"><span class="secno">5.4. </span><span class="content">[utility.swap] (unchanged)</span><a class="self-link" href="#wording-utility.swap"></a></h3>
-   <p><a href="https://eel.is/c++draft/utility.swap">[utility.swap]</a> does not seem to require any changes:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p></p>
-    <small> <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c->
-  <c- k>constexpr</c-> <c- b>void</c-> <c- n>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>b</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c->
-</pre><p>1. <i>Constraints:</i> <code class="highlight"><c- n>is_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code> and <code class="highlight"><c- n>is_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>. </p><p>2. <i>Preconditions:</i> Type <code class="highlight"><c- n>T</c-></code> meets the <em>Cpp17MoveConstructible</em> (Table 31) and <em>Cpp17MoveAssignable</em> (Table 33) requirements. </p><p>3. <i>Effects:</i> Exchanges values stored in two locations. </p><p>4. <i>Remarks:</i> The exception specification is equivalent to: <code class="highlight"><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> </p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>N</c-><c- o>></c->
-  <c- k>constexpr</c-> <c- b>void</c-> <c- n>swap</c-><c- p>(</c-><c- n>T</c-> <c- p>(</c-><c- o>&amp;</c-><c- n>a</c-><c- p>)[</c-><c- n>N</c-><c- p>],</c-> <c- n>T</c-> <c- p>(</c-><c- o>&amp;</c-><c- n>b</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-> <c- k>noexcept</c-><c- p>(</c-><c- n>is_nothrow_swappable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>);</c->
-</pre><p>5. <i>Constraints:</i> <code class="highlight"><c- n>is_swappable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>. </p><p>6. <i>Preconditions:</i> <code class="highlight"><c- n>a</c-><c- p>[</c-><c- n>i</c-><c- p>]</c-></code> is swappable with ([swappable.requirements]) <code class="highlight"><c- n>b</c-><c- p>[</c-><c- n>i</c-><c- p>]</c-></code> for all <code class="highlight"><c- n>i</c-></code> in the range <code class="highlight"><c- p>[</c-><c- mi>0</c-><c- p>,</c-> <c- n>N</c-><c- p>)</c-></code>. </p><p>7. <i>Effects:</i> As if by <code class="highlight"><c- n>swap_ranges</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-> <c- o>+</c-> <c- n>N</c-><c- p>,</c-> <c- n>b</c-><c- p>)</c-></code>. </p></small>
-   </blockquote>
-   <h3 class="heading settled" data-level="5.5" id="wording-alg.swap"><span class="secno">5.5. </span><span class="content">[alg.swap]</span><a class="self-link" href="#wording-alg.swap"></a></h3>
+   <h3 class="heading settled" data-level="5.4" id="wording-alg.swap"><span class="secno">5.4. </span><span class="content">[alg.swap]</span><a class="self-link" href="#wording-alg.swap"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/alg.swap">[alg.swap]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2456,7 +2447,49 @@ position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- p>(</c-><c- n
   <c- k>constexpr</c-> <c- n>ranges</c-><c- o>::</c-><c- n>swap_ranges_result</c-><c- o>&lt;</c-><c- n>borrowed_iterator_t</c-><c- o>&lt;</c-><c- n>R1</c-><c- o>></c-><c- p>,</c-> <c- n>borrowed_iterator_t</c-><c- o>&lt;</c-><c- n>R2</c-><c- o>>></c->
     <c- n>ranges</c-><c- o>::</c-><c- n>swap_ranges</c-><c- p>(</c-><c- n>R1</c-><c- o>&amp;&amp;</c-> <c- n>r1</c-><c- p>,</c-> <c- n>R2</c-><c- o>&amp;&amp;</c-> <c- n>r2</c-><c- p>);</c->
 </pre><p>1. Let: </p><ul><li data-md><p><code class="highlight"><c- n>last2</c-></code> be <code class="highlight"><c- n>first2</c-> <c- o>+</c-> <c- p>(</c-><c- n>last1</c-> <c- o>-</c-> <c- n>first1</c-><c- p>)</c-></code> for the overloads with no parameter named <code class="highlight"><c- n>last2</c-></code>;</p> </li><li data-md><p><em>M</em> be <code class="highlight"><c- n>min</c-><c- p>(</c-><c- n>last1</c-> <c- o>-</c-> <c- n>first1</c-><c- p>,</c-> <c- n>last2</c-> <c- o>-</c-> <c- n>first2</c-><c- p>)</c-></code>.</p> </li></ul> <p>2. <i>Preconditions:</i> The two ranges <code class="highlight"><c- p>[</c-><c- n>first1</c-><c- p>,</c-> <c- n>last1</c-><c- p>)</c-></code> and <code class="highlight"><c- p>[</c-><c- n>first2</c-><c- p>,</c-> <c- n>last2</c-><c- p>)</c-></code> do not overlap.
-For the overloads in namespace <code class="highlight"><c- n>std</c-></code>, <code class="highlight"><c- o>*</c-><c- p>(</c-><c- n>first1</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code> is swappable with ([swappable.requirements]) <code class="highlight"><c- o>*</c-><c- p>(</c-><c- n>first2</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code> <ins>for all <code class="highlight"><c- n>n</c-></code> in the range <code class="highlight"><c- p>[</c-><c- mi>0</c-><c- p>,</c-> <c- n>M</c-><c- p>)</c-></code></ins>. </p><p>3. <i>Effects:</i> For each non-negative integer <em>n</em> &lt; <em>M</em> <del>performs</del> : </p><ul><li data-md><del><code class="highlight"><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- p>(</c-><c- n>first1</c-> <c- o>+</c-> <c- n>n</c-><c- p>),</c-> <c- o>*</c-><c- p>(</c-><c- n>first2</c-> <c- o>+</c-> <c- n>n</c-><c- p>))</c-></code></del> <ins>exchanges the values of <code class="highlight"><c- o>*</c-><c- p>(</c-><c- n>first1</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code> and <code class="highlight"><c- o>*</c-><c- p>(</c-><c- n>first2</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code></ins> for the overloads in namespace <code class="highlight"><c- n>std</c-></code>; </li><li data-md><ins>performs</ins> <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-><c- p>(</c-><c- n>first1</c-> <c- o>+</c-> <c- n>n</c-><c- p>,</c-> <c- n>first2</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code> for the overloads in namespace <code class="highlight"><c- n>ranges</c-></code>. </li></ul> <p>4. <i>Returns:</i> </p><ul><li data-md><p><code class="highlight"><c- n>last2</c-></code> for the overloads in namespace <code class="highlight"><c- n>std</c-></code>.</p> </li><li data-md><p><code class="highlight"><c- p>{</c-><c- n>first1</c-> <c- o>+</c-> <c- n>M</c-><c- p>,</c-> <c- n>first2</c-> <c- o>+</c-> <c- n>M</c-><c- p>}</c-></code> for the overloads in namespace <code class="highlight"><c- n>ranges</c-></code>.</p> </li></ul> <p>5. <i>Complexity:</i> Exactly <em>M</em> swaps. </p></small>
+For the overloads in namespace <code class="highlight"><c- n>std</c-></code>, <code class="highlight"><c- o>*</c-><c- p>(</c-><c- n>first1</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code> is swappable with ([swappable.requirements]) <code class="highlight"><c- o>*</c-><c- p>(</c-><c- n>first2</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code> <ins>for all <code class="highlight"><c- n>n</c-></code> in the range <code class="highlight"><c- p>[</c-><c- mi>0</c-><c- p>,</c-> <c- n>M</c-><c- p>)</c-></code></ins>. </p><p>3. <i>Effects:</i> For each non-negative integer <em>n</em> &lt; <em>M</em> <del>performs</del> : </p><ul><li data-md><del><code class="highlight"><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- p>(</c-><c- n>first1</c-> <c- o>+</c-> <c- n>n</c-><c- p>),</c-> <c- o>*</c-><c- p>(</c-><c- n>first2</c-> <c- o>+</c-> <c- n>n</c-><c- p>))</c-></code></del> <ins>exchanges the values of <code class="highlight"><c- o>*</c-><c- p>(</c-><c- n>first1</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code> and <code class="highlight"><c- o>*</c-><c- p>(</c-><c- n>first2</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code></ins> for the overloads in namespace <code class="highlight"><c- n>std</c-></code>; </li><li data-md><ins>performs</ins> <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-><c- p>(</c-><c- n>first1</c-> <c- o>+</c-> <c- n>n</c-><c- p>,</c-> <c- n>first2</c-> <c- o>+</c-> <c- n>n</c-><c- p>)</c-></code> for the overloads in namespace <code class="highlight"><c- n>ranges</c-></code>. </li></ul> <p>4. <i>Returns:</i> </p><ul><li data-md><p><code class="highlight"><c- n>last2</c-></code> for the overloads in namespace <code class="highlight"><c- n>std</c-></code>.</p> </li><li data-md><p><code class="highlight"><c- p>{</c-><c- n>first1</c-> <c- o>+</c-> <c- n>M</c-><c- p>,</c-> <c- n>first2</c-> <c- o>+</c-> <c- n>M</c-><c- p>}</c-></code> for the overloads in namespace <code class="highlight"><c- n>ranges</c-></code>.</p> </li></ul> <p>5. <i>Complexity:</i> Exactly <em>M</em> swaps. </p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ForwardIterator1</c-><c- p>,</c-> <c- k>class</c-> <c- nc>ForwardIterator2</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- b>void</c-> <c- n>iter_swap</c-><c- p>(</c-><c- n>ForwardIterator1</c-> <c- n>a</c-><c- p>,</c-> <c- n>ForwardIterator2</c-> <c- n>b</c-><c- p>);</c->
+</pre><p>6. <i>Preconditions:</i> <code class="highlight"><c- n>a</c-></code> and <code class="highlight"><c- n>b</c-></code> are dereferenceable. <code class="highlight"><c- o>*</c-><c- n>a</c-></code> is swappable with ([swappable.requirements]) <code class="highlight"><c- o>*</c-><c- n>b</c-></code>. </p><p>7. <i>Effects:</i> As if by <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- n>a</c-><c- p>,</c-> <c- o>*</c-><c- n>b</c-><c- p>)</c-></code>. </p></small>
+   </blockquote>
+   <h3 class="heading settled" data-level="5.5" id="wording-utility.swap"><span class="secno">5.5. </span><span class="content">[utility.swap] (unchanged)</span><a class="self-link" href="#wording-utility.swap"></a></h3>
+   <p><a href="https://eel.is/c++draft/utility.swap">[utility.swap]</a> does not seem to require any changes:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- b>void</c-> <c- n>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>b</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c->
+</pre><p>1. <i>Constraints:</i> <code class="highlight"><c- n>is_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code> and <code class="highlight"><c- n>is_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>. </p><p>2. <i>Preconditions:</i> Type <code class="highlight"><c- n>T</c-></code> meets the <em>Cpp17MoveConstructible</em> (Table 31) and <em>Cpp17MoveAssignable</em> (Table 33) requirements. </p><p>3. <i>Effects:</i> Exchanges values stored in two locations. </p><p>4. <i>Remarks:</i> The exception specification is equivalent to: <code class="highlight"><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> </p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>N</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- b>void</c-> <c- n>swap</c-><c- p>(</c-><c- n>T</c-> <c- p>(</c-><c- o>&amp;</c-><c- n>a</c-><c- p>)[</c-><c- n>N</c-><c- p>],</c-> <c- n>T</c-> <c- p>(</c-><c- o>&amp;</c-><c- n>b</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-> <c- k>noexcept</c-><c- p>(</c-><c- n>is_nothrow_swappable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>);</c->
+</pre><p>5. <i>Constraints:</i> <code class="highlight"><c- n>is_swappable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>. </p><p>6. <i>Preconditions:</i> <code class="highlight"><c- n>a</c-><c- p>[</c-><c- n>i</c-><c- p>]</c-></code> is swappable with ([swappable.requirements]) <code class="highlight"><c- n>b</c-><c- p>[</c-><c- n>i</c-><c- p>]</c-></code> for all <code class="highlight"><c- n>i</c-></code> in the range <code class="highlight"><c- p>[</c-><c- mi>0</c-><c- p>,</c-> <c- n>N</c-><c- p>)</c-></code>. </p><p>7. <i>Effects:</i> As if by <code class="highlight"><c- n>swap_ranges</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-> <c- o>+</c-> <c- n>N</c-><c- p>,</c-> <c- n>b</c-><c- p>)</c-></code>. </p></small>
+   </blockquote>
+   <h3 class="heading settled" data-level="5.6" id="wording-iterator.cust.swap"><span class="secno">5.6. </span><span class="content">[iterator.cust.swap] (unchanged)</span><a class="self-link" href="#wording-iterator.cust.swap"></a></h3>
+   <p class="note" role="note"><span class="marker">Note:</span> Trivial types may ignore the first bullet below, because even if a user-defined ADL <code class="highlight"><c- n>iter_swap</c-></code> is
+available, it must "exchange the values denoted by <code class="highlight"><c- n>E1</c-></code> and <code class="highlight"><c- n>E2</c-></code>" — that is, it must not be observably different
+from an ordinary (possibly trivial) swap. The second and third bullets explicitly describe ways of performing
+an ordinary (possibly trivial) swap by hand; for any P1144 trivially relocatable type, these are guaranteed to
+be tantamount to swapping the bytes. Therefore vendors can already optimize <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-></code> today,
+without any change in this section’s wording.</p>
+   <p><a href="https://eel.is/c++draft/iterator.cust.swap">[iterator.cust.swap]</a> does not seem to require any changes:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <p>1. The name <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-></code> denotes a customization point object ([customization.point.object]) that exchanges the values ([concept.swappable]) denoted by its arguments. </p><p>2. Let <code class="highlight"><i><c- n>iter</c-><c- o>-</c-><c- n>exchange</c-><c- o>-</c-><c- n>move</c-></i></code> be the exposition-only function template: </p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>X</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Y</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- n>iter_value_t</c-><c- o>&lt;</c-><c- n>X</c-><c- o>></c-> <i><c- n>iter</c-><c- o>-</c-><c- n>exchange</c-><c- o>-</c-><c- n>move</c-></i><c- p>(</c-><c- n>X</c-><c- o>&amp;&amp;</c-> <c- n>x</c-><c- p>,</c-> <c- n>Y</c-><c- o>&amp;&amp;</c-> <c- n>y</c-><c- p>)</c->
+    <c- k>noexcept</c-><c- p>(</c-><c- k>noexcept</c-><c- p>(</c-><c- n>iter_value_t</c-><c- o>&lt;</c-><c- n>X</c-><c- o>></c-><c- p>(</c-><c- n>iter_move</c-><c- p>(</c-><c- n>x</c-><c- p>)))</c-> <c- o>&amp;&amp;</c->
+             <c- k>noexcept</c-><c- p>(</c-><c- o>*</c-><c- n>x</c-> <c- o>=</c-> <c- n>iter_move</c-><c- p>(</c-><c- n>y</c-><c- p>)));</c->
+</pre><p>3. <em>Effects:</em> Equivalent to: </p><pre class="highlight"><c- n>iter_value_t</c-><c- o>&lt;</c-><c- n>X</c-><c- o>></c-> <c- n>old_value</c-><c- p>(</c-><c- n>iter_move</c-><c- p>(</c-><c- n>x</c-><c- p>));</c->
+<c- o>*</c-><c- n>x</c-> <c- o>=</c-> <c- n>iter_move</c-><c- p>(</c-><c- n>y</c-><c- p>);</c->
+<c- k>return</c-> <c- n>old_value</c-><c- p>;</c->
+</pre><p>4. The expression <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-><c- p>(</c-><c- n>E1</c-><c- p>,</c-> <c- n>E2</c-><c- p>)</c-></code> for subexpressions <code class="highlight"><c- n>E1</c-></code> and <code class="highlight"><c- n>E2</c-></code> is expression-equivalent to: </p><ul><li data-md><p><code class="highlight"><c- p>(</c-><c- b>void</c-><c- p>)</c-><c- n>iter_swap</c-><c- p>(</c-><c- n>E1</c-><c- p>,</c-> <c- n>E2</c-><c- p>)</c-></code>, if either <code class="highlight"><c- n>E1</c-></code> or <code class="highlight"><c- n>E2</c-></code> has class or enumeration type and <code class="highlight"><c- n>iter_swap</c-><c- p>(</c-><c- n>E1</c-><c- p>,</c-> <c- n>E2</c-><c- p>)</c-></code> is a well-formed expression
+    with overload resolution performed in a context that includes the declaration</p> <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>I1</c-><c- p>,</c-> <c- k>class</c-> <c- nc>I2</c-><c- o>></c->
+  <c- b>void</c-> <c- n>iter_swap</c-><c- p>(</c-><c- n>I1</c-><c- p>,</c-> <c- n>I2</c-><c- p>)</c-> <c- o>=</c-> <c- k>delete</c-><c- p>;</c->
+</pre><p>and does not include a declaration of <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-></code>. If the function selected by overload resolution
+    does not exchange the values denoted by <code class="highlight"><c- n>E1</c-></code> and <code class="highlight"><c- n>E2</c-></code>, the program is ill-formed, no diagnostic required.
+    [<i>Note:</i> This precludes calling unconstrained <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>iter_swap</c-></code>. When the deleted overload is viable,
+    program-defined overloads need to be more specialized ([temp.func.order]) to be selected. <i>—end note</i>]</p> </li><li data-md><p>Otherwise, if the types of <code class="highlight"><c- n>E1</c-></code> and <code class="highlight"><c- n>E2</c-></code> each model <code class="highlight"><c- n>indirectly_readable</c-></code>, and if the reference types of <code class="highlight"><c- n>E1</c-></code> and <code class="highlight"><c- n>E2</c-></code> model <code class="highlight"><c- n>swappable_with</c-></code> ([concept.swappable]), then <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- n>E1</c-><c- p>,</c-> <c- o>*</c-><c- n>E2</c-><c- p>)</c-></code>.</p> </li><li data-md><p>Otherwise, if the types <code class="highlight"><c- n>T1</c-></code> and <code class="highlight"><c- n>T2</c-></code> of <code class="highlight"><c- n>E1</c-></code> and <code class="highlight"><c- n>E2</c-></code> model <code class="highlight"><c- n>indirectly_movable_storable</c-><c- o>&lt;</c-><c- n>T1</c-><c- p>,</c-> <c- n>T2</c-><c- o>></c-></code> and <code class="highlight"><c- n>indirectly_movable_storable</c-><c- o>&lt;</c-><c- n>T2</c-><c- p>,</c-> <c- n>T1</c-><c- o>></c-></code>,
+    then <code class="highlight"><c- p>(</c-><c- b>void</c-><c- p>)(</c-><c- o>*</c-><c- n>E1</c-> <c- o>=</c-> <i><c- n>iter</c-><c- o>-</c-><c- n>exchange</c-><c- o>-</c-><c- n>move</c-></i><c- p>(</c-><c- n>E2</c-><c- p>,</c-> <c- n>E1</c-><c- p>))</c-></code>, except that <code class="highlight"><c- n>E1</c-></code> is evaluated only once.</p> </li><li data-md><p>Otherwise, <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-><c- p>(</c-><c- n>E1</c-><c- p>,</c-> <c- n>E2</c-><c- p>)</c-></code> is ill-formed.
+    [<i>Note:</i> This case can result in substitution failure when <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-><c- p>(</c-><c- n>E1</c-><c- p>,</c-> <c- n>E2</c-><c- p>)</c-></code> appears
+    in the immediate context of a template instantiation. <i>—end note</i>]</p> </li></ul> </small>
    </blockquote>
   </main>
 <script>

@@ -2,7 +2,7 @@
 Title: Relax wording to permit relocation optimizations in the STL
 Shortname: D3055
 Revision: 0
-!Draft Revision: 1
+!Draft Revision: 2
 Audience: LEWG
 Status: D
 Group: WG21
@@ -33,7 +33,7 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 # Motivation and proposal # {#proposal}
 
 We have two largely similar active proposals for "trivial relocation" in C++: Arthur's [[P1144]],
-and Bloomberg's [[P2786]] / [[P2959]] / [[P2967]]. We also have two relatively recent proposals
+and Bloomberg's [[P2786]] / [[P2959]] / [[P2967]]. We also have two recent proposals
 for "non-trivial relocation" as a new fundamental operation: Bloomberg's [[P2839]] (rejected by EWG
 in Varna) and Bini and Catmur's [[P2785]] (still active).
 
@@ -61,8 +61,8 @@ The exact details of this code snippet are up for debate: should the library pro
 to use memcpy instead of move-and-destroy-in-a-loop? and so on. This paper P3055 considers all
 those little details to be "out of scope"; they don't affect the gist of this paper.
 
-This paper concerns itself with the gigantic problem — anything like the above implementation
-is,formally, forbidden by the current Standard! To permit the above implementation, we must
+This paper concerns itself with one giant problem — anything like the above implementation
+is, formally, forbidden by the current Standard! To permit the above implementation, we must
 loosen the specification of `vector::erase`
 (<a href="https://eel.is/c++draft/vector.modifiers">[vector.modifiers]/3</a>)
 along these lines:
@@ -144,12 +144,15 @@ which are present in the actual library.
     }
 ```
 
+## Benchmark ## {#benchmark}
+
 As [the above Godbolt](https://godbolt.org/z/EWzKqq5s3) shows,
 trivial relocation is an "infinitely valuable optimization"
 in the same sense as C++11 move semantics. For the following type `S`,
 mainline libc++ compiles `std::swap` into 74 lines of assembly;
 Arthur's P1144 fork of libc++ compiles it into 18 lines.
 
+```c++
     struct S {
         S();
         std::unique_ptr<int> p;
@@ -160,6 +163,7 @@ Arthur's P1144 fork of libc++ compiles it into 18 lines.
     void test(S& a, S& b) {
         std::swap(a, b);
     }
+```
 
 This propagates back up the call-stack as high as we're willing to let it propagate.
 Arthur's libc++ effectively applies this paper P3055's proposed wording already,
@@ -378,30 +382,6 @@ position `first + (i + (last - middle)) % (last - first)`. [<i>Note:</i> This 
 <p>4. <i>Complexity:</i> <del>At most `last - first` swaps.</del> <ins>Linear in `last - first`.</ins>
 </blockquote></small>
 
-## [utility.swap] (unchanged) ## {#wording-utility.swap}
-
-<a href="https://eel.is/c++draft/utility.swap">[utility.swap]</a> does not seem to require any changes:
-
-<small><blockquote>
-<pre>
-template&lt;class T>
-  constexpr void swap(T& a, T& b) noexcept(<i>see below</i>);
-</pre>
-<p>1. <i>Constraints:</i> `is_move_constructible_v<T>` is `true` and `is_move_assignable_v<T>` is `true`.
-<p>2. <i>Preconditions:</i> Type `T` meets the *Cpp17MoveConstructible* (Table 31) and *Cpp17MoveAssignable* (Table 33) requirements.
-<p>3. <i>Effects:</i> Exchanges values stored in two locations.
-<p>4. <i>Remarks:</i> The exception specification is equivalent to:
-`is_nothrow_move_constructible_v<T> && is_nothrow_move_assignable_v<T>`
-
-<pre>
-template&lt;class T, size_t N>
-  constexpr void swap(T (&a)\[N], T (&b)\[N]) noexcept(is_nothrow_swappable_v&lt;T>);
-</pre>
-<p>5. <i>Constraints:</i> `is_swappable_v<T>` is `true`.
-<p>6. <i>Preconditions:</i> `a[i]` is swappable with ([swappable.requirements]) `b[i]` for all `i` in the range `[0, N)`.
-<p>7. <i>Effects:</i> As if by `swap_ranges(a, a + N, b)`.
-</blockquote></small>
-
 ## [alg.swap] ## {#wording-alg.swap}
 
 Modify <a href="https://eel.is/c++draft/alg.swap">[alg.swap]</a> as follows:
@@ -445,6 +425,88 @@ For the overloads in namespace `std`, `*(first1 + n)` is swappable with ([swappa
 - `{first1 + M, first2 + M}` for the overloads in namespace `ranges`.
 
 <p>5. <i>Complexity:</i> Exactly *M* swaps.
+
+<pre>
+template&lt;class ForwardIterator1, class ForwardIterator2>
+  constexpr void iter_swap(ForwardIterator1 a, ForwardIterator2 b);
+</pre>
+<p>6. <i>Preconditions:</i> `a` and `b` are dereferenceable. `*a` is swappable with ([swappable.requirements]) `*b`.
+<p>7. <i>Effects:</i> As if by `swap(*a, *b)`.
+</blockquote></small>
+
+## [utility.swap] (unchanged) ## {#wording-utility.swap}
+
+<a href="https://eel.is/c++draft/utility.swap">[utility.swap]</a> does not seem to require any changes:
+
+<small><blockquote>
+<pre>
+template&lt;class T>
+  constexpr void swap(T& a, T& b) noexcept(<i>see below</i>);
+</pre>
+<p>1. <i>Constraints:</i> `is_move_constructible_v<T>` is `true` and `is_move_assignable_v<T>` is `true`.
+<p>2. <i>Preconditions:</i> Type `T` meets the *Cpp17MoveConstructible* (Table 31) and *Cpp17MoveAssignable* (Table 33) requirements.
+<p>3. <i>Effects:</i> Exchanges values stored in two locations.
+<p>4. <i>Remarks:</i> The exception specification is equivalent to:
+`is_nothrow_move_constructible_v<T> && is_nothrow_move_assignable_v<T>`
+
+<pre>
+template&lt;class T, size_t N>
+  constexpr void swap(T (&a)\[N], T (&b)\[N]) noexcept(is_nothrow_swappable_v&lt;T>);
+</pre>
+<p>5. <i>Constraints:</i> `is_swappable_v<T>` is `true`.
+<p>6. <i>Preconditions:</i> `a[i]` is swappable with ([swappable.requirements]) `b[i]` for all `i` in the range `[0, N)`.
+<p>7. <i>Effects:</i> As if by `swap_ranges(a, a + N, b)`.
+</blockquote></small>
+
+## [iterator.cust.swap] (unchanged) ## {#wording-iterator.cust.swap}
+
+Note: Trivial types may ignore the first bullet below, because even if a user-defined ADL `iter_swap` is
+available, it must "exchange the values denoted by `E1` and `E2`" — that is, it must not be observably different
+from an ordinary (possibly trivial) swap. The second and third bullets explicitly describe ways of performing
+an ordinary (possibly trivial) swap by hand; for any P1144 trivially relocatable type, these are guaranteed to
+be tantamount to swapping the bytes. Therefore vendors can already optimize `ranges::iter_swap` today,
+without any change in this section's wording.
+
+<a href="https://eel.is/c++draft/iterator.cust.swap">[iterator.cust.swap]</a> does not seem to require any changes:
+
+<small><blockquote>
+<p>1. The name `ranges::iter_swap` denotes a customization point object ([customization.point.object]) that exchanges the values ([concept.swappable]) denoted by its arguments.
+<p>2. Let <code><i>iter-exchange-move</i></code> be the exposition-only function template:
+<pre>
+template&lt;class X, class Y>
+  constexpr iter_value_t&lt;X> <i>iter-exchange-move</i>(X&& x, Y&& y)
+    noexcept(noexcept(iter_value_t&lt;X>(iter_move(x))) &&
+             noexcept(*x = iter_move(y)));
+</pre>
+<p>3. *Effects:* Equivalent to:
+<pre>
+iter_value_t&lt;X> old_value(iter_move(x));
+*x = iter_move(y);
+return old_value;
+</pre>
+<p>4. The expression `ranges::iter_swap(E1, E2)` for subexpressions `E1` and `E2` is expression-equivalent to:
+
+- `(void)iter_swap(E1, E2)`, if either `E1` or `E2` has class or enumeration type and `iter_swap(E1, E2)` is a well-formed expression
+        with overload resolution performed in a context that includes the declaration
+        <pre>
+        template&lt;class I1, class I2>
+          void iter_swap(I1, I2) = delete;
+        </pre>
+        and does not include a declaration of `ranges::iter_swap`. If the function selected by overload resolution
+        does not exchange the values denoted by `E1` and `E2`, the program is ill-formed, no diagnostic required.
+        [<i>Note:</i> This precludes calling unconstrained `std::iter_swap`. When the deleted overload is viable,
+        program-defined overloads need to be more specialized ([temp.func.order]) to be selected. <i>—end note</i>]
+
+- Otherwise, if the types of `E1` and `E2` each model `indirectly_readable`, and if the reference types of `E1` and `E2`
+        model `swappable_with` ([concept.swappable]), then `ranges::swap(*E1, *E2)`.
+
+- Otherwise, if the types `T1` and `T2` of `E1` and `E2` model `indirectly_movable_storable<T1, T2>` and `indirectly_movable_storable<T2, T1>`,
+        then <code>(void)(*E1 = <i>iter-exchange-move</i>(E2, E1))</code>, except that `E1` is evaluated only once.
+
+- Otherwise, `ranges::iter_swap(E1, E2)` is ill-formed.
+        [<i>Note:</i> This case can result in substitution failure when `ranges::iter_swap(E1, E2)` appears
+        in the immediate context of a template instantiation. <i>—end note</i>]
+
 </blockquote></small>
 
 <pre class=biblio>
