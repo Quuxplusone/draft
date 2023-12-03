@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 10
-!Draft Revision: 57
+!Draft Revision: 58
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
   Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2023-11-28
+Date: 2023-12-02
 </pre>
 
 <style>
@@ -485,7 +485,7 @@ Modify <a href="http://eel.is/c++draft/class.prop">[class.prop]</a> as follows:
 - <ins>all of whose base classes are of trivially relocatable type;</ins>
 
 <ins>or a class that is declared with a `trivially_relocatable` attribute with value `true` (<a href="#wording-dcl.attr.trivreloc">[dcl.attr.trivreloc]</a>)
-if that attribute is supported by the implementation ([cpp.cond]).</ins>
+if that attribute is supported by the implementation (<a href="#wording-cpp.cond">[cpp.cond]</a>).</ins>
 
 <p>3․ A class `S` is a <i>standard-layout class</i> if it: [...]
 </blockquote></small>
@@ -505,7 +505,7 @@ and <i>cv</i>-qualified versions of these types are collectively called <i>stand
 Scalar types, implicit-lifetime class types ([class.prop]), array types, and <i>cv</i>-qualified versions of these types
 are collectively called <i>implicit-lifetime types</i>.
 
-<p><ins>x․ Trivially copyable types, trivially relocatable class types ([class.prop]), arrays of such types,
+<p><ins>x․ Trivially copyable types, trivially relocatable class types (<a href="#wording-class.prop">[class.prop]</a>), arrays of such types,
 and <i>cv</i>-qualified versions of these types are collectively called <i>trivially relocatable types</i>.
 
 <p><ins>[*Note:* For a trivially relocatable type, the relocation operation ([defns.relocation]) as performed by,
@@ -546,7 +546,7 @@ observable side-effects of its relocation other than a copy of the underlying by
 
 <p><ins>4․ *Recommended practice:* The value of a <i>has-attribute-expression</i> for
 the `trivially_relocatable` attribute should be `0` for a given implementation unless this attribute
-can cause a class type to be trivially relocatable ([class.prop]).</ins>
+can cause a class type to be trivially relocatable (<a href="#wording-class.prop">[class.prop]</a>).</ins>
 </blockquote></small>
 
 
@@ -633,6 +633,13 @@ Add a new entry to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">
 
 ## `relocate_at` and `relocate` ## {#wording-specialized.relocate}
 
+Note:
+These functions have both been implemented in my libc++ fork; for `relocate`, see [this Godbolt](https://p1144.godbolt.org/z/MqPjWfe3e)
+and [[StdRelocateIsCute]]. My implementation of their "as-if-by-memcpy" codepaths relies on
+Clang's `__builtin_memmove`; vendors can use any vendor-specific means to implement them.
+The wording also deliberately permits a low-quality implementation with no such codepath at all.
+See [[CppNow]] [@45:23–48:39](https://www.youtube.com/watch?v=SGdfPextuAU&t=45m23s).
+
 Add a new section after <a href="http://eel.is/c++draft/specialized.destroy">[specialized.destroy]</a>:
 
 <small><blockquote>
@@ -665,13 +672,6 @@ associated with the relocation of the value of `*source` might not happen.</ins>
 <ins>except that if `T` is trivially relocatable ([basic.types]), side effects
 associated with the relocation of the object's value might not happen.</ins>
 </blockquote></small>
-
-Note:
-These functions have both been implemented in my libc++ fork; for `relocate`, see [godbolt.org/z/cqPP4oeE9](https://p1144.godbolt.org/z/cqPP4oeE9)
-and [[StdRelocateIsCute]]. My implementation of their "as-if-by-memcpy" codepaths relies on
-Clang's `__builtin_memmove`; vendors can use any vendor-specific means to implement them.
-The wording also deliberately permits a low-quality implementation with no such codepath at all.
-See [[CppNow]] [@45:23–48:39](https://www.youtube.com/watch?v=SGdfPextuAU&t=45m23s).
 
 
 ## Nothrow bidirectional iterator [algorithms.requirements] ## {#wording-algorithms.requirements}
@@ -879,23 +879,22 @@ ranges are destroyed.
 ## Attribute `[[maybe_trivially_relocatable]]` ## {#maybe-trivially-relocatable}
 
 My Clang implementation, currently available on Godbolt, supports both
-`[[clang::trivially_relocatable]]` and another attribute called `[[clang::maybe_trivially_relocatable]]`,
-which John McCall requested that I explore.
+`[[trivially_relocatable]]` and another attribute called `[[clang::maybe_trivially_relocatable]]`,
+as suggested by John McCall in 2018 and also explored by <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a> in 2023.
+Where `[[trivially_relocatable]]` is a "sharp knife" that always cuts what you aim it at,
+`[[maybe_trivially_relocatable]]` is a "dull knife" that refuses to cut certain materials.
+
+* `[[maybe_trivially_relocatable]]` fails to support [[#design-goals]] examples #4 and #5.
+
+* See <a href="https://quuxplusone.github.io/blog/2023/03/10/sharp-knife-dull-knife/">"Should the compiler sometimes reject a `[[trivially_relocatable]]` warrant?"</a> (2023-03-10).
+
+* See [P1144R4 §6.2](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1144r4.html#maybe-trivially-relocatable).
 
 In Issaquah (February 2023), <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a>
-suggested a very similar design to `[[clang::maybe_trivially_relocatable]]`.
+suggested a "dull knife" design similar to `[[clang::maybe_trivially_relocatable]]`.
 EWGI took a three-way straw poll on `[[trivially_relocatable]]` versus `[[maybe_trivially_relocatable]]`,
 with an inconclusive 7–5–6 vote (the author of P1144 voting "For" and the three representatives of P2786
-voting "Against").
-
-For discussion of `[[maybe_trivially_relocatable]]` and why I don't think it's the right thing
-to standardize, see
-
-* `[[maybe_trivially_relocatable]]` by itself cannot support [[#design-goals]] examples #4 and #5
-
-* [P1144R4 section 6.2](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1144r4.html#maybe-trivially-relocatable)
-
-* <a href="https://quuxplusone.github.io/blog/2023/03/10/sharp-knife-dull-knife/">"Should the compiler sometimes reject a `[[trivially_relocatable]]` warrant?"</a> (2023-03-10)
+voting "Against"; i.e. the vote sans authors was 6–5–3).
 
 
 ## Confusing interactions with `std::pmr` ## {#pmr-concerns}
