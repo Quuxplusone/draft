@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D3016R1<br>Resolve inconsistencies in begin/end for <code class="highlight"><c- n>valarray</c-></code> and braced initializer lists</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-11-12">2023-11-12</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-12-08">2023-12-08</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2105,7 +2105,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>6
+     <dd>7
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2205,7 +2205,8 @@ more harmful than helpful.</p>
    <p>We propose to resolve <code class="highlight"><c- n>valarray</c-></code>’s <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>cbegin</c-></code> inconsistency in favor of "make it work"
 and to resolve <em>braced-initializer-list</em>’s inconsistency in favor of "make it ill-formed."</p>
    <h3 class="heading settled" data-level="2.1" id="data-empty"><span class="secno">2.1. </span><span class="content">.data and .empty</span><a class="self-link" href="#data-empty"></a></h3>
-   <p>We also propose two additional member functions for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code>: <code class="highlight"><c- n>data</c-><c- p>()</c-></code> and <code class="highlight"><c- n>empty</c-><c- p>()</c-></code>. <code class="highlight"><c- n>data</c-><c- p>()</c-></code> is conspicuously missing. Many places in the library clauses would like to operate on
+   <p>We also propose two additional member functions for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code>: <code class="highlight"><c- p>.</c-><c- n>data</c-><c- p>()</c-></code> and <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code>.</p>
+   <p>Many places in the library clauses would like to operate on
 the contiguous data of an <code class="highlight"><c- n>initializer_list</c-></code> using the "data + size" idiom, but since <code class="highlight"><c- n>initializer_list</c-></code> lacks <code class="highlight"><c- p>.</c-><c- n>data</c-><c- p>()</c-></code>, they’re forced to use an awkward "begin + size" approach instead. This (1) looks unnatural
 and (2) causes extra mental effort for library writers. Part of P3016’s proposed wording is to update
 these places in the library. For example:</p>
@@ -2217,9 +2218,7 @@ these places in the library. For example:</p>
 </pre> <p>16. <em>Effects:</em> Equivalent to <code class="highlight"><c- k>return</c-> <c- n>append</c-><c- p>(</c-><ins><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>(),</c-> <c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></ins> <del><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></del><c- p>);</c-></code> </p></small>
    </blockquote>
    <p>As for <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code>, it is generally recognized these days that ranges providing <code class="highlight"><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> should also
-provide <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code>. For example see <a data-link-type="biblio" href="#biblio-lwg4001" title="iota_view should provide empty">[LWG4001]</a> adding member <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code> to <code class="highlight"><c- n>iota_view</c-></code>.
-(As of 2023-11-12, LWG4001 is still officially unprioritized, but on its prioritization poll on 2023-10-30
-received 7 votes for P0 and no objections, so I think it’s going to happen.)</p>
+provide <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code>. For example, <code class="highlight"><c- n>iota_view</c-></code>’s missing <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code> was added as a DR by <a data-link-type="biblio" href="#biblio-lwg4001" title="iota_view should provide empty">[LWG4001]</a>.</p>
    <p>By making <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>()</c-></code> and <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code> well-formed for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code> objects, we satisfy the SFINAE
 conditions of the primary templates for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>data</c-><c- p>(</c-><c- n>il</c-><c- p>)</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>empty</c-><c- p>(</c-><c- n>il</c-><c- p>)</c-></code>, meaning that we can eliminate
 their special overloads for <code class="highlight"><c- n>initializer_list</c-></code> arguments.</p>
@@ -2231,10 +2230,15 @@ their special overloads for <code class="highlight"><c- n>initializer_list</c-><
 <c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>data</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
   <c- c1>// OK, calls the initializer_list overload</c->
   <c- c1>// specially provided in &lt;iterator></c->
+<c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>empty</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// OK, calls the initializer_list overload</c->
+  <c- c1>// specially provided in &lt;iterator></c->
 </pre>
       <td>
 <pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>il</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
 <c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>data</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// OK, calls the primary template</c->
+<c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>empty</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
   <c- c1>// OK, calls the primary template</c->
 </pre>
      <tr>
@@ -2243,15 +2247,34 @@ their special overloads for <code class="highlight"><c- n>initializer_list</c-><
   <c- c1>// calls the initializer_list overload</c->
   <c- c1>// specially provided in &lt;iterator>,</c->
   <c- c1>// and immediately dangles</c->
+<c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>q</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>data</c-><c- p>({});</c->
+  <c- c1>// does not compile</c->
 </pre>
       <td>
 <pre class="language-c++ highlight"><c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>data</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c->
+  <c- c1>// does not compile</c->
+<c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>q</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>data</c-><c- p>({});</c->
+  <c- c1>// does not compile</c->
+</pre>
+     <tr>
+      <td>
+<pre class="language-c++ highlight"><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>empty</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c->
+  <c- c1>// calls the initializer_list overload</c->
+  <c- c1>// specially provided in &lt;iterator>,</c->
+  <c- c1>// invariably returns false</c->
+<c- b>bool</c-> <c- n>c</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>empty</c-><c- p>({});</c->
+  <c- c1>// does not compile</c->
+</pre>
+      <td>
+<pre class="language-c++ highlight"><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>empty</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c->
+  <c- c1>// does not compile</c->
+<c- b>bool</c-> <c- n>c</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>empty</c-><c- p>({});</c->
   <c- c1>// does not compile</c->
 </pre>
    </table>
    <h2 class="heading settled" data-level="3" id="history"><span class="secno">3. </span><span class="content">Historical background</span><a class="self-link" href="#history"></a></h2>
    <p><a data-link-type="biblio" href="#biblio-n2930" title="Range-Based For Loop Wording (Without Concepts)">[N2930]</a> "Range-Based For Loop Wording (Without Concepts)" (2009) proposed that <a href="https://eel.is/c++draft/stmt.ranged">[stmt.ranged]</a> should consider only free function <code class="highlight"><c- n>begin</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> plus a special case
-for built-in arrays; therefore N2930 added not only <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> but also <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code>’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> (because they wanted <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> not to pull in <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>, and <code class="highlight"><c- n>initializer_list</c-></code>’s member function <code class="highlight"><c- n>begin</c-><c- p>()</c-></code> wasn’t going to be found by
+for built-in arrays; therefore N2930 added both <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> and <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code>’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> — because they wanted <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> not to pull in <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>, and <code class="highlight"><c- n>initializer_list</c-></code>’s member function <code class="highlight"><c- n>begin</c-><c- p>()</c-></code> wasn’t going to be found by
 their proposed [stmt.ranged].</p>
    <p>Then, <a data-link-type="biblio" href="#biblio-n3271" title="Wording for Range-Based For Loop (Option #5)">[N3271]</a> "Wording for Range-Based For Loop (Option #5)" (2011) added the middle
 bullet point in today’s version of [stmt.ranged]:</p>
@@ -2268,9 +2291,9 @@ this name lookup, namespace <code class="highlight"><c- n>std</c-></code> is an 
    <p></p>
    <p>This change meant that <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code> no longer needed to provide
 free <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>end</c-></code>: The new second bullet lets us use <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> and <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>end</c-><c- p>()</c-></code>,
-so the third bullet is never reached when <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- n>__range</c-><c- p>)</c-></code> is <code class="highlight"><c- n>initializer_list</c-></code>.</p>
-   <p>There was a subtlety with loops of the form <code class="highlight"><c- k>for</c-> <c- p>(</c-><c- b>int</c-> <c- n>i</c-> <c- o>:</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code>, whose <em>for-range-initializer</em> is a <em>braced-initializer-list</em> with no type. <a data-link-type="biblio" href="#biblio-cwg1274" title="Common nonterminal for expression and braced-init-list">[CWG1274]</a> forced such loops to use the free <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>__range</c-><c- p>)</c-></code>; but (1) this would still have worked even without the custom overload
-for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c-></code>, and (2) Clang/GCC/EDG all use member <code class="highlight"><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>::</c-><c- n>begin</c-><c- p>()</c-></code> for this kind of loop anyway. <a data-link-type="biblio" href="#biblio-cwg2825" title="Range-based for statement using a braced-init-list">[CWG2825]</a> will soon resolve this wording defect.</p>
+so the third bullet is never reached when <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- n>__range</c-><c- p>)</c-></code> is <code class="highlight"><c- n>initializer_list</c-></code>.
+(Loops of the form <code class="highlight"><c- k>for</c-> <c- p>(</c-><c- b>int</c-> <c- n>i</c-> <c- o>:</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code> are subtle because the <em>for-range-initializer</em> is a <em>braced-initializer-list</em> with no type. <a data-link-type="biblio" href="#biblio-cwg2825" title="Range-based for statement using a braced-init-list">[CWG2825]</a> addressed this; GCC, Clang, and EDG
+already implement the resolution.)</p>
    <p>Meanwhile, since the prioritized customization point in [stmt.ranged] had shifted from
 non-member <code class="highlight"><c- n>begin</c-></code> to member <code class="highlight"><c- n>begin</c-></code>, it would have made sense for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>valarray</c-></code>’s <code class="highlight"><c- n>begin</c-></code> to change from a non-member to a member. But this was not done — possibly out of C++0x–era
 concerns that giving <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>valarray</c-></code> member <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>end</c-></code> would make it "too much like a container." <a data-link-type="biblio" href="#biblio-lwg2058" title="valarray and begin/end">[LWG2058]</a> (2011) contains comments like: "The intent of these overloads is entirely to support
@@ -2317,8 +2340,9 @@ no problems except in this single test from libc++'s own test suite:</p>
    <p>This test now fails first because <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> was not included, and second
 because today’s <code class="highlight"><c- n>begin</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-><c- p>)</c-></code> is noexcept
 but the primary template <code class="highlight"><c- n>begin</c-><c- p>(</c-><c- n>C</c-><c- o>&amp;</c-><c- p>)</c-></code> is non-noexcept
-(per <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf">P0884</a> guidance).
-Of course P3016 preserves that <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>)</c-></code> is noexcept.</p>
+(per <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf">P0884</a> guidance).</p>
+   <p><code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> and <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>)</c-></code> remain noexcept.</p>
+   <p><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>valarray</c-><c- p>)</c-></code> remains non-noexcept.</p>
    <h3 class="heading settled" data-level="4.1" id="tony-table"><span class="secno">4.1. </span><span class="content">Tony Table</span><a class="self-link" href="#tony-table"></a></h3>
    <table>
     <tbody>
@@ -2398,6 +2422,8 @@ and shall allow assignments and compound assignments of such types to <code clas
    <h3 class="heading settled" data-level="5.2" id="wording-template.valarray.overview"><span class="secno">5.2. </span><span class="content">[template.valarray.overview]</span><a class="self-link" href="#wording-template.valarray.overview"></a></h3>
    <p class="note" role="note"><span class="marker">Note:</span> We propose exposition-only <code class="highlight"><c- n>iterator</c-></code> and <code class="highlight"><c- n>const_iterator</c-></code> typedefs, but would
 love to make them non-exposition-only.</p>
+   <p class="note" role="note"><span class="marker">Note:</span> The <code class="highlight"><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> and <code class="highlight"><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> members of every STL container are marked noexcept. <code class="highlight"><c- n>valarray</c-></code>’s <code class="highlight"><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> are non-noexcept. We propose <code class="highlight"><c- n>valarray</c-></code>’s <code class="highlight"><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> should also be non-noexcept, for consistency. If we add any <code class="highlight"><c- k>noexcept</c-></code> markings to <code class="highlight"><c- n>valarray</c-></code>,
+we should add them consistently throughout the class — not <em>only</em> on its <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code>.</p>
    <p>Modify <a href="https://eel.is/c++draft/template.valarray.overview">[template.valarray.overview]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2495,7 +2521,7 @@ Copying an <code class="highlight"><c- n>initializer_list</c-></code> does not c
    <h3 class="heading settled" data-level="5.5" id="wording-iterator.synopsis"><span class="secno">5.5. </span><span class="content">[iterator.synopsis]</span><a class="self-link" href="#wording-iterator.synopsis"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:</p>
    <p><small></small></p>
-   <blockquote><small> <b>25.2 Header <iterator> synopsis[iterator.synopsis]</iterator></b><p></p> <pre class="highlight"><c- cp>#include</c-> &lt;compare><c- c1>              // see [compare.syn]</c->
+   <blockquote><small> <b>25.2 Header <iterator> synopsis [iterator.synopsis]</iterator></b><p></p> <pre class="highlight"><c- cp>#include</c-> &lt;compare><c- c1>              // see [compare.syn]</c->
 <c- cp>#include</c-> &lt;concepts><c- c1>             // see [concepts.syn]</c->
 <ins><c- cp>#include</c-> &lt;initializer_list><c- c1>     // see [initializer.list.syn]</c-></ins>
 
@@ -2764,8 +2790,6 @@ Copying an <code class="highlight"><c- n>initializer_list</c-></code> does not c
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
-   <dt id="biblio-cwg1274">[CWG1274]
-   <dd>Daniel Krügler. <a href="https://cplusplus.github.io/CWG/issues/1274.html"><cite>Common nonterminal for expression and braced-init-list</cite></a>. March 2011–October 2015. URL: <a href="https://cplusplus.github.io/CWG/issues/1274.html">https://cplusplus.github.io/CWG/issues/1274.html</a>
    <dt id="biblio-cwg2825">[CWG2825]
    <dd>Arthur O'Dwyer. <a href="https://cplusplus.github.io/CWG/issues/2825.html"><cite>Range-based for statement using a braced-init-list</cite></a>. November 2023. URL: <a href="https://cplusplus.github.io/CWG/issues/2825.html">https://cplusplus.github.io/CWG/issues/2825.html</a>
    <dt id="biblio-lwg2058">[LWG2058]

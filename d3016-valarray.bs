@@ -2,7 +2,7 @@
 Title: Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists
 Shortname: D3016
 Revision: 1
-!Draft Revision: 6
+!Draft Revision: 7
 Audience: LEWG
 Status: D
 Group: WG21
@@ -14,7 +14,7 @@ Abstract:
   applied to `valarray` and to braced initializer lists were caused by
   C++0x uncertainty around [stmt.ranged], and resolve these inconsistencies
   for C++26.
-Date: 2023-11-12
+Date: 2023-12-08
 </pre>
 
 <style>
@@ -88,8 +88,9 @@ and to resolve *braced-initializer-list*’s inconsistency in favor of "make it 
 
 ## .data and .empty ## {#data-empty}
 
-We also propose two additional member functions for `std::initializer_list`: `data()` and `empty()`.
-`data()` is conspicuously missing. Many places in the library clauses would like to operate on
+We also propose two additional member functions for `std::initializer_list`: `.data()` and `.empty()`.
+
+Many places in the library clauses would like to operate on
 the contiguous data of an `initializer_list` using the "data + size" idiom, but since `initializer_list`
 lacks `.data()`, they're forced to use an awkward "begin + size" approach instead. This (1) looks unnatural
 and (2) causes extra mental effort for library writers. Part of P3016's proposed wording is to update
@@ -108,9 +109,7 @@ constexpr basic_string& append(initializer_list&lt;charT> il);
 </blockquote></small>
 
 As for `.empty()`, it is generally recognized these days that ranges providing `.size()` should also
-provide `.empty()`. For example see [[LWG4001]] adding member `.empty()` to `iota_view`.
-(As of 2023-11-12, LWG4001 is still officially unprioritized, but on its prioritization poll on 2023-10-30
-received 7 votes for P0 and no objections, so I think it's going to happen.)
+provide `.empty()`. For example, `iota_view`'s missing `.empty()` was added as a DR by [[LWG4001]].
 
 By making `il.data()` and `il.empty()` well-formed for `std::initializer_list` objects, we satisfy the SFINAE
 conditions of the primary templates for `std::data(il)` and `std::empty(il)`, meaning that we can eliminate
@@ -124,12 +123,17 @@ their special overloads for `initializer_list` arguments.
   const int *p = std::data(il);
     // OK, calls the initializer_list overload
     // specially provided in <iterator>
+  bool b = std::empty(il);
+    // OK, calls the initializer_list overload
+    // specially provided in <iterator>
 ```
 </td>
 <td>
 ```c++
   std::initializer_list<int> il = {1,2,3};
   const int *p = std::data(il);
+    // OK, calls the primary template
+  bool b = std::empty(il);
     // OK, calls the primary template
 ```
 </td>
@@ -141,11 +145,35 @@ their special overloads for `initializer_list` arguments.
     // calls the initializer_list overload
     // specially provided in <iterator>,
     // and immediately dangles
+  const int *q = std::data({});
+    // does not compile
 ```
 </td>
 <td>
 ```c++
   const int *p = std::data({1,2,3});
+    // does not compile
+  const int *q = std::data({});
+    // does not compile
+```
+</td>
+</tr>
+<tr>
+<td>
+```c++
+  bool b = std::empty({1,2,3});
+    // calls the initializer_list overload
+    // specially provided in <iterator>,
+    // invariably returns false
+  bool c = std::empty({});
+    // does not compile
+```
+</td>
+<td>
+```c++
+  bool b = std::empty({1,2,3});
+    // does not compile
+  bool c = std::empty({});
     // does not compile
 ```
 </td>
@@ -157,8 +185,8 @@ their special overloads for `initializer_list` arguments.
 
 [[N2930]] "Range-Based For Loop Wording (Without Concepts)" (2009) proposed that
 <a href="https://eel.is/c++draft/stmt.ranged">[stmt.ranged]</a> should consider only free function `begin(x)` plus a special case
-for built-in arrays; therefore N2930 added not only `<iterator>`'s `std::begin` but also
-`<initializer_list>`'s `std::begin` (because they wanted `<initializer_list>` not to pull in
+for built-in arrays; therefore N2930 added both `<iterator>`'s `std::begin` and
+`<initializer_list>`'s `std::begin` — because they wanted `<initializer_list>` not to pull in
 `<iterator>`, and `initializer_list`'s member function `begin()` wasn't going to be found by
 their proposed [stmt.ranged].
 
@@ -184,12 +212,9 @@ bullet point in today's version of [stmt.ranged]:
 This change meant that `std::initializer_list` no longer needed to provide
 free `begin`/`end`: The new second bullet lets us use `il.begin()` and `il.end()`,
 so the third bullet is never reached when `decltype(__range)` is `initializer_list`.
-
-There was a subtlety with loops of the form `for (int i : {1,2,3})`, whose *for-range-initializer*
-is a *braced-initializer-list* with no type. [[CWG1274]] forced such loops to use the free
-`std::begin(__range)`; but (1) this would still have worked even without the custom overload
-for `std::begin(initializer_list<T>)`, and (2) Clang/GCC/EDG all use member `initializer_list<T>::begin()`
-for this kind of loop anyway. [[CWG2825]] will soon resolve this wording defect.
+(Loops of the form `for (int i : {1,2,3})` are subtle because the *for-range-initializer*
+is a *braced-initializer-list* with no type. [[CWG2825]] addressed this; GCC, Clang, and EDG
+already implement the resolution.)
 
 Meanwhile, since the prioritized customization point in [stmt.ranged] had shifted from
 non-member `begin` to member `begin`, it would have made sense for `std::valarray`'s `begin`
@@ -254,7 +279,10 @@ This test now fails first because `<iterator>` was not included, and second
 because today's `begin(initializer_list<E>)` is noexcept
 but the primary template `begin(C&)` is non-noexcept
 (per <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf">P0884</a> guidance).
-Of course P3016 preserves that `ranges::begin(il)` is noexcept.
+
+`il.begin()` and `ranges::begin(il)` remain noexcept.
+
+`std::begin(valarray)` remains non-noexcept.
 
 
 ## Tony Table ## {#tony-table}
@@ -386,6 +414,11 @@ and shall allow assignments and compound assignments of such types to `valarray<
 
 Note: We propose exposition-only `iterator` and `const_iterator` typedefs, but would
 love to make them non-exposition-only.
+
+Note: The `.size()` and `.begin()` members of every STL container are marked noexcept.
+`valarray`'s `.size()` and `std::begin` are non-noexcept. We propose `valarray`'s `.begin()`
+should also be non-noexcept, for consistency. If we add any `noexcept` markings to `valarray`,
+we should add them consistently throughout the class — not *only* on its `begin` and `end`.
 
 Modify <a href="https://eel.is/c++draft/template.valarray.overview">[template.valarray.overview]</a> as follows:
 
@@ -563,7 +596,7 @@ constexpr size_t size() const noexcept;
 Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:
 
 <small><blockquote>
-<b>25.2 Header <iterator> synopsis[iterator.synopsis]</b>
+<b>25.2 Header <iterator> synopsis [iterator.synopsis]</b>
 
 <pre>
 #include &lt;compare>              // see [compare.syn]
