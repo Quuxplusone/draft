@@ -2,7 +2,7 @@
 Title: Relax wording to permit relocation optimizations in the STL
 Shortname: D3055
 Revision: 0
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: LEWG
 Status: D
 Group: WG21
@@ -13,8 +13,9 @@ Abstract:
   We catalog the STL containers and algorithms that could benefit from
   optimizations related to relocation (P1144, P2786), and propose to loosen
   their current overspecification so that such optimizations become legal
-  (but not mandatory).
-Date: 2023-11-16
+  (but not mandatory), even in the absence of a standardized vocabulary
+  for relocation.
+Date: 2023-12-09
 </pre>
 
 <style>
@@ -37,10 +38,10 @@ and Bloomberg's [[P2786]] / [[P2959]] / [[P2967]]. We also have two recent propo
 for "non-trivial relocation" as a new fundamental operation: Bloomberg's [[P2839]] (rejected by EWG
 in Varna) and Bini and Catmur's [[P2785]] (still active).
 
-One major motivation for "(trivial) relocation" is that it allows library authors to choose "fast paths"
-for (trivially) relocatable types. For example, `vector::erase(it)` for a non-relocatable type must
-use `operator=` in a loop (represented here by `std::move`), but for a trivially relocatable type
-such as `unique_ptr` it can avoid `operator=` and use the moral equivalent of memcpy
+A major motivation for "(trivial) relocation" is that it allows library authors to choose "fast paths"
+for (trivially) relocatable types. For example, `vector::erase(it)` for non-relocatable `T` must
+use `operator=` in a loop (represented here by `std::move`), but for trivially relocatable `T`
+it can avoid `operator=` and use the moral equivalent of memcpy
 (represented here by P1144 `std::uninitialized_relocate`).
 
 ```c++
@@ -56,7 +57,7 @@ such as `unique_ptr` it can avoid `operator=` and use the moral equivalent of me
     }
 ```
 
-The exact details of this code snippet are up for debate: should the library provide a trait
+The exact details of that snippet are up for debate: should the library provide a trait
 `is_nothrow_relocatable_v`? should `uninitialized_relocate` be guaranteed, or merely encouraged,
 to use memcpy instead of move-and-destroy-in-a-loop? and so on. This paper P3055 considers all
 those little details to be "out of scope"; they don't affect the gist of this paper.
@@ -87,8 +88,7 @@ strategy. So for example it would become legal for the implementation to do just
 ```c++
     void erase(iterator it) {
         std::rotate(it, it + 1, end_);
-        std::destroy_at(end_ - 1);
-        --end_;
+        std::destroy_at(end_--);
     }
 ```
 
@@ -144,13 +144,21 @@ which are present in the actual library.
     }
 ```
 
+In other words, this paper P3055 is needed, even after P1144/P2786. If one of those papers
+is adopted without P3055, then conforming implementations will still be technically forbidden to do
+the optimizations we want to enable (which are already done by `bsl::vector`, `folly::FBVector`, etc).
+Vice versa, as soon as P3055 is adopted (even without P1144/P2786), a conforming implementation will
+be able to use these optimizations on types it knows to be trivially relocatable
+(e.g. `std::deque<int>`), even if we continue to lack a standardized vocabulary
+for relocatable user-defined types.
+
+
 ## Benchmark ## {#benchmark}
 
-As [the above Godbolt](https://godbolt.org/z/EWzKqq5s3) shows,
-trivial relocation is an "infinitely valuable optimization"
+Trivial relocation is an "infinitely valuable optimization"
 in the same sense as C++11 move semantics. For the following type `S`,
-mainline libc++ compiles `std::swap` into 74 lines of assembly;
-Arthur's P1144 fork of libc++ compiles it into 18 lines.
+mainline libc++ compiles `std::swap` into 74 lines of assembly.
+Arthur's P1144 fork of libc++ compiles it into 18 lines. ([Godbolt.](https://godbolt.org/z/EWzKqq5s3))
 
 ```c++
     struct S {
@@ -209,7 +217,7 @@ which we propose to remove. After that change, a vendor might reasonably constru
     assert(a[0] == 2 && a[1] == 3 && a[2] == 1);
 ```
 
-...was no longer strictly mandated. They might choose to rotate the `tuple<int&>`s as-if-by relocation, rebinding
+...was no longer strictly mandated. They might choose to "place" the `tuple<int&>`s as-if-by relocation, rebinding
 each `tuple<int&>` and leaving the array `a` untouched. (However, Arthur's libc++ doesn't change this behavior,
 because Arthur's libc++ optimizes only trivially relocatable types, and `tuple<int&>` is not trivially relocatable.)
 
@@ -228,7 +236,7 @@ which we propose to remove. After that change, a vendor might reasonably constru
 rebinding each `tuple<int&>` and leaving the array `a` untouched. As [[P2959]] points out, this is
 exactly what happens anyway if you switch out `vector` for `list`. (Again, Arthur's libc++ doesn't change
 this behavior, because `tuple<int&>` is not trivially relocatable; but we certainly have no desire to
-continue mandating this behavior.)
+continue mandating the old behavior.)
 
 
 # Implementation experience # {#experience}
