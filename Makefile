@@ -14,6 +14,7 @@ all: \
     d2752-static-storage-for-braced-initializers.html \
     d2767-flat-omnibus.html \
     d2848-std-is-uniqued.html \
+    d2893-variadic-friends.html \
     d2903-ignore-explicit.html \
     d2952-auto-operators.html \
     d2953-forbid-defaulting-rr-assignment.html \
