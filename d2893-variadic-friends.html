@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D2893R1<br>Variadic friends</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-12-13">2023-12-13</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-12-15">2023-12-15</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2106,7 +2106,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>1
+     <dd>2
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2126,17 +2126,21 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#passkey-idiom"><span class="secno">2.1</span> <span class="content">Passkey idiom</span></a>
       <li><a href="#crtp-access"><span class="secno">2.2</span> <span class="content">CRTP access to derived</span></a>
      </ol>
-    <li><a href="#confusing"><span class="secno">3</span> <span class="content">Confusing grammatical examples</span></a>
+    <li>
+     <a href="#confusing"><span class="secno">3</span> <span class="content">Confusing grammatical examples</span></a>
+     <ol class="toc">
+      <li><a href="#confusing-elab"><span class="secno">3.1</span> <span class="content"><code class="highlight"><c- k>friend</c-> <c- k>class</c-> <c- nc>Ts</c-><c- p>...</c-></code></span></a>
+     </ol>
     <li>
      <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording</span></a>
      <ol class="toc">
       <li>
        <a href="#wording1"><span class="secno">4.1</span> <span class="content">Option 1 (preferred)</span></a>
        <ol class="toc">
-        <li><a href="#wording1-dcl.pre"><span class="secno">4.1.1</span> <span class="content">[dcl.pre]</span></a>
-        <li><a href="#wording1-temp.res.general"><span class="secno">4.1.2</span> <span class="content">[temp.res.general]</span></a>
-        <li><a href="#wording1-temp.variadic"><span class="secno">4.1.3</span> <span class="content">[temp.variadic]</span></a>
-        <li><a href="#wording1-class.friend"><span class="secno">4.1.4</span> <span class="content">[class.friend]</span></a>
+        <li><a href="#wording1-class.mem.general"><span class="secno">4.1.1</span> <span class="content">[class.mem.general]</span></a>
+        <li><a href="#wording1-class.friend"><span class="secno">4.1.2</span> <span class="content">[class.friend]</span></a>
+        <li><a href="#wording1-temp.res.general"><span class="secno">4.1.3</span> <span class="content">[temp.res.general]</span></a>
+        <li><a href="#wording1-temp.variadic"><span class="secno">4.1.4</span> <span class="content">[temp.variadic]</span></a>
        </ol>
       <li>
        <a href="#wording2"><span class="secno">4.2</span> <span class="content">Option 2</span></a>
@@ -2156,7 +2160,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <p>R1 (post-Kona 2023):</p>
      <ul>
       <li data-md>
-       <p>New and improved wording after CWG feedback.</p>
+       <p>New and improved wording after CWG feedback (<a href="https://wiki.edg.com/bin/view/Wg21kona2023/CoreWorkingGroup#P2893R1">minutes</a>).</p>
      </ul>
    </ul>
    <h2 class="heading settled" data-level="2" id="introduction"><span class="secno">2. </span><span class="content">Introduction</span><a class="self-link" href="#introduction"></a></h2>
@@ -2277,6 +2281,29 @@ the base class.</p>
 </pre>
    <p>Note that both inheritance and <code class="highlight"><c- k>using</c-></code> support pack-expansion. Only <code class="highlight"><c- k>friend</c-></code> does not.</p>
    <h2 class="heading settled" data-level="3" id="confusing"><span class="secno">3. </span><span class="content">Confusing grammatical examples</span><a class="self-link" href="#confusing"></a></h2>
+   <h3 class="heading settled" data-level="3.1" id="confusing-elab"><span class="secno">3.1. </span><span class="content"><code class="highlight"><c- k>friend</c-> <c- k>class</c-> <c- nc>Ts</c-><c- p>...</c-></code></span><a class="self-link" href="#confusing-elab"></a></h3>
+   <p>C++ already disallows <code class="highlight"><c- k>friend</c-> <c- k>class</c-> <c- nc>T</c-></code> (<a href="https://godbolt.org/z/zMefooj6h">Godbolt</a>)
+in <a href="https://eel.is/c++draft/dcl.spec#dcl.type.elab-4">[dcl.type.elab]</a>:</p>
+<pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
+<c- k>struct</c-> <c- nc>S</c-> <c- p>{</c->
+  <c- n>friend</c-> <c- n>class</c-> <c- n>T</c-><c- p>;</c->
+<c- p>};</c->
+</pre>
+   <p>but permits these ways to befriend a specific class instantiated from a class template <code class="highlight"><c- n>C</c-></code>:</p>
+<pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c->
+<c- k>struct</c-> <c- nc>S</c-> <c- p>{</c->
+  <c- k>friend</c-> <c- k>class</c-> <c- nc>C</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>;</c->
+  <c- k>friend</c-> <c- k>class</c-> <c- nc>N</c-><c- o>::</c-><c- n>C</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>;</c->
+<c- p>};</c->
+</pre>
+   <p>The existing wording for this is: <small></small></p>
+   <blockquote><small> If an <em>elaborated-type-specifier</em> appears with the <code class="highlight"><c- k>friend</c-></code> specifier as an entire <em>member-declaration</em>, the <em>member-declaration</em> shall have one of the following forms:<p></p> <ul><li data-md><p><code class="highlight"><c- k>friend</c-></code> <em>class-key nested-name-specifier</em><sub>opt</sub> <em>identifier</em> <code class="highlight"><c- p>;</c-></code></p> </li><li data-md><p><code class="highlight"><c- k>friend</c-></code> <em>class-key simple-template-id</em> <code class="highlight"><c- p>;</c-></code></p> </li><li data-md><p><code class="highlight"><c- k>friend</c-></code> <em>class-key nested-name-specifier</em> <code class="highlight"><c- k>template</c-></code><sub>opt</sub> <em>simple-template-id</em> <code class="highlight"><c- p>;</c-></code></p> </li></ul> <p>Any unqualified lookup for the <em>identifier</em> (in the first case) does not consider scopes that contain the target scope; no name is bound.
+[<em>Note:</em> A using-directive in the target scope is ignored if it refers to a namespace not contained by that scope.
+[basic.lookup.elab] describes how name lookup proceeds in an elaborated-type-specifier. — <em>end note</em>]</p> <p>5. [<em>Note:</em> An <em>elaborated-type-specifier</em> can be used to refer to a previously declared <em>class-name</em> or <em>enum-name</em> even if the name has been hidden by a non-type declaration. — <em>end note</em>]
+If the <em>identifier</em> or <em>simple-template-id</em> resolves to a <em>class-name</em> or <em>enum-name</em>, the <em>elaborated-type-specifier</em> introduces it
+into the declaration the same way a <em>simple-type-specifier</em> introduces its <em>type-name</em> ([dcl.type.simple]).
+If the <em>identifier</em> or <em>simple-template-id</em> resolves to a <em>typedef-name</em> ([dcl.typedef], [temp.names]), the <em>elaborated-type-specifier</em> is ill-formed.
+[<em>Note:</em> This implies that, within a class template with a template type-parameter T, the declaration <code class="highlight"><c- k>friend</c-> <c- k>class</c-> <c- nc>T</c-><c- p>;</c-></code> is ill-formed. However, the similar declaration <code class="highlight"><c- k>friend</c-> <c- n>T</c-><c- p>;</c-></code> is allowed ([class.friend]). — <em>end note</em>] </p></small></blockquote>
    <p>The following <code class="highlight"><c- n>task1</c-></code> and <code class="highlight"><c- n>task2</c-></code> are grammatical according to our grammar, but it’s not clear what
 they mean (or if they’re ill-formed for other reasons). Is this a problem?</p>
 <pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-><c- p>...</c-> <c- n>Ts</c-><c- o>></c->
@@ -2303,43 +2330,33 @@ it’s <em>not</em> our preferred direction.</p>
 that the wording to support <code class="highlight"><c- k>friend</c-> <c- n>T1</c-><c- p>,</c-> <c- n>T2</c-></code> might be difficult, and so the presentation
 drifted toward Option 2. By presenting both possible wordings in P2893R1, we allow
 readers to decide for themselves whether Option 1’s wording "pays for itself."</p>
-   <p>In the Example, notice that <code class="highlight"><c- k>friend</c-> <c- n>T</c-><c- o>::</c-><c- n>Nested</c-></code> already produces a <a href="https://eel.is/c++draft/temp.res.general#def:context,type-only">type-only context</a>,
-according to GCC/Clang/EDG/MSVC. I think that’s because today <code class="highlight"><c- n>T</c-><c- o>::</c-><c- n>Nested</c-></code> is
-a <em>decl-specifier</em> of a <em>simple-declaration</em>? However, at least for clarity,
-and probably because it needs to, Option 1 adds the statement that every <em>friend-declarator</em> imposes a type-only context.</p>
+   <p>We make <em>simple-friend-declaration</em> a <a href="https://eel.is/c++draft/temp.res.general#def:context,type-only">type-only context</a>, as already
+implemented by GCC/Clang/EDG/MSVC (<a href="https://godbolt.org/z/fbddeoMbW">Godbolt</a>).
+That means we could eliminate the production for <code class="highlight"><c- k>friend</c-> <c- k>typename</c-> <c- nc>X</c-><c- o>&lt;</c-><c- n>Ts</c-><c- o>>::</c-><c- n>Y</c-><c- p>...</c-></code> if we wanted,
+but it seems more consistent to keep it. (That is, the production of <em>simple-friend-declarator</em> from <em>typename-specifier</em> as well as from <em>simple-type-specifier</em>.)</p>
    <h3 class="heading settled" data-level="4.1" id="wording1"><span class="secno">4.1. </span><span class="content">Option 1 (preferred)</span><a class="self-link" href="#wording1"></a></h3>
-   <p class="note" role="note"><span class="marker">Note:</span> Precedent for "If a <em>block-declaration</em> matches..." is found in <a href="https://eel.is/c++draft/dcl.pre#10">[dcl.pre]/10</a> "If a <em>static-assert-message</em> matches..."</p>
-   <h4 class="heading settled" data-level="4.1.1" id="wording1-dcl.pre"><span class="secno">4.1.1. </span><span class="content">[dcl.pre]</span><a class="self-link" href="#wording1-dcl.pre"></a></h4>
-   <p>Modify <a href="https://eel.is/c++draft/dcl.pre#nt:block-declaration">[dcl.pre]</a> as follows:</p>
+   <p class="note" role="note"><span class="marker">Note:</span> Precedent for "If a <em>member-declaration</em> matches..." is found in <a href="https://eel.is/c++draft/dcl.pre#10">[dcl.pre]/10</a> "If a <em>static-assert-message</em> matches..."</p>
+   <p class="note" role="note"><span class="marker">Note:</span> We want to support <code class="highlight"><c- k>friend</c-> <c- n>Ts</c-><c- p>...</c-></code> and <code class="highlight"><c- k>friend</c-> <c- n>X</c-><c- o>&lt;</c-><c- n>Ts</c-><c- o>>::</c-><c- n>Y</c-><c- o>&lt;</c-><c- n>Us</c-><c- o>></c-><c- p>...</c-></code> but not <code class="highlight"><c- k>friend</c-> <c- k>class</c-> <c- nc>A</c-><c- p>,</c-> <c- k>class</c-> <c- nc>B</c-></code> and therefore not <code class="highlight"><c- k>friend</c-> <c- k>class</c-> <c- nc>Ts</c-><c- p>...</c-></code>. Therefore <em>simple-friend-declarator</em> is not producible from <em>elaborated-type-specifier</em>.</p>
+   <h4 class="heading settled" data-level="4.1.1" id="wording1-class.mem.general"><span class="secno">4.1.1. </span><span class="content">[class.mem.general]</span><a class="self-link" href="#wording1-class.mem.general"></a></h4>
+   <p>Modify <a href="https://eel.is/c++draft/class.mem.general#nt:member-declaration">[class.mem.general]</a> as follows:</p>
    <p><small></small></p>
-   <blockquote><small> <i>block-declaration</i>:<br>   <i>simple-declaration</i><br>   <i>asm-declaration</i><br>   <i>namespace-alias-definition</i><br>   <ins><i>friend-nonfunc-declaration</i></ins><br>   <i>using-declaration</i><br>   <i>using-enum-declaration</i><br>   <i>using-directive</i><br>   <i>static_assert-declaration</i><br>   <i>alias-declaration</i><br>   <i>opaque-enum-declaration</i><br><p></p> <ins><i>friend-nonfunc-declaration</i>:</ins><br>   <ins><code class="highlight"><c- k>friend</c-></code> <i>friend-declarator-list</i> <code class="highlight"><c- p>;</c-></code></ins><br> <ins><i>friend-declarator-list</i>:</ins><br>   <ins><i>friend-declarator</i> <code class="highlight"><c- p>...</c-></code><sub>opt</sub></ins><br>   <ins><i>friend-declarator-list</i> <code class="highlight"><c- p>,</c-></code> <i>friend-declarator</i> <code class="highlight"><c- p>...</c-></code><sub>opt</sub></ins><br> <ins><i>friend-declarator</i>:</ins><br>   <ins><i>elaborated-type-specifier</i></ins><br>   <ins><i>simple-type-specifier</i></ins><br>   <ins><i>typename-specifier</i></ins><br> <p>[...]</p> <p><i>simple-declaration</i>:<br>   <i>decl-specifier-seq init-declarator-list</i><sub>opt</sub> <code class="highlight"><c- p>;</c-></code><br>   <i>attribute-specifier-seq decl-specifier-seq init-declarator-list</i> <code class="highlight"><c- p>;</c-></code><br>   <i>attribute-specifier-seq</i><sub>opt</sub> <i>decl-specifier-seq ref-qualifier</i><sub>opt</sub> <code class="highlight"><c- p>[</c-></code> <i>identifier-list</i> <code class="highlight"><c- p>]</c-></code> <i>initializer</i> <code class="highlight"><c- p>;</c-></code><br></p> <p>[...]</p> <p>2. Certain declarations contain one or more scopes ([basic.scope.scope]). Unless otherwise stated,
-utterances in [dcl.dcl] about components in, of, or contained by a declaration or subcomponent thereof
-refer only to those components of the declaration that are not nested within scopes nested within the declaration. </p><p><ins>x. If a <em>block-declaration</em> matches the syntactic requirements of <em>friend-nonfunc-declaration</em>, it is a <em>friend-nonfunc-declaration</em>.</ins> </p><p>3. A <em>simple-declaration</em> or <em>nodeclspec-function-declaration</em> of the form [...] </p></small></blockquote>
-   <h4 class="heading settled" data-level="4.1.2" id="wording1-temp.res.general"><span class="secno">4.1.2. </span><span class="content">[temp.res.general]</span><a class="self-link" href="#wording1-temp.res.general"></a></h4>
-   <p>Modify <a href="https://eel.is/c++draft/temp.res.general">[temp.res.general]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p></p>
-    <small> <p>4. A qualified or unqualified name is said to be in a <em>type-only context</em> if it is the terminal name of </p><ul><li data-md><p>a <em>typename-specifier</em>, <em>nested-name-specifier</em>, <em>elaborated-type-specifier</em>, <em>class-or-decltype</em>, <ins><i>friend-declarator</i>,</ins> or</p> </li><li data-md><p>a <em>type-specifier</em> of a</p> </li><li data-md><p><em>new-type-id</em>,</p> </li><li data-md><p><em>defining-type-id</em>,</p> </li><li data-md><p><em>conversion-type-id</em>,</p> </li><li data-md><p><em>trailing-return-type</em>,</p> </li><li data-md><p>default argument of a <em>type-parameter</em>, or</p> </li><li data-md><p><em>type-id</em> of a <code class="highlight"><c- k>static_cast</c-></code>, <code class="highlight"><c- k>const_cast</c-></code>, <code class="highlight"><c- k>reinterpret_cast</c-></code>, or <code class="highlight"><c- k>dynamic_cast</c-></code>, or</p> </li><li data-md><p>a <em>decl-specifier</em> of the <em>decl-specifier-seq</em> of a</p> </li><li data-md><p><em>simple-declaration</em> or a <em>function-definition</em> in namespace scope,</p> </li><li data-md><p><em>member-declaration</em>,</p> </li><li data-md><p><em>parameter-declaration</em> in a <em>member-declaration</em>, unless that <em>parameter-declaration</em> appears in a default argument,</p> </li><li data-md><p><em>parameter-declaration</em> in a declarator of a function or function template declaration whose <em>declarator-id</em> is qualified, unless that <em>parameter-declaration</em> appears in a default argument,</p> </li><li data-md><p><em>parameter-declaration</em> in a <em>lambda-declarator</em> or <em>requirement-parameter-list</em>, unless that <em>parameter-declaration</em> appears in a default argument, or</p> </li><li data-md><p><em>parameter-declaration</em> of a (non-type) <em>template-parameter</em>.</p> </li></ul> </small>
-   </blockquote>
-   <h4 class="heading settled" data-level="4.1.3" id="wording1-temp.variadic"><span class="secno">4.1.3. </span><span class="content">[temp.variadic]</span><a class="self-link" href="#wording1-temp.variadic"></a></h4>
-   <p>Modify <a href="https://eel.is/c++draft/temp.variadic">[temp.variadic]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p></p>
-    <small> <p>5. A <em>pack expansion</em> consists of a <em>pattern</em> and an <em>ellipsis</em>, the instantiation of which produces
-zero or more instantiations of the pattern in a list (described below). The form of the pattern depends
-on the context in which the expansion occurs. Pack expansions can occur in the following contexts: </p><ul><li data-md><p>In a function parameter pack ([dcl.fct]); the pattern is the <em>parameter-declaration</em> without the ellipsis.</p> </li><li data-md><p>In a <em>using-declaration</em> ([namespace.udecl]); the pattern is a <em>using-declarator</em>.</p> </li><li data-md><ins>In a <em>friend-nonfunc-declaration</em> (<a href="#wording1-dcl.pre">[dcl.pre]</a>); the pattern is a <em>friend-declarator</em>.</ins> </li><li data-md><p>In a template parameter pack that is a pack expansion ([temp.param]):</p> </li><li data-md><p>if the template parameter pack is a <em>parameter-declaration</em>; the pattern is the <em>parameter-declaration</em> without the ellipsis;</p> </li><li data-md><p>if the template parameter pack is a <em>type-parameter</em>; the pattern is the corresponding <em>type-parameter</em> without the ellipsis.</p> </li><li data-md><p>In an <em>initializer-list</em> ([dcl.init]); the pattern is an <em>initializer-clause</em>.</p> </li><li data-md><p>In a <em>base-specifier-list</em> ([class.derived]); the pattern is a <em>base-specifier</em>.</p> </li><li data-md><p>In a <em>mem-initializer-list</em> ([class.base.init]) for a <em>mem-initializer</em> whose <em>mem-initializer-id</em> denotes a base class; the pattern is the <em>mem-initializer</em>.</p> </li><li data-md><p>In a <em>template-argument-list</em> ([temp.arg]); the pattern is a <em>template-argument</em>.</p> </li><li data-md><p>In an <em>attribute-list</em> ([dcl.attr.grammar]); the pattern is an <em>attribute</em>.</p> </li><li data-md><p>In an <em>alignment-specifier</em> ([dcl.align]); the pattern is the <em>alignment-specifier</em> without the ellipsis.</p> </li><li data-md><p>In a <em>capture-list</em> ([expr.prim.lambda.capture]); the pattern is the <em>capture</em> without the ellipsis.</p> </li><li data-md><p>In a <code class="highlight"><c- k>sizeof</c-><c- p>...</c-></code> expression; the pattern is an <em>identifier</em>.</p> </li><li data-md><p>In a <em>fold-expression</em> ([expr.prim.fold]); the pattern is the <em>cast-expression</em> that contains an unexpanded pack.</p> </li></ul> </small>
-   </blockquote>
-   <h4 class="heading settled" data-level="4.1.4" id="wording1-class.friend"><span class="secno">4.1.4. </span><span class="content">[class.friend]</span><a class="self-link" href="#wording1-class.friend"></a></h4>
+   <blockquote><small> <i>member-declaration</i>:<br>   <i>attribute-specifier-seq</i><sub>opt</sub> <i>decl-specifier-seq</i><sub>opt</sub> <i>member-declarator-list</i><sub>opt</sub> <code class="highlight"><c- p>;</c-></code><br>   <i>function-definition</i><br>   <ins><i>simple-friend-declaration</i></ins><br>   <i>using-declaration</i><br>   <i>using-enum-declaration</i><br>   <i>static_assert-declaration</i><br>   <i>template-declaration</i><br>   <i>explicit-specialization</i><br>   <i>deduction-guide</i><br>   <i>alias-declaration</i><br>   <i>opaque-enum-declaration</i><br>   <i>empty-declaration</i><br><p></p> <ins><i>simple-friend-declaration</i>:</ins><br>   <ins><code class="highlight"><c- k>friend</c-></code> <i>simple-friend-declarator-list</i> <code class="highlight"><c- p>;</c-></code></ins><br> <ins><i>simple-friend-declarator-list</i>:</ins><br>   <ins><i>simple-friend-declarator</i> <code class="highlight"><c- p>...</c-></code><sub>opt</sub></ins><br>   <ins><i>simple-friend-declarator-list</i> <code class="highlight"><c- p>,</c-></code> <i>simple-friend-declarator</i> <code class="highlight"><c- p>...</c-></code><sub>opt</sub></ins><br> <ins><i>simple-friend-declarator</i>:</ins><br>   <ins><i>simple-type-specifier</i></ins><br>   <ins><i>typename-specifier</i></ins><br> <p><i>member-declarator-list</i>:<br>   <i>member-declarator</i><br>   <i>member-declarator-list</i> <code class="highlight"><c- p>,</c-></code> <i>member-declarator</i><br></p> <p>[...]</p> <p>2. A <em>member-declaration</em> does not declare new members of the class if it is </p><ul><li data-md><p>a friend declaration ([class.friend]),</p> </li><li data-md><p>a <em>deduction-guide</em> ([temp.deduct.guide]),</p> </li><li data-md><p>a <em>template-declaration</em> whose declaration is one of the above,</p> </li><li data-md><p>a <em>static_assert-declaration</em>,</p> </li><li data-md><p>a <em>using-declaration</em> ([namespace.udecl]), or</p> </li><li data-md><p>an <em>empty-declaration</em>.</p> </li></ul> <p>For any other <em>member-declaration</em>, each declared entity that is not an unnamed bit-field
+is a member of the class, and each such <em>member-declaration</em> shall either
+declare at least one member name of the class or declare at least one unnamed bit-field. </p><p>[...] </p><p>8. A class <code class="highlight"><c- n>C</c-></code> is complete at a program point <em>P</em> if the definition of <code class="highlight"><c- n>C</c-></code> is reachable from <em>P</em> ([module.reach])
+or if <em>P</em> is in a complete-class context of <code class="highlight"><c- n>C</c-></code>. Otherwise, <code class="highlight"><c- n>C</c-></code> is incomplete at <em>P</em>. </p><p><ins>x. If a <em>member-declaration</em> matches the syntactic requirements of <em>simple-friend-declaration</em>, it is a <em>simple-friend-declaration</em>.</ins> </p><p>9. In a <em>member-declarator</em>, an <code class="highlight"><c- o>=</c-></code> immediately following the <em>declarator</em> is interpreted as
+introducing a <em>pure-specifier</em> if the <em>declarator-id</em> has function type;
+otherwise it is interpreted as introducing a <em>brace-or-equal-initializer</em>. [...] </p><p>10. In a <em>member-declarator</em> for a bit-field, the <em>constant-expression</em> is parsed as
+the longest sequence of tokens that could syntactically form a <em>constant-expression</em>. [...] </p></small></blockquote>
+   <h4 class="heading settled" data-level="4.1.2" id="wording1-class.friend"><span class="secno">4.1.2. </span><span class="content">[class.friend]</span><a class="self-link" href="#wording1-class.friend"></a></h4>
    <p>Modify <a href="https://eel.is/c++draft/class.friend">[class.friend]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <p>3. A friend declaration that does not declare a function shall <del>have
-one of the following forms:</del> <ins>be a <i>friend-nonfunc-declaration</i>.</ins> </p><p>  <del><code class="highlight"><c- k>friend</c-></code> <em>elaborated-type-specifier</em> <code class="highlight"><c- p>;</c-></code></del><br>   <del><code class="highlight"><c- k>friend</c-></code> <em>simple-type-specifier</em> <code class="highlight"><c- p>;</c-></code></del><br>   <del><code class="highlight"><c- k>friend</c-></code> <em>typename-specifier</em> <code class="highlight"><c- p>;</c-></code></del><br></p> <p>[<em>Note:</em> A friend declaration can be the declaration in a <em>template-declaration</em> ([temp.pre], [temp.friend]). — <em>end note</em>]</p> <del>If the type specifier in a friend declaration designates a (possibly cv-qualified) class type,
-that class is declared as a friend; otherwise, the friend declaration is ignored.</del> <ins>Each <em>friend-declarator</em> that designates a (possibly cv-qualified) class type declares that class as a friend;
-each <em>friend-declarator</em> that does not designate a (possibly cv-qualified) class type is ignored.</ins> <p>[<em>Example 4:</em></p> <pre class="highlight"><c- k>class</c-> <c- nc>C</c-><c- p>;</c->
+    <small> <p>3. A friend declaration that does not declare a function shall have
+one of the following forms: </p><p>  <ins><i><a href="#wording1-class.mem.general">simple-friend-declaration</a></i></ins><br>   <code class="highlight"><c- k>friend</c-></code> <em>elaborated-type-specifier</em> <code class="highlight"><c- p>;</c-></code><br>   <del><code class="highlight"><c- k>friend</c-></code> <em>simple-type-specifier</em> <code class="highlight"><c- p>;</c-></code></del><br>   <code class="highlight"><c- k>friend</c-></code> <em>typename-specifier</em> <code class="highlight"><c- p>;</c-></code><br></p> <p>[<em>Note:</em> A friend declaration can be the declaration in a <em>template-declaration</em> ([temp.pre], [temp.friend]). — <em>end note</em>]</p> <del>If the type specifier in a friend declaration designates a (possibly cv-qualified) class type,
+that class is declared as a friend; otherwise, the friend declaration is ignored.</del> <ins>Each
+type specifier in a friend declaration that designates a (possibly cv-qualified) class type declares
+that class as a friend. Each other type specifier is ignored.</ins> <p>[<em>Example 4:</em></p> <pre class="highlight"><c- k>class</c-> <c- nc>C</c-><c- p>;</c->
 <c- k>typedef</c-> <c- n>C</c-> <c- n>Ct</c-><c- p>;</c->
 <ins><c- k>struct</c-> <c- nc>E</c-><c- p>;</c-></ins>
 
@@ -2369,11 +2386,26 @@ each <em>friend-declarator</em> that does not designate a (possibly cv-qualified
 <ins><c- p>};</c-></ins>
 
 <ins><c- n>S</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-> <c- n>sc</c-><c- p>;</c->                   <c- c1>// E::Nested and R&lt;E> are friends of S&lt;E></c-></ins>
+<ins><c- n>S</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>sc</c-><c- p>;</c->                 <c- c1>// error: int::Nested does not exist</c-></ins>
 </pre><p>— <em>end example</em>]</p> </small>
    </blockquote>
+   <h4 class="heading settled" data-level="4.1.3" id="wording1-temp.res.general"><span class="secno">4.1.3. </span><span class="content">[temp.res.general]</span><a class="self-link" href="#wording1-temp.res.general"></a></h4>
+   <p>Modify <a href="https://eel.is/c++draft/temp.res.general">[temp.res.general]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <p>4. A qualified or unqualified name is said to be in a <em>type-only context</em> if it is the terminal name of </p><ul><li data-md><p>a <em>typename-specifier</em>, <em>nested-name-specifier</em>, <em>elaborated-type-specifier</em>, <em>class-or-decltype</em>, or</p> </li><li data-md><ins>the <em>simple-type-specifier</em> of a <em>simple-friend-declarator</em>, or</ins> </li><li data-md><p>a <em>type-specifier</em> of a</p> </li><li data-md><p><em>new-type-id</em>,</p> </li><li data-md><p><em>defining-type-id</em>,</p> </li><li data-md><p><em>conversion-type-id</em>,</p> </li><li data-md><p><em>trailing-return-type</em>,</p> </li><li data-md><p>default argument of a <em>type-parameter</em>, or</p> </li><li data-md><p><em>type-id</em> of a <code class="highlight"><c- k>static_cast</c-></code>, <code class="highlight"><c- k>const_cast</c-></code>, <code class="highlight"><c- k>reinterpret_cast</c-></code>, or <code class="highlight"><c- k>dynamic_cast</c-></code>, or</p> </li><li data-md><p>a <em>decl-specifier</em> of the <em>decl-specifier-seq</em> of a</p> </li><li data-md><p><em>simple-declaration</em> or a <em>function-definition</em> in namespace scope,</p> </li><li data-md><p><em>member-declaration</em>,</p> </li><li data-md><p><em>parameter-declaration</em> in a <em>member-declaration</em>, unless that <em>parameter-declaration</em> appears in a default argument,</p> </li><li data-md><p><em>parameter-declaration</em> in a declarator of a function or function template declaration whose <em>declarator-id</em> is qualified, unless that <em>parameter-declaration</em> appears in a default argument,</p> </li><li data-md><p><em>parameter-declaration</em> in a <em>lambda-declarator</em> or <em>requirement-parameter-list</em>, unless that <em>parameter-declaration</em> appears in a default argument, or</p> </li><li data-md><p><em>parameter-declaration</em> of a (non-type) <em>template-parameter</em>.</p> </li></ul> </small>
+   </blockquote>
+   <h4 class="heading settled" data-level="4.1.4" id="wording1-temp.variadic"><span class="secno">4.1.4. </span><span class="content">[temp.variadic]</span><a class="self-link" href="#wording1-temp.variadic"></a></h4>
+   <p>Modify <a href="https://eel.is/c++draft/temp.variadic">[temp.variadic]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <p>5. A <em>pack expansion</em> consists of a <em>pattern</em> and an <em>ellipsis</em>, the instantiation of which produces
+zero or more instantiations of the pattern in a list (described below). The form of the pattern depends
+on the context in which the expansion occurs. Pack expansions can occur in the following contexts: </p><ul><li data-md><p>In a function parameter pack ([dcl.fct]); the pattern is the <em>parameter-declaration</em> without the ellipsis.</p> </li><li data-md><p>In a <em>using-declaration</em> ([namespace.udecl]); the pattern is a <em>using-declarator</em>.</p> </li><li data-md><ins>In a <em>simple-friend-declaration</em> (<a href="#wording1-class.mem.general">[class.mem.general]</a>); the pattern is a <em>simple-friend-declarator</em>.</ins> </li><li data-md><p>In a template parameter pack that is a pack expansion ([temp.param]):</p> </li><li data-md><p>if the template parameter pack is a <em>parameter-declaration</em>; the pattern is the <em>parameter-declaration</em> without the ellipsis;</p> </li><li data-md><p>if the template parameter pack is a <em>type-parameter</em>; the pattern is the corresponding <em>type-parameter</em> without the ellipsis.</p> </li><li data-md><p>In an <em>initializer-list</em> ([dcl.init]); the pattern is an <em>initializer-clause</em>.</p> </li><li data-md><p>In a <em>base-specifier-list</em> ([class.derived]); the pattern is a <em>base-specifier</em>.</p> </li><li data-md><p>In a <em>mem-initializer-list</em> ([class.base.init]) for a <em>mem-initializer</em> whose <em>mem-initializer-id</em> denotes a base class; the pattern is the <em>mem-initializer</em>.</p> </li><li data-md><p>In a <em>template-argument-list</em> ([temp.arg]); the pattern is a <em>template-argument</em>.</p> </li><li data-md><p>In an <em>attribute-list</em> ([dcl.attr.grammar]); the pattern is an <em>attribute</em>.</p> </li><li data-md><p>In an <em>alignment-specifier</em> ([dcl.align]); the pattern is the <em>alignment-specifier</em> without the ellipsis.</p> </li><li data-md><p>In a <em>capture-list</em> ([expr.prim.lambda.capture]); the pattern is the <em>capture</em> without the ellipsis.</p> </li><li data-md><p>In a <code class="highlight"><c- k>sizeof</c-><c- p>...</c-></code> expression; the pattern is an <em>identifier</em>.</p> </li><li data-md><p>In a <em>fold-expression</em> ([expr.prim.fold]); the pattern is the <em>cast-expression</em> that contains an unexpanded pack.</p> </li></ul> </small>
+   </blockquote>
    <h3 class="heading settled" data-level="4.2" id="wording2"><span class="secno">4.2. </span><span class="content">Option 2</span><a class="self-link" href="#wording2"></a></h3>
-   <p class="note" role="note"><span class="marker">Note:</span> The phrase "friend declaration that does not declare a function" is unwieldy, but we could fix it
-by introducing Option 1’s <i>friend-nonfunc-declaration</i> here too.</p>
    <p class="note" role="note"><span class="marker">Note:</span> The idea that a pack-expansion can produce a semicolon-separated "sequence of declarations"
 is not a problem, but it is novel.</p>
    <p class="note" role="note"><span class="marker">Note:</span> We need to permit <code class="highlight"><c- k>friend</c-> <c- n>Ts</c-><c- p>...;</c-></code> and <code class="highlight"><c- k>friend</c-> <c- k>typename</c-> <c- nc>Ts</c-><c- o>::</c-><c- n>Nested</c-><c- p>...;</c-></code>, but while keeping <code class="highlight"><c- k>friend</c-> <c- b>int</c-> <c- nf>fs</c-><c- p>()...;</c-></code> and <code class="highlight"><c- kr>inline</c-> <c- b>int</c-> <c- n>xs</c-><c- p>...;</c-></code> clearly ill-formed. This wording probably achieves the former, but
