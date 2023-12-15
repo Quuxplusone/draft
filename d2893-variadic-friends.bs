@@ -2,7 +2,7 @@
 Title: Variadic friends
 Shortname: D2893
 Revision: 1
-!Draft Revision: 1
+!Draft Revision: 2
 Audience: CWG
 Status: D
 Group: WG21
@@ -12,7 +12,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Support `friend Ts...` in C++26.
-Date: 2023-12-13
+Date: 2023-12-15
 </pre>
 
 <style>
@@ -25,7 +25,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 - R1 (post-Kona 2023):
 
-    - New and improved wording after CWG feedback.
+    - New and improved wording after CWG feedback ([minutes](https://wiki.edg.com/bin/view/Wg21kona2023/CoreWorkingGroup#P2893R1)).
 
 
 
@@ -162,6 +162,47 @@ Note that both inheritance and `using` support pack-expansion. Only `friend` doe
 
 # Confusing grammatical examples # {#confusing}
 
+## `friend class Ts...` ## {#confusing-elab}
+
+C++ already disallows `friend class T` ([Godbolt](https://godbolt.org/z/zMefooj6h))
+in <a href="https://eel.is/c++draft/dcl.spec#dcl.type.elab-4">[dcl.type.elab]</a>:
+```c++
+template<class T>
+struct S {
+  friend class T;
+};
+```
+but permits these ways to befriend a specific class instantiated from a class template `C`:
+```
+template<class T>
+struct S {
+  friend class C<T>;
+  friend class N::C<T>;
+};
+```
+
+The existing wording for this is:
+<small><blockquote>
+If an *elaborated-type-specifier* appears with the `friend` specifier as an entire *member-declaration*, the *member-declaration* shall have one of the following forms:
+
+- `friend` *class-key nested-name-specifier*<sub>opt</sub> *identifier* `;`
+- `friend` *class-key simple-template-id* `;`
+- `friend` *class-key nested-name-specifier* `template`<sub>opt</sub> *simple-template-id* `;`
+
+Any unqualified lookup for the *identifier* (in the first case) does not consider scopes that contain the target scope; no name is bound.
+[*Note:* A using-directive in the target scope is ignored if it refers to a namespace not contained by that scope.
+[basic.lookup.elab] describes how name lookup proceeds in an elaborated-type-specifier. — *end note*]
+<p>5. [*Note:* An *elaborated-type-specifier* can be used to refer to a previously declared *class-name* or *enum-name*
+even if the name has been hidden by a non-type declaration. — *end note*]
+If the *identifier* or *simple-template-id* resolves to a *class-name* or *enum-name*, the *elaborated-type-specifier* introduces it
+into the declaration the same way a *simple-type-specifier* introduces its *type-name* ([dcl.type.simple]).
+If the *identifier* or *simple-template-id* resolves to a *typedef-name* ([dcl.typedef], [temp.names]), the *elaborated-type-specifier* is ill-formed.
+[*Note:* This implies that, within a class template with a template type-parameter T, the declaration
+`friend class T;` is ill-formed. However, the similar declaration `friend T;` is allowed ([class.friend]). — *end note*]
+</blockquote></small>
+
+
+
 The following `task1` and `task2` are grammatical according to our grammar, but it's not clear what
 they mean (or if they're ill-formed for other reasons). Is this a problem?
 
@@ -196,111 +237,79 @@ that the wording to support `friend T1, T2` might be difficult, and so the prese
 drifted toward Option 2. By presenting both possible wordings in P2893R1, we allow
 readers to decide for themselves whether Option 1's wording "pays for itself."
 
-In the Example, notice that `friend T::Nested` already produces a
-<a href="https://eel.is/c++draft/temp.res.general#def:context,type-only">type-only context</a>,
-according to GCC/Clang/EDG/MSVC. I think that's because today `T::Nested` is
-a *decl-specifier* of a *simple-declaration*? However, at least for clarity,
-and probably because it needs to, Option 1 adds the statement that every
-*friend-declarator* imposes a type-only context.
+We make *simple-friend-declaration* a
+<a href="https://eel.is/c++draft/temp.res.general#def:context,type-only">type-only context</a>, as already
+implemented by GCC/Clang/EDG/MSVC ([Godbolt](https://godbolt.org/z/fbddeoMbW)).
+That means we could eliminate the production for `friend typename X<Ts>::Y...` if we wanted,
+but it seems more consistent to keep it. (That is, the production of *simple-friend-declarator*
+from *typename-specifier* as well as from *simple-type-specifier*.)
 
 ## Option 1 (preferred) ## {#wording1}
 
-Note: Precedent for "If a *block-declaration* matches..." is found in
+Note: Precedent for "If a *member-declaration* matches..." is found in
 <a href="https://eel.is/c++draft/dcl.pre#10">[dcl.pre]/10</a> "If a *static-assert-message* matches..."
 
-### [dcl.pre] ### {#wording1-dcl.pre}
+Note: We want to support `friend Ts...` and `friend X<Ts>::Y<Us>...` but not `friend class A, class B`
+and therefore not `friend class Ts...`. Therefore *simple-friend-declarator* is not producible from
+*elaborated-type-specifier*.
 
-Modify <a href="https://eel.is/c++draft/dcl.pre#nt:block-declaration">[dcl.pre]</a> as follows:
+### [class.mem.general] ### {#wording1-class.mem.general}
+
+Modify <a href="https://eel.is/c++draft/class.mem.general#nt:member-declaration">[class.mem.general]</a> as follows:
 
 <small><blockquote>
-<i>block-declaration</i>:<br>
-&emsp; <i>simple-declaration</i><br>
-&emsp; <i>asm-declaration</i><br>
-&emsp; <i>namespace-alias-definition</i><br>
-&emsp; <ins><i>friend-nonfunc-declaration</i></ins><br>
+<i>member-declaration</i>:<br>
+&emsp; <i>attribute-specifier-seq</i><sub>opt</sub> <i>decl-specifier-seq</i><sub>opt</sub> <i>member-declarator-list</i><sub>opt</sub> `;`<br>
+&emsp; <i>function-definition</i><br>
+&emsp; <ins><i>simple-friend-declaration</i></ins><br>
 &emsp; <i>using-declaration</i><br>
 &emsp; <i>using-enum-declaration</i><br>
-&emsp; <i>using-directive</i><br>
 &emsp; <i>static_assert-declaration</i><br>
+&emsp; <i>template-declaration</i><br>
+&emsp; <i>explicit-specialization</i><br>
+&emsp; <i>deduction-guide</i><br>
 &emsp; <i>alias-declaration</i><br>
 &emsp; <i>opaque-enum-declaration</i><br>
+&emsp; <i>empty-declaration</i><br>
 
-<ins><i>friend-nonfunc-declaration</i>:</ins><br>
-&emsp; <ins>`friend` <i>friend-declarator-list</i> `;`</ins><br>
-<ins><i>friend-declarator-list</i>:</ins><br>
-&emsp; <ins><i>friend-declarator</i> `...`<sub>opt</sub></ins><br>
-&emsp; <ins><i>friend-declarator-list</i> `,` <i>friend-declarator</i> `...`<sub>opt</sub></ins><br>
-<ins><i>friend-declarator</i>:</ins><br>
-&emsp; <ins><i>elaborated-type-specifier</i></ins><br>
+<ins><i>simple-friend-declaration</i>:</ins><br>
+&emsp; <ins>`friend` <i>simple-friend-declarator-list</i> `;`</ins><br>
+<ins><i>simple-friend-declarator-list</i>:</ins><br>
+&emsp; <ins><i>simple-friend-declarator</i> `...`<sub>opt</sub></ins><br>
+&emsp; <ins><i>simple-friend-declarator-list</i> `,` <i>simple-friend-declarator</i> `...`<sub>opt</sub></ins><br>
+<ins><i>simple-friend-declarator</i>:</ins><br>
 &emsp; <ins><i>simple-type-specifier</i></ins><br>
 &emsp; <ins><i>typename-specifier</i></ins><br>
 
-[...]
-
-<i>simple-declaration</i>:<br>
-&emsp; <i>decl-specifier-seq init-declarator-list</i><sub>opt</sub> `;`<br>
-&emsp; <i>attribute-specifier-seq decl-specifier-seq init-declarator-list</i> `;`<br>
-&emsp; <i>attribute-specifier-seq</i><sub>opt</sub> <i>decl-specifier-seq ref-qualifier</i><sub>opt</sub> `[` <i>identifier-list</i> `]` <i>initializer</i> `;`<br>
+<i>member-declarator-list</i>:<br>
+&emsp; <i>member-declarator</i><br>
+&emsp; <i>member-declarator-list</i> `,` <i>member-declarator</i><br>
 
 [...]
 
-<p>2. Certain declarations contain one or more scopes ([basic.scope.scope]). Unless otherwise stated,
-utterances in [dcl.dcl] about components in, of, or contained by a declaration or subcomponent thereof
-refer only to those components of the declaration that are not nested within scopes nested within the declaration.
-<p><ins>x. If a *block-declaration* matches the syntactic requirements of *friend-nonfunc-declaration*, it is a *friend-nonfunc-declaration*.</ins>
-<p>3. A *simple-declaration* or *nodeclspec-function-declaration* of the form [...]
-</blockquote></small>
+<p>2. A *member-declaration* does not declare new members of the class if it is
+- a friend declaration ([class.friend]),
+- a *deduction-guide* ([temp.deduct.guide]),
+- a *template-declaration* whose declaration is one of the above,
+- a *static_assert-declaration*,
+- a *using-declaration* ([namespace.udecl]), or
+- an *empty-declaration*.
 
-### [temp.res.general] ### {#wording1-temp.res.general}
+<p>For any other *member-declaration*, each declared entity that is not an unnamed bit-field
+is a member of the class, and each such *member-declaration* shall either
+declare at least one member name of the class or declare at least one unnamed bit-field.
+<p>[...]
+<p>8. A class `C` is complete at a program point *P* if the definition of `C` is reachable from *P* ([module.reach])
+or if *P* is in a complete-class context of `C`. Otherwise, `C` is incomplete at *P*.
 
-Modify <a href="https://eel.is/c++draft/temp.res.general">[temp.res.general]</a> as follows:
+<p><ins>x. If a *member-declaration* matches the syntactic requirements of *simple-friend-declaration*, it is a *simple-friend-declaration*.</ins>
 
-<small><blockquote>
-<p>4. A qualified or unqualified name is said to be in a *type-only context* if it is the terminal name of
+<p>9. In a *member-declarator*, an `=` immediately following the *declarator* is interpreted as
+introducing a *pure-specifier* if the *declarator-id* has function type;
+otherwise it is interpreted as introducing a *brace-or-equal-initializer*. [...]
 
-* a *typename-specifier*, *nested-name-specifier*, *elaborated-type-specifier*, *class-or-decltype*, <ins><i>friend-declarator</i>,</ins> or
-* a *type-specifier* of a
-  - *new-type-id*,
-  - *defining-type-id*,
-  - *conversion-type-id*,
-  - *trailing-return-type*,
-  - default argument of a *type-parameter*, or
-  - *type-id* of a `static_cast`, `const_cast`, `reinterpret_cast`, or `dynamic_cast`, or
-* a *decl-specifier* of the *decl-specifier-seq* of a
-  - *simple-declaration* or a *function-definition* in namespace scope,
-  - *member-declaration*,
-  - *parameter-declaration* in a *member-declaration*, unless that *parameter-declaration* appears in a default argument,
-  - *parameter-declaration* in a declarator of a function or function template declaration whose *declarator-id* is qualified, unless that *parameter-declaration* appears in a default argument,
-  - *parameter-declaration* in a *lambda-declarator* or *requirement-parameter-list*, unless that *parameter-declaration* appears in a default argument, or
-  - *parameter-declaration* of a (non-type) *template-parameter*.
-
-</blockquote></small>
-
-### [temp.variadic] ### {#wording1-temp.variadic}
-
-Modify <a href="https://eel.is/c++draft/temp.variadic">[temp.variadic]</a> as follows:
-
-<small><blockquote>
-<p>5. A *pack expansion* consists of a *pattern* and an *ellipsis*, the instantiation of which produces
-zero or more instantiations of the pattern in a list (described below). The form of the pattern depends
-on the context in which the expansion occurs. Pack expansions can occur in the following contexts:
-
-* In a function parameter pack ([dcl.fct]); the pattern is the *parameter-declaration* without the ellipsis.
-* In a *using-declaration* ([namespace.udecl]); the pattern is a *using-declarator*.
-* <ins>In a *friend-nonfunc-declaration* (<a href="#wording1-dcl.pre">[dcl.pre]</a>); the pattern is a *friend-declarator*.</ins>
-* In a template parameter pack that is a pack expansion ([temp.param]):
-  - if the template parameter pack is a *parameter-declaration*; the pattern is the *parameter-declaration* without the ellipsis;
-  - if the template parameter pack is a *type-parameter*; the pattern is the corresponding *type-parameter* without the ellipsis.
-* In an *initializer-list* ([dcl.init]); the pattern is an *initializer-clause*.
-* In a *base-specifier-list* ([class.derived]); the pattern is a *base-specifier*.
-* In a *mem-initializer-list* ([class.base.init]) for a *mem-initializer* whose *mem-initializer-id* denotes a base class; the pattern is the *mem-initializer*.
-* In a *template-argument-list* ([temp.arg]); the pattern is a *template-argument*.
-* In an *attribute-list* ([dcl.attr.grammar]); the pattern is an *attribute*.
-* In an *alignment-specifier* ([dcl.align]); the pattern is the *alignment-specifier* without the ellipsis.
-* In a *capture-list* ([expr.prim.lambda.capture]); the pattern is the *capture* without the ellipsis.
-* In a `sizeof...` expression; the pattern is an *identifier*.
-* In a *fold-expression* ([expr.prim.fold]); the pattern is the *cast-expression* that contains an unexpanded pack.
-
+<p>10. In a *member-declarator* for a bit-field, the *constant-expression* is parsed as
+the longest sequence of tokens that could syntactically form a *constant-expression*. [...]
 </blockquote></small>
 
 ### [class.friend] ### {#wording1-class.friend}
@@ -308,19 +317,20 @@ on the context in which the expansion occurs. Pack expansions can occur in the f
 Modify <a href="https://eel.is/c++draft/class.friend">[class.friend]</a> as follows:
 
 <small><blockquote>
-<p>3. A friend declaration that does not declare a function shall <del>have
-one of the following forms:</del> <ins>be a <i>friend-nonfunc-declaration</i>.</ins>
+<p>3. A friend declaration that does not declare a function shall have
+one of the following forms:
 
-&emsp; <del>`friend` *elaborated-type-specifier* `;`</del><br>
+&emsp; <ins><i><a href="#wording1-class.mem.general">simple-friend-declaration</a></i></ins><br>
+&emsp; `friend` *elaborated-type-specifier* `;`<br>
 &emsp; <del>`friend` *simple-type-specifier* `;`</del><br>
-&emsp; <del>`friend` *typename-specifier* `;`</del><br>
+&emsp; `friend` *typename-specifier* `;`<br>
 
 [*Note:* A friend declaration can be the declaration in a *template-declaration* ([temp.pre], [temp.friend]). — *end note*]
 
 <del>If the type specifier in a friend declaration designates a (possibly cv-qualified) class type,
 that class is declared as a friend; otherwise, the friend declaration is ignored.</del> <ins>Each
-*friend-declarator* that designates a (possibly cv-qualified) class type declares that class as a friend;
-each *friend-declarator* that does not designate a (possibly cv-qualified) class type is ignored.</ins>
+type specifier in a friend declaration that designates a (possibly cv-qualified) class type declares
+that class as a friend. Each other type specifier is ignored.</ins>
 
 [*Example 4:*
 <pre>
@@ -354,14 +364,65 @@ R&lt;int> Ri;                      // OK, "friend int;" is ignored
 <ins>};</ins>
 
 <ins>S&lt;E> sc;                   // E::Nested and R&lt;E> are friends of S&lt;E></ins>
+<ins>S&lt;int> sc;                 // error: int::Nested does not exist</ins>
 </pre>
 — *end example*]
 </blockquote></small>
 
-## Option 2 ## {#wording2}
+### [temp.res.general] ### {#wording1-temp.res.general}
 
-Note: The phrase "friend declaration that does not declare a function" is unwieldy, but we could fix it
-by introducing Option 1's <i>friend-nonfunc-declaration</i> here too.
+Modify <a href="https://eel.is/c++draft/temp.res.general">[temp.res.general]</a> as follows:
+
+<small><blockquote>
+<p>4. A qualified or unqualified name is said to be in a *type-only context* if it is the terminal name of
+
+* a *typename-specifier*, *nested-name-specifier*, *elaborated-type-specifier*, *class-or-decltype*, or
+* <ins>the *simple-type-specifier* of a *simple-friend-declarator*, or</ins>
+* a *type-specifier* of a
+  - *new-type-id*,
+  - *defining-type-id*,
+  - *conversion-type-id*,
+  - *trailing-return-type*,
+  - default argument of a *type-parameter*, or
+  - *type-id* of a `static_cast`, `const_cast`, `reinterpret_cast`, or `dynamic_cast`, or
+* a *decl-specifier* of the *decl-specifier-seq* of a
+  - *simple-declaration* or a *function-definition* in namespace scope,
+  - *member-declaration*,
+  - *parameter-declaration* in a *member-declaration*, unless that *parameter-declaration* appears in a default argument,
+  - *parameter-declaration* in a declarator of a function or function template declaration whose *declarator-id* is qualified, unless that *parameter-declaration* appears in a default argument,
+  - *parameter-declaration* in a *lambda-declarator* or *requirement-parameter-list*, unless that *parameter-declaration* appears in a default argument, or
+  - *parameter-declaration* of a (non-type) *template-parameter*.
+
+</blockquote></small>
+
+### [temp.variadic] ### {#wording1-temp.variadic}
+
+Modify <a href="https://eel.is/c++draft/temp.variadic">[temp.variadic]</a> as follows:
+
+<small><blockquote>
+<p>5. A *pack expansion* consists of a *pattern* and an *ellipsis*, the instantiation of which produces
+zero or more instantiations of the pattern in a list (described below). The form of the pattern depends
+on the context in which the expansion occurs. Pack expansions can occur in the following contexts:
+
+* In a function parameter pack ([dcl.fct]); the pattern is the *parameter-declaration* without the ellipsis.
+* In a *using-declaration* ([namespace.udecl]); the pattern is a *using-declarator*.
+* <ins>In a *simple-friend-declaration* (<a href="#wording1-class.mem.general">[class.mem.general]</a>); the pattern is a *simple-friend-declarator*.</ins>
+* In a template parameter pack that is a pack expansion ([temp.param]):
+  - if the template parameter pack is a *parameter-declaration*; the pattern is the *parameter-declaration* without the ellipsis;
+  - if the template parameter pack is a *type-parameter*; the pattern is the corresponding *type-parameter* without the ellipsis.
+* In an *initializer-list* ([dcl.init]); the pattern is an *initializer-clause*.
+* In a *base-specifier-list* ([class.derived]); the pattern is a *base-specifier*.
+* In a *mem-initializer-list* ([class.base.init]) for a *mem-initializer* whose *mem-initializer-id* denotes a base class; the pattern is the *mem-initializer*.
+* In a *template-argument-list* ([temp.arg]); the pattern is a *template-argument*.
+* In an *attribute-list* ([dcl.attr.grammar]); the pattern is an *attribute*.
+* In an *alignment-specifier* ([dcl.align]); the pattern is the *alignment-specifier* without the ellipsis.
+* In a *capture-list* ([expr.prim.lambda.capture]); the pattern is the *capture* without the ellipsis.
+* In a `sizeof...` expression; the pattern is an *identifier*.
+* In a *fold-expression* ([expr.prim.fold]); the pattern is the *cast-expression* that contains an unexpanded pack.
+
+</blockquote></small>
+
+## Option 2 ## {#wording2}
 
 Note: The idea that a pack-expansion can produce a semicolon-separated "sequence of declarations"
 is not a problem, but it is novel.
