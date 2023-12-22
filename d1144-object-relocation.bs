@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 10
-!Draft Revision: 58
+!Draft Revision: 59
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
   Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2023-12-02
+Date: 2023-12-22
 </pre>
 
 <style>
@@ -791,87 +791,85 @@ Modify <a href="http://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:
 Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:
 
 <small><blockquote>
-<b><code>uninitialized_relocate</code> [uninitialized.relocate]</b>
+<ins><b><code>uninitialized_relocate</code> [uninitialized.relocate]</b></ins>
 <pre>
-  template&lt;class InputIterator, class NoThrowForwardIterator>
-  NoThrowForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,
-                                                NoThrowForwardIterator result);
+  <ins>template&lt;class InputIterator, class NoThrowForwardIterator></ins>
+  <ins>NoThrowForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,</ins>
+                                                <ins>NoThrowForwardIterator result);</ins>
 </pre>
-<p>1․ *Effects:* Equivalent to:
+<p><ins>1․ *Effects:* Equivalent to:</ins>
 <pre>
-  try {
-    for (; first != last; ++result, (void)++first) {
-      ::new (<i>voidify</i>(*result))
-        typename iterator_traits&lt;NoThrowForwardIterator>::value_type(std::move(*first));
-      destroy_at(addressof(*first));
-    }
-    return result;
-  } catch (...) {
-    destroy(++first, last);
-    throw;
-  }
+  <ins>try {</ins>
+    <ins>for (; first != last; ++result, (void)++first) {</ins>
+      <ins>::new (<i>voidify</i>(*result))</ins>
+        <ins>typename iterator_traits&lt;NoThrowForwardIterator>::value_type(std::move(*first));</ins>
+      <ins>destroy_at(addressof(*first));</ins>
+    <ins>}</ins>
+    <ins>return result;</ins>
+  <ins>} catch (...) {</ins>
+    <ins>destroy(++first, last);</ins>
+    <ins>throw;</ins>
+  <ins>}</ins>
 </pre>
-except that if the iterators' common value type is trivially relocatable, side effects
-associated with the relocation of the object's value might not happen.
-<p>2․ *Remarks:* If an exception is thrown, all objects in both the source and destination
-ranges are destroyed.
+<ins>except that if the iterators' common value type is trivially relocatable, side effects
+associated with the relocation of the object's value might not happen.</ins>
+<p><ins>2․ *Remarks:* If an exception is thrown, all objects in both the source and destination
+ranges are destroyed.</ins>
 
 <pre>
-  template&lt;class InputIterator, class Size, class NoThrowForwardIterator>
-    pair&lt;InputIterator, NoThrowForwardIterator>
-      uninitialized_relocate_n(InputIterator first, Size n, NoThrowForwardIterator result);
+  <ins>template&lt;class InputIterator, class Size, class NoThrowForwardIterator></ins>
+    <ins>pair&lt;InputIterator, NoThrowForwardIterator></ins>
+      <ins>uninitialized_relocate_n(InputIterator first, Size n, NoThrowForwardIterator result);</ins>
 </pre>
-
-3․ *Effects:* Equivalent to:
+<p><ins>3․ *Effects:* Equivalent to:</ins>
 <pre>
-  try {
-    for (; n > 0; ++result, (void)++first, --n) {
-      ::new (<i>voidify</i>(*result))
-        typename iterator_traits&lt;NoThrowForwardIterator>::value_type(std::move(*first));
-      destroy_at(addressof(*first));
-    }
-    return {first, result};
-  } catch (...) {
-    destroy_n(++first, --n);
-    throw;
-  }
+  <ins>try {</ins>
+    <ins>for (; n > 0; ++result, (void)++first, --n) {</ins>
+      <ins>::new (<i>voidify</i>(*result))</ins>
+        <ins>typename iterator_traits&lt;NoThrowForwardIterator>::value_type(std::move(*first));</ins>
+      <ins>destroy_at(addressof(*first));</ins>
+    <ins>}</ins>
+    <ins>return {first, result};</ins>
+  <ins>} catch (...) {</ins>
+    <ins>destroy_n(++first, --n);</ins>
+    <ins>throw;</ins>
+  <ins>}</ins>
 </pre>
-except that if the iterators' common value type is trivially relocatable, side effects
-associated with the relocation of the object's value might not happen.
+<ins>except that if the iterators' common value type is trivially relocatable, side effects
+associated with the relocation of the object's value might not happen.</ins>
 
-4․ *Remarks:* If an exception is thrown, all objects in both the source and destination
-ranges are destroyed.
+<p><ins>4․ *Remarks:* If an exception is thrown, all objects in both the source and destination
+ranges are destroyed.</ins>
 
 <pre>
-  template&lt;class BidirectionalIterator, class NoThrowBidirectionalIterator>
-    NoThrowBidirectionalIterator
-      uninitialized_relocate_backward(BidirectionalIterator first, BidirectionalIterator last,
-                                      NoThrowBidirectionalIterator result);
+  <ins>template&lt;class BidirectionalIterator, class NoThrowBidirectionalIterator></ins>
+    <ins>NoThrowBidirectionalIterator</ins>
+      <ins>uninitialized_relocate_backward(BidirectionalIterator first, BidirectionalIterator last,</ins>
+                                      <ins>NoThrowBidirectionalIterator result);</ins>
 </pre>
 
-5․ *Effects:* Equivalent to:
+<ins>5․ *Effects:* Equivalent to:</ins>
 <pre>
-  try {
-    for (; last != first; ) {
-      --last;
-      --result;
-      ::new (<i>voidify</i>(*result))
-        typename iterator_traits&lt;NoThrowBidirectionalIterator>::value_type(std::move(*last));
-      destroy_at(addressof(*last));
-    }
-    return result;
-  } catch (...) {
-    destroy(first, ++last);
-    throw;
-  }
+  <ins>try {</ins>
+    <ins>for (; last != first; ) {</ins>
+      <ins>--last;</ins>
+      <ins>--result;</ins>
+      <ins>::new (<i>voidify</i>(*result))</ins>
+        <ins>typename iterator_traits&lt;NoThrowBidirectionalIterator>::value_type(std::move(*last));</ins>
+      <ins>destroy_at(addressof(*last));</ins>
+    <ins>}</ins>
+    <ins>return result;</ins>
+  <ins>} catch (...) {</ins>
+    <ins>destroy(first, ++last);</ins>
+    <ins>throw;</ins>
+  <ins>}</ins>
 </pre>
-except that if the iterators' common value type is trivially relocatable, side effects
-associated with the relocation of the object's value might not happen.
+<ins>except that if the iterators' common value type is trivially relocatable, side effects
+associated with the relocation of the object's value might not happen.</ins>
 
-6․ *Remarks:* If an exception is thrown, all objects in both the source and destination
-ranges are destroyed.
+<p><ins>6․ *Remarks:* If an exception is thrown, all objects in both the source and destination
+ranges are destroyed.</ins>
 </blockquote></small>
-
 
 
 # Rationale and alternatives # {#alternatives}
@@ -1163,10 +1161,16 @@ all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. S
 
 ## Library implementations ## {#implementation-lib}
 
-[Arthur's fork of libc++](https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable) implements 
-all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. See it in action        
-[on godbolt.org](https://p1144.godbolt.org/z/jf67zx5hq), under the name "x86-64 clang (experimental P1144)."
+Since 2018, [Arthur maintains a fork of libc++](https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable)
+with a fully optimizing implementation of P1144. See it in action
+[on godbolt.org](https://p1144.godbolt.org/z/KasGGoE64), under the name "x86-64 clang (experimental P1144)."
 ([Here](https://p1144.godbolt.org/z/t28saC) is another example showing P1144's interaction with fancy allocators.)
+
+Since 2023, [Arthur maintains a fork of libstdc++](https://github.com/Quuxplusone/gcc/tree/trivially-relocatable)
+with a conforming implementation of P1144, although it omits some optimizations. For example, `std::relocate` never
+lowers to `memcpy`, and (as of December 2023) `vector` reallocation never relocates. See it in action
+[on godbolt.org](https://p1144.godbolt.org/z/zTvKPzxer), under the name "x86-64 clang (experimental P1144),"
+by passing `-stdlib=libstdc++` on the command line.
 
 Since October 2020, Carnegie Mellon's [[ParlayLib]] implements `uninitialized_relocate{,_n}` in the `parlay` namespace.
 
