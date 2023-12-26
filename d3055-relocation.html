@@ -2095,7 +2095,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D3055R1<br>Relax wording to permit relocation optimizations in the STL</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-12-09">2023-12-09</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-12-28">2023-12-28</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2105,7 +2105,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>4
+     <dd>6
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2129,17 +2129,38 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <ol class="toc">
       <li><a href="#benchmark"><span class="secno">2.1</span> <span class="content">Benchmark</span></a>
      </ol>
-    <li><a href="#breakage"><span class="secno">3</span> <span class="content">Breakage of existing code</span></a>
-    <li><a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
     <li>
-     <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording</span></a>
+     <a href="#utility"><span class="secno">3</span> <span class="content">Utility types</span></a>
      <ol class="toc">
-      <li><a href="#wording-vector.modifiers"><span class="secno">5.1</span> <span class="content">[vector.modifiers]</span></a>
-      <li><a href="#wording-deque.modifiers"><span class="secno">5.2</span> <span class="content">[deque.modifiers]</span></a>
-      <li><a href="#wording-alg.rotate"><span class="secno">5.3</span> <span class="content">[alg.rotate]</span></a>
-      <li><a href="#wording-alg.swap"><span class="secno">5.4</span> <span class="content">[alg.swap]</span></a>
-      <li><a href="#wording-utility.swap"><span class="secno">5.5</span> <span class="content">[utility.swap] (unchanged)</span></a>
-      <li><a href="#wording-iterator.cust.swap"><span class="secno">5.6</span> <span class="content">[iterator.cust.swap] (unchanged)</span></a>
+      <li><a href="#utility-optional"><span class="secno">3.1</span> <span class="content"><code class="highlight"><c- n>optional</c-></code></span></a>
+      <li><a href="#utility-function-and-any"><span class="secno">3.2</span> <span class="content"><code class="highlight"><c- n>function</c-></code> and <code class="highlight"><c- n>any</c-></code></span></a>
+     </ol>
+    <li><a href="#breakage"><span class="secno">4</span> <span class="content">Breakage of existing code</span></a>
+    <li><a href="#experience"><span class="secno">5</span> <span class="content">Implementation experience</span></a>
+    <li>
+     <a href="#wording"><span class="secno">6</span> <span class="content">Proposed wording</span></a>
+     <ol class="toc">
+      <li><a href="#wording-vector.modifiers"><span class="secno">6.1</span> <span class="content">[vector.modifiers]</span></a>
+      <li><a href="#wording-deque.modifiers"><span class="secno">6.2</span> <span class="content">[deque.modifiers]</span></a>
+      <li><a href="#wording-alg.rotate"><span class="secno">6.3</span> <span class="content">[alg.rotate]</span></a>
+      <li><a href="#wording-alg.shift"><span class="secno">6.4</span> <span class="content">[alg.shift]</span></a>
+      <li><a href="#wording-alg.swap"><span class="secno">6.5</span> <span class="content">[alg.swap]</span></a>
+      <li><a href="#wording-utility.swap"><span class="secno">6.6</span> <span class="content">[utility.swap] (unchanged)</span></a>
+      <li><a href="#wording-iterator.cust.swap"><span class="secno">6.7</span> <span class="content">[iterator.cust.swap] (unchanged)</span></a>
+      <li>
+       <a href="#wording-optional"><span class="secno">6.8</span> <span class="content">[optional]</span></a>
+       <ol class="toc">
+        <li><a href="#wording-optional.ctor"><span class="secno">6.8.1</span> <span class="content">[optional.ctor]</span></a>
+        <li><a href="#wording-optional.assign"><span class="secno">6.8.2</span> <span class="content">[optional.assign]</span></a>
+       </ol>
+      <li>
+       <a href="#wording-type-erasure"><span class="secno">6.9</span> <span class="content">Type-erasure types</span></a>
+       <ol class="toc">
+        <li><a href="#wording-func.wrap.move.ctor"><span class="secno">6.9.1</span> <span class="content">[func.wrap.move.ctor] (unchanged)</span></a>
+        <li><a href="#wording-any.cons"><span class="secno">6.9.2</span> <span class="content">[any.cons]</span></a>
+        <li><a href="#wording-any.assign"><span class="secno">6.9.3</span> <span class="content">[any.assign]</span></a>
+        <li><a href="#wording-func.wrap.func.con"><span class="secno">6.9.4</span> <span class="content">[func.wrap.func.con]</span></a>
+       </ol>
      </ol>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
@@ -2153,6 +2174,12 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <ul>
     <li data-md>
      <p>R1:</p>
+     <ul>
+      <li data-md>
+       <p>Add wording for <a href="#wording-alg.shift">[alg.shift]</a>.</p>
+      <li data-md>
+       <p>Add discussion and wording for <code class="highlight"><c- n>optional</c-></code>, <code class="highlight"><c- n>function</c-></code>, and <code class="highlight"><c- n>any</c-></code>.</p>
+     </ul>
     <li data-md>
      <p>R0:</p>
      <ul>
@@ -2224,7 +2251,7 @@ and the type of <code class="highlight"><c- o>*</c-><c- n>first</c-></code> meet
    </blockquote>
    <p>Here the status quo is sufficiently loose to permit an efficient implementation by means of relocation,
 and in fact Arthur’s libc++ fork does exactly that
-(<a href="https://github.com/Quuxplusone/llvm-project/blob/trivially-relocatable-v88/libcxx/include/__utility/swap.h#L67-L86">source</a>, <a href="https://godbolt.org/z/EWzKqq5s3">Godbolt</a>). The following code omits details such as <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_constant_evaluated</c-><c- p>()</c-></code> which are present in the actual library.</p>
+(<a href="https://github.com/Quuxplusone/llvm-project/blob/trivially-relocatable-v95/libcxx/include/__utility/swap.h#L67-L86">source</a>, <a href="https://godbolt.org/z/EWzKqq5s3">Godbolt</a>). The following code omits details such as <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_constant_evaluated</c-><c- p>()</c-></code> which are present in the actual library.</p>
 <pre class="language-c++ highlight"><c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>b</c-><c- p>)</c->
     <c- n>noexcept</c-><c- p>(</c-><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c->
 <c- p>{</c->
@@ -2283,7 +2310,102 @@ in terms of <code class="highlight"><c- n>rotate</c-></code>.</p>
       <td>108
       <td>39
    </table>
-   <h2 class="heading settled" data-level="3" id="breakage"><span class="secno">3. </span><span class="content">Breakage of existing code</span><a class="self-link" href="#breakage"></a></h2>
+   <h2 class="heading settled" data-level="3" id="utility"><span class="secno">3. </span><span class="content">Utility types</span><a class="self-link" href="#utility"></a></h2>
+   <p>Relocation can be useful in two more places: the "disengageable" algebraic types
+such as <code class="highlight"><c- n>optional</c-></code> and <code class="highlight"><c- n>inplace_vector</c-></code>, and the "disengageable" type-erasure types such as <code class="highlight"><c- n>any</c-></code> and <code class="highlight"><c- n>function</c-></code>.</p>
+   <h3 class="heading settled" data-level="3.1" id="utility-optional"><span class="secno">3.1. </span><span class="content"><code class="highlight"><c- n>optional</c-></code></span><a class="self-link" href="#utility-optional"></a></h3>
+   <p>C++17 specifically requires <code class="highlight"><c- n>optional</c-></code>’s move-constructor to leave the right-hand <code class="highlight"><c- n>optional</c-></code> engaged.
+We can imagine a world in which <code class="highlight"><c- n>optional</c-></code>’s move-constructor was permitted to relocate from the right-hand <code class="highlight"><c- n>optional</c-></code>’s value, leaving the right-hand <code class="highlight"><c- n>optional</c-></code> disengaged (<a href="https://godbolt.org/z/Ecxzj8e8T">Godbolt</a>):</p>
+   <table>
+    <tbody>
+     <tr>
+      <th>Today
+      <th>Tomorrow?
+     <tr>
+      <td>
+<pre class="highlight"><c- k>using</c-> <c- n>U</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>array</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- mi>100</c-><c- o>></c-><c- p>;</c->
+<c- n>std</c-><c- o>::</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-> <c- n>src</c-> <c- o>=</c-> <c- n>U</c-><c- p>();</c->
+<c- n>std</c-><c- o>::</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-> <c- n>dst</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>src</c-><c- p>);</c->
+  <c- c1>// trivial (tantamount to memcpy)</c->
+<c- n>assert</c-><c- p>(</c-><c- n>src</c-><c- p>.</c-><c- n>has_value</c-><c- p>());</c->
+</pre>
+      <td>
+<pre class="highlight"><c- k>using</c-> <c- n>U</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>array</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- mi>100</c-><c- o>></c-><c- p>;</c->
+<c- n>std</c-><c- o>::</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-> <c- n>src</c-> <c- o>=</c-> <c- n>U</c-><c- p>();</c->
+<c- n>std</c-><c- o>::</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-> <c- n>dst</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>src</c-><c- p>);</c->
+  <c- c1>// trivial (tantamount to memcpy)</c->
+<c- n>assert</c-><c- p>(</c-><c- n>src</c-><c- p>.</c-><c- n>has_value</c-><c- p>());</c->
+</pre>
+     <tr>
+      <td>
+<pre class="highlight"><c- k>using</c-> <c- n>T</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>array</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>,</c-> <c- mi>100</c-><c- o>></c-><c- p>;</c->
+<c- n>std</c-><c- o>::</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>src</c-> <c- o>=</c-> <c- n>T</c-><c- p>();</c->
+<c- n>std</c-><c- o>::</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>dst</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>src</c-><c- p>);</c->
+  <c- c1>// must move-construct 100 vectors</c->
+  <c- c1>// (tantamount to memcpy + memset)</c->
+<c- n>assert</c-><c- p>(</c-><c- n>src</c-><c- p>.</c-><c- n>has_value</c-><c- p>());</c->
+</pre>
+      <td>
+<pre class="highlight"><c- k>using</c-> <c- n>T</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>array</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>,</c-> <c- mi>100</c-><c- o>></c-><c- p>;</c->
+<c- n>std</c-><c- o>::</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>src</c-> <c- o>=</c-> <c- n>T</c-><c- p>();</c->
+<c- n>std</c-><c- o>::</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>dst</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>src</c-><c- p>);</c->
+  <c- c1>// trivially relocate the array object</c->
+  <c- c1>// (tantamount to memcpy alone),</c->
+  <c- c1>// then disengage src</c->
+<c- n>assert</c-><c- p>(</c-><c- o>!</c-><c- n>src</c-><c- p>.</c-><c- n>has_value</c-><c- p>());</c->
+</pre>
+   </table>
+   <p>This would be more efficient for types like <code class="highlight"><c- n>T</c-></code>, but also less predictable. Now, when <a data-link-type="biblio" href="#biblio-n3672" title="A utility class to represent optional objects">[N3672]</a> originally proposed <code class="highlight"><c- n>optional</c-></code> for C++14 (before it was moved to LFv1 and then back into C++17), <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3672.html#rationale.moved_from">the authors gave a rationale for move-construction</a> specifically in terms of performance — they assumed "move" must be faster than "move and destroy,"
+because "relocate" wasn’t a well-known verb in 2014. They also implicitly assumed that
+since <code class="highlight"><c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-></code> obviously should not disengage-on-move, therefore <code class="highlight"><c- n>optional</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> should not either.
+The conclusion is defensible from a teachability perspective, but it’s not self-evident.</p>
+   <p><a data-link-type="biblio" href="#biblio-p0843" title="inplace_vector">[P0843]</a> <code class="highlight"><c- n>inplace_vector</c-></code> specifically permits a moved-from <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> to become cleared,
+while normatively requiring that a moved-from <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-></code> must retain its old value (i.e., <code class="highlight"><c- n>inplace_vector</c-></code>’s move constructor must be trivial whenever <code class="highlight"><c- n>U</c-></code>’s is). We could retroactively change
+the semantics of <code class="highlight"><c- n>optional</c-></code> to match <code class="highlight"><c- n>inplace_vector</c-></code>’s. However, this is likely controversial;
+notice <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html#Move-semantics">the 6–9–1–5–6 straw poll</a> that delivered <code class="highlight"><c- n>inplace_vector</c-></code>’s current semantics.</p>
+   <p>We provide wording for <code class="highlight"><c- n>optional</c-></code> <a href="#wording-optional">below</a>, but we’re not married to it.</p>
+   <p>What about <code class="highlight"><c- n>variant</c-></code> and <code class="highlight"><c- n>expected</c-></code>? Those types deliberately pretend not to have a disengaged state,
+and we should respect that:</p>
+<pre class="language-c++ highlight"><c- n>using</c-> <c- n>T</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>array</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>,</c-> <c- mi>100</c-><c- o>></c-><c- p>;</c->
+
+<c- n>std</c-><c- o>::</c-><c- n>variant</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>v</c-> <c- o>=</c-> <c- n>T</c-><c- p>();</c->
+<c- n>std</c-><c- o>::</c-><c- n>variant</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>w</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>v</c-><c- p>);</c->
+<c- n>assert</c-><c- p>(</c-><c- o>!</c-><c- n>v</c-><c- p>.</c-><c- n>valueless_by_exception</c-><c- p>());</c-> <c- c1>// important</c->
+
+<c- n>std</c-><c- o>::</c-><c- n>expected</c-><c- o>&lt;</c-><c- b>void</c-><c- p>,</c-> <c- n>T</c-><c- o>></c-> <c- n>e</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>unexpected</c-><c- p>(</c-><c- n>T</c-><c- p>());</c->
+<c- n>std</c-><c- o>::</c-><c- n>expected</c-><c- o>&lt;</c-><c- b>void</c-><c- p>,</c-> <c- n>T</c-><c- o>></c-> <c- n>f</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>e</c-><c- p>);</c->
+<c- n>assert</c-><c- p>(</c-><c- o>!</c-><c- n>e</c-><c- p>.</c-><c- n>has_value</c-><c- p>());</c->              <c- c1>// important</c->
+</pre>
+   <h3 class="heading settled" data-level="3.2" id="utility-function-and-any"><span class="secno">3.2. </span><span class="content"><code class="highlight"><c- n>function</c-></code> and <code class="highlight"><c- n>any</c-></code></span><a class="self-link" href="#utility-function-and-any"></a></h3>
+   <p>The type-erasure types like <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>function</c-></code> use stronger and stronger language to permit
+relocation optimization the further forward you go chronologically. <code class="highlight"><c- n>any</c-></code>’s wording is
+stronger than <code class="highlight"><c- n>function</c-></code>’s, and <code class="highlight"><c- n>copyable_function</c-></code>/<code class="highlight"><c- n>move_only_function</c-></code>’s are stronger
+than <code class="highlight"><c- n>any</c-></code>’s.</p>
+   <ul>
+    <li data-md>
+     <p><code class="highlight"><c- n>function</c-></code>’s move-ctor leaves the right-hand object "in a valid state with an unspecified value"
+(<a href="https://eel.is/c++draft/func.wrap.func#con-6.sentence-1">[func.wrap.func.con]/6</a>)
+and its assignment operator doesn’t explicitly specify
+(<a href="https://eel.is/c++draft/func.wrap.func#con-21.sentence-1">[func.wrap.func.con]/21</a>)</p>
+    <li data-md>
+     <p><code class="highlight"><c- n>any</c-></code>’s move-ctor doesn’t explicitly specify
+(<a href="https://eel.is/c++draft/any#cons-4">[any.cons]/4</a>)
+and its assignment operator is "as if by" move-construct and swap
+(<a href="https://eel.is/c++draft/any#assign-4">[any.assign]/4</a>)</p>
+    <li data-md>
+     <p><code class="highlight"><c- n>move_only_function</c-></code>’s move-ctor leaves the right-hand object "in a valid state with an unspecified value"
+(<a href="https://eel.is/c++draft/func.wrap#move.ctor-3">[func.wrap.move.ctor]/3</a>)
+and its assignment operator is "equivalent to" move-construct and swap
+(<a href="https://eel.is/c++draft/func.wrap#move.ctor-22">[func.wrap.move.ctor]/22</a>)</p>
+    <li data-md>
+     <p><code class="highlight"><c- n>copyable_function</c-></code>’s move-ctor leaves the right-hand object "in a valid state with an unspecified value"
+(<a href="https://eel.is/c++draft/func.wrap#copy.ctor-5">[func.wrap.copy.ctor]/5</a>)
+and its assignment operator is "equivalent to" move-construct and swap
+(<a href="https://eel.is/c++draft/func.wrap#copy.ctor-26">[func.wrap.copy.ctor]/26</a>)</p>
+   </ul>
+   <p>I’m not sure whether "doesn’t explicitly specify" is a defect or not. However, it can’t
+hurt to harmonize the wording of all four type-erasure types, so we do so <a href="#wording-type-erasure">below</a>.</p>
+   <h2 class="heading settled" data-level="4" id="breakage"><span class="secno">4. </span><span class="content">Breakage of existing code</span><a class="self-link" href="#breakage"></a></h2>
    <p>Since the proposed wording is looser than the existing wording, all vendors already conform to it by definition;
 we’re not asking any vendor to change their implementation for C++26. However, a vendor who takes advantage of
 the new freedom may change the behavior of certain algorithms and containers for non-regular types.
@@ -2322,12 +2444,12 @@ rebinding each <code class="highlight"><c- n>tuple</c-><c- o>&lt;</c-><c- b>int<
 exactly what happens anyway if you switch out <code class="highlight"><c- n>vector</c-></code> for <code class="highlight"><c- n>list</c-></code>. (Again, Arthur’s libc++ doesn’t change
 this behavior, because <code class="highlight"><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- o>&amp;></c-></code> is not trivially relocatable; but we certainly have no desire to
 continue mandating the old behavior.)</p>
-   <h2 class="heading settled" data-level="4" id="experience"><span class="secno">4. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
+   <h2 class="heading settled" data-level="5" id="experience"><span class="secno">5. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>Since the proposed wording is looser than the existing wording, all vendors already conform to it
 by definition; we’re not asking any vendor to change their implementation for C++26.</p>
    <p>Arthur has implemented trivial-relocation optimizations in his fork of libc++, and used it to compile
 both LLVM/Clang/libc++ and another large C++17 codebase. No problems were found (naturally).</p>
-   <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
+   <h2 class="heading settled" data-level="6" id="wording"><span class="secno">6. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <p class="note" role="note"><span class="marker">Note:</span> We’re trying to eliminate places where the <i>Effects</i> and <i>Complexity</i> elements specifically mention
 assignment. We don’t mind e.g. when [deque.modifiers] specifies that <code class="highlight"><c- n>push_back</c-></code> "causes a single call to a constructor of <code class="highlight"><c- n>T</c-></code>,"
 because that’s still correct even if we’re optimizing trivially relocatable types. We don’t even mind when
@@ -2336,7 +2458,7 @@ because of course it does; but we propose to remove that sentence anyway because
 mind when an operation says "<i>Throws:</i> Nothing unless an exception is thrown from the assignment operator
 of <code class="highlight"><c- n>T</c-></code>," because our new trivial-relocation "happy path" will never throw. Such a <i>Throws</i> element continues
 to describe the circumstances under which the operation <i>might</i> throw. We never propose to loosen any <i>Throws</i> element.</p>
-   <h3 class="heading settled" data-level="5.1" id="wording-vector.modifiers"><span class="secno">5.1. </span><span class="content">[vector.modifiers]</span><a class="self-link" href="#wording-vector.modifiers"></a></h3>
+   <h3 class="heading settled" data-level="6.1" id="wording-vector.modifiers"><span class="secno">6.1. </span><span class="content">[vector.modifiers]</span><a class="self-link" href="#wording-vector.modifiers"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/vector.modifiers">[vector.modifiers]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2369,7 +2491,7 @@ Otherwise, if an exception is thrown by the move constructor of a non-<i>Cpp17Co
 but the assignment operator of <code class="highlight"><c- n>T</c-></code> is called the number of times equal to the number of elements in the vector after
 the erased elements.</del> <ins>Linear in the number of elements after the first erased element in the original vector.</ins> </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.2" id="wording-deque.modifiers"><span class="secno">5.2. </span><span class="content">[deque.modifiers]</span><a class="self-link" href="#wording-deque.modifiers"></a></h3>
+   <h3 class="heading settled" data-level="6.2" id="wording-deque.modifiers"><span class="secno">6.2. </span><span class="content">[deque.modifiers]</span><a class="self-link" href="#wording-deque.modifiers"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/deque.modifiers">[deque.modifiers]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2412,7 +2534,7 @@ but the number of calls to the assignment operator of <code class="highlight"><c
 and the number of elements after the erased elements.</del> <ins>Linear in the lesser of the number of elements after the first erased element
 and the number of elements before the last erased element in the original deque.</ins> </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.3" id="wording-alg.rotate"><span class="secno">5.3. </span><span class="content">[alg.rotate]</span><a class="self-link" href="#wording-alg.rotate"></a></h3>
+   <h3 class="heading settled" data-level="6.3" id="wording-alg.rotate"><span class="secno">6.3. </span><span class="content">[alg.rotate]</span><a class="self-link" href="#wording-alg.rotate"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/alg.rotate">[alg.rotate]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2430,7 +2552,49 @@ and the number of elements before the last erased element in the original deque.
 the <em>Cpp17MoveConstructible</em> (Table 31) and <em>Cpp17MoveAssignable</em> (Table 33) requirements. </p><p>2. <i>Effects:</i> For each non-negative integer <code class="highlight"><c- n>i</c-> <c- o>&lt;</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-></code>, places the element from the position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- n>i</c-></code> into
 position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- p>(</c-><c- n>i</c-> <c- o>+</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>middle</c-><c- p>))</c-> <c- o>%</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-></code>. [<i>Note:</i> This is a left rotate. <i>— end note</i>] </p><p>3. Returns: </p><ul><li data-md><p><code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>middle</c-><c- p>)</c-></code> for the overloads in namespace <code class="highlight"><c- n>std</c-></code>.</p> </li><li data-md><p><code class="highlight"><c- p>{</c-><c- n>first</c-> <c- o>+</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>middle</c-><c- p>),</c-> <c- n>last</c-><c- p>}</c-></code> for the overload in namespace <code class="highlight"><c- n>ranges</c-></code>.</p> </li></ul> <p>4. <i>Complexity:</i> <del>At most <code class="highlight"><c- n>last</c-> <c- o>-</c-> <c- n>first</c-></code> swaps.</del> <ins>Linear in <code class="highlight"><c- n>last</c-> <c- o>-</c-> <c- n>first</c-></code>.</ins> </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.4" id="wording-alg.swap"><span class="secno">5.4. </span><span class="content">[alg.swap]</span><a class="self-link" href="#wording-alg.swap"></a></h3>
+   <h3 class="heading settled" data-level="6.4" id="wording-alg.shift"><span class="secno">6.4. </span><span class="content">[alg.shift]</span><a class="self-link" href="#wording-alg.shift"></a></h3>
+   <p class="note" role="note"><span class="marker">Note:</span> We propose to change these Complexity elements mainly for consistency with <code class="highlight"><c- n>rotate</c-></code>. <code class="highlight"><c- n>shift_left</c-></code> and <code class="highlight"><c- n>shift_right</c-></code> probably can’t benefit from relocation, except insofar as they
+can be implemented in terms of <code class="highlight"><c- n>swap</c-></code>/<code class="highlight"><c- n>rotate</c-></code>. <code class="highlight"><c- n>shift_right</c-></code> is already explicitly permitted
+to use "swaps," though we presume it must fall back to assignment if the <em>Cpp17ValueSwappable</em> requirements aren’t met. Both shift algorithms use the verb "move," rather than "move-assign";
+we loosen this to "place" for consistency with <code class="highlight"><c- n>rotate</c-></code>.</p>
+   <p>Modify <a href="https://eel.is/c++draft/alg.shift">[alg.shift]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ForwardIterator</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- n>ForwardIterator</c->
+    <c- n>shift_left</c-><c- p>(</c-><c- n>ForwardIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>ForwardIterator</c-> <c- n>last</c-><c- p>,</c->
+               <c- k>typename</c-> <c- nc>iterator_traits</c-><c- o>&lt;</c-><c- n>ForwardIterator</c-><c- o>>::</c-><c- n>difference_type</c-> <c- n>n</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ExecutionPolicy</c-><c- p>,</c-> <c- k>class</c-> <c- nc>ForwardIterator</c-><c- o>></c->
+  <c- n>ForwardIterator</c->
+    <c- n>shift_left</c-><c- p>(</c-><c- n>ExecutionPolicy</c-><c- o>&amp;&amp;</c-> <c- n>exec</c-><c- p>,</c-> <c- n>ForwardIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>ForwardIterator</c-> <c- n>last</c-><c- p>,</c->
+               <c- k>typename</c-> <c- nc>iterator_traits</c-><c- o>&lt;</c-><c- n>ForwardIterator</c-><c- o>>::</c-><c- n>difference_type</c-> <c- n>n</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- n>permutable</c-> <c- n>I</c-><c- p>,</c-> <c- n>sentinel_for</c-><c- o>&lt;</c-><c- n>I</c-><c- o>></c-> <c- n>S</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- n>subrange</c-><c- o>&lt;</c-><c- n>I</c-><c- o>></c-> <c- n>ranges</c-><c- o>::</c-><c- n>shift_left</c-><c- p>(</c-><c- n>I</c-> <c- n>first</c-><c- p>,</c-> <c- n>S</c-> <c- n>last</c-><c- p>,</c-> <c- n>iter_difference_t</c-><c- o>&lt;</c-><c- n>I</c-><c- o>></c-> <c- n>n</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- n>forward_range</c-> <c- n>R</c-><c- o>></c->
+  <c- k>requires</c-> <c- n>permutable</c-><c- o>&lt;</c-><c- n>iterator_t</c-><c- o>&lt;</c-><c- n>R</c-><c- o>>></c->
+  <c- k>constexpr</c-> <c- n>borrowed_subrange_t</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-> <c- n>ranges</c-><c- o>::</c-><c- n>shift_left</c-><c- p>(</c-><c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>r</c-><c- p>,</c-> <c- n>range_difference_t</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-> <c- n>n</c-><c- p>)</c->
+</pre><p>1. <i>Preconditions:</i> <code class="highlight"><c- n>n</c-> <c- o>>=</c-> <c- mi>0</c-></code> is <code class="highlight">true</code>. For the overloads in namespace <code class="highlight"><c- n>std</c-></code>, the type of <code class="highlight"><c- o>*</c-><c- n>first</c-></code> meets the <em>Cpp17MoveAssignable</em> requirements. </p><p>2. <i>Effects:</i> If <code class="highlight"><c- n>n</c-> <c- o>==</c-> <c- mi>0</c-></code> or <code class="highlight"><c- n>n</c-> <c- o>>=</c-> <c- n>last</c-> <c- o>-</c-> <c- n>first</c-></code>, does nothing. Otherwise, <del>moves</del> <ins>places</ins> the
+element from position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- n>n</c-> <c- o>+</c-> <c- n>i</c-></code> into position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- n>i</c-></code> for each non-negative integer <code class="highlight"><c- n>i</c-> <c- o>&lt;</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-> <c- o>-</c-> <c- n>n</c-></code>.
+For the overloads without an <code class="highlight"><c- n>ExecutionPolicy</c-></code> template parameter, does so in order starting from <code class="highlight"><c- n>i</c-> <c- o>=</c-> <c- mi>0</c-></code> and proceeding to <code class="highlight"><c- n>i</c-> <c- o>=</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-> <c- o>-</c-> <c- n>n</c-> <c- o>-</c-> <c- mi>1</c-></code>. </p><p>3. <i>Returns:</i> Let <code class="highlight"><c- n>NEW_LAST</c-></code> be <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-> <c- o>-</c-> <c- n>n</c-><c- p>)</c-></code> if <code class="highlight"><c- n>n</c-> <c- o>&lt;</c-> <c- n>last</c-> <c- o>-</c-> <c- n>first</c-></code>, otherwise <code class="highlight"><c- n>first</c-></code>. </p><ul><li data-md><p><code class="highlight"><c- n>NEW_LAST</c-></code> for the overloads in namespace <code class="highlight"><c- n>std</c-></code>.</p> </li><li data-md><p><code class="highlight"><c- p>{</c-><c- n>first</c-><c- p>,</c-> <c- n>NEW_LAST</c-><c- p>}</c-></code> for the overloads in namespace <code class="highlight"><c- n>ranges</c-></code>.</p> </li></ul> <p>4. <i>Complexity:</i> <del>At most <code class="highlight"><c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-> <c- o>-</c-> <c- n>n</c-></code> assignments.</del> <ins>Linear in <code class="highlight"><c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-> <c- o>-</c-> <c- n>n</c-></code>.</ins> </p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ForwardIterator</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- n>ForwardIterator</c->
+    <c- n>shift_right</c-><c- p>(</c-><c- n>ForwardIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>ForwardIterator</c-> <c- n>last</c-><c- p>,</c->
+                <c- k>typename</c-> <c- nc>iterator_traits</c-><c- o>&lt;</c-><c- n>ForwardIterator</c-><c- o>>::</c-><c- n>difference_type</c-> <c- n>n</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ExecutionPolicy</c-><c- p>,</c-> <c- k>class</c-> <c- nc>ForwardIterator</c-><c- o>></c->
+  <c- n>ForwardIterator</c->
+    <c- n>shift_right</c-><c- p>(</c-><c- n>ExecutionPolicy</c-><c- o>&amp;&amp;</c-> <c- n>exec</c-><c- p>,</c-> <c- n>ForwardIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>ForwardIterator</c-> <c- n>last</c-><c- p>,</c->
+                <c- k>typename</c-> <c- nc>iterator_traits</c-><c- o>&lt;</c-><c- n>ForwardIterator</c-><c- o>>::</c-><c- n>difference_type</c-> <c- n>n</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- n>permutable</c-> <c- n>I</c-><c- p>,</c-> <c- n>sentinel_for</c-><c- o>&lt;</c-><c- n>I</c-><c- o>></c-> <c- n>S</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- n>subrange</c-><c- o>&lt;</c-><c- n>I</c-><c- o>></c-> <c- n>ranges</c-><c- o>::</c-><c- n>shift_right</c-><c- p>(</c-><c- n>I</c-> <c- n>first</c-><c- p>,</c-> <c- n>S</c-> <c- n>last</c-><c- p>,</c-> <c- n>iter_difference_t</c-><c- o>&lt;</c-><c- n>I</c-><c- o>></c-> <c- n>n</c-><c- p>);</c->
+<c- k>template</c-><c- o>&lt;</c-><c- n>forward_range</c-> <c- n>R</c-><c- o>></c->
+  <c- k>requires</c-> <c- n>permutable</c-><c- o>&lt;</c-><c- n>iterator_t</c-><c- o>&lt;</c-><c- n>R</c-><c- o>>></c->
+  <c- k>constexpr</c-> <c- n>borrowed_subrange_t</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-> <c- n>ranges</c-><c- o>::</c-><c- n>shift_right</c-><c- p>(</c-><c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>r</c-><c- p>,</c-> <c- n>range_difference_t</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-> <c- n>n</c-><c- p>);</c->
+</pre><p>1. <i>Preconditions:</i> <code class="highlight"><c- n>n</c-> <c- o>>=</c-> <c- mi>0</c-></code> is <code class="highlight">true</code>. For the overloads in namespace <code class="highlight"><c- n>std</c-></code>, the type of <code class="highlight"><c- o>*</c-><c- n>first</c-></code> meets the <em>Cpp17MoveAssignable</em> requirements,
+and <code class="highlight"><c- n>ForwardIterator</c-></code> meets the <em>Cpp17BidirectionalIterator</em> requirements ([bidirectional.iterators]) or the <em>Cpp17ValueSwappable</em> requirements. </p><p>2. <i>Effects:</i> If <code class="highlight"><c- n>n</c-> <c- o>==</c-> <c- mi>0</c-></code> or <code class="highlight"><c- n>n</c-> <c- o>>=</c-> <c- n>last</c-> <c- o>-</c-> <c- n>first</c-></code>, does nothing. Otherwise, <del>moves</del> <ins>places</ins> the
+element from position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- n>i</c-></code> into position <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- n>n</c-> <c- o>+</c-> <c- n>i</c-></code> for each non-negative integer <code class="highlight"><c- n>i</c-> <c- o>&lt;</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-> <c- o>-</c-> <c- n>n</c-></code>.
+Does so in order starting from <code class="highlight"><c- n>i</c-> <c- o>=</c-> <c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-> <c- o>-</c-> <c- n>n</c-> <c- o>-</c-> <c- mi>1</c-></code> and proceeding to <code class="highlight"><c- n>i</c-> <c- o>=</c-> <c- mi>0</c-></code> if: </p><ul><li data-md><p>for the overload in namespace <code class="highlight"><c- n>std</c-></code> without an <code class="highlight"><c- n>ExecutionPolicy</c-></code> template parameter, <code class="highlight"><c- n>ForwardIterator</c-></code> meets the <em>Cpp17BidirectionalIterator</em> requirements,</p> </li><li data-md><p>for the overloads in namespace <code class="highlight"><c- n>ranges</c-></code>, <code class="highlight"><c- n>I</c-></code> models <code class="highlight"><c- n>bidirectional_iterator</c-></code>.</p> </li></ul> <p>3. <i>Returns:</i> Let <code class="highlight"><c- n>NEW_FIRST</c-></code> be <code class="highlight"><c- n>first</c-> <c- o>+</c-> <c- n>n</c-></code> if <code class="highlight"><c- n>n</c-> <c- o>&lt;</c-> <c- n>last</c-> <c- o>-</c-> <c- n>first</c-></code>, otherwise <code class="highlight"><c- n>last</c-></code>. </p><ul><li data-md><p><code class="highlight"><c- n>NEW_FIRST</c-></code> for the overloads in namespace <code class="highlight"><c- n>std</c-></code>.</p> </li><li data-md><p><code class="highlight"><c- p>{</c-><c- n>NEW_FIRST</c-><c- p>,</c-> <c- n>last</c-><c- p>}</c-></code> for the overloads in namespace <code class="highlight"><c- n>ranges</c-></code>.</p> </li></ul> <p>4. <i>Complexity:</i> <del>At most <code class="highlight"><c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-> <c- o>-</c-> <c- n>n</c-></code> assignments or swaps.</del> <ins>Linear in <code class="highlight"><c- p>(</c-><c- n>last</c-> <c- o>-</c-> <c- n>first</c-><c- p>)</c-> <c- o>-</c-> <c- n>n</c-></code>.</ins> </p></small>
+   </blockquote>
+   <h3 class="heading settled" data-level="6.5" id="wording-alg.swap"><span class="secno">6.5. </span><span class="content">[alg.swap]</span><a class="self-link" href="#wording-alg.swap"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/alg.swap">[alg.swap]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2458,8 +2622,8 @@ For the overloads in namespace <code class="highlight"><c- n>std</c-></code>, <c
   <c- k>constexpr</c-> <c- b>void</c-> <c- n>iter_swap</c-><c- p>(</c-><c- n>ForwardIterator1</c-> <c- n>a</c-><c- p>,</c-> <c- n>ForwardIterator2</c-> <c- n>b</c-><c- p>);</c->
 </pre><p>6. <i>Preconditions:</i> <code class="highlight"><c- n>a</c-></code> and <code class="highlight"><c- n>b</c-></code> are dereferenceable. <code class="highlight"><c- o>*</c-><c- n>a</c-></code> is swappable with ([swappable.requirements]) <code class="highlight"><c- o>*</c-><c- n>b</c-></code>. </p><p>7. <i>Effects:</i> As if by <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- n>a</c-><c- p>,</c-> <c- o>*</c-><c- n>b</c-><c- p>)</c-></code>. </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.5" id="wording-utility.swap"><span class="secno">5.5. </span><span class="content">[utility.swap] (unchanged)</span><a class="self-link" href="#wording-utility.swap"></a></h3>
-   <p><a href="https://eel.is/c++draft/utility.swap">[utility.swap]</a> does not seem to require any changes:</p>
+   <h3 class="heading settled" data-level="6.6" id="wording-utility.swap"><span class="secno">6.6. </span><span class="content">[utility.swap] (unchanged)</span><a class="self-link" href="#wording-utility.swap"></a></h3>
+   <p><a href="https://eel.is/c++draft/utility.swap">[utility.swap]</a> doesn’t seem to require any changes:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
@@ -2469,14 +2633,14 @@ For the overloads in namespace <code class="highlight"><c- n>std</c-></code>, <c
   <c- k>constexpr</c-> <c- b>void</c-> <c- n>swap</c-><c- p>(</c-><c- n>T</c-> <c- p>(</c-><c- o>&amp;</c-><c- n>a</c-><c- p>)[</c-><c- n>N</c-><c- p>],</c-> <c- n>T</c-> <c- p>(</c-><c- o>&amp;</c-><c- n>b</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-> <c- k>noexcept</c-><c- p>(</c-><c- n>is_nothrow_swappable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>);</c->
 </pre><p>5. <i>Constraints:</i> <code class="highlight"><c- n>is_swappable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>. </p><p>6. <i>Preconditions:</i> <code class="highlight"><c- n>a</c-><c- p>[</c-><c- n>i</c-><c- p>]</c-></code> is swappable with ([swappable.requirements]) <code class="highlight"><c- n>b</c-><c- p>[</c-><c- n>i</c-><c- p>]</c-></code> for all <code class="highlight"><c- n>i</c-></code> in the range <code class="highlight"><c- p>[</c-><c- mi>0</c-><c- p>,</c-> <c- n>N</c-><c- p>)</c-></code>. </p><p>7. <i>Effects:</i> As if by <code class="highlight"><c- n>swap_ranges</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- n>a</c-> <c- o>+</c-> <c- n>N</c-><c- p>,</c-> <c- n>b</c-><c- p>)</c-></code>. </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.6" id="wording-iterator.cust.swap"><span class="secno">5.6. </span><span class="content">[iterator.cust.swap] (unchanged)</span><a class="self-link" href="#wording-iterator.cust.swap"></a></h3>
+   <h3 class="heading settled" data-level="6.7" id="wording-iterator.cust.swap"><span class="secno">6.7. </span><span class="content">[iterator.cust.swap] (unchanged)</span><a class="self-link" href="#wording-iterator.cust.swap"></a></h3>
    <p class="note" role="note"><span class="marker">Note:</span> Trivial types may ignore the first bullet below, because even if a user-defined ADL <code class="highlight"><c- n>iter_swap</c-></code> is
 available, it must "exchange the values denoted by <code class="highlight"><c- n>E1</c-></code> and <code class="highlight"><c- n>E2</c-></code>" — that is, it must not be observably different
 from an ordinary (possibly trivial) swap. The second and third bullets explicitly describe ways of performing
 an ordinary (possibly trivial) swap by hand; for any P1144 trivially relocatable type, these are guaranteed to
 be tantamount to swapping the bytes. Therefore vendors can already optimize <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-></code> today,
 without any change in this section’s wording.</p>
-   <p><a href="https://eel.is/c++draft/iterator.cust.swap">[iterator.cust.swap]</a> does not seem to require any changes:</p>
+   <p><a href="https://eel.is/c++draft/iterator.cust.swap">[iterator.cust.swap]</a> doesn’t seem to require any changes:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
@@ -2497,6 +2661,77 @@ without any change in this section’s wording.</p>
     then <code class="highlight"><c- p>(</c-><c- b>void</c-><c- p>)(</c-><c- o>*</c-><c- n>E1</c-> <c- o>=</c-> <i><c- n>iter</c-><c- o>-</c-><c- n>exchange</c-><c- o>-</c-><c- n>move</c-></i><c- p>(</c-><c- n>E2</c-><c- p>,</c-> <c- n>E1</c-><c- p>))</c-></code>, except that <code class="highlight"><c- n>E1</c-></code> is evaluated only once.</p> </li><li data-md><p>Otherwise, <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-><c- p>(</c-><c- n>E1</c-><c- p>,</c-> <c- n>E2</c-><c- p>)</c-></code> is ill-formed.
     [<i>Note:</i> This case can result in substitution failure when <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iter_swap</c-><c- p>(</c-><c- n>E1</c-><c- p>,</c-> <c- n>E2</c-><c- p>)</c-></code> appears
     in the immediate context of a template instantiation. <i>—end note</i>]</p> </li></ul> </small>
+   </blockquote>
+   <h3 class="heading settled" data-level="6.8" id="wording-optional"><span class="secno">6.8. </span><span class="content">[optional]</span><a class="self-link" href="#wording-optional"></a></h3>
+   <p class="note" role="note"><span class="marker">Note:</span> As noted <a href="#utility-optional">above</a>, we’re not married to this one.
+P3055R1 provides this wording so that LEWG has something concrete to straw-poll and reject.</p>
+   <h4 class="heading settled" data-level="6.8.1" id="wording-optional.ctor"><span class="secno">6.8.1. </span><span class="content">[optional.ctor]</span><a class="self-link" href="#wording-optional.ctor"></a></h4>
+   <p>Modify <a href="https://eel.is/c++draft/optional.ctor">[optional.ctor]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- k>constexpr</c-> <c- n>optional</c-><c- p>(</c-><c- n>optional</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c->
+</pre><p>8. <em>Constraints:</em> <code class="highlight"><c- n>is_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>. </p><p>9. <em>Effects:</em> If <code class="highlight"><c- n>rhs</c-></code> contains a value, direct-non-list-initializes the contained value with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>rhs</c-><c- p>)</c-></code>. <del><code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-></code> is unchanged.</del> <ins><code class="highlight"><c- n>rhs</c-></code> is left in a valid state with an unspecified value.</ins> </p><p><del>10. <em>Postconditions:</em> <code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-> <c- o>==</c-> <c- k>this</c-><c- o>-></c-><c- n>has_value</c-><c- p>()</c-></code>.</del> </p><p>11. <em>Throws:</em> Any exception thrown by the selected constructor of <code class="highlight"><c- n>T</c-></code>. </p><p>12. <em>Remarks:</em> The exception specification is equivalent to <code class="highlight"><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code>.
+If <code class="highlight"><c- n>is_trivially_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>, this constructor is trivial. </p><p>[...]</p> <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>U</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>explicit</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>)</c-> <c- n>optional</c-><c- p>(</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;&amp;</c-> <c- n>rhs</c-><c- p>);</c->
+</pre><p>33. <em>Constraints:</em> </p><ul><li data-md><p><code class="highlight"><c- n>is_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>U</c-><c- o>></c-></code> is <code class="highlight">true</code>, and</p> </li><li data-md><p>if <code class="highlight"><c- n>T</c-></code> is not <em>cv</em> <code class="highlight"><c- b>bool</c-></code>, <code class="highlight"><i><c- n>converts</c-><c- o>-</c-><c- n>from</c-><c- o>-</c-><c- n>any</c-><c- o>-</c-><c- n>cvref</c-></i><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>></c-></code> is <code class="highlight">false</code>.</p> </li></ul> <p>34. <em>Effects:</em> If <code class="highlight"><c- n>rhs</c-></code> contains a value, direct-non-list-initializes the contained value with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>rhs</c-><c- p>)</c-></code>. <del><code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-></code> is
+unchanged.</del> <ins><code class="highlight"><c- n>rhs</c-></code> is left in a valid state with an unspecified value.</ins> </p><p><del>35. <em>Postconditions:</em> <code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-> <c- o>==</c-> <c- k>this</c-><c- o>-></c-><c- n>has_value</c-><c- p>()</c-></code>.</del> </p><p>36. <em>Throws:</em> Any exception thrown by the selected constructor of <code class="highlight"><c- n>T</c-></code>. </p><p>37. <em>Remarks:</em> The expression inside <code class="highlight"><c- k>explicit</c-></code> is equivalent to: </p><pre class="highlight"><c- o>!</c-><c- n>is_convertible_v</c-><c- o>&lt;</c-><c- n>U</c-><c- p>,</c-> <c- n>T</c-><c- o>></c-></pre></small>
+   </blockquote>
+   <h4 class="heading settled" data-level="6.8.2" id="wording-optional.assign"><span class="secno">6.8.2. </span><span class="content">[optional.assign]</span><a class="self-link" href="#wording-optional.assign"></a></h4>
+   <p>Modify <a href="https://eel.is/c++draft/optional.assign">[optional.assign]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- k>constexpr</c-> <c- n>optional</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>optional</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c->
+</pre><p>Constraints: is_move_constructible_v<t> is true and is_move_assignable_v<t> is true.</t></t></p> <p>9. <em>Effects:</em> See Table 59. <del>The result of the expression <code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-></code> remains unchanged.</del> <ins><code class="highlight"><c- n>rhs</c-></code> is left in a valid state with an unspecified value.</ins> </p><table> <tbody><tr><th colspan="3"><code class="highlight"><c- n>optional</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>optional</c-><c- o>&amp;&amp;</c-><c- p>)</c-></code> effects</th></tr> <tr><th></th><th><code class="highlight"><c- o>*</c-><c- k>this</c-></code> contains a value</th><th><code class="highlight"><c- o>*</c-><c- k>this</c-></code> does not contain a value</th></tr> <tr><th><code class="highlight"><c- n>rhs</c-></code> contains a value</th><td>assigns <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>rhs</c-><c- p>)</c-></code> to the contained value</td><td>direct-non-list-initializes the contained value with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>rhs</c-><c- p>)</c-></code></td></tr> <tr><th><code class="highlight"><c- n>rhs</c-></code> does not contain a value</th><td>destroys the contained value by calling <code class="highlight"><c- n>val</c-><c- o>-></c-><c- n>T</c-><c- o>::~</c-><c- n>T</c-><c- p>()</c-></code></td><td>no effect</td></tr> </tbody></table> <p><del>10. Postconditions: <code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-> <c- o>==</c-> <c- k>this</c-><c- o>-></c-><c- n>has_value</c-><c- p>()</c-></code>.</del> </p><p>11. Returns: <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. </p><p>12. Remarks: The exception specification is equivalent to: </p><pre class="highlight"><c- n>is_nothrow_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></pre><p>13. If any exception is thrown, the result of the expression <code class="highlight"><c- k>this</c-><c- o>-></c-><c- n>has_value</c-><c- p>()</c-></code> remains unchanged.
+If an exception is thrown during the call to <code class="highlight"><c- n>T</c-></code>’s move constructor, the state of <code class="highlight"><c- o>*</c-><c- n>rhs</c-><c- p>.</c-><c- n>val</c-></code> is determined by the exception safety guarantee of <code class="highlight"><c- n>T</c-></code>’s move constructor.
+If an exception is thrown during the call to <code class="highlight"><c- n>T</c-></code>’s move assignment <ins>operator</ins>, the state of <code class="highlight"><c- o>*</c-><c- n>val</c-></code> and <code class="highlight"><c- o>*</c-><c- n>rhs</c-><c- p>.</c-><c- n>val</c-></code> is determined by
+the exception safety guarantee of <code class="highlight"><c- n>T</c-></code>’s move assignment <ins>operator</ins>.
+If <code class="highlight"><c- n>is_trivially_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_trivially_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_trivially_destructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>, this assignment operator is trivial. </p><p>[...]</p> <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>U</c-><c- o>></c-> <c- k>constexpr</c-> <c- n>optional</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;&amp;</c-> <c- n>rhs</c-><c- p>);</c->
+</pre><p>24. <em>Constraints:</em> </p><ul><li data-md><p><code class="highlight"><c- n>is_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>U</c-><c- o>></c-></code> is <code class="highlight">true</code>,</p> </li><li data-md><p><code class="highlight"><c- n>is_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- n>U</c-><c- o>></c-></code> is <code class="highlight">true</code>,</p> </li><li data-md><p><code class="highlight"><i><c- n>converts</c-><c- o>-</c-><c- n>from</c-><c- o>-</c-><c- n>any</c-><c- o>-</c-><c- n>cvref</c-></i><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>></c-></code> is <code class="highlight">false</code>,</p> </li><li data-md><p><code class="highlight"><c- n>is_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;></c-></code> is <code class="highlight">false</code>,</p> </li><li data-md><p><code class="highlight"><c- n>is_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;&amp;></c-></code> is <code class="highlight">false</code>,</p> </li><li data-md><p><code class="highlight"><c- n>is_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- k>const</c-> <c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;></c-></code> is <code class="highlight">false</code>, and</p> </li><li data-md><p><code class="highlight"><c- n>is_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- k>const</c-> <c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;&amp;></c-></code> is <code class="highlight">false</code>.</p> </li></ul> <p>25. <em>Effects:</em> See Table 61. <del>The result of the expression <code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-></code> remains unchanged.</del> <ins><code class="highlight"><c- n>rhs</c-></code> is left in a valid state with an unspecified value.</ins> </p><table> <tbody><tr><th colspan="3"><code class="highlight"><c- n>optional</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>optional</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;&amp;</c-><c- p>)</c-></code> effects</th></tr> <tr><th></th><th><code class="highlight"><c- o>*</c-><c- k>this</c-></code> contains a value</th><th><code class="highlight"><c- o>*</c-><c- k>this</c-></code> does not contain a value</th></tr> <tr><th><code class="highlight"><c- n>rhs</c-></code> contains a value</th><td>assigns <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>rhs</c-><c- p>)</c-></code> to the contained value</td><td>direct-non-list-initializes the contained value with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>rhs</c-><c- p>)</c-></code></td></tr> <tr><th><code class="highlight"><c- n>rhs</c-></code> does not contain a value</th><td>destroys the contained value by calling <code class="highlight"><c- n>val</c-><c- o>-></c-><c- n>T</c-><c- o>::~</c-><c- n>T</c-><c- p>()</c-></code></td><td>no effect</td></tr> </tbody></table> <p><del>26. <em>Postconditions:</em> <code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-> <c- o>==</c-> <c- k>this</c-><c- o>-></c-><c- n>has_value</c-><c- p>()</c-></code>.</del> </p><p>27. <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. </p><p>28. <em>Remarks:</em> If any exception is thrown, the result of the expression <code class="highlight"><c- k>this</c-><c- o>-></c-><c- n>has_value</c-><c- p>()</c-></code> remains unchanged.
+If an exception is thrown during <del>the</del> <ins>a</ins> call to <code class="highlight"><c- n>T</c-></code>’s constructor, the state of <code class="highlight"><c- o>*</c-><c- n>rhs</c-><c- p>.</c-><c- n>val</c-></code> is determined by the exception safety guarantee of <code class="highlight"><c- n>T</c-></code>’s constructor.
+If an exception is thrown during <del>the</del> <ins>a</ins> call to <code class="highlight"><c- n>T</c-></code>’s assignment <ins>operator</ins>, the state of <code class="highlight"><c- o>*</c-><c- n>val</c-></code> and <code class="highlight"><c- o>*</c-><c- n>rhs</c-><c- p>.</c-><c- n>val</c-></code> is determined by the exception safety guarantee of <code class="highlight"><c- n>T</c-></code>’s assignment <ins>operator</ins>. </p></small>
+   </blockquote>
+   <h3 class="heading settled" data-level="6.9" id="wording-type-erasure"><span class="secno">6.9. </span><span class="content">Type-erasure types</span><a class="self-link" href="#wording-type-erasure"></a></h3>
+   <h4 class="heading settled" data-level="6.9.1" id="wording-func.wrap.move.ctor"><span class="secno">6.9.1. </span><span class="content">[func.wrap.move.ctor] (unchanged)</span><a class="self-link" href="#wording-func.wrap.move.ctor"></a></h4>
+   <p><a href="https://eel.is/c++draft/func.wrap.move.ctor">[func.wrap.move.ctor]</a> doesn’t seem to require any changes:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- n>move_only_function</c-><c- p>(</c-><c- n>move_only_function</c-><c- o>&amp;&amp;</c-> <c- n>f</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
+</pre><p>3. <em>Postconditions:</em> The target object of <code class="highlight"><c- o>*</c-><c- k>this</c-></code> is the target object <code class="highlight"><c- n>f</c-></code> had before the construction,
+and <code class="highlight"><c- n>f</c-></code> is in a valid state with an unspecified value. </p><p>[...]</p> <pre class="highlight"><c- n>move_only_function</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>move_only_function</c-><c- o>&amp;&amp;</c-> <c- n>f</c-><c- p>);</c->
+</pre><p>22. <em>Effects:</em> Equivalent to: <code class="highlight"><c- n>move_only_function</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>f</c-><c- p>)).</c-><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- k>this</c-><c- p>);</c-></code> </p><p>23. <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. </p></small>
+   </blockquote>
+   <h4 class="heading settled" data-level="6.9.2" id="wording-any.cons"><span class="secno">6.9.2. </span><span class="content">[any.cons]</span><a class="self-link" href="#wording-any.cons"></a></h4>
+   <p>Modify <a href="https://eel.is/c++draft/any.cons">[any.cons]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- n>any</c-><c- p>(</c-><c- n>any</c-><c- o>&amp;&amp;</c-> <c- n>other</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
+</pre><p><del>4. <em>Effects:</em> If <code class="highlight"><c- n>other</c-><c- p>.</c-><c- n>has_value</c-><c- p>()</c-></code> is <code class="highlight">false</code>, constructs an object that has no value.
+Otherwise, constructs an object of type <code class="highlight"><c- n>any</c-></code> that contains either the contained value of <code class="highlight"><c- n>other</c-></code>,
+or contains an object of the same type constructed from the contained value of <code class="highlight"><c- n>other</c-></code> considering that contained value as an rvalue.</del> </p><p><ins>x. <em>Postconditions:</em> The contained value of <code class="highlight"><c- o>*</c-><c- k>this</c-></code> is the value contained by <code class="highlight"><c- n>other</c-></code> before the construction,
+and <code class="highlight"><c- n>other</c-></code> is in a valid state with an unspecified value.</ins> </p></small>
+   </blockquote>
+   <h4 class="heading settled" data-level="6.9.3" id="wording-any.assign"><span class="secno">6.9.3. </span><span class="content">[any.assign]</span><a class="self-link" href="#wording-any.assign"></a></h4>
+   <p>Modify <a href="https://eel.is/c++draft/any.assign">[any.assign]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- n>any</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>any</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>);</c->
+</pre><p>1. <em>Effects:</em> <del>As if by any(rhs).swap(*this). No effects if an exception is thrown.</del> <ins>Equivalent to: <code class="highlight"><c- n>any</c-><c- p>(</c-><c- n>rhs</c-><c- p>).</c-><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- k>this</c-><c- p>);</c-></code></ins> </p><p>2. <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. </p><p><del>3. <em>Throws:</em> Any exceptions arising from the copy constructor for the contained value.</del> </p><pre class="highlight"><c- n>any</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>any</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
+</pre><p>4. <em>Effects:</em> <del>As if by <code class="highlight"><c- n>any</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>rhs</c-><c- p>)).</c-><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- k>this</c-><c- p>)</c-></code>.</del> <ins>Equivalent to: <code class="highlight"><c- n>any</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>rhs</c-><c- p>)).</c-><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- k>this</c-><c- p>);</c-></code></ins> </p><p><del>5. <em>Postconditions:</em> The state of <code class="highlight"><c- o>*</c-><c- k>this</c-></code> is equivalent to the original state of <code class="highlight"><c- n>rhs</c-></code>.</del> </p><p>6. <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. </p></small>
+   </blockquote>
+   <h4 class="heading settled" data-level="6.9.4" id="wording-func.wrap.func.con"><span class="secno">6.9.4. </span><span class="content">[func.wrap.func.con]</span><a class="self-link" href="#wording-func.wrap.func.con"></a></h4>
+   <p>Modify <a href="https://eel.is/c++draft/func.wrap.func.con">[func.wrap.func.con]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- n>function</c-><c- p>(</c-><c- n>function</c-><c- o>&amp;&amp;</c-> <c- n>f</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
+</pre><p>6. <em>Postconditions:</em> If <code class="highlight"><c- o>!</c-><c- n>f</c-></code>, <code class="highlight"><c- o>*</c-><c- k>this</c-></code> has no target; otherwise, the target of <code class="highlight"><c- o>*</c-><c- k>this</c-></code> is equivalent to the target of <code class="highlight"><c- n>f</c-></code> before the construction, and <code class="highlight"><c- n>f</c-></code> is in a valid state with an unspecified value. </p><p>7. <em>Recommended practice:</em> Implementations should avoid the use of dynamically allocated memory for small callable objects,
+for example, where <code class="highlight"><c- n>f</c-></code>’s target is an object holding only a pointer or reference to an object and a member function pointer. </p><p>[...]</p> <pre class="highlight"><c- n>function</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>function</c-><c- o>&amp;</c-> <c- n>f</c-><c- p>);</c->
+</pre><p>19. <em>Effects:</em> <del>As if by <code class="highlight"><c- n>function</c-><c- p>(</c-><c- n>f</c-><c- p>).</c-><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- k>this</c-><c- p>);</c-></code></del> <ins>Equivalent to: <code class="highlight"><c- n>function</c-><c- p>(</c-><c- n>f</c-><c- p>).</c-><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- k>this</c-><c- p>);</c-></code></ins> </p><p>20. <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. </p><pre class="highlight"><c- n>function</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>function</c-><c- o>&amp;&amp;</c-> <c- n>f</c-><c- p>);</c->
+</pre><p>21. <em>Effects:</em> <del>Replaces the target of <code class="highlight"><c- o>*</c-><c- k>this</c-></code> with the target of <code class="highlight"><c- n>f</c-></code>.</del> <ins>Equivalent to: <code class="highlight"><c- n>function</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>f</c-><c- p>)).</c-><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- k>this</c-><c- p>);</c-></code></ins> </p><p>22. <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. </p></small>
    </blockquote>
   </main>
 <script>
@@ -2631,6 +2866,10 @@ without any change in this section’s wording.</p>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
+   <dt id="biblio-n3672">[N3672]
+   <dd>Fernando Cacciola; Andrzej Krzemieński. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3672.html"><cite>A utility class to represent optional objects</cite></a>. April 2013. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3672.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3672.html</a>
+   <dt id="biblio-p0843">[P0843]
+   <dd>Gonzalo Brito Gadeschi; et al. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html"><cite>inplace_vector</cite></a>. September 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html</a>
    <dt id="biblio-p1144">[P1144]
    <dd>Arthur O'Dwyer. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r9.html"><cite>std::is_trivially_relocatable</cite></a>. October 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r9.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r9.html</a>
    <dt id="biblio-p2785">[P2785]
