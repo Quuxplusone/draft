@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 10
-!Draft Revision: 59
+!Draft Revision: 60
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
   Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2023-12-22
+Date: 2023-12-31
 </pre>
 
 <style>
@@ -29,7 +29,8 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 - R10:
 
-    - Added implementation experience with [[HPX]], [[ParlayLib]], and [[StdxError]].
+    - Added implementation experience with [[HPX]], [[ParlayLib]], [[AMC]], and [[StdxError]].
+            Added <a href="#relevance-of-assignment">§5.2 "Relevance of `operator=`"</a>.
 
     - Wording for `ExecutionPolicy` overloads of the specialized algorithms. Explain why
             there are no `ranges` overloads.
@@ -46,7 +47,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
     - Replaced [[#non-trivial-samples|Appendix C "Examples of non-trivially relocatable class types"]]
             with a shorter summary.
 
-    - Removed Appendix E "Open questions" as basically redundant with <a href="#pmr-concerns">§5.2 "Confusing interactions with `std::pmr`"</a>.
+    - Removed Appendix E "Open questions" as basically redundant with <a href="#pmr-concerns">§5.3 "Confusing interactions with `std::pmr`"</a>.
             See ["P1144 PMR koans"](https://quuxplusone.github.io/blog/2023/06/03/p1144-pmr-koans/) (June 2023).
 
 - R8 (pre-Varna 2023):
@@ -61,11 +62,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
     - Marked `std::relocate` as `[[nodiscard]]`; changed its return type to `remove_cv_t<T>`.
 
-    - Resolved the Appendix E question about potentially overlapping subobjects;
-            we have implementation experience now that proves this is not a problem. Expanded discussion
-            of `pmr` types.
-
-    - Replaced [[#design-goals|§3 "Design goals"]] with a shorter summary.
+    - Rewrote [[#design-goals|§3 "Design goals."]]
 
 - R7 (post-Issaquah 2023):
 
@@ -78,19 +75,6 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
     - Added straw poll results from Issaquah; removed much background and discussion
             (leaving only notes for the interested reader to consult [[P1144R6]]).
-
-    - Removed mentions of EASTL.
-
-    - Added Appendix E "Open questions."
-
-- R6:
-
-    - Added `T std::relocate(T *source)`.
-
-    - Changed the exception guarantee of `uninitialized_relocate` and `uninitialized_relocate_n`
-            in accord with feedback from David Stone.
-
-    - Removed `std::ranges::relocate_at` (but kept `std::relocate_at`).
 
 
 # Introduction and motivation # {#intro}
@@ -268,7 +252,10 @@ the programmer to warrant the trivial relocatability of any type stored in a `fo
 
 This merely encouraged the programmer to add the warrant and continue. An incorrect
 warrant was discovered only at runtime, via undefined behavior. See
-[[FollyIssue889]] and (most importantly) [[CppNow]] [@27:26–31:47](https://www.youtube.com/watch?v=SGdfPextuAU&t=27m26s).
+[[CppNow]] [@27:26–31:47](https://www.youtube.com/watch?v=SGdfPextuAU&t=27m26s);
+for real-world examples see Folly issue [#889](https://github.com/facebook/folly/issues/889)
+([#35](https://github.com/facebook/folly/issues/35), [#316](https://github.com/facebook/folly/issues/316),
+[#498](https://github.com/facebook/folly/issues/498)).
 
 ```c++
     class Gadget {
@@ -303,7 +290,7 @@ can even find real bugs. [Example:](https://p1144.godbolt.org/z/7b8893sjr)
     static_assert(std::is_trivially_relocatable_v<Gadget>);  // correctly ERRORS
 ```
 
-The improvement in user experience and safety in real-world codebases ([[Folly]], [[BSL]], [[Qt]], [[HPX]], [[ParlayLib]], etc.)
+The improvement in user experience and safety in real-world codebases ([[Folly]], [[BSL]], [[Qt]], [[HPX]], [[ParlayLib]], [[AMC]], etc.)
 is the most important benefit to be gained by this proposal.
 
 # Design goals # {#design-goals}
@@ -894,6 +881,64 @@ EWGI took a three-way straw poll on `[[trivially_relocatable]]` versus `[[maybe_
 with an inconclusive 7–5–6 vote (the author of P1144 voting "For" and the three representatives of P2786
 voting "Against"; i.e. the vote sans authors was 6–5–3).
 
+## Relevance of `operator=` ## {#relevance-of-assignment}
+
+Here's how current implementations define "is trivially relocatable":
+
+- Mainline Clang `__is_trivially_relocatable(T)`: Trivially copyable, or has `[[clang::trivial_abi]]`
+- Arthur's Clang (P1144) `__is_trivially_relocatable(T)`: Trivially copyable, or has `[[clang::trivial_abi]]`, or has `[[trivially_relocatable]]`
+- Amadeus [[AMC]]'s `amc::is_trivially_relocatable<T>`: `is_trivially_copyable<T>` or has member typedef `T::trivially_relocatable`
+- Facebook [[Folly]]'s `folly::IsRelocatable<T>`: `is_trivially_copyable<T>` or has member typedef `T::IsRelocatable`
+- Bloomberg [[BSL]]'s `bslmf::IsBitwiseMoveable<T>`: Has a conversion to `bslmf::NestedTraitDeclaration<T, bslmf::IsBitwiseMoveable, true>`,
+    or has a conversion to `bslmf::NestedTraitDeclaration<T, bslmf::IsBitwiseCopyable, true>`, or `is_trivially_copyable<T>`,
+    or `sizeof(T) == 1`
+- [[HPX]]'s `hpx::experimental::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or the trait is specialized for `T`
+- [[ParlayLib]]'s `parlay::is_trivially_relocatable<T>`: currently "`is_trivially_move_constructible_v<T> && is_trivially_destructible_v<T>`,"
+    but after [#67](https://github.com/cmuparlay/parlaylib/pull/67) it'll be "`is_trivially_copyable<T>`, or the trait is specialized for `T`"
+
+Notice that all implementors (except ParlayLib trunk) agree that a type with trivial move-constructor, trivial destructor,
+*and non-trivial assignment operator* is considered non-trivially relocatable. That is, the assignment operator is relevant!
+P1144 preserves that behavior, and justifies it by pointing out that relocation
+can replace assignment in `vector::erase` and `std::swap`, among other algorithms. Existing codebases have written a lot
+of code that branches on `is_trivially_relocatable`, taking an optimized codepath when `is_trivially_relocatable` and an
+unoptimized codepath otherwise. P1144 carefully proposes a definition for `std::is_trivially_relocatable` that keeps
+those codebases safe, and never unexpectedly reports a type `T` as `is_trivially_relocatable` when it's not physically safe
+to use `T` with such an optimized codepath.
+
+```c++
+    #include <bsl_vector.h>
+    using namespace BloombergLP::bslmf;
+
+    struct T : NestedTraitDeclaration<T, IsBitwiseMoveable> {
+        int i_;
+        T(int i) : i_(i) {}
+        T(const T&) = default;
+        void operator=(const T&) noexcept { puts("Called operator="); }
+        ~T() = default;
+    };
+    int main() {
+        bsl::vector<T> v = {1,2};
+        v.erase(v.begin());
+          // prints nothing; bsl::vector::erase is optimized
+    }
+
+    struct U {
+        int i_;
+        U(int i) : i_(i) {}
+        U(const U&) = default;
+        void operator=(const U&) noexcept { puts("Called operator="); }
+        ~U() = default;
+    };
+    int main() {
+        bsl::vector<U> v = {1,2};
+        v.erase(v.begin());
+          // prints "Called operator="; BSL believes that a non-defaulted
+          // assignment operator makes U non-trivially relocatable.
+          // P1144 agrees. std::is_trivially_relocatable_v<U>
+          // must remain false, so as not to silently change the
+          // behavior of bsl::vector<U>.
+    }
+```
 
 ## Confusing interactions with `std::pmr` ## {#pmr-concerns}
 
@@ -1196,6 +1241,14 @@ See [[#applications|table §2.1]] for more details on [[Qt]], [[Folly]], and [[B
 
 <pre class=biblio>
 {
+  "AMC": {
+    "authors": [
+      "Stephane Janel"
+    ],
+    "title": "AMadeus (C++) Containers",
+    "href": "https://github.com/AmadeusITGroup/amc",
+    "date": "April 2021"
+  },
   "Announcing": {
     "authors": [
       "Arthur O'Dwyer"
@@ -1284,13 +1337,6 @@ See [[#applications|table §2.1]] for more details on [[Qt]], [[Folly]], and [[B
     ],
     "title": "Folly documentation on \"Object Relocation\"",
     "href": "https://github.com/facebook/folly/blob/master/folly/docs/FBVector.md#object-relocation"
-  },
-  "FollyIssue889": {
-    "authors": [
-      "Arthur O'Dwyer"
-    ],
-    "title": "Traits.h marks std::list as trivially relocatable, but in fact it is not",
-    "href": "https://github.com/facebook/folly/issues/889"
   },
   "HPX": {
     "authors": [
