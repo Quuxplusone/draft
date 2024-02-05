@@ -2,7 +2,7 @@
 Title: Variadic friends
 Shortname: D2893
 Revision: 1
-!Draft Revision: 2
+!Draft Revision: 3
 Audience: CWG
 Status: D
 Group: WG21
@@ -12,7 +12,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Support `friend Ts...` in C++26.
-Date: 2023-12-15
+Date: 2024-01-20
 </pre>
 
 <style>
@@ -37,12 +37,14 @@ be used with a single template parameter, because friendship cannot be currently
 
 <table>
 <tr><th>Before</th><th>After</th></tr>
-<tr><td><pre>template&lt;class T=void, class U=void>
+<tr><td><pre>template&lt;class T=void,
+         class U=void>
 class Foo {
   friend T;
   friend U;
 };
-</pre></td><td><pre>template&lt;class... Ts>
+</pre></td><td><pre>
+template&lt;class... Ts>
 class Foo {
   friend Ts...;
 };
@@ -60,7 +62,7 @@ so nobody but `B` can construct instances of `Passkey<B>`. You can't call
 `intentionalB` without an instance of `Passkey<B>` as the first argument.
 So, even though `intentionalB` is public, it is callable only from `B`.
 
-```c++
+```cpp
 template<class T>
 class Passkey {
   friend T;
@@ -97,7 +99,7 @@ class B {
 We would like to expand this idiom, and grant access to `Foo::intentional`
 from multiple classes.
 
-```c++
+```cpp
 template<class... Ts>
 class Passkey {
   friend Ts...; // Today: Error. Proposed: OK
@@ -120,10 +122,12 @@ There may be parts of the derived class API which are needed in the base class,
 but only the base class, so they are private, and friendship is granted to
 the base class.
 
-```c++
-template<class DispatcherT, class MsgT>
+```cpp
+template<class Crtp, class MsgT>
 class Receiver {
-  // Can static_cast to DispatcherT and access private stuff
+  void receive(MsgT) {
+    static_cast<Crtp*>(this)->private_ += 1;
+  }
 };
 
 template<class MsgT>
@@ -131,30 +135,32 @@ struct Dispatcher :
   public Receiver<Dispatcher<MsgT>, MsgT>
 {
   using Receiver<Dispatcher, MsgT>::Receiver;
-
-private:
   friend Receiver<Dispatcher, MsgT>;
 
-  int receiverCanAccess_;
+private:
+  int private_;
 };
 ```
 
 To support multiple base classes, we would like to make `Dispatcher` variadic:
 
-```C++
-template<class DispatcherT, class MsgT>
-class Receiver { ~~~~ };
+```cpp
+template<class Crtp, class MsgT>
+class Receiver {
+  void receive(MsgT) {
+    static_cast<Crtp*>(this)->private_ += 1;
+  }
+};
 
 template<class... MsgTs>
 struct Dispatcher :
   public Receiver<Dispatcher<MsgTs...>, MsgTs>... // OK
 {
   using Receiver<Dispatcher, MsgTs>::Receiver...;  // OK
-
-private:
   friend Receiver<Dispatcher, MsgTs>...; // Today: Error. Proposed: OK
 
-  int allReceiversCanAccess_;
+private:
+  int private_;
 };
 ```
 
@@ -162,11 +168,130 @@ Note that both inheritance and `using` support pack-expansion. Only `friend` doe
 
 # Confusing grammatical examples # {#confusing}
 
+A declaration `template<class T> friend ~~~` is not a template for stamping out friends;
+it is a request to befriend a specific template.
+
+```cpp
+template<class T>
+friend class C::Nested;
+```
+
+declares that `C` has a member named `Nested` which itself is a class template, and we're
+befriending that template. That is:
+
+```cpp
+struct C { template<class T> class Nested; };
+struct S {
+  template<class T>
+  friend class C::Nested;
+};
+```
+
+Therefore it is never well-formed to use the parameters of the friend declaration's own *template-head*
+within the declarator itself. That is, these are all ill-formed, and replacing `U` with `Us...` doesn't
+change anything:
+
+<table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td><pre>
+template&lt;class T>
+struct S {
+  template&lt;class U>
+  friend U; // ill-formed
+
+  template&lt;class U>
+  friend class U; // ill-formed
+
+  template&lt;class U>
+  friend class C&lt;T>::Nested&lt;U>; // ill-formed
+
+
+
+
+  template&lt;class U>
+  friend class C&lt;U>::Nested; // ill-formed
+};
+</pre></td><td><pre>
+template&lt;class... Ts>
+struct VS {
+  template&lt;class... Us>
+  friend Us...; // ill-formed
+
+  template&lt;class... Us>
+  friend class Us...; // ill-formed
+
+  template&lt;class U>
+  friend class C&lt;Ts>::Nested&lt;U>...; // ill-formed
+
+  template&lt;class... Us>
+  friend class C&lt;Ts...>::Nested&lt;Us>...; // ill-formed
+
+  template&lt;class... Us>
+  friend class C&lt;Us>::Nested...; // ill-formed
+};
+</pre></td></tr>
+</table>
+
+But these are well-formed:
+
+<table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td><pre>
+template&lt;class T>
+struct C {
+  template&lt;class U> struct Nested;
+};
+
+template&lt;class T>
+struct S {
+  template&lt;class U>
+  friend class C&lt;T>::Nested; // OK
+};
+
+template&lt;class T>
+template&lt;class U>
+struct C&lt;T>::Nested {
+  int m(S&lt;int>& s) { return s.private_; }
+};
+
+int main() {
+  S&lt;int> s;
+  C&lt;int>::Nested&lt;float>().m(s); // OK
+  C&lt;char>::Nested&lt;float>().m(s); // error, inaccessible
+}
+</pre></td><td><pre>
+template&lt;class T>
+struct C {
+  template&lt;class U> struct Nested;
+};
+
+template&lt;class... Ts>
+struct VS {
+  template&lt;class U>
+  friend class C&lt;Ts>::Nested...; // OK
+};
+
+template&lt;class T>
+template&lt;class U>
+struct C&lt;T>::Nested {
+  int m(VS&lt;int, char>& vs) { return vs.private_; }
+};
+
+int main() {
+  VS&lt;int, char> vs;
+  C&lt;int>::Nested&lt;float>().m(vs); // OK
+  C&lt;char>::Nested&lt;float>().m(vs); // OK
+  C&lt;float>::Nested&lt;float>().m(vs); // error, inaccessible
+}
+</pre></td></tr>
+</table>
+
+
 ## `friend class Ts...` ## {#confusing-elab}
 
 C++ already disallows `friend class T` ([Godbolt](https://godbolt.org/z/zMefooj6h))
 in <a href="https://eel.is/c++draft/dcl.spec#dcl.type.elab-4">[dcl.type.elab]</a>:
-```c++
+```cpp
 template<class T>
 struct S {
   friend class T;
@@ -206,7 +331,7 @@ If the *identifier* or *simple-template-id* resolves to a *typedef-name* ([dcl.t
 The following `task1` and `task2` are grammatical according to our grammar, but it's not clear what
 they mean (or if they're ill-formed for other reasons). Is this a problem?
 
-```c++
+```cpp
 template<class... Ts>
 class Task1 {
   friend class Newname<Ts>...;
@@ -220,6 +345,23 @@ class Task2 {
 };
 ```
 
+<table>
+<tr><td><pre>friend int f(Ts)...;</pre></td><td>Ill-formed by the grammar (`...` not allowed here)</td></tr>
+<tr><td><pre>friend Ts...;</pre></td><td>OK</td></tr>
+<tr><td><pre>friend class Ts...;</pre></td><td>Ill-formed; `class Ts`, being an *elaborated-type-specifier*, is not a *simple-friend-declarator*</td></tr>
+<tr><td><pre>friend C&lt;Ts>...;</pre></td><td>OK; `C<Ts>`, being a *simple-type-specifier*, is a *simple-friend-declarator*</td></tr>
+<tr><td><pre>friend typename C&lt;Ts>::type...;</pre></td><td>OK; `typename C<Ts>::type`, being a *typename-specifier*, is a *simple-friend-declarator*</td></tr>
+<tr><td><pre>template&lt;class U> friend C&lt;Ts, U>...;</pre></td><td>OK</td></tr>
+<tr><td><pre>template&lt;class... Us> friend C&lt;Ts, Us...>...;</pre></td><td>OK</td></tr>
+<tr><td><pre>template&lt;class U> friend U;</pre></td><td>Vendors agree this is ill-formed; but how?</td></tr>
+<tr><td><pre>template&lt;class U> friend typename U;</pre></td><td>Vendors agree this is ill-formed; but how?</td></tr>
+<tr><td><pre>template&lt;class... Us> friend Us...;</pre></td><td>Should be ill-formed; but how?</td></tr>
+<tr><td><pre>template&lt;class... Us> friend C&lt;Ts, Us>...;</pre></td><td>Should be ill-formed; but how?</td></tr>
+<tr><td><pre></pre></td><td>Ill-formed by <a href=""></a></td></tr>
+</table>
+
+
+
 # Proposed wording # {#wording}
 
 We present two possible wording options. Option 1 proposes to make `friend Ts...` expand to
@@ -229,8 +371,8 @@ preferred direction, for consistency with `using T1::T1, T2::T2`.
 Option 2 proposes to make `friend Ts...` expand to `friend T1; friend T2`, which means
 that `friend T1, T2` will remain ill-formed — and if someone wants C++ to support that
 syntax, they'll have to bring a new proposal and effectively reinvent Option 1 by unwinding
-the effects of our paper. We think this is likely to happen if we go with Option 2, so
-it's *not* our preferred direction.
+the effects of our paper. We think this is likely to happen, so Option 2 is *not* our
+preferred direction.
 
 P2893R0 presented Option 1, but with incomplete wording. EWG at Kona was concerned
 that the wording to support `friend T1, T2` might be difficult, and so the presentation
@@ -323,7 +465,7 @@ one of the following forms:
 &emsp; <ins><i><a href="#wording1-class.mem.general">simple-friend-declaration</a></i></ins><br>
 &emsp; `friend` *elaborated-type-specifier* `;`<br>
 &emsp; <del>`friend` *simple-type-specifier* `;`</del><br>
-&emsp; `friend` *typename-specifier* `;`<br>
+&emsp; <del>`friend` *typename-specifier* `;`</del><br>
 
 [*Note:* A friend declaration can be the declaration in a *template-declaration* ([temp.pre], [temp.friend]). — *end note*]
 

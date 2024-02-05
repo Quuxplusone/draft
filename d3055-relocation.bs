@@ -50,7 +50,7 @@ use `operator=` in a loop (represented here by `std::move`), but for trivially r
 it can avoid `operator=` and use the moral equivalent of memcpy
 (represented here by P1144 `std::uninitialized_relocate`).
 
-```c++
+```cpp
     void erase(iterator it) {
         if constexpr (std::is_trivially_relocatable_v<value_type>) {
             std::destroy_at(it);
@@ -91,7 +91,7 @@ This change would be consistent with LWG's wording choices in the modern era:
 it specifies the complexity only in terms of big-O, and does not directly mandate any particular implementation
 strategy. So for example it would become legal for the implementation to do just this:
 
-```c++
+```cpp
     void erase(iterator it) {
         std::rotate(it, it + 1, end_);
         std::destroy_at(end_--);
@@ -136,7 +136,7 @@ and in fact Arthur's libc++ fork does exactly that
 [Godbolt](https://godbolt.org/z/EWzKqq5s3)). The following code omits details such as `std::is_constant_evaluated()`
 which are present in the actual library.
 
-```c++
+```cpp
     void swap(T& a, T& b)
         noexcept(is_nothrow_move_constructible_v<T> && is_nothrow_move_assignable_v<T>)
     {
@@ -166,7 +166,7 @@ in the same sense as C++11 move semantics. For the following type `S`,
 mainline libc++ compiles `std::swap` into 74 lines of assembly.
 Arthur's P1144 fork of libc++ compiles it into 18 lines. ([Godbolt.](https://godbolt.org/z/EWzKqq5s3))
 
-```c++
+```cpp
     struct S {
         S();
         std::unique_ptr<int> p;
@@ -251,7 +251,7 @@ We provide wording for `optional` <a href="#wording-optional">below</a>, but we'
 What about `variant` and `expected`? Those types deliberately pretend not to have a disengaged state,
 and we should respect that:
 
-```c++
+```cpp
 using T = std::array<std::vector<int>, 100>;
 
 std::variant<T> v = T();
@@ -304,7 +304,7 @@ terminology, `reference_wrapper<int>` is trivially relocatable and `tuple<int&>`
 Recall that `swap` is already loosely specified — it "exchanges the values"  of its arguments — so
 our proposal leaves the following example untouched:
 
-```c++
+```cpp
     int i = 1, j = 2;
     std::tuple<int&> a = {i}, b = {j};
     std::swap(a, b);
@@ -315,7 +315,7 @@ our proposal leaves the following example untouched:
 its semantics are coupled to `swap` only through the phrase "At most *n* swaps" in the <i>Complexity</i> element,
 which we propose to remove. After that change, a vendor might reasonably construe that this old behavior...
 
-```c++
+```cpp
     int a[3] = {1,2,3};
     std::tuple<int&> ts[3] = {{a[0]}, {a[1]}, {a[2]}};
     std::rotate(ts, ts+1, ts+3);
@@ -329,7 +329,7 @@ because Arthur's libc++ optimizes only trivially relocatable types, and `tuple<i
 Consider `vector::erase`, whose semantics are coupled to `operator=` only through wording in its <i>Complexity</i> element
 which we propose to remove. After that change, a vendor might reasonably construe that this old behavior...
 
-```c++
+```cpp
     int a[3] = {1,2,3};
     std::vector<std::tuple<int&>> ts = {{a[0]}, {a[1]}, {a[2]}};
     ts.erase(ts.begin());

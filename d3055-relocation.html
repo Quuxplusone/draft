@@ -2196,8 +2196,8 @@ in Varna) and Bini and Catmur’s <a data-link-type="biblio" href="#biblio-p2785
 for (trivially) relocatable types. For example, <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>erase</c-><c- p>(</c-><c- n>it</c-><c- p>)</c-></code> for non-relocatable <code class="highlight"><c- n>T</c-></code> must
 use <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> in a loop (represented here by <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>move</c-></code>), but for trivially relocatable <code class="highlight"><c- n>T</c-></code> it can avoid <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> and use the moral equivalent of memcpy
 (represented here by P1144 <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate</c-></code>).</p>
-<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>erase</c-><c- p>(</c-><c- n>iterator</c-> <c- n>it</c-><c- p>)</c-> <c- p>{</c->
-    <c- k>if</c-> <c- n>constexpr</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-><c- p>)</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- b>void</c-> <c- nf>erase</c-><c- p>(</c-><c- n>iterator</c-> <c- n>it</c-><c- p>)</c-> <c- p>{</c->
+    <c- k>if</c-> <c- k>constexpr</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-><c- p>)</c-> <c- p>{</c->
         <c- n>std</c-><c- o>::</c-><c- n>destroy_at</c-><c- p>(</c-><c- n>it</c-><c- p>);</c->
         <c- n>std</c-><c- o>::</c-><c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>it</c-> <c- o>+</c-> <c- mi>1</c-><c- p>,</c-> <c- n>end_</c-><c- p>,</c-> <c- n>it</c-><c- p>);</c->
     <c- p>}</c-> <c- k>else</c-> <c- p>{</c->
@@ -2227,7 +2227,7 @@ erased elements.</del> <ins>Linear in the number of elements following the first
    <p>This change would be consistent with LWG’s wording choices in the modern era:
 it specifies the complexity only in terms of big-O, and does not directly mandate any particular implementation
 strategy. So for example it would become legal for the implementation to do just this:</p>
-<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>erase</c-><c- p>(</c-><c- n>iterator</c-> <c- n>it</c-><c- p>)</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- b>void</c-> <c- nf>erase</c-><c- p>(</c-><c- n>iterator</c-> <c- n>it</c-><c- p>)</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>rotate</c-><c- p>(</c-><c- n>it</c-><c- p>,</c-> <c- n>it</c-> <c- o>+</c-> <c- mi>1</c-><c- p>,</c-> <c- n>end_</c-><c- p>);</c->
     <c- n>std</c-><c- o>::</c-><c- n>destroy_at</c-><c- p>(</c-><c- n>end_</c-><c- o>--</c-><c- p>);</c->
 <c- p>}</c->
@@ -2252,10 +2252,10 @@ and the type of <code class="highlight"><c- o>*</c-><c- n>first</c-></code> meet
    <p>Here the status quo is sufficiently loose to permit an efficient implementation by means of relocation,
 and in fact Arthur’s libc++ fork does exactly that
 (<a href="https://github.com/Quuxplusone/llvm-project/blob/trivially-relocatable-v95/libcxx/include/__utility/swap.h#L67-L86">source</a>, <a href="https://godbolt.org/z/EWzKqq5s3">Godbolt</a>). The following code omits details such as <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_constant_evaluated</c-><c- p>()</c-></code> which are present in the actual library.</p>
-<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>b</c-><c- p>)</c->
-    <c- n>noexcept</c-><c- p>(</c-><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c->
+<pre class="language-cpp highlight"><c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>b</c-><c- p>)</c->
+    <c- k>noexcept</c-><c- p>(</c-><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c->
 <c- p>{</c->
-    <c- k>if</c-> <c- n>constexpr</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c-> <c- p>{</c->
+    <c- k>if</c-> <c- k>constexpr</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c-> <c- p>{</c->
         <c- n>__builtin_memswap</c-><c- p>(</c-><c- o>&amp;</c-><c- n>a</c-><c- p>,</c-> <c- o>&amp;</c-><c- n>b</c-><c- p>,</c-> <c- n>__datasizeof</c-><c- p>(</c-><c- n>T</c-><c- p>));</c->
     <c- p>}</c-> <c- k>else</c-> <c- p>{</c->
         <c- n>T</c-> <c- n>temp</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>a</c-><c- p>);</c->
@@ -2276,7 +2276,7 @@ for relocatable user-defined types.</p>
 in the same sense as C++11 move semantics. For the following type <code class="highlight"><c- n>S</c-></code>,
 mainline libc++ compiles <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code> into 74 lines of assembly.
 Arthur’s P1144 fork of libc++ compiles it into 18 lines. (<a href="https://godbolt.org/z/EWzKqq5s3">Godbolt.</a>)</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>S</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>S</c-> <c- p>{</c->
     <c- n>S</c-><c- p>();</c->
     <c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>p</c-><c- p>;</c->
     <c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>q</c-><c- p>;</c->
@@ -2366,7 +2366,7 @@ notice <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9
    <p>We provide wording for <code class="highlight"><c- n>optional</c-></code> <a href="#wording-optional">below</a>, but we’re not married to it.</p>
    <p>What about <code class="highlight"><c- n>variant</c-></code> and <code class="highlight"><c- n>expected</c-></code>? Those types deliberately pretend not to have a disengaged state,
 and we should respect that:</p>
-<pre class="language-c++ highlight"><c- n>using</c-> <c- n>T</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>array</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>,</c-> <c- mi>100</c-><c- o>></c-><c- p>;</c->
+<pre class="language-cpp highlight"><c- k>using</c-> <c- n>T</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>array</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>,</c-> <c- mi>100</c-><c- o>></c-><c- p>;</c->
 
 <c- n>std</c-><c- o>::</c-><c- n>variant</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>v</c-> <c- o>=</c-> <c- n>T</c-><c- p>();</c->
 <c- n>std</c-><c- o>::</c-><c- n>variant</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>w</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>v</c-><c- p>);</c->
@@ -2415,7 +2415,7 @@ terminology, <code class="highlight"><c- n>reference_wrapper</c-><c- o>&lt;</c->
 (<a href="https://godbolt.org/z/4nqY1GTrx">Godbolt.</a>)</p>
    <p>Recall that <code class="highlight"><c- n>swap</c-></code> is already loosely specified — it "exchanges the values"  of its arguments — so
 our proposal leaves the following example untouched:</p>
-<pre class="language-c++ highlight"><c- b>int</c-> <c- n>i</c-> <c- o>=</c-> <c- mi>1</c-><c- p>,</c-> <c- n>j</c-> <c- o>=</c-> <c- mi>2</c-><c- p>;</c->
+<pre class="language-cpp highlight"><c- b>int</c-> <c- n>i</c-> <c- o>=</c-> <c- mi>1</c-><c- p>,</c-> <c- n>j</c-> <c- o>=</c-> <c- mi>2</c-><c- p>;</c->
 <c- n>std</c-><c- o>::</c-><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- o>&amp;></c-> <c- n>a</c-> <c- o>=</c-> <c- p>{</c-><c- n>i</c-><c- p>},</c-> <c- n>b</c-> <c- o>=</c-> <c- p>{</c-><c- n>j</c-><c- p>};</c->
 <c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>a</c-><c- p>,</c-> <c- n>b</c-><c- p>);</c->
 <c- n>assert</c-><c- p>(</c-><c- n>i</c-> <c- o>==</c-> <c- mi>2</c-> <c- o>&amp;&amp;</c-> <c- n>j</c-> <c- o>==</c-> <c- mi>1</c-><c- p>);</c->
@@ -2423,7 +2423,7 @@ our proposal leaves the following example untouched:</p>
    <p><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rotate</c-></code>’s <i>Effects</i> are specified via the phrase "places the element from position <em>x</em> into position <em>y</em>";
 its semantics are coupled to <code class="highlight"><c- n>swap</c-></code> only through the phrase "At most <em>n</em> swaps" in the <i>Complexity</i> element,
 which we propose to remove. After that change, a vendor might reasonably construe that this old behavior...</p>
-<pre class="language-c++ highlight"><c- b>int</c-> <c- n>a</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
+<pre class="language-cpp highlight"><c- b>int</c-> <c- n>a</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
 <c- n>std</c-><c- o>::</c-><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- o>&amp;></c-> <c- n>ts</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{{</c-><c- n>a</c-><c- p>[</c-><c- mi>0</c-><c- p>]},</c-> <c- p>{</c-><c- n>a</c-><c- p>[</c-><c- mi>1</c-><c- p>]},</c-> <c- p>{</c-><c- n>a</c-><c- p>[</c-><c- mi>2</c-><c- p>]}};</c->
 <c- n>std</c-><c- o>::</c-><c- n>rotate</c-><c- p>(</c-><c- n>ts</c-><c- p>,</c-> <c- n>ts</c-><c- o>+</c-><c- mi>1</c-><c- p>,</c-> <c- n>ts</c-><c- o>+</c-><c- mi>3</c-><c- p>);</c->
 <c- n>assert</c-><c- p>(</c-><c- n>a</c-><c- p>[</c-><c- mi>0</c-><c- p>]</c-> <c- o>==</c-> <c- mi>2</c-> <c- o>&amp;&amp;</c-> <c- n>a</c-><c- p>[</c-><c- mi>1</c-><c- p>]</c-> <c- o>==</c-> <c- mi>3</c-> <c- o>&amp;&amp;</c-> <c- n>a</c-><c- p>[</c-><c- mi>2</c-><c- p>]</c-> <c- o>==</c-> <c- mi>1</c-><c- p>);</c->
@@ -2433,7 +2433,7 @@ each <code class="highlight"><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- o>
 because Arthur’s libc++ optimizes only trivially relocatable types, and <code class="highlight"><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- o>&amp;></c-></code> is not trivially relocatable.)</p>
    <p>Consider <code class="highlight"><c- n>vector</c-><c- o>::</c-><c- n>erase</c-></code>, whose semantics are coupled to <code class="highlight"><c- k>operator</c-><c- o>=</c-></code> only through wording in its <i>Complexity</i> element
 which we propose to remove. After that change, a vendor might reasonably construe that this old behavior...</p>
-<pre class="language-c++ highlight"><c- b>int</c-> <c- n>a</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
+<pre class="language-cpp highlight"><c- b>int</c-> <c- n>a</c-><c- p>[</c-><c- mi>3</c-><c- p>]</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
 <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- o>&amp;>></c-> <c- n>ts</c-> <c- o>=</c-> <c- p>{{</c-><c- n>a</c-><c- p>[</c-><c- mi>0</c-><c- p>]},</c-> <c- p>{</c-><c- n>a</c-><c- p>[</c-><c- mi>1</c-><c- p>]},</c-> <c- p>{</c-><c- n>a</c-><c- p>[</c-><c- mi>2</c-><c- p>]}};</c->
 <c- n>ts</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>ts</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->
 <c- n>assert</c-><c- p>(</c-><c- n>a</c-><c- p>[</c-><c- mi>0</c-><c- p>]</c-> <c- o>==</c-> <c- mi>2</c-> <c- o>&amp;&amp;</c-> <c- n>a</c-><c- p>[</c-><c- mi>1</c-><c- p>]</c-> <c- o>==</c-> <c- mi>3</c-> <c- o>&amp;&amp;</c-> <c- n>a</c-><c- p>[</c-><c- mi>2</c-><c- p>]</c-> <c- o>==</c-> <c- mi>3</c-><c- p>);</c->

@@ -31,12 +31,24 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 TODO: Read P2828R1 Copy elision for direct-initialization with a conversion function (Core issue 2327) (Brian Bi)
 
+[Clang #77768](https://github.com/llvm/llvm-project/pull/77768), trying to implement [[CWG2137]], resulted in this example:
+```cpp
+struct A { A(); };
+struct V { V(std::initializer_list<A>); };
+void foo(A);
+void foo(V);
+int main() {
+    foo({A()});
+      // Today: calls foo(A), not foo(V)
+      // Really should: call foo(V)
+}
+```
 
 # Motivation # {#motivation}
 
 Consider the following two types:
 
-```c++
+```cpp
 struct Fish {
   explicit Fish(int, int) {}
 };
@@ -72,7 +84,7 @@ Any design change in this area requires a paper." This P2903 is intended to be t
 
 Worse, consider this pathological type:
 
-```c++
+```cpp
 struct Evil {
   explicit Evil(int, int=0); // #1
   Evil(long, long=0);        // #2
@@ -113,7 +125,7 @@ by one `=` character could both be well-formed and yet choose completely differe
 In C++11, this was a relatively surprising idea. In C++98, you could certainly craft types
 with that behavior:
 
-```c++
+```cpp
     struct S {
       S(long);
       explicit S(int);
@@ -140,7 +152,7 @@ evolving) Bjarne Stroustrup wrote:
 
 He gives this example:
 
-```c++
+```cpp
     struct String1 { explicit String1(const char*); }
     struct String2 { String2(const char*); }
     
@@ -182,7 +194,7 @@ rather than 2007), I don't think that should be our default assumption.
 
 Stroustrup's example is precisely isomorphic to this one:
 
-```c++
+```cpp
     void f1(std::reverse_iterator<const char*>);
     void f2(std::string_view);
     void f(std::reverse_iterator<const char*>);
@@ -201,7 +213,7 @@ Now consider the multi-argument version... ooh, but this is much harder to formu
 with STL types, because the STL is exactly Bjarne's "sloppy programmer." It's hard to find
 any STL type with an explicit multi-argument constructor. So for example we have:
 
-```c++
+```cpp
     using Pair = std::pair<int, std::string>;
     using Vector = std::vector<std::string>;
     using SharedPtr = std::shared_ptr<int>;
@@ -228,7 +240,7 @@ proposed change, nothing would break immediately; but later, if we made that
 chosen constructor properly `explicit`, it would silently start choosing some
 different constructor!
 
-```c++
+```cpp
 struct SloppySpan {
     SloppySpan(const char *, int); // #1
     SloppySpan(const char *, const char *); // #2
@@ -248,7 +260,7 @@ and "Make this converting constructor `=delete`'d." Ideally, we should use `=del
 the latter. But then we'd need some way to overload a non-converting constructor
 with a deleted conversion. This doesn't work today:
 
-```c++
+```cpp
 struct EvolvedSpan {
     explicit EvolvedSpan(const char *, int); // #1 non-converting ctor
     EvolvedSpan(const char *, int) = delete; // #1 deleted conversion
@@ -266,7 +278,7 @@ ABI break. I'm not interested in pursuing that direction.)
 A popular gripe with C++11's copy-list-initialization was that it didn't seem to "work right" with
 `tuple`. That's because, until C++14, `std::tuple` had only an `explicit` elementwise constructor.
 
-```c++
+```cpp
     std::tuple<int> t1 = {1};       // ill-formed before N3680
     std::tuple<int,int> t2 = {2,2}; // ill-formed before N3680
 ```
@@ -286,7 +298,7 @@ after deduction? Is this a problem for P2903?
 I don't think it's a problem, because we can already handle the C++98 version
 (<a href="https://godbolt.org/z/cvEzTroY3">Godbolt</a>).
 
-```c++
+```cpp
     struct E {
       E(long); // #1
       template<class T> explicit(sizeof(T)==4) E(T); // #2
@@ -298,7 +310,7 @@ I don't think it's a problem, because we can already handle the C++98 version
 ## CWG 1467 ## {#cwg1467}
 
 [[CWG1467]] (adopted November 2014) gave this example:
-```c++
+```cpp
     struct Agg {
       Agg() = default;
       Agg(const Agg&) = default;
@@ -308,7 +320,7 @@ I don't think it's a problem, because we can already handle the C++98 version
 ```
 We want this to use the copy ctor. It does. Good.
 But then [[CWG2137]] (adopted June 2016) gave this example:
-```c++
+```cpp
     struct Q {
       Q();
       Q(const Q&);
@@ -318,7 +330,7 @@ But then [[CWG2137]] (adopted June 2016) gave this example:
 ```
 We want this to use the `initializer_list` ctor, not the copy ctor. It does. Good.
 But then [[CWG2311]] (open) gives this example:
-```c++
+```cpp
     struct NonAgg {
       NonAgg();
     };
@@ -402,7 +414,7 @@ This restriction only applies if this initialization is part of the final result
 1․ The current wording specifies two consecutive overload resolutions, which has all the same potential for
 vendor divergence as we reported in [[P2266]]. For example (cf. [[P2266]] example `fourteen`):
 
-```c++
+```cpp
 struct A {
   A(int);
   A(std::initializer_list<short>);
@@ -425,7 +437,7 @@ MSVC goes on to perform the second resolution.
 this is prone to vendor divergence. For example, *having a default constructor* is orthogonal to
 *being default constructible.*
 
-```c++
+```cpp
 struct B {
   B();
   B(int = 0);
@@ -441,7 +453,7 @@ B two = {};
 3․ Whether "no viable initializer-list constructor is found" in the first pass critically depends on
 what counts as an initializer-list constructor. For example:
 
-```c++
+```cpp
 template<class T>
 using Alias = std::initializer_list<T>;
 
@@ -513,7 +525,7 @@ But I don't think this goes far enough. I think what we need to say, roughly, is
 
 For example, today when we see...
 
-```c++
+```cpp
 struct Alpha {
     Alpha(Beta);
 };
@@ -528,7 +540,7 @@ and pick the best match. So we have *some* way today of comparing the rank of ca
 directly isomorphic. But I do admit that whatever way we have today, seems to be just as much a source of
 vendor divergence as anything we're replacing:
 
-```c++
+```cpp
 struct Alpha { Alpha(const Beta&); };
 struct Beta { operator Alpha() const; };
 Alpha a = Beta();  // EDG+GCC call the ctor; Clang+MSVC reject

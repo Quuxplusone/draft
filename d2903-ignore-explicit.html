@@ -1561,7 +1561,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version d29f71adb, updated Wed Jul 19 11:08:56 2023 -0700" name="generator">
+  <meta content="Bikeshed version 82ce88815, updated Thu Sep 7 16:33:55 2023 -0700" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
@@ -2105,7 +2105,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Audience:
      <dd>EWG
      <dt>Project:
-     <dd>ISO/IEC JTC1/SC22/WG21 14882: Programming Language — C++
+     <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
      <dd>2
      <dt>Current Source:
@@ -2160,10 +2160,21 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      </ul>
    </ul>
    <p>TODO: Read P2828R1 Copy elision for direct-initialization with a conversion function (Core issue 2327) (Brian Bi)</p>
+   <p><a href="https://github.com/llvm/llvm-project/pull/77768">Clang #77768</a>, trying to implement <a data-link-type="biblio" href="#biblio-cwg2137" title="List-initialization from object of same type">[CWG2137]</a>, resulted in this example:</p>
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c-> <c- n>A</c-><c- p>();</c-> <c- p>};</c->
+<c- k>struct</c-> <c- nc>V</c-> <c- p>{</c-> <c- n>V</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>A</c-><c- o>></c-><c- p>);</c-> <c- p>};</c->
+<c- b>void</c-> <c- nf>foo</c-><c- p>(</c-><c- n>A</c-><c- p>);</c->
+<c- b>void</c-> <c- nf>foo</c-><c- p>(</c-><c- n>V</c-><c- p>);</c->
+<c- b>int</c-> <c- nf>main</c-><c- p>()</c-> <c- p>{</c->
+    <c- n>foo</c-><c- p>({</c-><c- n>A</c-><c- p>()});</c->
+      <c- c1>// Today: calls foo(A), not foo(V)</c->
+      <c- c1>// Really should: call foo(V)</c->
+<c- p>}</c->
+</pre>
    <h2 class="heading settled" data-level="2" id="motivation"><span class="secno">2. </span><span class="content">Motivation</span><a class="self-link" href="#motivation"></a></h2>
    <p>Consider the following two types:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Fish</c-> <c- p>{</c->
-  <c- n>explicit</c-> <c- nf>Fish</c-><c- p>(</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-> <c- p>{}</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>Fish</c-> <c- p>{</c->
+  <c- k>explicit</c-> <c- n>Fish</c-><c- p>(</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-> <c- p>{}</c->
 <c- p>};</c->
 
 <c- k>struct</c-> <c- nc>Fowl</c-> <c- p>{</c->
@@ -2185,8 +2196,8 @@ The GCC+MSVC behavior is conforming, but often reported as a bug
    <p>The reason this code is actually ill-formed is because, as <a data-link-type="biblio" href="#biblio-cwg1228" title="Copy-list-initialization and explicit constructors">[CWG1228]</a> identified back in 2010, the Standard uses different logic in <a href="https://eel.is/c++draft/over.match.list#1.sentence-2">[over.match.list]</a> versus <a href="https://eel.is/c++draft/over.match.copy#1.1.sentence-1">[over.match.copy]</a>. <a data-link-type="biblio" href="#biblio-cwg1228" title="Copy-list-initialization and explicit constructors">[CWG1228]</a> was resolved "NAD," as in "The inconsistency, sadly, matches the current design.
 Any design change in this area requires a paper." This P2903 is intended to be that paper.</p>
    <p>Worse, consider this pathological type:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Evil</c-> <c- p>{</c->
-  <c- n>explicit</c-> <c- nf>Evil</c-><c- p>(</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>=</c-><c- mi>0</c-><c- p>);</c-> <c- c1>// #1</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>Evil</c-> <c- p>{</c->
+  <c- k>explicit</c-> <c- n>Evil</c-><c- p>(</c-><c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>=</c-><c- mi>0</c-><c- p>);</c-> <c- c1>// #1</c->
   <c- n>Evil</c-><c- p>(</c-><c- b>long</c-><c- p>,</c-> <c- b>long</c-><c- o>=</c-><c- mi>0</c-><c- p>);</c->        <c- c1>// #2</c->
 <c- p>};</c->
 <c- n>Evil</c-> <c- n>ea</c-> <c- o>=</c-> <c- mi>1</c-><c- p>;</c->     <c- c1>// OK, calls #2</c->
@@ -2218,9 +2229,9 @@ changing the meaning of the code for the worse (the "more dangerous").</p>
 by one <code class="highlight"><c- o>=</c-></code> character could both be well-formed and yet choose completely different constructors.
 In C++11, this was a relatively surprising idea. In C++98, you could certainly craft types
 with that behavior:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>S</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>S</c-> <c- p>{</c->
   <c- n>S</c-><c- p>(</c-><c- b>long</c-><c- p>);</c->
-  <c- n>explicit</c-> <c- nf>S</c-><c- p>(</c-><c- b>int</c-><c- p>);</c->
+  <c- k>explicit</c-> <c- n>S</c-><c- p>(</c-><c- b>int</c-><c- p>);</c->
 <c- p>};</c->
 
 <c- n>S</c-> <c- n>s</c-> <c- o>=</c-> <c- p>(</c-><c- mi>1</c-><c- p>);</c-> <c- c1>// OK, calls S(long)</c->
@@ -2236,7 +2247,7 @@ For example, can <code class="highlight"><c- n>f</c-><c- p>({</c-><c- n>v</c-><c
     <p><code class="highlight"><c- p>{...}</c-></code> provides an alternative solution to the problems that <code class="highlight"><c- k>explicit</c-></code> was designed to solve.</p>
    </blockquote>
    <p>He gives this example:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>String1</c-> <c- p>{</c-> <c- n>explicit</c-> <c- nf>String1</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-><c- o>*</c-><c- p>);</c-> <c- p>}</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>String1</c-> <c- p>{</c-> <c- k>explicit</c-> <c- n>String1</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-><c- o>*</c-><c- p>);</c-> <c- p>}</c->
 <c- k>struct</c-> <c- nc>String2</c-> <c- p>{</c-> <c- n>String2</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-><c- o>*</c-><c- p>);</c-> <c- p>}</c->
     
 <c- b>void</c-> <c- n>f1</c-><c- p>(</c-><c- n>String1</c-><c- p>);</c->
@@ -2270,7 +2281,7 @@ library type <code class="highlight"><c- n>String2</c-></code> knew what they we
 from a string literal. Maybe they were just "sloppy," but as the client programmer (and in the year 2023
 rather than 2007), I don’t think that should be our default assumption.</p>
    <p>Stroustrup’s example is precisely isomorphic to this one:</p>
-<pre class="language-c++ highlight"><c- b>void</c-> <c- nf>f1</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>reverse_iterator</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>char</c-><c- o>*></c-><c- p>);</c->
+<pre class="language-cpp highlight"><c- b>void</c-> <c- nf>f1</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>reverse_iterator</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>char</c-><c- o>*></c-><c- p>);</c->
 <c- b>void</c-> <c- nf>f2</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>string_view</c-><c- p>);</c->
 <c- b>void</c-> <c- nf>f</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>reverse_iterator</c-><c- o>&lt;</c-><c- k>const</c-> <c- b>char</c-><c- o>*></c-><c- p>);</c->
 <c- b>void</c-> <c- nf>f</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>string_view</c-><c- p>);</c->
@@ -2285,9 +2296,9 @@ rather than 2007), I don’t think that should be our default assumption.</p>
    <p>Now consider the multi-argument version... ooh, but this is much harder to formulate
 with STL types, because the STL is exactly Bjarne’s "sloppy programmer." It’s hard to find
 any STL type with an explicit multi-argument constructor. So for example we have:</p>
-<pre class="language-c++ highlight"><c- n>using</c-> <c- n>Pair</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>pair</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>;</c->
-<c- n>using</c-> <c- n>Vector</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>;</c->
-<c- n>using</c-> <c- n>SharedPtr</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>;</c->
+<pre class="language-cpp highlight"><c- k>using</c-> <c- n>Pair</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>pair</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>;</c->
+<c- k>using</c-> <c- n>Vector</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>;</c->
+<c- k>using</c-> <c- n>SharedPtr</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>shared_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>;</c->
 
 <c- b>void</c-> <c- nf>f</c-><c- p>(</c-><c- n>Vector</c-><c- p>);</c-> <c- c1>// #1</c->
 <c- b>void</c-> <c- nf>f</c-><c- p>(</c-><c- n>Pair</c-><c- p>);</c-> <c- c1>// #2</c->
@@ -2296,7 +2307,7 @@ any STL type with an explicit multi-argument constructor. So for example we have
 <c- b>void</c-> <c- nf>g</c-><c- p>(</c-><c- n>SharedPtr</c-><c- p>);</c-> <c- c1>// #1</c->
 <c- b>void</c-> <c- nf>g</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>pair</c-><c- o>&lt;</c-><c- n>SharedPtr</c-><c- p>,</c-> <c- n>SharedPtr</c-><c- o>></c-><c- p>);</c-> <c- c1>// #2</c->
 <c- n>SharedPtr</c-> <c- n>p</c-><c- p>;</c->
-<c- n>g</c-><c- p>({</c-><c- n>p</c-><c- p>,</c-> <c- n>nullptr</c-><c- p>});</c->  <c- c1>// ill-formed, ambiguous</c->
+<c- n>g</c-><c- p>({</c-><c- n>p</c-><c- p>,</c-> <c- k>nullptr</c-><c- p>});</c->  <c- c1>// ill-formed, ambiguous</c->
 </pre>
    <p>In a perfect world, both of these would unambiguously call #2,
 because <code class="highlight"><c- n>vector</c-></code>’s constructor from <code class="highlight"><c- p>{</c-><c- mi>42</c-><c- p>,</c-> <c- s>"abc"</c-><c- p>}</c-></code> and <code class="highlight"><c- n>shared_ptr</c-></code>’s constructor from <code class="highlight"><c- p>{</c-><c- n>p</c-><c- p>,</c-> <c- k>nullptr</c-><c- p>}</c-></code> would both be <code class="highlight"><c- k>explicit</c-></code>.
@@ -2306,7 +2317,7 @@ that <code class="highlight"><c- p>{</c-><c- n>a</c-><c- p>,</c-><c- n>b</c-><c-
 proposed change, nothing would break immediately; but later, if we made that
 chosen constructor properly <code class="highlight"><c- k>explicit</c-></code>, it would silently start choosing some
 different constructor!</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>SloppySpan</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>SloppySpan</c-> <c- p>{</c->
     <c- n>SloppySpan</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>,</c-> <c- b>int</c-><c- p>);</c-> <c- c1>// #1</c->
     <c- n>SloppySpan</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>,</c-> <c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>);</c-> <c- c1>// #2</c->
 <c- p>};</c->
@@ -2322,9 +2333,9 @@ but simply makes them ill-formed if it is the best match. Unfortunately this giv
 and "Make this converting constructor <code class="highlight"><c- o>=</c-><c- k>delete</c-></code>’d." Ideally, we should use <code class="highlight"><c- o>=</c-><c- k>delete</c-></code> when we mean
 the latter. But then we’d need some way to overload a non-converting constructor
 with a deleted conversion. This doesn’t work today:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>EvolvedSpan</c-> <c- p>{</c->
-    <c- n>explicit</c-> <c- nf>EvolvedSpan</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>,</c-> <c- b>int</c-><c- p>);</c-> <c- c1>// #1 non-converting ctor</c->
-    <c- n>EvolvedSpan</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-> <c- o>=</c-> <c- n>delete</c-><c- p>;</c-> <c- c1>// #1 deleted conversion</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>EvolvedSpan</c-> <c- p>{</c->
+    <c- k>explicit</c-> <c- n>EvolvedSpan</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>,</c-> <c- b>int</c-><c- p>);</c-> <c- c1>// #1 non-converting ctor</c->
+    <c- n>EvolvedSpan</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-> <c- o>=</c-> <c- k>delete</c-><c- p>;</c-> <c- c1>// #1 deleted conversion</c->
     <c- n>EvolvedSpan</c-><c- p>(</c-><c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>,</c-> <c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- p>);</c-> <c- c1>// #2 OK conversion</c->
 <c- p>};</c->
 </pre>
@@ -2333,7 +2344,7 @@ with a deleted conversion. This doesn’t work today:</p>
 ABI break. I’m not interested in pursuing that direction.)</p>
    <h3 class="heading settled" data-level="3.2" id="tuple-note"><span class="secno">3.2. </span><span class="content"><code class="highlight"><c- n>tuple</c-> <c- n>t</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>}</c-></code></span><a class="self-link" href="#tuple-note"></a></h3>
    <p>A popular gripe with C++11’s copy-list-initialization was that it didn’t seem to "work right" with <code class="highlight"><c- n>tuple</c-></code>. That’s because, until C++14, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>tuple</c-></code> had only an <code class="highlight"><c- k>explicit</c-></code> elementwise constructor.</p>
-<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>t1</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>};</c->       <c- c1>// ill-formed before N3680</c->
+<pre class="language-cpp highlight"><c- n>std</c-><c- o>::</c-><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>t1</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>};</c->       <c- c1>// ill-formed before N3680</c->
 <c- n>std</c-><c- o>::</c-><c- n>tuple</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-><c- b>int</c-><c- o>></c-> <c- n>t2</c-> <c- o>=</c-> <c- p>{</c-><c- mi>2</c-><c- p>,</c-><c- mi>2</c-><c- p>};</c-> <c- c1>// ill-formed before N3680</c->
 </pre>
    <p>This was fixed by <a data-link-type="biblio" href="#biblio-n3680" title="Improving pair and tuple">[N3680]</a>, which made <code class="highlight"><c- n>tuple</c-></code>’s constructor conditionally <code class="highlight"><c- k>explicit</c-></code>,
@@ -2346,16 +2357,16 @@ based on their template parameters, which we’ll know only after deduction. How
 after deduction? Is this a problem for P2903?</p>
    <p>I don’t think it’s a problem, because we can already handle the C++98 version
 (<a href="https://godbolt.org/z/cvEzTroY3">Godbolt</a>).</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>E</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>E</c-> <c- p>{</c->
   <c- n>E</c-><c- p>(</c-><c- b>long</c-><c- p>);</c-> <c- c1>// #1</c->
-  <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c-> <c- n>explicit</c-><c- p>(</c-><c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-><c- o>==</c-><c- mi>4</c-><c- p>)</c-> <c- n>E</c-><c- p>(</c-><c- n>T</c-><c- p>);</c-> <c- c1>// #2</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <c- k>explicit</c-><c- p>(</c-><c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-><c- o>==</c-><c- mi>4</c-><c- p>)</c-> <c- n>E</c-><c- p>(</c-><c- n>T</c-><c- p>);</c-> <c- c1>// #2</c->
 <c- p>};</c->
 <c- n>E</c-> <c- n>e1</c-> <c- o>=</c-> <c- mi>42</c-><c- p>;</c->  <c- c1>// OK, calls #1 because #2 is explicit</c->
 <c- n>E</c-> <c- n>e2</c-> <c- o>=</c-> <c- sc>'x'</c-><c- p>;</c-> <c- c1>// OK, calls #2 as the best match</c->
 </pre>
    <h3 class="heading settled" data-level="3.4" id="cwg1467"><span class="secno">3.4. </span><span class="content">CWG 1467</span><a class="self-link" href="#cwg1467"></a></h3>
    <p><a data-link-type="biblio" href="#biblio-cwg1467" title="List-initialization of aggregate from same-type object">[CWG1467]</a> (adopted November 2014) gave this example:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Agg</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>Agg</c-> <c- p>{</c->
   <c- n>Agg</c-><c- p>()</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
   <c- n>Agg</c-><c- p>(</c-><c- k>const</c-> <c- n>Agg</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c->
@@ -2364,7 +2375,7 @@ after deduction? Is this a problem for P2903?</p>
 </pre>
    <p>We want this to use the copy ctor. It does. Good.
 But then <a data-link-type="biblio" href="#biblio-cwg2137" title="List-initialization from object of same type">[CWG2137]</a> (adopted June 2016) gave this example:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Q</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>Q</c-> <c- p>{</c->
   <c- n>Q</c-><c- p>();</c->
   <c- n>Q</c-><c- p>(</c-><c- k>const</c-> <c- n>Q</c-><c- o>&amp;</c-><c- p>);</c->
   <c- n>Q</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>Q</c-><c- o>></c-><c- p>);</c->
@@ -2373,7 +2384,7 @@ But then <a data-link-type="biblio" href="#biblio-cwg2137" title="List-initializ
 </pre>
    <p>We want this to use the <code class="highlight"><c- n>initializer_list</c-></code> ctor, not the copy ctor. It does. Good.
 But then <a data-link-type="biblio" href="#biblio-cwg2311" title="Missed case for guaranteed copy elision">[CWG2311]</a> (open) gives this example:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>NonAgg</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>NonAgg</c-> <c- p>{</c->
   <c- n>NonAgg</c-><c- p>();</c->
 <c- p>};</c->
 <c- n>NonAgg</c-> <c- nf>make</c-><c- p>();</c->
@@ -2419,7 +2430,7 @@ where only converting constructors are considered for copy-initialization.
 This restriction only applies if this initialization is part of the final result of overload resolution. <em>—end note</em>]</p> </small></blockquote>
    <p>1․ The current wording specifies two consecutive overload resolutions, which has all the same potential for
 vendor divergence as we reported in <a data-link-type="biblio" href="#biblio-p2266" title="Simpler implicit move">[P2266]</a>. For example (cf. <a data-link-type="biblio" href="#biblio-p2266" title="Simpler implicit move">[P2266]</a> example <code class="highlight"><c- n>fourteen</c-></code>):</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
   <c- n>A</c-><c- p>(</c-><c- b>int</c-><c- p>);</c->
   <c- n>A</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>short</c-><c- o>></c-><c- p>);</c->
   <c- n>A</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>long</c-><c- o>></c-><c- p>);</c->
@@ -2435,7 +2446,7 @@ MSVC goes on to perform the second resolution.</p>
    <p><b>Non-conforming fallback to <code class="highlight"><c- n>A</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-></code>:</b> MSVC</p>
    <p>2․ For an empty initializer list, we do the first pass only if "<code class="highlight"><c- n>T</c-></code> has no default constructor";
 this is prone to vendor divergence. For example, <em>having a default constructor</em> is orthogonal to <em>being default constructible.</em></p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>B</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>B</c-> <c- p>{</c->
   <c- n>B</c-><c- p>();</c->
   <c- n>B</c-><c- p>(</c-><c- b>int</c-> <c- o>=</c-> <c- mi>0</c-><c- p>);</c->
   <c- n>B</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>);</c->
@@ -2446,11 +2457,11 @@ this is prone to vendor divergence. For example, <em>having a default constructo
    <p><b>Non-conforming call to <code class="highlight"><c- n>B</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>)</c-></code>:</b> Clang</p>
    <p>3․ Whether "no viable initializer-list constructor is found" in the first pass critically depends on
 what counts as an initializer-list constructor. For example:</p>
-<pre class="language-c++ highlight"><c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
-<c- n>using</c-> <c- n>Alias</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>;</c->
+<pre class="language-cpp highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c->
+<c- k>using</c-> <c- n>Alias</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>;</c->
 
 <c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
-  <c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c-> <c- n>C</c-><c- p>(</c-><c- n>Alias</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>);</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <c- n>C</c-><c- p>(</c-><c- n>Alias</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>);</c->
 <c- p>};</c->
 <c- n>C</c-> <c- n>three</c-> <c- o>=</c-> <c- p>{</c-><c- mi>42</c-><c- p>};</c->
 </pre>
@@ -2491,11 +2502,11 @@ to <em>a collection of other things.</em> I can imagine that that’s unwieldy.<
      <p>I suspect a proper solution would probably allow us to eliminate <a href="https://eel.is/c++draft/over.match.best#over.best.ics.general-4">[over.best.ics.general]/4</a>.</p>
    </ul>
    <p>For example, today when we see...</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Alpha</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>Alpha</c-> <c- p>{</c->
     <c- n>Alpha</c-><c- p>(</c-><c- n>Beta</c-><c- p>);</c->
 <c- p>};</c->
 <c- k>struct</c-> <c- nc>Beta</c-> <c- p>{</c->
-    <c- n>operator</c-> <c- nf>Alpha</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c->
+    <c- k>operator</c-> <c- n>Alpha</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c->
 <c- p>};</c->
 <c- n>Alpha</c-> <c- n>a</c-> <c- o>=</c-> <c- n>Beta</c-><c- p>();</c->
 </pre>
@@ -2503,12 +2514,12 @@ to <em>a collection of other things.</em> I can imagine that that’s unwieldy.<
 and pick the best match. So we have <em>some</em> way today of comparing the rank of candidates or ICSes that aren’t
 directly isomorphic. But I do admit that whatever way we have today, seems to be just as much a source of
 vendor divergence as anything we’re replacing:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Alpha</c-> <c- p>{</c-> <c- n>Alpha</c-><c- p>(</c-><c- k>const</c-> <c- n>Beta</c-><c- o>&amp;</c-><c- p>);</c-> <c- p>};</c->
-<c- k>struct</c-> <c- nc>Beta</c-> <c- p>{</c-> <c- n>operator</c-> <c- nf>Alpha</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-> <c- p>};</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>Alpha</c-> <c- p>{</c-> <c- n>Alpha</c-><c- p>(</c-><c- k>const</c-> <c- n>Beta</c-><c- o>&amp;</c-><c- p>);</c-> <c- p>};</c->
+<c- k>struct</c-> <c- nc>Beta</c-> <c- p>{</c-> <c- k>operator</c-> <c- n>Alpha</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-> <c- p>};</c->
 <c- n>Alpha</c-> <c- n>a</c-> <c- o>=</c-> <c- n>Beta</c-><c- p>();</c->  <c- c1>// EDG+GCC call the ctor; Clang+MSVC reject</c->
 
 <c- k>struct</c-> <c- nc>Alpha</c-> <c- p>{</c-> <c- n>Alpha</c-><c- p>(</c-><c- k>const</c-> <c- n>Beta</c-><c- o>&amp;</c-><c- p>);</c-> <c- p>};</c->
-<c- k>struct</c-> <c- nc>Beta</c-> <c- p>{</c-> <c- n>operator</c-> <c- nf>Alpha</c-><c- p>()</c-> <c- k>const</c-><c- o>&amp;</c-><c- p>;</c-> <c- p>};</c->
+<c- k>struct</c-> <c- nc>Beta</c-> <c- p>{</c-> <c- k>operator</c-> <c- n>Alpha</c-><c- p>()</c-> <c- k>const</c-><c- o>&amp;</c-><c- p>;</c-> <c- p>};</c->
 <c- n>Alpha</c-> <c- n>a</c-> <c- o>=</c-> <c- n>Beta</c-><c- p>();</c->  <c- c1>// EDG calls the ctor; GCC+Clang+MSVC reject</c->
 </pre>
    <h2 class="heading settled" data-level="5" id="experience"><span class="secno">5. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
