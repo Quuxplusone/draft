@@ -2,7 +2,7 @@
 Title: Variadic friends
 Shortname: D2893
 Revision: 1
-!Draft Revision: 3
+!Draft Revision: 5
 Audience: CWG
 Status: D
 Group: WG21
@@ -12,7 +12,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Support `friend Ts...` in C++26.
-Date: 2024-01-20
+Date: 2024-02-06
 </pre>
 
 <style>
@@ -25,8 +25,9 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 - R1 (post-Kona 2023):
 
-    - New and improved wording after CWG feedback ([minutes](https://wiki.edg.com/bin/view/Wg21kona2023/CoreWorkingGroup#P2893R1)).
+    - New and improved wording after CWG feedback ([minutes](https://wiki.edg.com/bin/view/Wg21kona2023/CoreWorkingGroup#P2893R1))
 
+    - Add feature-test macro `__cpp_variadic_friend`
 
 
 # Introduction # {#introduction}
@@ -168,6 +169,12 @@ Note that both inheritance and `using` support pack-expansion. Only `friend` doe
 
 # Confusing grammatical examples # {#confusing}
 
+The following two subsections merely record some design notes
+in case we want to refer back to them during CWG discussion.
+You can skip reading these subsections for now.
+
+## `template<class... Ts> friend Ts...` ## {#not-for-stamping}
+
 A declaration `template<class T> friend ~~~` is not a template for stamping out friends;
 it is a request to befriend a specific template.
 
@@ -188,8 +195,8 @@ struct S {
 ```
 
 Therefore it is never well-formed to use the parameters of the friend declaration's own *template-head*
-within the declarator itself. That is, these are all ill-formed, and replacing `U` with `Us...` doesn't
-change anything:
+within the declarator itself. That is, these are all ill-formed, and replacing today's `U` with tomorrow's `Us...`
+won't change anything:
 
 <table>
 <tr><th>Before</th><th>After</th></tr>
@@ -198,16 +205,16 @@ template&lt;class T>
 struct S {
   template&lt;class U>
   friend U; // ill-formed
-
+  &nbsp;
   template&lt;class U>
   friend class U; // ill-formed
-
+  &nbsp;
   template&lt;class U>
   friend class C&lt;T>::Nested&lt;U>; // ill-formed
-
-
-
-
+  &nbsp;
+  &nbsp;
+  &nbsp;
+  &nbsp;
   template&lt;class U>
   friend class C&lt;U>::Nested; // ill-formed
 };
@@ -216,23 +223,24 @@ template&lt;class... Ts>
 struct VS {
   template&lt;class... Us>
   friend Us...; // ill-formed
-
+  &nbsp;
   template&lt;class... Us>
   friend class Us...; // ill-formed
-
+  &nbsp;
   template&lt;class U>
   friend class C&lt;Ts>::Nested&lt;U>...; // ill-formed
-
+  &nbsp;
   template&lt;class... Us>
   friend class C&lt;Ts...>::Nested&lt;Us>...; // ill-formed
-
+  &nbsp;
   template&lt;class... Us>
   friend class C&lt;Us>::Nested...; // ill-formed
 };
 </pre></td></tr>
 </table>
 
-But these are well-formed:
+On the other hand, this usage (to befriend the member template `C<T>::Nested`) is well-formed,
+and remains well-formed after replacing today's `T` with tomorrow's `Ts...`:
 
 <table>
 <tr><th>Before</th><th>After</th></tr>
@@ -241,47 +249,50 @@ template&lt;class T>
 struct C {
   template&lt;class U> struct Nested;
 };
-
+&nbsp;
 template&lt;class T>
 struct S {
   template&lt;class U>
   friend class C&lt;T>::Nested; // OK
 };
-
+&nbsp;
 template&lt;class T>
 template&lt;class U>
 struct C&lt;T>::Nested {
   int m(S&lt;int>& s) { return s.private_; }
 };
-
+&nbsp;
 int main() {
   S&lt;int> s;
   C&lt;int>::Nested&lt;float>().m(s); // OK
-  C&lt;char>::Nested&lt;float>().m(s); // error, inaccessible
+  &nbsp;
+  C&lt;float>::Nested&lt;float>().m(s);
+    // error, inaccessible
 }
 </pre></td><td><pre>
 template&lt;class T>
 struct C {
   template&lt;class U> struct Nested;
 };
-
+&nbsp;
 template&lt;class... Ts>
 struct VS {
   template&lt;class U>
   friend class C&lt;Ts>::Nested...; // OK
 };
-
+&nbsp;
 template&lt;class T>
 template&lt;class U>
 struct C&lt;T>::Nested {
   int m(VS&lt;int, char>& vs) { return vs.private_; }
 };
-
+&nbsp;
 int main() {
   VS&lt;int, char> vs;
   C&lt;int>::Nested&lt;float>().m(vs); // OK
   C&lt;char>::Nested&lt;float>().m(vs); // OK
-  C&lt;float>::Nested&lt;float>().m(vs); // error, inaccessible
+  C&lt;float>::Nested&lt;float>().m(vs);
+    // error, inaccessible
 }
 </pre></td></tr>
 </table>
@@ -289,77 +300,55 @@ int main() {
 
 ## `friend class Ts...` ## {#confusing-elab}
 
-C++ already disallows `friend class T` ([Godbolt](https://godbolt.org/z/zMefooj6h))
-in <a href="https://eel.is/c++draft/dcl.spec#dcl.type.elab-4">[dcl.type.elab]</a>:
-```cpp
-template<class T>
-struct S {
-  friend class T;
-};
-```
-but permits these ways to befriend a specific class instantiated from a class template `C`:
-```
-template<class T>
-struct S {
-  friend class C<T>;
-  friend class N::C<T>;
-};
-```
-
-The existing wording for this is:
-<small><blockquote>
-If an *elaborated-type-specifier* appears with the `friend` specifier as an entire *member-declaration*, the *member-declaration* shall have one of the following forms:
-
-- `friend` *class-key nested-name-specifier*<sub>opt</sub> *identifier* `;`
-- `friend` *class-key simple-template-id* `;`
-- `friend` *class-key nested-name-specifier* `template`<sub>opt</sub> *simple-template-id* `;`
-
-Any unqualified lookup for the *identifier* (in the first case) does not consider scopes that contain the target scope; no name is bound.
-[*Note:* A using-directive in the target scope is ignored if it refers to a namespace not contained by that scope.
-[basic.lookup.elab] describes how name lookup proceeds in an elaborated-type-specifier. — *end note*]
-<p>5. [*Note:* An *elaborated-type-specifier* can be used to refer to a previously declared *class-name* or *enum-name*
-even if the name has been hidden by a non-type declaration. — *end note*]
-If the *identifier* or *simple-template-id* resolves to a *class-name* or *enum-name*, the *elaborated-type-specifier* introduces it
-into the declaration the same way a *simple-type-specifier* introduces its *type-name* ([dcl.type.simple]).
-If the *identifier* or *simple-template-id* resolves to a *typedef-name* ([dcl.typedef], [temp.names]), the *elaborated-type-specifier* is ill-formed.
-[*Note:* This implies that, within a class template with a template type-parameter T, the declaration
-`friend class T;` is ill-formed. However, the similar declaration `friend T;` is allowed ([class.friend]). — *end note*]
-</blockquote></small>
-
-
-
-The following `task1` and `task2` are grammatical according to our grammar, but it's not clear what
-they mean (or if they're ill-formed for other reasons). Is this a problem?
-
-```cpp
-template<class... Ts>
-class Task1 {
-  friend class Newname<Ts>...;
-};
-
-template<class...> class Stranger;
-
-class Task2 {
-  template<class... Us>
-  friend Stranger<Us>...;
-};
-```
-
+C++ already disallows `friend class T` when it stands alone ([Godbolt](https://godbolt.org/z/zMefooj6h)):
 <table>
-<tr><td><pre>friend int f(Ts)...;</pre></td><td>Ill-formed by the grammar (`...` not allowed here)</td></tr>
-<tr><td><pre>friend Ts...;</pre></td><td>OK</td></tr>
-<tr><td><pre>friend class Ts...;</pre></td><td>Ill-formed; `class Ts`, being an *elaborated-type-specifier*, is not a *simple-friend-declarator*</td></tr>
-<tr><td><pre>friend C&lt;Ts>...;</pre></td><td>OK; `C<Ts>`, being a *simple-type-specifier*, is a *simple-friend-declarator*</td></tr>
-<tr><td><pre>friend typename C&lt;Ts>::type...;</pre></td><td>OK; `typename C<Ts>::type`, being a *typename-specifier*, is a *simple-friend-declarator*</td></tr>
-<tr><td><pre>template&lt;class U> friend C&lt;Ts, U>...;</pre></td><td>OK</td></tr>
-<tr><td><pre>template&lt;class... Us> friend C&lt;Ts, Us...>...;</pre></td><td>OK</td></tr>
-<tr><td><pre>template&lt;class U> friend U;</pre></td><td>Vendors agree this is ill-formed; but how?</td></tr>
-<tr><td><pre>template&lt;class U> friend typename U;</pre></td><td>Vendors agree this is ill-formed; but how?</td></tr>
-<tr><td><pre>template&lt;class... Us> friend Us...;</pre></td><td>Should be ill-formed; but how?</td></tr>
-<tr><td><pre>template&lt;class... Us> friend C&lt;Ts, Us>...;</pre></td><td>Should be ill-formed; but how?</td></tr>
-<tr><td><pre></pre></td><td>Ill-formed by <a href=""></a></td></tr>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td><pre>
+template&lt;class T>
+struct S {
+  friend class T; // Error
+};
+</pre></td><td><pre>
+template&lt;class... Ts>
+struct S {
+  friend class Ts...; // Error
+};
+</pre></td></tr>
+</table>
+but permits these ways to befriend a specific class instantiated from a class template `C`,
+or to befriend a member class template:
+<table>
+<tr><th>Before</th><th>After</th></tr>
+<tr><td><pre>
+template&lt;class T>
+struct S {
+  friend class C&lt;T>;
+  friend class N::C&lt;T>;
+};
+</pre></td><td><pre>
+template&lt;class... Ts>
+struct S {
+  friend class C&lt;Ts>...;
+  friend class N::C&lt;Ts>...;
+};
+</pre></td></tr>
+<tr><td><pre>
+template&lt;class T>
+struct S {
+  template&lt;class U>
+  friend class C&lt;T>::Nested;
+};
+</pre></td><td><pre>
+template&lt;class... Ts>
+struct S {
+  template&lt;class U>
+  friend class C&lt;Ts>::Nested...;
+};
+</pre></td></tr>
 </table>
 
+The existing wording for this is in <a href="https://eel.is/c++draft/dcl.type.elab#4">[dcl.type.elab]/4</a>, which we modify
+<a href="#wording1-dcl.type.elab">below</a> by adding an <ins>`...`<sub><i>opt</i></sub></ins>.
 
 
 # Proposed wording # {#wording}
@@ -391,9 +380,54 @@ from *typename-specifier* as well as from *simple-type-specifier*.)
 Note: Precedent for "If a *member-declaration* matches..." is found in
 <a href="https://eel.is/c++draft/dcl.pre#10">[dcl.pre]/10</a> "If a *static-assert-message* matches..."
 
-Note: We want to support `friend Ts...` and `friend X<Ts>::Y<Us>...` but not `friend class A, class B`
-and therefore not `friend class Ts...`. Therefore *simple-friend-declarator* is not producible from
-*elaborated-type-specifier*.
+Note: CWG discussion in Kona ([minutes](https://wiki.edg.com/bin/view/Wg21kona2023/CoreWorkingGroup#P2893R1))
+suggested that *simple-friend-declarator* shouldn't be producible from
+*elaborated-type-specifier*, because then we'd appear to support `friend class A, class B;`.
+However, as shown above, we need to support `template<class> friend class Ts::Nested...;` which
+means that *simple-friend-declarator* must be producible from *elaborated-type-specifier*.
+Contrariwise, we certainly do not want to support `template<class> friend class A::Nested, class B::Nested;`.
+Luckily <a href="#wording1-dcl.type.elab">[dcl.type.elab]/4</a> already forbids that sort of thing.
+We add <ins>`...`<sub><i>opt</i></sub></ins> to [dcl.type.elab]/4 but don't add anything to permit commas.
+
+### [cpp.predefined] ### {#wording1-cpp.predefined}
+
+Add a feature-test macro to the table in
+<a href="https://eel.is/c++draft/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:
+
+<small><blockquote>
+<pre>
+__cpp_variable_templates  201304L
+<ins>__cpp_variadic_friend     YYYYMML</ins>
+__cpp_variadic_templates  200704L
+__cpp_variadic_using      201611L
+</pre>
+</blockquote></small>
+
+### [dcl.type.elab] ### {#wording1-dcl.type.elab}
+
+Modify <a href="https://eel.is/c++draft/dcl.type.elab#4">[dcl.type.elab]</a> as follows:
+
+<small><blockquote>
+<p>4. <del>If an *elaborated-type-specifier* appears with the `friend` specifier
+as an entire *member-declaration*, the *member-declaration* shall</del> <ins>If any *simple-friend-declarator* in a *simple-friend-declaration*
+is an *elaborated-type-specifier*, the *simple-friend-declaration* shall</ins> have one of the following forms:
+
+- `friend` *class-key nested-name-specifier*<sub>opt</sub> *identifier* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+- `friend` *class-key simple-template-id* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+- `friend` *class-key nested-name-specifier* `template`<sub>opt</sub> *simple-template-id* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+
+Any unqualified lookup for the *identifier* (in the first case) does not consider scopes that contain the target scope; no name is bound.
+<p>[*Note:* A using-directive in the target scope is ignored if it refers to a namespace not contained by that scope.
+[basic.lookup.elab] describes how name lookup proceeds in an elaborated-type-specifier. — *end note*]
+<p>[*Note:* An *elaborated-type-specifier* can be used to refer to a previously declared *class-name* or *enum-name*
+even if the name has been hidden by a non-type declaration. — *end note*]
+
+<p>5. If the *identifier* or *simple-template-id* resolves to a *class-name* or *enum-name*, the *elaborated-type-specifier* introduces it
+into the declaration the same way a *simple-type-specifier* introduces its *type-name* ([dcl.type.simple]).
+If the *identifier* or *simple-template-id* resolves to a *typedef-name* ([dcl.typedef], [temp.names]), the *elaborated-type-specifier* is ill-formed.
+<p>[*Note:* This implies that, within a class template with a template *type-parameter* `T`, the declaration
+`friend class T;` is ill-formed. However, the similar declaration `friend T;` is well-formed ([class.friend]). — *end note*]
+</blockquote></small>
 
 ### [class.mem.general] ### {#wording1-class.mem.general}
 
@@ -421,6 +455,7 @@ Modify <a href="https://eel.is/c++draft/class.mem.general#nt:member-declaration"
 &emsp; <ins><i>simple-friend-declarator-list</i> `,` <i>simple-friend-declarator</i> `...`<sub>opt</sub></ins><br>
 <ins><i>simple-friend-declarator</i>:</ins><br>
 &emsp; <ins><i>simple-type-specifier</i></ins><br>
+&emsp; <ins><i>elaborated-type-specifier</i></ins><br>
 &emsp; <ins><i>typename-specifier</i></ins><br>
 
 <i>member-declarator-list</i>:<br>
@@ -521,19 +556,19 @@ Modify <a href="https://eel.is/c++draft/temp.res.general">[temp.res.general]</a>
 * a *typename-specifier*, *nested-name-specifier*, *elaborated-type-specifier*, *class-or-decltype*, or
 * <ins>the *simple-type-specifier* of a *simple-friend-declarator*, or</ins>
 * a *type-specifier* of a
-  - *new-type-id*,
-  - *defining-type-id*,
-  - *conversion-type-id*,
-  - *trailing-return-type*,
-  - default argument of a *type-parameter*, or
-  - *type-id* of a `static_cast`, `const_cast`, `reinterpret_cast`, or `dynamic_cast`, or
+    - *new-type-id*,
+    - *defining-type-id*,
+    - *conversion-type-id*,
+    - *trailing-return-type*,
+    - default argument of a *type-parameter*, or
+    - *type-id* of a `static_cast`, `const_cast`, `reinterpret_cast`, or `dynamic_cast`, or
 * a *decl-specifier* of the *decl-specifier-seq* of a
-  - *simple-declaration* or a *function-definition* in namespace scope,
-  - *member-declaration*,
-  - *parameter-declaration* in a *member-declaration*, unless that *parameter-declaration* appears in a default argument,
-  - *parameter-declaration* in a declarator of a function or function template declaration whose *declarator-id* is qualified, unless that *parameter-declaration* appears in a default argument,
-  - *parameter-declaration* in a *lambda-declarator* or *requirement-parameter-list*, unless that *parameter-declaration* appears in a default argument, or
-  - *parameter-declaration* of a (non-type) *template-parameter*.
+    - *simple-declaration* or *function-definition* in namespace scope,
+    - *member-declaration*,
+    - *parameter-declaration* in a *member-declaration*, unless that *parameter-declaration* appears in a default argument,
+    - *parameter-declaration* in a declarator of a function or function template declaration whose *declarator-id* is qualified, unless that *parameter-declaration* appears in a default argument,
+    - *parameter-declaration* in a *lambda-declarator* or *requirement-parameter-list*, unless that *parameter-declaration* appears in a default argument, or
+    - *parameter-declaration* of a (non-type) *template-parameter*.
 
 </blockquote></small>
 
@@ -576,6 +611,49 @@ Today, `friend T;` is a <a href="https://eel.is/c++draft/dcl.pre#nt:simple-decla
 consisting of two *decl-specifiers* and no *init-declarator-list*. The second *decl-specifier*
 is a *defining-type-specifier* which is a *simple-type-specifier*.
 
+Note: The identifier in `friend Ts::Nested...;` is in a type-only context because
+it is a *decl-specifier* of the *decl-specifier-seq* of a *member-declaration*. Therefore Option 2 can omit
+Option 1's patch to <a href="#wording1-temp.res.general">[temp.res.general]</a>.
+
+### [cpp.predefined] ### {#wording2-cpp.predefined}
+
+Add a feature-test macro to the table in
+<a href="https://eel.is/c++draft/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:
+
+<small><blockquote>
+<pre>
+__cpp_variable_templates  201304L
+<ins>__cpp_variadic_friend     YYYYMML</ins>
+__cpp_variadic_templates  200704L
+__cpp_variadic_using      201611L
+</pre>
+</blockquote></small>
+
+### [dcl.type.elab] ### {#wording2-dcl.type.elab}
+
+Modify <a href="https://eel.is/c++draft/dcl.type.elab#4">[dcl.type.elab]</a> as follows:
+
+<small><blockquote>
+<p>4. If an *elaborated-type-specifier* appears with the `friend` specifier as an entire *member-declaration*,
+the *member-declaration* shall have one of the following forms:
+
+- `friend` *class-key nested-name-specifier*<sub>opt</sub> *identifier* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+- `friend` *class-key simple-template-id* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+- `friend` *class-key nested-name-specifier* `template`<sub>opt</sub> *simple-template-id* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+
+Any unqualified lookup for the *identifier* (in the first case) does not consider scopes that contain the target scope; no name is bound.
+<p>[*Note:* A using-directive in the target scope is ignored if it refers to a namespace not contained by that scope.
+[basic.lookup.elab] describes how name lookup proceeds in an elaborated-type-specifier. — *end note*]
+<p>[*Note:* An *elaborated-type-specifier* can be used to refer to a previously declared *class-name* or *enum-name*
+even if the name has been hidden by a non-type declaration. — *end note*]
+
+<p>5. If the *identifier* or *simple-template-id* resolves to a *class-name* or *enum-name*, the *elaborated-type-specifier* introduces it
+into the declaration the same way a *simple-type-specifier* introduces its *type-name* ([dcl.type.simple]).
+If the *identifier* or *simple-template-id* resolves to a *typedef-name* ([dcl.typedef], [temp.names]), the *elaborated-type-specifier* is ill-formed.
+<p>[*Note:* This implies that, within a class template with a template *type-parameter* `T`, the declaration
+`friend class T;` is ill-formed. However, the similar declaration `friend T;` is well-formed ([class.friend]). — *end note*]
+</blockquote></small>
+
 ### [dcl.type.general] ### {#wording2-dcl.type.general}
 
 Modify <a href="https://eel.is/c++draft/dcl.type.general">[dcl.type.general]</a> as follows:
@@ -599,27 +677,6 @@ Modify <a href="https://eel.is/c++draft/dcl.type.general">[dcl.type.general]</a>
 &emsp; <i>enum-specifier</i><br>
 
 [...]
-</blockquote></small>
-
-### [temp.variadic] ### {#wording2-temp.variadic}
-
-Modify <a href="https://eel.is/c++draft/temp.variadic">[temp.variadic]</a> as follows:
-
-<small><blockquote>
-<p>9. The instantiation of a `sizeof...` expression ([expr.sizeof]) produces an integral constant with value *N*.
-<p>10. The instantiation of an *alignment-specifier* with an ellipsis produces `E`<sub>1</sub>`E`<sub>2</sub>...`E`<sub>N</sub>.
-<p>11. The instantiation of a *fold-expression* ([expr.prim.fold]) produces:
-
-* `( (( E`<sub>1</sub> <i>op</i> `E`<sub>2</sub>`)` <i>op</i> ... `)` <i>op</i> `E`<sub>N</sub>`)` for a unary left fold,
-* `(E`<sub>1</sub> <i>op</i> `(` ... <i>op</i> `(E`<sub>N-1</sub> <i>op</i> `E`<sub>N</sub>`)) )` for a unary right fold,
-* `( (((E` <i>op</i> `E`<sub>1</sub>`)` <i>op</i> `E`<sub>2</sub> `)` <i>op</i> ... `)` <i>op</i> `E`<sub>N</sub> `)` for a binary left fold, and
-* `(E`<sub>1</sub> <i>op</i> `(` ... <i>op</i> `(E`<sub>N-1</sub> <i>op</i> `(E`<sub>N</sub> <i>op</i> `E))) )` for a binary right fold. [...]
-
-<p><ins>x. The instantiation of a friend declaration (<a href="#wording2-class.friend">[class.friend]</a>) produces a sequence of declarations
-`friend E`<sub>1</sub>`;` `friend E`<sub>2</sub>`;`...`friend E`<sub>N</sub>`;`.</ins>
-<p>12. The instantiation of any other pack expansion produces a list of elements `E`<sub>1</sub>`,E`<sub>2</sub>`,`...`,E`<sub>N</sub>.
-[*Note:* The variety of list varies with the context: *expression-list*, *base-specifier-list*, *template-argument-list*, etc. — *end note*]
-When *N* is zero, the instantiation of the expansion produces an empty list.
 </blockquote></small>
 
 ### [class.friend] ### {#wording2-class.friend}
@@ -676,6 +733,27 @@ R&lt;int> Ri;                      // OK, "friend int;" is ignored
 <ins>S&lt;E> sc;                   // E::Nested and R&lt;E> are friends of S&lt;E></ins>
 </pre>
 — *end example*]
+</blockquote></small>
+
+### [temp.variadic] ### {#wording2-temp.variadic}
+
+Modify <a href="https://eel.is/c++draft/temp.variadic">[temp.variadic]</a> as follows:
+
+<small><blockquote>
+<p>9. The instantiation of a `sizeof...` expression ([expr.sizeof]) produces an integral constant with value *N*.
+<p>10. The instantiation of an *alignment-specifier* with an ellipsis produces `E`<sub>1</sub>`E`<sub>2</sub>...`E`<sub>N</sub>.
+<p>11. The instantiation of a *fold-expression* ([expr.prim.fold]) produces:
+
+* `( (( E`<sub>1</sub> <i>op</i> `E`<sub>2</sub>`)` <i>op</i> ... `)` <i>op</i> `E`<sub>N</sub>`)` for a unary left fold,
+* `(E`<sub>1</sub> <i>op</i> `(` ... <i>op</i> `(E`<sub>N-1</sub> <i>op</i> `E`<sub>N</sub>`)) )` for a unary right fold,
+* `( (((E` <i>op</i> `E`<sub>1</sub>`)` <i>op</i> `E`<sub>2</sub> `)` <i>op</i> ... `)` <i>op</i> `E`<sub>N</sub> `)` for a binary left fold, and
+* `(E`<sub>1</sub> <i>op</i> `(` ... <i>op</i> `(E`<sub>N-1</sub> <i>op</i> `(E`<sub>N</sub> <i>op</i> `E))) )` for a binary right fold. [...]
+
+<p><ins>x. The instantiation of a friend declaration (<a href="#wording2-class.friend">[class.friend]</a>) produces a sequence of declarations
+`friend E`<sub>1</sub>`;` `friend E`<sub>2</sub>`;` ... `friend E`<sub>N</sub>`;`.</ins>
+<p>12. The instantiation of any other pack expansion produces a list of elements `E`<sub>1</sub>`,E`<sub>2</sub>`,` ... `,E`<sub>N</sub>.
+[*Note:* The variety of list varies with the context: *expression-list*, *base-specifier-list*, *template-argument-list*, etc. — *end note*]
+When *N* is zero, the instantiation of the expansion produces an empty list.
 </blockquote></small>
 
 
