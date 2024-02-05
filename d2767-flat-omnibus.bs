@@ -159,7 +159,7 @@ and otherwise <i>N</i> log <i>N</i>, where <i>N</i> is the value of `cont.size()
 
 ## Add move semantics to `flat_set::insert_range` ## {#set-insert-range}
 
-```c++
+```cpp
     std::flat_set<std::string> fs1;
     std::vector<std::string> v1 = {"hello", "world"};
     fs1.insert_range(std::views::as_rvalue(v1));
@@ -237,7 +237,7 @@ Note: This resolves [[LWG4000]].
 
 `flat_map`'s `insert_range` has the same issue as `flat_set`'s, at least on paper.
 
-```c++
+```cpp
     std::flat_map<int, std::unique_ptr<int>> fs2;
     std::vector<std::pair<int, std::unique_ptr<int>>> v2;
     fs2.insert_range(std::views::as_rvalue(v2));
@@ -252,7 +252,7 @@ Instead, it implicitly requires that `range_reference_t<R>::first` be convertibl
 and `range_reference_t<R>::second` be convertible to `mapped_type`. If `range_reference_t<R>` is
 something without `first` and `second` members, the current spec doesn't work at all.
 
-```c++
+```cpp
     std::pair<int, int> p1 = {1,2};
     std::reference_wrapper<std::pair<int, int>> a[] = { p1 };
     std::flat_map<int, int> fm;
@@ -323,7 +323,7 @@ c.values.erase(c.values.begin() + dist, c.values.end());
 
 ## `insert` is more primitive than `emplace` ## {#insert-emplace}
 
-```c++
+```cpp
     std::pmr::set_default_resource(std::pmr::null_memory_resource());
     std::pmr::monotonic_buffer_resource mr(1'000'000);
 
@@ -406,7 +406,7 @@ the very large overload set of `insert`; but I think it's safe: it should always
 
 ### Ambiguous `insert(first, last)` ### {#insert-ambiguity}
 
-```c++
+```cpp
 struct Address {
   const char *p_ = nullptr;
   Address(auto p) : p_((const char*)&*p) {}
@@ -426,7 +426,7 @@ It's not a problem for the maps, so they don't need to change.
 
 ### `flat_multiset::emplace` by rotation? ### {#multiset-emplace}
 
-```c++
+```cpp
     template<class T, class C = std::less<T>>
     using PmrFlatMultiset = std::flat_multiset<T, C, std::pmr::vector<T>>;
     auto fms = PmrFlatMultiset<std::pmr::string>(&mr);
@@ -791,7 +791,7 @@ make the special members non-defaulted. Vendors are still permitted to strengthe
 noexceptness and/or triviality of declared functions; for example, both libc++ and libstdc++
 make `set(set&&)` conditionally noexcept.
 
-```c++
+```cpp
     using V = std::inplace_vector<int, 100>;
     static_assert(std::is_trivially_destructible_v<V>);
     using M = std::flat_set<int, std::less<int>, V>;
@@ -811,7 +811,7 @@ the comparator, leaving the source object in a "radioactive" state.
 This whole area is the subject of [[LWG2227]] "Stateful comparison objects in associative containers,"
 and is certainly beyond the scope of this paper P2767.
 
-```c++
+```cpp
   struct TestLess : std::less<> {
     // make this too big to fit in the small buffer
     char pad_[1000];
@@ -883,7 +883,7 @@ This is extremely expensive for in-place containers such as
 <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html">P0843</a> `std::inplace_vector` (proposed for C++26).
 A reduced example looks like this ([Godbolt](https://godbolt.org/z/aWoYxEfve)):
 
-```c++
+```cpp
     struct flat_set {
         using key_compare = std::less<int>;
         using container_type = std::inplace_vector<int, 1024>;
@@ -901,7 +901,7 @@ The value-initialization of `c_` zeroes the memory footprint of `c_` and then ca
 default constructor (which initializes `size_` but is otherwise trivial). This involves a 4096-byte `memset`.
 On the other hand, if `flat_set`'s constructors were defined as
 
-```c++
+```cpp
         flat_set() = default;
         explicit flat_set(const key_compare& comp)
           : compare_(comp) { }
@@ -1315,7 +1315,7 @@ For the second overload, `is_convertible_v<K&&, const_iterator>` and `is_convert
 define the complexity of `b.equal_range(k)` and `a_tran.equal_range(ke)` as "Logarithmic."
 This means that we have the following required complexities, for both `foo` and `flat_foo`:
 
-```c++
+```cpp
     std::set<std::string> s;
     std::multiset<std::string> ms;
     std::set<std::string, std::less<>> st;
@@ -1343,7 +1343,7 @@ to `upper_bound` — bookkeeping which would again unnecessarily slow down the a
 
 Consider a working programmer who writes
 
-```c++
+```cpp
     std::flat_set<std::string> s;
     s.equal_range("abc");
       // lower_bound, lower_bound+1; (1 + lg N) operations total
@@ -1352,7 +1352,7 @@ Consider a working programmer who writes
 and then switches to a heterogeneous comparator in an effort to "speed up" the code
 by avoiding the conversion to `std::string`:
 
-```c++
+```cpp
     std::flat_set<std::string, std::less<>> st;
     st.equal_range("abc");
       // lower_bound, upper_bound; (2 lg N) operations total, cache-unfriendly
@@ -1591,7 +1591,7 @@ the multi-element `foo::insert(first, last)` to insert in an unspecified order.
 Nevertheless, in practice, all three vendors implement the latter as a simple
 loop over the former, so we have this de-facto behavior portable everywhere:
 
-```c++
+```cpp
     struct Apathy { bool operator()(int, int) const { return false; } };
     int a[] = {1,2,3,4,5};
     std::multiset<int, Apathy> s;
@@ -1613,7 +1613,7 @@ loop over the former, so we have this de-facto behavior portable everywhere:
 
 Similarly with equivalent keys in a `map` or `multimap`:
 
-```c++
+```cpp
     std::pair<int, int> a[] = {{1,1},{1,2},{1,3}};
     std::map<int, int, Apathy> m;
 
@@ -1635,7 +1635,7 @@ Similarly with equivalent keys in a `map` or `multimap`:
 Arthur's libc++ implementation leans into the idea that `flat_foo` is a drop-in replacement for `foo`,
 and ensures that `flat_foo::insert{,_range}` will behave exactly like `foo::insert{,_range}`.
 
-```c++
+```cpp
     std::flat_multiset<int, Apathy> fs;
 
     // #1
@@ -1697,7 +1697,7 @@ randomized order (at least in debug mode).
 
 The multi-element insertion API consists of these five overloads:
 
-```c++
+```cpp
   insert(first, last);                 // 1a
   insert(il);                          // 2a
   insert_range(rg);                    // 3a
@@ -1917,7 +1917,7 @@ I'll present these problems, and then present a monolithic solution with all of 
 Arthur has observed [in a blog post](https://quuxplusone.github.io/blog/2023/04/28/flat-map-constructors/)
 that `flat_{multi,}map`'s non-explicit constructor from two containers is deceptive when used with braced initializers.
 
-```c++
+```cpp
     void print_map(std::flat_multimap<int, int>);
 
     print_map({ {1, 2, 3}, {10, 20, 30} }); // prints {1,10}, {2,20}, {3,30}
@@ -2141,7 +2141,7 @@ fs.replace(std::sorted_unique, std::move(v));
 Arthur's libc++ has implemented move-semantic allocator-extended constructors for all four flat containers
 (<a href="https://godbolt.org/z/We7K1K6bE">Godbolt</a>). This is [[LWG3802]].
 
-```c++
+```cpp
     template<class K, class V, class C = std::less<K>>
     using PmrFlatMap = std::flat_map<K, V, C, std::pmr::vector<K>, std::pmr::vector<V>>;
 

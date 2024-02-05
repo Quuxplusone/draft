@@ -2368,7 +2368,7 @@ see <a data-link-type="biblio" href="#biblio-stdxerror" title="Implementation of
    <h3 class="heading settled" data-level="2.3" id="doing-it-wrong"><span class="secno">2.3. </span><span class="content">Eliminate manual warrants, improve safety</span><a class="self-link" href="#doing-it-wrong"></a></h3>
    <p>Many real-world codebases contain templates which require
 trivial relocatability of their template parameters, but cannot today <em>verify</em> trivial relocatability. For example, until 2012 <a data-link-type="biblio" href="#biblio-folly" title="Folly documentation on &quot;Object Relocation&quot;">[Folly]</a> <a href="https://github.com/facebook/folly/blob/93b0f543f20b8ef3a4c1e34591370011e2dc7168/folly/FBVector.h#L337-L348">required</a> the programmer to warrant the trivial relocatability of any type stored in a <code class="highlight"><c- n>folly</c-><c- o>::</c-><c- n>fbvector</c-></code>:</p>
-<pre class="language-c++ highlight"><c- n>class</c-> <c- n>Widget</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>class</c-> <c- nc>Widget</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>lst_</c-><c- p>;</c->
 <c- p>};</c->
 
@@ -2377,11 +2377,11 @@ trivial relocatability of their template parameters, but cannot today <em>verify
    <p>This merely encouraged the programmer to add the warrant and continue. An incorrect
 warrant was discovered only at runtime, via undefined behavior. See <a data-link-type="biblio" href="#biblio-cppnow" title="Trivially Relocatable (C++Now 2019)">[CppNow]</a> <a href="https://www.youtube.com/watch?v=SGdfPextuAU&amp;t=27m26s">@27:26–31:47</a>;
 for real-world examples see Folly issue <a href="https://github.com/facebook/folly/issues/889">#889</a> (<a href="https://github.com/facebook/folly/issues/35">#35</a>, <a href="https://github.com/facebook/folly/issues/316">#316</a>, <a href="https://github.com/facebook/folly/issues/498">#498</a>).</p>
-<pre class="language-c++ highlight"><c- n>class</c-> <c- n>Gadget</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>class</c-> <c- nc>Gadget</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>lst_</c-><c- p>;</c->
 <c- p>};</c->
 <c- c1>// sigh, add the warrant on autopilot</c->
-<c- n>template</c-><c- o>&lt;></c-> <c- k>struct</c-> <c- nc>folly</c-><c- o>::</c-><c- n>IsRelocatable</c-><c- o>&lt;</c-><c- n>Gadget</c-><c- o>></c-> <c- o>:</c-> <c- n>std</c-><c- o>::</c-><c- n>true_type</c-> <c- p>{};</c->
+<c- k>template</c-><c- o>&lt;></c-> <c- k>struct</c-> <c- nc>folly</c-><c- o>::</c-><c- n>IsRelocatable</c-><c- o>&lt;</c-><c- n>Gadget</c-><c- o>></c-> <c- o>:</c-> <c- n>std</c-><c- o>::</c-><c- n>true_type</c-> <c- p>{};</c->
 
 <c- n>folly</c-><c- o>::</c-><c- n>fbvector</c-><c- o>&lt;</c-><c- n>Gadget</c-><c- o>></c-> <c- n>vec</c-><c- p>;</c->  <c- c1>// CRASH AT RUNTIME due to fraudulent warrant</c->
 </pre>
@@ -2393,12 +2393,12 @@ remains the same — UB and crash — but a missing warrant simply disables the 
    <p>If this proposal is adopted, then Folly can start using <code class="highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c-></code> resp. <code class="highlight"><c- k>if</c-> <c- k>constexpr</c-> <c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c-></code> in the implementation of <code class="highlight"><c- n>fbvector</c-></code>, and the programmer can stop writing explicit warrants.
 Finally, the programmer can start writing assertions of correctness, which aids maintainability and
 can even find real bugs. <a href="https://p1144.godbolt.org/z/7b8893sjr">Example:</a></p>
-<pre class="language-c++ highlight"><c- n>class</c-> <c- n>Widget</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>class</c-> <c- nc>Widget</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>lst_</c-><c- p>;</c->
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Widget</c-><c- o>></c-><c- p>);</c->  <c- c1>// correctly SUCCEEDS</c->
 
-<c- n>class</c-> <c- n>Gadget</c-> <c- p>{</c->
+<c- k>class</c-> <c- nc>Gadget</c-> <c- p>{</c->
     <c- n>std</c-><c- o>::</c-><c- n>list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>lst_</c-><c- p>;</c->
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Gadget</c-><c- o>></c-><c- p>);</c->  <c- c1>// correctly ERRORS</c->
@@ -2408,32 +2408,32 @@ is the most important benefit to be gained by this proposal.</p>
    <h2 class="heading settled" data-level="3" id="design-goals"><span class="secno">3. </span><span class="content">Design goals</span><a class="self-link" href="#design-goals"></a></h2>
    <p>For the former, longer, contents of this section, see <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r7.html#design-goals">P1144R7 §3</a>.</p>
    <p>Briefly: We want to support all five of the following use-cases (<a href="https://godbolt.org/z/6Mfb1sfnY">Godbolt</a>).</p>
-<pre class="language-c++ highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>);</c-> <c- c1>// #1</c->
+<pre class="language-cpp highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>);</c-> <c- c1>// #1</c->
 
 <c- k>struct</c-> <c- nc>RuleOfZero</c-> <c- p>{</c-> <c- n>std</c-><c- o>::</c-><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>p_</c-><c- p>;</c-> <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>RuleOfZero</c-><c- o>></c-><c- p>);</c-> <c- c1>// #2</c->
 
 <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>RuleOf3</c-> <c- p>{</c->
     <c- n>RuleOf3</c-><c- p>(</c-><c- n>RuleOf3</c-><c- o>&amp;&amp;</c-><c- p>);</c->
-    <c- n>RuleOf3</c-><c- o>&amp;</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- n>RuleOf3</c-><c- o>&amp;&amp;</c-><c- p>);</c->
+    <c- n>RuleOf3</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>RuleOf3</c-><c- o>&amp;&amp;</c-><c- p>);</c->
     <c- o>~</c-><c- n>RuleOf3</c-><c- p>();</c->
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>RuleOf3</c-><c- o>></c-><c- p>);</c-> <c- c1>// #3</c->
 
 <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>Wrap0</c-> <c- p>{</c->
     <c- n>boost</c-><c- o>::</c-><c- n>container</c-><c- o>::</c-><c- n>static_vector</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- mi>10</c-><c- o>></c-> <c- n>v_</c-><c- p>;</c->
-    <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>decltype</c-><c- p>(</c-><c- n>v_</c-><c- p>)</c-><c- o>></c-><c- p>);</c->
+    <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- k>decltype</c-><c- p>(</c-><c- n>v_</c-><c- p>)</c-><c- o>></c-><c- p>);</c->
         <c- c1>// it’s not annotated, but we know it’s actually trivial</c->
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Wrap0</c-><c- o>></c-><c- p>);</c-> <c- c1>// #4</c->
 
 <c- k>struct</c-> <c- p>[[</c-><c- n>trivially_relocatable</c-><c- p>]]</c-> <c- n>Wrap3</c-> <c- p>{</c->
     <c- n>Wrap3</c-><c- p>(</c-><c- n>Wrap3</c-><c- o>&amp;&amp;</c-><c- p>);</c->
-    <c- n>Wrap3</c-><c- o>&amp;</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- n>Wrap3</c-><c- o>&amp;&amp;</c-><c- p>);</c->
+    <c- n>Wrap3</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>Wrap3</c-><c- o>&amp;&amp;</c-><c- p>);</c->
     <c- o>~</c-><c- n>Wrap3</c-><c- p>();</c->
     <c- b>int</c-> <c- n>i_</c-><c- p>;</c->
     <c- n>boost</c-><c- o>::</c-><c- n>interprocess</c-><c- o>::</c-><c- n>offset_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>p_</c-> <c- o>=</c-> <c- o>&amp;</c-><c- n>i_</c-><c- p>;</c->
-    <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>decltype</c-><c- p>(</c-><c- n>p_</c-><c- p>)</c-><c- o>></c-><c- p>);</c->
+    <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- k>decltype</c-><c- p>(</c-><c- n>p_</c-><c- p>)</c-><c- o>></c-><c- p>);</c->
         <c- c1>// it’s not trivial, but we preserve our invariant correctly</c->
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>Wrap3</c-><c- o>></c-><c- p>);</c-> <c- c1>// #5</c->
@@ -2461,7 +2461,7 @@ types that are relocatable in other ways. The two most-frequently-asked scenario
    </ul>
    <p>The most promising active proposal for "non-trivial relocation" is <a data-link-type="biblio" href="#biblio-p2785r3" title="Relocating prvalues">[P2785R3]</a>. It proposes a
 "relocation constructor" like this:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
     <c- n>A</c-><c- p>(</c-><c- n>A</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c->
 </pre>
@@ -2808,14 +2808,14 @@ of code that branches on <code class="highlight"><c- n>is_trivially_relocatable<
 unoptimized codepath otherwise. P1144 carefully proposes a definition for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable</c-></code> that keeps
 those codebases safe, and never unexpectedly reports a type <code class="highlight"><c- n>T</c-></code> as <code class="highlight"><c- n>is_trivially_relocatable</c-></code> when it’s not physically safe
 to use <code class="highlight"><c- n>T</c-></code> with such an optimized codepath.</p>
-<pre class="language-c++ highlight"><c- cp>#include</c-> &lt;bsl_vector.h>
-<c- n>using</c-> <c- n>namespace</c-> <c- n>BloombergLP</c-><c- o>::</c-><c- n>bslmf</c-><c- p>;</c->
+<pre class="language-cpp highlight"><c- cp>#include</c-> &lt;bsl_vector.h>
+<c- k>using</c-> <c- k>namespace</c-> <c- nn>BloombergLP</c-><c- o>::</c-><c- nn>bslmf</c-><c- p>;</c->
 
 <c- k>struct</c-> <c- nc>T</c-> <c- o>:</c-> <c- n>NestedTraitDeclaration</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>IsBitwiseMoveable</c-><c- o>></c-> <c- p>{</c->
     <c- b>int</c-> <c- n>i_</c-><c- p>;</c->
     <c- n>T</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- o>:</c-> <c- n>i_</c-><c- p>(</c-><c- n>i</c-><c- p>)</c-> <c- p>{}</c->
     <c- n>T</c-><c- p>(</c-><c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- b>void</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-><c- p>)</c-> <c- n>noexcept</c-> <c- p>{</c-> <c- n>puts</c-><c- p>(</c-><c- s>"Called operator="</c-><c- p>);</c-> <c- p>}</c->
+    <c- b>void</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>noexcept</c-> <c- p>{</c-> <c- n>puts</c-><c- p>(</c-><c- s>"Called operator="</c-><c- p>);</c-> <c- p>}</c->
     <c- o>~</c-><c- n>T</c-><c- p>()</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c->
 <c- b>int</c-> <c- nf>main</c-><c- p>()</c-> <c- p>{</c->
@@ -2828,7 +2828,7 @@ to use <code class="highlight"><c- n>T</c-></code> with such an optimized codepa
     <c- b>int</c-> <c- n>i_</c-><c- p>;</c->
     <c- n>U</c-><c- p>(</c-><c- b>int</c-> <c- n>i</c-><c- p>)</c-> <c- o>:</c-> <c- n>i_</c-><c- p>(</c-><c- n>i</c-><c- p>)</c-> <c- p>{}</c->
     <c- n>U</c-><c- p>(</c-><c- k>const</c-> <c- n>U</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- b>void</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>U</c-><c- o>&amp;</c-><c- p>)</c-> <c- n>noexcept</c-> <c- p>{</c-> <c- n>puts</c-><c- p>(</c-><c- s>"Called operator="</c-><c- p>);</c-> <c- p>}</c->
+    <c- b>void</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>U</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>noexcept</c-> <c- p>{</c-> <c- n>puts</c-><c- p>(</c-><c- s>"Called operator="</c-><c- p>);</c-> <c- p>}</c->
     <c- o>~</c-><c- n>U</c-><c- p>()</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c->
 <c- b>int</c-> <c- nf>main</c-><c- p>()</c-> <c- p>{</c->
@@ -2852,9 +2852,9 @@ and easy to spell.</p>
    <p>P1144 proposes a "trivial relocatability" very similar to "trivial copyability": if the user
 provides any special member, we assume that the user wants control over this type’s value
 semantics, and we won’t implicitly infer triviality. This includes the assignment operator.</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
     <c- n>A</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- n>A</c-><c- o>&amp;</c-> <c- n>operator</c-><c- o>=</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;&amp;</c-><c- p>);</c->
+    <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;&amp;</c-><c- p>);</c->
     <c- o>~</c-><c- n>A</c-><c- p>()</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>A</c-><c- o>></c-><c- p>);</c->
@@ -2864,7 +2864,7 @@ semantics, and we won’t implicitly infer triviality. This includes the assignm
 safe to replace "copy and destroy" with "move and destroy" (and thus with "relocate").
 This is informed by Arthur’s experience standardizing "implicit move" in <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1155r3.html">P1155</a> (C++20) and <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2266r3.html">P2266</a> (C++23).
 "Implicit move" affects <code class="highlight"><c- n>pmr</c-></code> types because their copy differs from their move. <a href="https://godbolt.org/z/sGKhxbsrK">Example</a>:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>ByValueSink</c-> <c- p>{</c->
+<pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>ByValueSink</c-> <c- p>{</c->
     <c- n>ByValueSink</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>v</c-><c- p>)</c-> <c- o>:</c-> <c- n>v_</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- n>v</c-><c- p>))</c-> <c- p>{}</c->
     <c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>v_</c-><c- p>;</c->
 <c- p>};</c->
@@ -2888,7 +2888,7 @@ We can optimize vector insert to use (trivial) relocation for element types that
    <p>Some types invariably model <code class="highlight"><c- n>relocatable</c-></code>; that is, their assignment is naturally tantamount to construct-and-destroy.
 But for <code class="highlight"><c- n>pmr</c-></code> types and polymorphic types, assignment is <em>not</em> tantamount to construct-and-destroy, <em>except</em> under certain conditions. For <code class="highlight"><c- n>pmr</c-></code> types, the condition is "both objects have the same
 allocator." For polymorphic types, the condition is "both objects have the same dynamic type."</p>
-<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>Derived</c-><c- o>></c-> <c- n>dv</c-> <c- o>=</c-> <c- p>{</c-> <c- o>~~~</c-> <c- p>};</c->
+<pre class="language-cpp highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>Derived</c-><c- o>></c-> <c- n>dv</c-> <c- o>=</c-> <c- p>{</c-> <c- o>~~~</c-> <c- p>};</c->
 <c- n>dv</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>dv</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->
   <c- c1>// Every object in the vector certainly has the same dynamic type.</c->
 
@@ -2905,7 +2905,7 @@ allocator." For polymorphic types, the condition is "both objects have the same 
   <c- c1>// Objects in the contiguous range might have different allocators?</c->
 </pre>
    <p>P1144 aims to permit efficient insertion and erasure in <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-></code>. <a href="https://p1144.godbolt.org/z/vv5q69q44">Example:</a></p>
-<pre class="language-c++ highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>></c-> <c- n>vs</c-><c- p>(</c-><c- mi>501</c-><c- p>);</c->
+<pre class="language-cpp highlight"><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>string</c-><c- o>></c-> <c- n>vs</c-><c- p>(</c-><c- mi>501</c-><c- p>);</c->
 <c- n>vs</c-><c- p>.</c-><c- n>erase</c-><c- p>(</c-><c- n>vs</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->
 </pre>
    <p>This <code class="highlight"><c- n>erase</c-></code> requires us to shift down 500 <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>string</c-></code> objects. We can do this
@@ -2915,7 +2915,7 @@ see <a href="#applications">table §2.1</a>). We want to permit BSL’s implemen
 That’s why since P1144R5, the definition of <code class="highlight"><c- k>concept</c-> <c- nc>relocatable</c-></code> in <a href="#wording-concept.relocatable">§4.8</a> places semantic requirements on <code class="highlight"><c- n>T</c-></code>’s assignment operators (if they exist) as well as on <code class="highlight"><c- n>T</c-></code>’s constructors and destructors.</p>
    <p>If <code class="highlight"><c- n>pmr</c-><c- o>::</c-><c- n>string</c-></code> is considered trivially relocatable, this will trickle down into all Rule-of-Zero
 types with a <code class="highlight"><c- n>pmr</c-><c- o>::</c-><c- n>string</c-></code> member. (<a href="https://godbolt.org/z/nhf38n33G">Godbolt.</a>)</p>
-<pre class="language-c++ highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>);</c->
+<pre class="language-cpp highlight"><c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_relocatable_v</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>);</c->
   <c- c1>// Before: not true, of course</c->
   <c- c1>// After: suppose this is true</c->
 <c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->

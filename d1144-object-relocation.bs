@@ -242,7 +242,7 @@ trivial relocatability. For example, until 2012 [[Folly]]
 [required](https://github.com/facebook/folly/blob/93b0f543f20b8ef3a4c1e34591370011e2dc7168/folly/FBVector.h#L337-L348)
 the programmer to warrant the trivial relocatability of any type stored in a `folly::fbvector`:
 
-```c++
+```cpp
     class Widget {
         std::vector<int> lst_;
     };
@@ -257,7 +257,7 @@ for real-world examples see Folly issue [#889](https://github.com/facebook/folly
 ([#35](https://github.com/facebook/folly/issues/35), [#316](https://github.com/facebook/folly/issues/316),
 [#498](https://github.com/facebook/folly/issues/498)).
 
-```c++
+```cpp
     class Gadget {
         std::list<int> lst_;
     };
@@ -278,7 +278,7 @@ in the implementation of `fbvector`, and the programmer can stop writing explici
 Finally, the programmer can start writing assertions of correctness, which aids maintainability and
 can even find real bugs. [Example:](https://p1144.godbolt.org/z/7b8893sjr)
 
-```c++
+```cpp
     class Widget {
         std::vector<int> lst_;
     };
@@ -300,7 +300,7 @@ For the former, longer, contents of this section, see
 
 Briefly: We want to support all five of the following use-cases ([Godbolt](https://godbolt.org/z/6Mfb1sfnY)).
 
-```c++
+```cpp
     static_assert(std::is_trivially_relocatable_v<std::unique_ptr<int>>); // #1
 
     struct RuleOfZero { std::unique_ptr<int> p_; };
@@ -358,7 +358,7 @@ types that are relocatable in other ways. The two most-frequently-asked scenario
 The most promising active proposal for "non-trivial relocation" is [[P2785R3]]. It proposes a
 "relocation constructor" like this:
 
-```c++
+```cpp
     struct A {
         A(A) = default;
     };
@@ -905,7 +905,7 @@ unoptimized codepath otherwise. P1144 carefully proposes a definition for `std::
 those codebases safe, and never unexpectedly reports a type `T` as `is_trivially_relocatable` when it's not physically safe
 to use `T` with such an optimized codepath.
 
-```c++
+```cpp
     #include <bsl_vector.h>
     using namespace BloombergLP::bslmf;
 
@@ -955,7 +955,7 @@ P1144 proposes a "trivial relocatability" very similar to "trivial copyability":
 provides any special member, we assume that the user wants control over this type's value
 semantics, and we won't implicitly infer triviality. This includes the assignment operator.
 
-```c++
+```cpp
     struct A {
         A(A&&) = default;
         A& operator=(A&&);
@@ -971,7 +971,7 @@ This is informed by Arthur's experience standardizing "implicit move" in <a href
 (C++20) and <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2266r3.html">P2266</a> (C++23).
 "Implicit move" affects `pmr` types because their copy differs from their move. [Example](https://godbolt.org/z/sGKhxbsrK):
 
-```c++
+```cpp
 struct ByValueSink {
     ByValueSink(std::pmr::vector<int> v) : v_(std::move(v)) {}
     std::pmr::vector<int> v_;
@@ -1002,7 +1002,7 @@ But for `pmr` types and polymorphic types, assignment is *not* tantamount to con
 under certain conditions. For `pmr` types, the condition is "both objects have the same
 allocator." For polymorphic types, the condition is "both objects have the same dynamic type."
 
-```c++
+```cpp
     std::vector<Derived> dv = { ~~~ };
     dv.erase(dv.begin());
       // Every object in the vector certainly has the same dynamic type.
@@ -1023,7 +1023,7 @@ allocator." For polymorphic types, the condition is "both objects have the same 
 P1144 aims to permit efficient insertion and erasure in `std::vector`.
 [Example:](https://p1144.godbolt.org/z/vv5q69q44)
 
-```c++
+```cpp
     std::vector<std::string> vs(501);
     vs.erase(vs.begin());
 ```
@@ -1039,7 +1039,7 @@ places semantic requirements on `T`'s assignment operators (if they exist) as we
 If `pmr::string` is considered trivially relocatable, this will trickle down into all Rule-of-Zero
 types with a `pmr::string` member. ([Godbolt.](https://godbolt.org/z/nhf38n33G))
 
-```c++
+```cpp
     static_assert(std::is_trivially_relocatable_v<std::pmr::string>);
       // Before: not true, of course
       // After: suppose this is true

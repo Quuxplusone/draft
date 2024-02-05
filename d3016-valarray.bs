@@ -44,7 +44,7 @@ Casey Carter [points out](https://lists.isocpp.org/lib/2023/10/26795.php)
 that the following program is supported by libstdc++ but not libc++ nor Microsoft
 ([Godbolt](https://godbolt.org/z/WK37KbGss)):
 
-```c++
+```cpp
 #include <iterator>
 #include <valarray>
 int main() {
@@ -63,7 +63,7 @@ are still transitively included by `<valarray>` before `std::valarray`'s own cod
 
 Likewise, on all vendors ([Godbolt](https://godbolt.org/z/fnjj4WWGo)):
 
-```c++
+```cpp
 #include <iterator>
 int main() {
   std::begin({1,2,3}); // OK
@@ -125,7 +125,7 @@ their special overloads for `initializer_list` arguments.
 <table>
 <tr>
 <td>
-```c++
+```cpp
   std::initializer_list<int> il = {1,2,3};
   const int *p = std::data(il);
     // OK, calls the initializer_list overload
@@ -136,7 +136,7 @@ their special overloads for `initializer_list` arguments.
 ```
 </td>
 <td>
-```c++
+```cpp
   std::initializer_list<int> il = {1,2,3};
   const int *p = std::data(il);
     // OK, calls the primary template
@@ -147,7 +147,7 @@ their special overloads for `initializer_list` arguments.
 </tr>
 <tr>
 <td>
-```c++
+```cpp
   const int *p = std::data({1,2,3});
     // calls the initializer_list overload
     // specially provided in <iterator>,
@@ -157,7 +157,7 @@ their special overloads for `initializer_list` arguments.
 ```
 </td>
 <td>
-```c++
+```cpp
   const int *p = std::data({1,2,3});
     // does not compile
   const int *q = std::data({});
@@ -167,7 +167,7 @@ their special overloads for `initializer_list` arguments.
 </tr>
 <tr>
 <td>
-```c++
+```cpp
   bool b = std::empty({1,2,3});
     // calls the initializer_list overload
     // specially provided in <iterator>,
@@ -177,7 +177,7 @@ their special overloads for `initializer_list` arguments.
 ```
 </td>
 <td>
-```c++
+```cpp
   bool b = std::empty({1,2,3});
     // does not compile
   bool c = std::empty({});
@@ -243,7 +243,7 @@ simply calls `c.rbegin()` — it never attempts to do `make_reverse_iterator(c.e
 because `make_reverse_iterator` isn't SFINAE-friendly. LWG2128's overloads are important
 because they allow us to write ([Godbolt](https://godbolt.org/z/n75jeM3h6)):
 
-```c++
+```cpp
     template<class C>
     void f(const C& c) {
       using std::rbegin, std::rend;
@@ -276,7 +276,7 @@ Arthur has implemented [[#wording]] in his fork of libc++, and used it to compil
 both LLVM/Clang/libc++ and another large C++17 codebase. Naturally, it caused
 no problems except in this single test from libc++'s own test suite:
 
-```c++
+```cpp
     #include <initializer_list> // but not <iterator>
     std::initializer_list<int> il;
     static_assert(noexcept(std::begin(il)));
@@ -297,7 +297,7 @@ but the primary template `begin(C&)` is non-noexcept
 <table>
 <tr>
 <td>
-```c++
+```cpp
   #include <initializer_list>
   void f(std::initializer_list<int> il) {
     auto it = std::begin(il);
@@ -305,7 +305,7 @@ but the primary template `begin(C&)` is non-noexcept
 ```
 </td>
 <td>
-```c++
+```cpp
   #include <initializer_list>
   #include <iterator> // for std::begin
   void f(std::initializer_list<int> il) {
@@ -316,13 +316,13 @@ but the primary template `begin(C&)` is non-noexcept
 </tr>
 <tr>
 <td>
-```c++
+```cpp
   S(std::initializer_list<int> il) :
     S(il.begin(), il.size()) {}
 ```
 </td>
 <td>
-```c++
+```cpp
   S(std::initializer_list<int> il) :
     S(il.data(), il.size()) {}
 ```
@@ -330,19 +330,19 @@ but the primary template `begin(C&)` is non-noexcept
 </tr>
 <tr>
 <td>
-```c++
+```cpp
   auto dangle = std::begin({1,2,3});
 ```
 </td>
 <td>
-```c++
+```cpp
   // no longer compiles
 ```
 </td>
 </tr>
 <tr>
 <td>
-```c++
+```cpp
   bool b = std::empty({1,2,3});
     // calls the initializer_list overload
     // specially provided in <iterator>,
@@ -350,7 +350,7 @@ but the primary template `begin(C&)` is non-noexcept
 ```
 </td>
 <td>
-```c++
+```cpp
   bool b = std::empty({1,2,3});
     // does not compile
 ```
@@ -358,7 +358,7 @@ but the primary template `begin(C&)` is non-noexcept
 </tr>
 <tr>
 <td>
-```c++
+```cpp
   #include <valarray>
   #include <utility>
   std::valarray<int> va;
@@ -366,7 +366,7 @@ but the primary template `begin(C&)` is non-noexcept
 ```
 </td>
 <td>
-```c++
+```cpp
   #include <valarray>
   #include <iterator>
   std::valarray<int> va;
