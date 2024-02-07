@@ -2,7 +2,7 @@
 Title: Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists
 Shortname: D3016
 Revision: 2
-!Draft Revision: 9
+!Draft Revision: 10
 Audience: LEWG
 Status: D
 Group: WG21
@@ -14,7 +14,7 @@ Abstract:
   applied to `valarray` and to braced initializer lists were caused by
   C++0x uncertainty around [stmt.ranged], and resolve these inconsistencies
   for C++26.
-Date: 2024-01-15
+Date: 2024-02-07
 </pre>
 
 <style>
@@ -28,6 +28,12 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 - R2:
 
     - Mention [[P2613]] and [[LWG4035]] as further precedent for `initializer_list.empty()`.
+
+    - Address concerns about <a href="#availability-concerns">breaking code</a>
+          by making the generic `begin` and `end` available via `<initializer_list>`; but mark
+          that availability "deprecated from birth."
+
+    - Add feature-test macros `__cpp_lib_initializer_list` and `__cpp_lib_valarray`.
 
 - R1:
 
@@ -187,6 +193,69 @@ their special overloads for `initializer_list` arguments.
 </tr>
 </table>
 
+## Availability of `begin`/`end` ## {#availability-concerns}
+
+The following snippet tries to use `std::begin(il)`
+without first including `<iterator>` nor any of the 15 other headers
+listed in <a href="https://eel.is/c++draft/iterator.range#1">[iterator.range]/1</a>
+that declare the generic `std::begin`. This code works in C++23.
+
+P3016R1 proposed simply to break this code, and force the programmer to
+write the right-hand snippet instead. Alisdair Meredith expressed concern that
+we were breaking valid code without a deprecation period.
+
+Therefore, P3016R2 proposes to make the generic function templates
+`begin` and `end` available via `<initializer_list>` (as well as via those
+other 16 headers). This keeps `std::begin(il)` working (although it still
+changes it from `noexcept(true)` to `noexcept(false)`). However, we propose
+to immediately deprecate this availability. That is, rather than simply
+*break* the snippet, we propose to *deprecate* its legality so that we can
+still come back and clean up this area in 3 or 6 years from now.
+
+<table>
+<tr>
+<td>
+```cpp
+  #include <initializer_list>
+  void f(std::initializer_list<int> il) {
+    auto it = std::begin(il);
+  }
+```
+</td>
+<td>
+```cpp
+  #include <initializer_list>
+  #include <iterator> // for std::begin
+  void f(std::initializer_list<int> il) {
+    auto it = std::begin(il);
+  }
+```
+</td>
+</tr>
+
+[[LWG3624]] and [[LWG3625]] are related. [[LWG3625]] is particularly
+nettlesome: `<stacktrace>` wants to provide [iterator.range]'s generic `begin`,
+but simply adding `<stacktrace>` to [iterator.range]/1 will force it also to
+drag in [iterator.range]'s `rbegin(initializer_list<E>)`, which forces it
+to drag in all of `<initializer_list>` although that header is otherwise unnecessary.
+The right solution is probably to exempt `rbegin(initializer_list<E>)` and
+`rend(initializer_list<E>)` from [iterator.range]/1. In fact, we could just say:
+
+<small><blockquote>
+<p>1. In addition to being available via inclusion of the `<iterator>` header, the function templates in [iterator.range]
+<ins>having a template type parameter `C`</ins> are available when any of the following headers are included: `<array>`, `<deque>`, `<flat_map>`, `<flat_set>`,
+`<forward_list>`, `<list>`, `<map>`, `<regex>`, `<set>`, `<span>`, `<string>`, `<string_view>`,
+`<unordered_map>`, `<unordered_set>`, and `<vector>`.
+</blockquote></small>
+
+This would exempt `begin(T(&)[N])`, `end(T(&)[N])`, `rbegin(T(&)[N])`, `rend(T(&)[N])`, `rbegin(initializer_list<E>)`, `rend(initializer_list<E>)`,
+`size(T(&)[N])`, `ssize(T(&)[N])`, `empty(T(&)[N])`, and `data(T(&)[N])`; i.e., those overloads would no longer need to be provided
+via the `<vector>`, `<list>`, etc. header files, but would now be available *only* via `<iterator>`.
+
+However, if we proposed this we'd presumably run into the same objection about removing
+availability without a deprecation period; and it's unclear how to address that
+objection without a lot of new wording.
+
 
 # Historical background # {#history}
 
@@ -233,7 +302,7 @@ to be iterable, without looking too much like a new kind of STL container. In 20
 that. In 2023, we do: `valarray` is a *range*, just like `array` or `span`, and there's
 nothing wrong with a *range* having member `begin` and `end`. (P3016 proposes to make it so.)
 
-Similarly, `valarray<T>::iterator` is currently ill-formed even though `ranges::iterator_t<valarray<int>>`
+Similarly, `valarray<int>::iterator` is currently ill-formed even though <code>ranges::iterator_t&lt;valarray&lt;int>></code>
 is well-formed; `std::rbegin(valarray)` is ill-formed even though `ranges::rbegin(valarray)`
 is well-formed; and so on.
 
@@ -377,6 +446,26 @@ but the primary template `begin(C&)` is non-noexcept
 </table>
 
 # Proposed wording # {#wording}
+
+Note: Vendors should provide `__cpp_lib_initializer_list` if `il.data()` and `il.empty()`
+are well-formed. Vendors should provide `__cpp_lib_valarray` if `va.begin()` and `va.end()` are well-formed
+and the free-function `begin` and `end` have been removed from `<valarray>`.
+
+## [version.syn] ## {#wording-version.syn}
+
+Add two feature-test macros to <a href="https://eel.is/c++draft/version.syn">[version.syn]/2</a>:
+
+<small><blockquote>
+<pre>
+#define __cpp_lib_incomplete_container_elements     201505L // also in &lt;forward_list>, &lt;list>, &lt;vector>
+<ins>#define __cpp_lib_initializer_list                  YYYYMML // also in &lt;initializer_list></ins>
+#define __cpp_lib_int_pow2                          202002L // freestanding, also in &lt;bit>
+[...]
+#define __cpp_lib_unwrap_ref                        201811L // freestanding, also in &lt;type_traits>
+<ins>#define __cpp_lib_valarray                          YYYYMML // also in &lt;valarray></ins>
+#define __cpp_lib_variant                           202306L // also in &lt;variant>
+</pre>
+</blockquote></small>
 
 ## [valarray.syn] ## {#wording-valarray.syn}
 
@@ -619,8 +708,8 @@ namespace std {
   template&lt;class C> constexpr auto begin(const C& c) -> decltype(c.begin());
   template&lt;class C> constexpr auto end(C& c) -> decltype(c.end());
   template&lt;class C> constexpr auto end(const C& c) -> decltype(c.end());
-  template&lt;class T, size_t N> constexpr T* begin(T (&array)\[N]) noexcept;
-  template&lt;class T, size_t N> constexpr T* end(T (&array)\[N]) noexcept;
+  template&lt;class T, size_t N> constexpr T* begin(T (&amp;array)\[N]) noexcept;
+  template&lt;class T, size_t N> constexpr T* end(T (&amp;array)\[N]) noexcept;
   template&lt;class C> constexpr auto cbegin(const C& c)
     noexcept(noexcept(std::begin(c))) -> decltype(std::begin(c));
   template&lt;class C> constexpr auto cend(const C& c)
@@ -629,8 +718,8 @@ namespace std {
   template&lt;class C> constexpr auto rbegin(const C& c) -> decltype(c.rbegin());
   template&lt;class C> constexpr auto rend(C& c) -> decltype(c.rend());
   template&lt;class C> constexpr auto rend(const C& c) -> decltype(c.rend());
-  template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*> rbegin(T (&array)\[N])
-  template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*> rend(T (&array)\[N]);
+  template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*> rbegin(T (&amp;array)\[N])
+  template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*> rend(T (&amp;array)\[N]);
   template&lt;class E> constexpr reverse_iterator&lt;const E*>
     rbegin(initializer_list&lt;E> il);
   template&lt;class E> constexpr reverse_iterator&lt;const E*>
@@ -643,24 +732,24 @@ namespace std {
   template&lt;class C> constexpr auto
     size(const C& c) -> decltype(c.size());
   template&lt;class T, size_t N> constexpr size_t
-    size(const T (&array)\[N]) noexcept;
+    size(const T (&amp;array)\[N]) noexcept;
 
   template&lt;class C> constexpr auto
     ssize(const C& c)
       -> common_type_t&lt;ptrdiff_t, make_signed_t&lt;decltype(c.size())>>;
   template&lt;class T, ptrdiff_t N> constexpr ptrdiff_t
-    ssize(const T (&array)\[N]) noexcept;
+    ssize(const T (&amp;array)\[N]) noexcept;
 
   template&lt;class C> [[nodiscard]] constexpr auto
     empty(const C& c) -> decltype(c.empty());
   template&lt;class T, size_t N> [[nodiscard]] constexpr bool
-    empty(const T (&array)\[N]) noexcept;
+    empty(const T (&amp;array)\[N]) noexcept;
   <del>template&lt;class E> [[nodiscard]] constexpr bool</del>
     <del>empty(initializer_list&lt;E> il) noexcept;</del>
 
   template&lt;class C> constexpr auto data(C& c) -> decltype(c.data());
   template&lt;class C> constexpr auto data(const C& c) -> decltype(c.data());
-  template&lt;class T, size_t N> constexpr T* data(T (&array)\[N]) noexcept;
+  template&lt;class T, size_t N> constexpr T* data(T (&amp;array)\[N]) noexcept;
   <del>template&lt;class E> constexpr const E* data(initializer_list&lt;E> il) noexcept;</del>
 }
 </pre>
@@ -671,7 +760,31 @@ namespace std {
 Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:
 
 <small><blockquote>
+<p>1. In addition to being available via inclusion of the `<iterator>` header, the function templates in [iterator.range]
+are available when any of the following headers are included: `<array>`, `<deque>`, `<flat_map>`, `<flat_set>`,
+`<forward_list>`, `<list>`, `<map>`, `<regex>`, `<set>`, `<span>`, `<string>`, `<string_view>`,
+`<unordered_map>`, `<unordered_set>`, <ins><code>&lt;valarray></code>,</ins> and `<vector>`.
+
+<pre>
+  template&lt;class C> constexpr auto begin(C& c) -> decltype(c.begin());
+  template&lt;class C> constexpr auto begin(const C& c) -> decltype(c.begin());
+</pre>
+<p>2. *Returns:* `c.begin()`.
+<p><ins>x. *Remarks:* In addition to being available via inclusion of the `<iterator>` header,
+these function templates are available when `<initializer_list>` is included.
+This availability is deprecated.</ins>
+
+<pre>
+  template&lt;class C> constexpr auto end(C& c) -> decltype(c.end());
+  template&lt;class C> constexpr auto end(const C& c) -> decltype(c.end());
+</pre>
+<p>3. *Returns:* `c.end()`.
+<p><ins>x. *Remarks:* In addition to being available via inclusion of the `<iterator>` header,
+these function templates are available when `<initializer_list>` is included.
+This availability is deprecated.</ins>
+
 [...]
+
 <pre>
 <del>template&lt;class E> [[nodiscard]] constexpr bool empty(initializer_list&lt;E> il) noexcept;</del>
 </pre>
@@ -681,6 +794,20 @@ Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as 
 <del>template&lt;class E> constexpr const E* data(initializer_list&lt;E> il) noexcept;</del>
 </pre>
 <p><del>25․ Returns: `il.begin()`.</del>
+</blockquote></small>
+
+## [depr] ## {#wording-depr}
+
+Add a new subsection <a href="https://eel.is/c++draft/depr">[depr.iterator.range]</a> as follows:
+
+<small><blockquote>
+<b>D.x Deprecated availability of iterator-access templates [depr.iterator.range]</b>
+
+<ins>The free function templates `begin` and `end` ([iterator.range]) are available not only via the
+headers listed in [iterator.range] but also via `<initializer_list>`. The availability of these
+two templates via `<initializer_list>` is deprecated. [*Note:* The other function templates in
+[iterator.range], such as `rbegin`, `cbegin`, and `size`, have never been available
+via `<initializer_list>`.]</ins>
 </blockquote></small>
 
 ## .data+.size cleanup ## {#wording-cleanup}
@@ -769,14 +896,6 @@ The next revision of this paper (if any) will be guided by the outcomes of these
 
 <pre class=biblio>
 {
-  "CWG1274": {
-    "title": "Common nonterminal for expression and braced-init-list",
-    "authors": [
-      "Daniel Krügler"
-    ],
-    "href": "https://cplusplus.github.io/CWG/issues/1274.html",
-    "date": "March 2011–October 2015"
-  },
   "CWG2825": {
     "title": "Range-based for statement using a braced-init-list",
     "authors": [
@@ -800,6 +919,22 @@ The next revision of this paper (if any) will be guided by the outcomes of these
     ],
     "href": "https://cplusplus.github.io/LWG/issue2128",
     "date": "January 2012–January 2016"
+  },
+  "LWG3624": {
+    "title": "Inconsistency of &lt;typeinfo>, &lt;initializer_list>, and &lt;compare>",
+    "authors": [
+      "Jiang An"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3624",
+    "date": "October 2021"
+  },
+  "LWG3625": {
+    "title": "Should &lt;stacktrace> provide range access function templates?",
+    "authors": [
+      "Jiang An"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3625",
+    "date": "October 2021"
   },
   "LWG4001": {
     "title": "iota_view should provide empty",
