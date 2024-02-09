@@ -2,7 +2,7 @@
 Title: Variadic friends
 Shortname: D2893
 Revision: 1
-!Draft Revision: 6
+!Draft Revision: 7
 Audience: CWG
 Status: D
 Group: WG21
@@ -12,7 +12,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   Support `friend Ts...` in C++26.
-Date: 2024-02-07
+Date: 2024-02-09
 </pre>
 
 <style>
@@ -353,20 +353,26 @@ The existing wording for this is in <a href="https://eel.is/c++draft/dcl.type.el
 
 # Proposed wording # {#wording}
 
-We present two possible wording options. Option 1 proposes to make `friend Ts...` expand to
-`friend T1, T2`, which means we also need to define what *that* means. This is our
-preferred direction, for consistency with `using T1::T1, T2::T2`.
+We present two possible wording options: our preferred way, and an alternative for comparison.
 
-Option 2 proposes to make `friend Ts...` expand to `friend T1; friend T2`, which means
-that `friend T1, T2` will remain ill-formed — and if someone wants C++ to support that
-syntax, they'll have to bring a new proposal and effectively reinvent Option 1 by unwinding
-the effects of our paper. We think this is likely to happen, so Option 2 is *not* our
-preferred direction.
+<table>
+<tr><th>Option 1</th><th>Option 2</th></tr>
+<tr><td>`friend Ts...` expands to `friend T1, T2`</td><td>`friend Ts...` expands to `friend T1; friend T2`</td></tr>
+<tr><td>`friend T1, T2;` is OK</td><td>`friend T1, T2;` remains ill-formed</td></tr>
+<tr><td>Consistent with `using T1::T1, T2::T2;`</td><td>—</td></tr>
+<tr><td>Does the work up front</td><td>We expect future proposals for `friend T1, T2;` anyway</td></tr>
+<tr><td>Adds <i>friend-type-declaration</i></td><td>Adds no new nonterminals</td></tr>
+<tr><td>Fails to disentangle the whole `friend` grammar</td><td>Doesn't even <i>try</i> to disentangle the `friend` grammar</td></tr>
+<tr><td>Wording seems OK</td><td>Wording apparently permits `void f(int... ...xs);` and `sizeof(int...)`</td>
+<tr><td><b>We prefer Option 1.</b></td><td>Provided for comparison only.</td></tr>
+</table>
 
-P2893R0 presented Option 1, but with incomplete wording. EWG at Kona was concerned
-that the wording to support `friend T1, T2` might be difficult, and so the presentation
-drifted toward Option 2. By presenting both possible wordings in P2893R1, we allow
-readers to decide for themselves whether Option 1's wording "pays for itself."
+P2893R0 presented Option 1, but with incomplete wording. At Kona, EWG was concerned
+that the wording for `friend T1, T2` might be difficult, and so the presentation
+drifted toward Option 2. But, having investigated Option 2, we think it's really about
+as hard, and has the drawbacks above. We show it here for comparison, so that when
+you ask "Why not just do [basically Option 2]?" we can point to it and say
+"Look. We tried. It's no better."
 
 Relevant paragraphs not modified here include:
 
@@ -379,25 +385,23 @@ Note: Precedent for "If a *member-declaration* matches..." is found in
 <a href="https://eel.is/c++draft/dcl.pre#10">[dcl.pre]/10</a> "If a *static-assert-message* matches..."
 
 Note: CWG discussion in Kona ([minutes](https://wiki.edg.com/bin/view/Wg21kona2023/CoreWorkingGroup#P2893R1))
-suggested that *simple-friend-type-specifier* shouldn't be producible from
+suggested that *friend-type-specifier* shouldn't be producible from
 *elaborated-type-specifier*, because then we'd appear to support `friend class A, class B;`.
 However, as shown above, we need to support `template<class> friend class Ts::Nested...;` which
-means that *simple-friend-type-specifier* must be producible from *elaborated-type-specifier*.
-Contrariwise, we certainly do not want to support `template<class> friend class A::Nested, class B::Nested;`.
-Luckily <a href="#wording1-dcl.type.elab">[dcl.type.elab]/4</a> already forbids that sort of thing.
+means that *friend-type-specifier* must be producible from *elaborated-type-specifier*.
+Luckily <a href="#wording1-dcl.type.elab">[dcl.type.elab]/4</a> already forbids `friend class A, class B;`.
 We add <ins>`...`<sub><i>opt</i></sub></ins> to [dcl.type.elab]/4 but don't add anything to permit commas.
 
-Note: We make *simple-friend-declaration* a
-<a href="https://eel.is/c++draft/temp.res.general#def:context,type-only">type-only context</a>, as already
-implemented by GCC/Clang/EDG/MSVC ([Godbolt](https://godbolt.org/z/fbddeoMbW)).
-That means we could eliminate the production for `friend typename X<Ts>::Y...` if we wanted,
-but it seems more consistent to keep it. (That is, the production of *simple-friend-type-specifier*
-from *typename-specifier* as well as from *simple-type-specifier*.)
+Note: Today `friend typename X<T>::Y;` is legal, as is `friend X<T>::Y;`. The identifier there is in
+a type-only context (<a href="#wording1-temp.res.general">[temp.res.general]</a>)
+because it's a *decl-specifier* of the *decl-specifier-seq* of a *member-declaration*.
+After our patch, it's in a type-only context because it's the *friend-type-specifier* of a *friend-type-declaration*.
 
-Note: A friend declaration which is a non-template is a *member-declaration*.
-A friend declaration which is a *template-declaration* consists of a *template-head*
-followed by a *declaration*. Therefore, *simple-friend-declaration* must appear in the list
-of alternatives for both *member-declaration* and (either *template-declaration* or *declaration*).
+Note: To befriend a non-template, you use a "friend declaration" which is a *member-declaration*.
+To befriend a template, you use a *template-declaration*, which consists of a *template-head*
+followed by a *declaration*; the "friend declaration" here is the *declaration* (<a href="#wording1-class.friend">[class.friend]/3</a>).
+Therefore, *friend-type-declaration* must appear in the list
+of alternatives for both <i><a href="#wording1-class.mem.general">member-declaration</a></i> and <i><a href="#wording1-dcl.pre">declaration</a></i>.
 Friend declarations are already forbidden to appear outside of classes, although that wording is
 elusive (maybe it doesn't exist).
 
@@ -415,34 +419,6 @@ __cpp_variadic_using      201611L
 </pre>
 </blockquote></small>
 
-### [dcl.type.elab] ### {#wording1-dcl.type.elab}
-
-Modify <a href="https://eel.is/c++draft/dcl.type.elab#4">[dcl.type.elab]</a> as follows:
-
-<small><blockquote>
-<p>4. <del>If an *elaborated-type-specifier* appears with the `friend` specifier
-as an entire *member-declaration*, the *member-declaration* shall</del> <ins>If any
-<i><a href="#wording1-class.mem.general">simple-friend-type-specifier</a></i> in a
-<i><a href="#wording1-class.mem.general">simple-friend-declaration</a></i>
-is an *elaborated-type-specifier*, the *simple-friend-declaration* shall</ins> have one of the following forms:
-
-- `friend` *class-key nested-name-specifier*<sub>opt</sub> *identifier* <ins>`...`<sub><i>opt</i></sub></ins> `;`
-- `friend` *class-key simple-template-id* <ins>`...`<sub><i>opt</i></sub></ins> `;`
-- `friend` *class-key nested-name-specifier* `template`<sub>opt</sub> *simple-template-id* <ins>`...`<sub><i>opt</i></sub></ins> `;`
-
-Any unqualified lookup for the *identifier* (in the first case) does not consider scopes that contain the target scope; no name is bound.
-<p>[*Note:* A using-directive in the target scope is ignored if it refers to a namespace not contained by that scope.
-[basic.lookup.elab] describes how name lookup proceeds in an elaborated-type-specifier. — *end note*]
-<p>[*Note:* An *elaborated-type-specifier* can be used to refer to a previously declared *class-name* or *enum-name*
-even if the name has been hidden by a non-type declaration. — *end note*]
-
-<p>5. If the *identifier* or *simple-template-id* resolves to a *class-name* or *enum-name*, the *elaborated-type-specifier* introduces it
-into the declaration the same way a *simple-type-specifier* introduces its *type-name* ([dcl.type.simple]).
-If the *identifier* or *simple-template-id* resolves to a *typedef-name* ([dcl.typedef], [temp.names]), the *elaborated-type-specifier* is ill-formed.
-<p>[*Note:* This implies that, within a class template with a template *type-parameter* `T`, the declaration
-`friend class T;` is ill-formed. However, the similar declaration `friend T;` is well-formed ([class.friend]). — *end note*]
-</blockquote></small>
-
 ### [class.mem.general] ### {#wording1-class.mem.general}
 
 Modify <a href="https://eel.is/c++draft/class.mem.general#nt:member-declaration">[class.mem.general]</a> as follows:
@@ -451,7 +427,7 @@ Modify <a href="https://eel.is/c++draft/class.mem.general#nt:member-declaration"
 <i>member-declaration</i>:<br>
 &emsp; <i>attribute-specifier-seq</i><sub>opt</sub> <i>decl-specifier-seq</i><sub>opt</sub> <i>member-declarator-list</i><sub>opt</sub> `;`<br>
 &emsp; <i>function-definition</i><br>
-&emsp; <ins><i>simple-friend-declaration</i></ins><br>
+&emsp; <ins><i>friend-type-declaration</i></ins><br>
 &emsp; <i>using-declaration</i><br>
 &emsp; <i>using-enum-declaration</i><br>
 &emsp; <i>static_assert-declaration</i><br>
@@ -462,12 +438,12 @@ Modify <a href="https://eel.is/c++draft/class.mem.general#nt:member-declaration"
 &emsp; <i>opaque-enum-declaration</i><br>
 &emsp; <i>empty-declaration</i><br>
 
-<ins><i>simple-friend-declaration</i>:</ins><br>
-&emsp; <ins>`friend` <i>simple-friend-type-specifier-list</i> `;`</ins><br>
-<ins><i>simple-friend-type-specifier-list</i>:</ins><br>
-&emsp; <ins><i>simple-friend-type-specifier</i> `...`<sub>opt</sub></ins><br>
-&emsp; <ins><i>simple-friend-type-specifier-list</i> `,` <i>simple-friend-type-specifier</i> `...`<sub>opt</sub></ins><br>
-<ins><i>simple-friend-type-specifier</i>:</ins><br>
+<ins><i>friend-type-declaration</i>:</ins><br>
+&emsp; <ins>`friend` <i>friend-type-specifier-list</i> `;`</ins><br>
+<ins><i>friend-type-specifier-list</i>:</ins><br>
+&emsp; <ins><i>friend-type-specifier</i> `...`<sub>opt</sub></ins><br>
+&emsp; <ins><i>friend-type-specifier-list</i> `,` <i>friend-type-specifier</i> `...`<sub>opt</sub></ins><br>
+<ins><i>friend-type-specifier</i>:</ins><br>
 &emsp; <ins><i>simple-type-specifier</i></ins><br>
 &emsp; <ins><i>elaborated-type-specifier</i></ins><br>
 &emsp; <ins><i>typename-specifier</i></ins><br>
@@ -493,7 +469,7 @@ declare at least one member name of the class or declare at least one unnamed bi
 <p>8. A class `C` is complete at a program point *P* if the definition of `C` is reachable from *P* ([module.reach])
 or if *P* is in a complete-class context of `C`. Otherwise, `C` is incomplete at *P*.
 
-<p><ins>x. If a *member-declaration* matches the syntactic requirements of *simple-friend-declaration*, it is a *simple-friend-declaration*.</ins>
+<p><ins>x. If a *member-declaration* matches the syntactic requirements of *friend-type-declaration*, it is a *friend-type-declaration*.</ins>
 
 <p>9. In a *member-declarator*, an `=` immediately following the *declarator* is interpreted as
 introducing a *pure-specifier* if the *declarator-id* has function type;
@@ -501,30 +477,6 @@ otherwise it is interpreted as introducing a *brace-or-equal-initializer*. [...]
 
 <p>10. In a *member-declarator* for a bit-field, the *constant-expression* is parsed as
 the longest sequence of tokens that could syntactically form a *constant-expression*. [...]
-</blockquote></small>
-
-### [temp.pre] ### {#wording1-temp.pre}
-
-Modify <a href="https://eel.is/c++draft/temp.pre">[temp.pre]</a> as follows:
-
-<small><blockquote>
-<p>1. A *template* defines a family of classes, functions, or variables, an alias for a family of types, or a concept.
-
-<i>template-declaration</i>:<br>
-&emsp; <i>template-head declaration</i><br>
-&emsp; <i>template-head concept-definition</i>
-
-[...]
-
-<p>2. The *declaration* in a *template-declaration* (if any) shall
-
-- declare or define a function, a class, or a variable, or
-- define a member function, a member class, a member enumeration, or a static data member of a class template or of a class nested within a class template, or
-- define a member template of a class or class template, or
-- <ins>be a <i><a href="#wording1-class.mem.general">simple-friend-declaration</a></i>, or</ins>
-- be a *deduction-guide*, or
-- be an *alias-declaration*.
-
 </blockquote></small>
 
 ### [dcl.pre] ### {#wording1-dcl.pre}
@@ -546,6 +498,7 @@ Modify <a href="https://eel.is/c++draft/dcl.pre">[dcl.pre]</a> as follows:
 &emsp; <i>block-declaration</i><br>
 &emsp; <i>nodeclspec-function-declaration</i><br>
 &emsp; <i>function-definition</i><br>
+&emsp; <ins><i><a href="#wording1-class.mem.general">friend-type-declaration</a></i></ins><br>
 &emsp; <i>template-declaration</i><br>
 &emsp; <i>deduction-guide</i><br>
 &emsp; <i>linkage-specification</i><br>
@@ -558,7 +511,6 @@ Modify <a href="https://eel.is/c++draft/dcl.pre">[dcl.pre]</a> as follows:
 &emsp; <i>explicit-instantiation</i><br>
 &emsp; <i>explicit-specialization</i><br>
 &emsp; <i>export-declaration</i><br>
-&emsp; <ins><i><a href="#wording1-class.mem.general">simple-friend-declaration</a></i></ins><br>
 
 [...]
 
@@ -566,9 +518,33 @@ Modify <a href="https://eel.is/c++draft/dcl.pre">[dcl.pre]</a> as follows:
 utterances in [dcl.dcl] about components in, of, or contained by a declaration or subcomponent thereof
 refer only to those components of the declaration that are not nested within scopes nested within the declaration.
 
-<p><ins>x. If a *declaration* matches the syntactic requirements of *simple-friend-declaration*, it is a *simple-friend-declaration*.</ins>
+<p><ins>x. If a *declaration* matches the syntactic requirements of *friend-type-declaration*, it is a *friend-type-declaration*.</ins>
 
 <p>3. A *simple-declaration* or *nodeclspec-function-declaration* of the form [...]
+</blockquote></small>
+
+### [temp.pre] ### {#wording1-temp.pre}
+
+Modify <a href="https://eel.is/c++draft/temp.pre">[temp.pre]</a> as follows:
+
+<small><blockquote>
+<p>1. A *template* defines a family of classes, functions, or variables, an alias for a family of types, or a concept.
+
+<i>template-declaration</i>:<br>
+&emsp; <i>template-head declaration</i><br>
+&emsp; <i>template-head concept-definition</i>
+
+[...]
+
+<p>2. The *declaration* in a *template-declaration* (if any) shall
+
+- declare or define a function, a class, or a variable, or
+- define a member function, a member class, a member enumeration, or a static data member of a class template or of a class nested within a class template, or
+- define a member template of a class or class template, or
+- <ins>be a <i><a href="#wording1-class.mem.general">friend-type-declaration</a></i>, or</ins>
+- be a *deduction-guide*, or
+- be an *alias-declaration*.
+
 </blockquote></small>
 
 ### [class.friend] ### {#wording1-class.friend}
@@ -577,7 +553,7 @@ Modify <a href="https://eel.is/c++draft/class.friend">[class.friend]</a> as foll
 
 <small><blockquote>
 <p>3. A friend declaration that does not declare a function shall <ins>be
-a *simple-friend-declaration*.</ins> <del>have one of the following forms:</del>
+a <i><a href="#wording1-class.mem.general">friend-type-declaration</a></i>.</ins> <del>have one of the following forms:</del>
 
 &emsp; <del>`friend` *elaborated-type-specifier* `;`</del><br>
 &emsp; <del>`friend` *simple-type-specifier* `;`</del><br>
@@ -587,9 +563,9 @@ a *simple-friend-declaration*.</ins> <del>have one of the following forms:</del>
 
 <del>If the type specifier in a friend declaration designates a (possibly cv-qualified) class type,
 that class is declared as a friend; otherwise, the friend declaration is ignored.</del> <ins>Each
-<i><a href="#wording1-class.mem.general">simple-friend-type-specifier</a></i>
-in a *simple-friend-declaration* that designates a (possibly cv-qualified) class type declares
-that class as a friend. Each other *simple-friend-type-specifier* is ignored.</ins>
+<i><a href="#wording1-class.mem.general">friend-type-specifier</a></i>
+in a *friend-type-declaration* that designates a (possibly cv-qualified) class type declares
+that class as a friend. Each other *friend-type-specifier* is ignored.</ins>
 
 [*Example 4:*
 <pre>
@@ -611,21 +587,48 @@ template &lt;class<ins>...</ins> T<ins>s</ins>> class R {
   friend T<ins>s...</ins>;
 };
 
+<ins>template &lt;class... Ts, class... Us></ins>
+<ins>class R&lt;R&lt;Ts...>, R&lt;Us...>> {</ins>
+<ins>  friend Ts::Nested..., Us...;</ins>
+<ins>};</ins>
+
 R&lt;C> rc;                        // class C is a friend of R&lt;C>
-<ins>R&lt;C, E> rce;                    // classes C and E are friends of R&lt;C,E></ins>
+<ins>R&lt;C, E> rce;                    // classes C and E are friends of R&lt;C, E></ins>
 R&lt;int> Ri;                      // OK, "friend int;" is ignored
 
 <ins>struct E { struct Nested; };</ins>
 
-<ins>template &lt;class... Ts> class S {</ins>
-  <ins>friend Ts::Nested...;</ins>
-  <ins>friend R&lt;Ts>...;</ins>
-<ins>};</ins>
-
-<ins>S&lt;E> sc;                   // E::Nested and R&lt;E> are friends of S&lt;E></ins>
-<ins>S&lt;int> sc;                 // error: int::Nested does not exist</ins>
+<ins>R&lt;R&lt;E>, R&lt;C, int>> rr;    // E::Nested and C are friends of R&lt;R&lt;E>, R&lt;C, int>></ins>
 </pre>
 — *end example*]
+</blockquote></small>
+
+### [dcl.type.elab] ### {#wording1-dcl.type.elab}
+
+Modify <a href="https://eel.is/c++draft/dcl.type.elab#4">[dcl.type.elab]</a> as follows:
+
+<small><blockquote>
+<p>4. <del>If an *elaborated-type-specifier* appears with the `friend` specifier
+as an entire *member-declaration*, the *member-declaration* shall</del> <ins>If any
+<i><a href="#wording1-class.mem.general">friend-type-specifier</a></i> in a
+<i><a href="#wording1-class.mem.general">friend-type-declaration</a></i>
+is an *elaborated-type-specifier*, the *friend-type-declaration* shall</ins> have one of the following forms:
+
+- `friend` *class-key nested-name-specifier*<sub>opt</sub> *identifier* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+- `friend` *class-key simple-template-id* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+- `friend` *class-key nested-name-specifier* `template`<sub>opt</sub> *simple-template-id* <ins>`...`<sub><i>opt</i></sub></ins> `;`
+
+Any unqualified lookup for the *identifier* (in the first case) does not consider scopes that contain the target scope; no name is bound.
+<p>[*Note:* A using-directive in the target scope is ignored if it refers to a namespace not contained by that scope.
+[basic.lookup.elab] describes how name lookup proceeds in an elaborated-type-specifier. — *end note*]
+<p>[*Note:* An *elaborated-type-specifier* can be used to refer to a previously declared *class-name* or *enum-name*
+even if the name has been hidden by a non-type declaration. — *end note*]
+
+<p>5. If the *identifier* or *simple-template-id* resolves to a *class-name* or *enum-name*, the *elaborated-type-specifier* introduces it
+into the declaration the same way a *simple-type-specifier* introduces its *type-name* ([dcl.type.simple]).
+If the *identifier* or *simple-template-id* resolves to a *typedef-name* ([dcl.typedef], [temp.names]), the *elaborated-type-specifier* is ill-formed.
+<p>[*Note:* This implies that, within a class template with a template *type-parameter* `T`, the declaration
+`friend class T;` is ill-formed. However, the similar declaration `friend T;` is well-formed ([class.friend]). — *end note*]
 </blockquote></small>
 
 ### [temp.res.general] ### {#wording1-temp.res.general}
@@ -636,7 +639,7 @@ Modify <a href="https://eel.is/c++draft/temp.res.general">[temp.res.general]</a>
 <p>4. A qualified or unqualified name is said to be in a *type-only context* if it is the terminal name of
 
 * a *typename-specifier*, *nested-name-specifier*, *elaborated-type-specifier*, *class-or-decltype*, or
-* <ins>the *simple-type-specifier* of a <i><a href="#wording1-class.mem.general">simple-friend-type-specifier</a></i>, or</ins>
+* <ins>the *simple-type-specifier* of a <i><a href="#wording1-class.mem.general">friend-type-specifier</a></i>, or</ins>
 * a *type-specifier* of a
     - *new-type-id*,
     - *defining-type-id*,
@@ -665,7 +668,7 @@ on the context in which the expansion occurs. Pack expansions can occur in the f
 
 * In a function parameter pack ([dcl.fct]); the pattern is the *parameter-declaration* without the ellipsis.
 * In a *using-declaration* ([namespace.udecl]); the pattern is a *using-declarator*.
-* <ins>In a *simple-friend-declaration* (<a href="#wording1-class.mem.general">[class.mem.general]</a>); the pattern is a *simple-friend-type-specifier*.</ins>
+* <ins>In a *friend-type-declaration* (<a href="#wording1-class.mem.general">[class.mem.general]</a>); the pattern is a *friend-type-specifier*.</ins>
 * In a template parameter pack that is a pack expansion ([temp.param]):
   - if the template parameter pack is a *parameter-declaration*; the pattern is the *parameter-declaration* without the ellipsis;
   - if the template parameter pack is a *type-parameter*; the pattern is the corresponding *type-parameter* without the ellipsis.
@@ -801,18 +804,19 @@ template &lt;class<ins>...</ins> T<ins>s</ins>> class R {
   friend T<ins>s...</ins>;
 };
 
+<ins>template &lt;class... Ts, class... Us></ins>
+<ins>class R&lt;R&lt;Ts...>, R&lt;Us...>> {</ins>
+<ins>  friend Ts::Nested...;</ins>
+<ins>  friend Us...;</ins>
+<ins>};</ins>
+
 R&lt;C> rc;                        // class C is a friend of R&lt;C>
-<ins>R&lt;C, E> rcef;                   // classes C and E are friends of R&lt;C,E></ins>
+<ins>R&lt;C, E> rce;                    // classes C and E are friends of R&lt;C, E></ins>
 R&lt;int> Ri;                      // OK, "friend int;" is ignored
 
 <ins>struct E { struct Nested; };</ins>
 
-<ins>template &lt;class... Ts> class S {</ins>
-  <ins>friend Ts::Nested...;</ins>
-  <ins>friend R&lt;Ts>...;</ins>
-<ins>};</ins>
-
-<ins>S&lt;E> sc;                   // E::Nested and R&lt;E> are friends of S&lt;E></ins>
+<ins>R&lt;R&lt;E>, R&lt;C, int>> rr;    // E::Nested and C are friends of R&lt;R&lt;E>, R&lt;C, int>></ins>
 </pre>
 — *end example*]
 </blockquote></small>
@@ -822,6 +826,28 @@ R&lt;int> Ri;                      // OK, "friend int;" is ignored
 Modify <a href="https://eel.is/c++draft/temp.variadic">[temp.variadic]</a> as follows:
 
 <small><blockquote>
+<p>5. A *pack expansion* consists of a *pattern* and an *ellipsis*, the instantiation of which produces
+zero or more instantiations of the pattern in a list (described below). The form of the pattern depends
+on the context in which the expansion occurs. Pack expansions can occur in the following contexts:
+
+* In a function parameter pack ([dcl.fct]); the pattern is the *parameter-declaration* without the ellipsis.
+* In a *using-declaration* ([namespace.udecl]); the pattern is a *using-declarator*.
+* <ins>In a friend declaration (<a href="#wording1-class.mem.general">[class.mem.general]</a>); the pattern is a *type-specifier*.</ins>
+* In a template parameter pack that is a pack expansion ([temp.param]):
+  - if the template parameter pack is a *parameter-declaration*; the pattern is the *parameter-declaration* without the ellipsis;
+  - if the template parameter pack is a *type-parameter*; the pattern is the corresponding *type-parameter* without the ellipsis.
+* In an *initializer-list* ([dcl.init]); the pattern is an *initializer-clause*.
+* In a *base-specifier-list* ([class.derived]); the pattern is a *base-specifier*.
+* In a *mem-initializer-list* ([class.base.init]) for a *mem-initializer* whose *mem-initializer-id* denotes a base class; the pattern is the *mem-initializer*.
+* In a *template-argument-list* ([temp.arg]); the pattern is a *template-argument*.
+* In an *attribute-list* ([dcl.attr.grammar]); the pattern is an *attribute*.
+* In an *alignment-specifier* ([dcl.align]); the pattern is the *alignment-specifier* without the ellipsis.
+* In a *capture-list* ([expr.prim.lambda.capture]); the pattern is the *capture* without the ellipsis.
+* In a `sizeof...` expression; the pattern is an *identifier*.
+* In a *fold-expression* ([expr.prim.fold]); the pattern is the *cast-expression* that contains an unexpanded pack.
+
+[...]
+
 <p>9. The instantiation of a `sizeof...` expression ([expr.sizeof]) produces an integral constant with value *N*.
 <p>10. The instantiation of an *alignment-specifier* with an ellipsis produces `E`<sub>1</sub>`E`<sub>2</sub>...`E`<sub>N</sub>.
 <p>11. The instantiation of a *fold-expression* ([expr.prim.fold]) produces:
