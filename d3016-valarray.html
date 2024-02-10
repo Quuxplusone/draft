@@ -2091,7 +2091,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D3016R2<br>Resolve inconsistencies in begin/end for <code class="highlight"><c- n>valarray</c-></code> and braced initializer lists</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-02-07">2024-02-07</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-02-10">2024-02-10</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2101,7 +2101,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>10
+     <dd>11
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2109,9 +2109,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   </div>
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
-   <p>We show that some inconsistencies between non-member <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>cbegin</c-></code> applied to <code class="highlight"><c- n>valarray</c-></code> and to braced initializer lists were caused by
-C++0x uncertainty around [stmt.ranged], and resolve these inconsistencies
-for C++26.</p>
+   <p>We resolve some inconsistencies among [iterator.range] functions, notably <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>end</c-></code>, <code class="highlight"><c- n>data</c-></code>, and <code class="highlight"><c- n>empty</c-></code>, as applied to <code class="highlight"><c- n>valarray</c-></code>, <code class="highlight"><c- n>initializer_list</c-></code>,
+and braced initializer lists. We also resolve LWG3624 and LWG3625.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -2120,38 +2119,36 @@ for C++26.</p>
     <li>
      <a href="#proposal"><span class="secno">2</span> <span class="content">Motivation and proposal</span></a>
      <ol class="toc">
-      <li><a href="#data-empty"><span class="secno">2.1</span> <span class="content">.data and .empty</span></a>
+      <li><a href="#data-empty"><span class="secno">2.1</span> <span class="content"><code class="highlight"><c- n>data</c-></code> and <code class="highlight"><c- n>empty</c-></code></span></a>
       <li><a href="#availability-concerns"><span class="secno">2.2</span> <span class="content">Availability of <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>end</c-></code></span></a>
      </ol>
-    <li><a href="#history"><span class="secno">3</span> <span class="content">Historical background</span></a>
     <li>
-     <a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
+     <a href="#experience"><span class="secno">3</span> <span class="content">Implementation experience</span></a>
      <ol class="toc">
-      <li><a href="#tony-table"><span class="secno">4.1</span> <span class="content">Tony Table</span></a>
+      <li><a href="#tony-table"><span class="secno">3.1</span> <span class="content">Tony Table</span></a>
      </ol>
     <li>
-     <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording</span></a>
+     <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording</span></a>
      <ol class="toc">
-      <li><a href="#wording-version.syn"><span class="secno">5.1</span> <span class="content">[version.syn]</span></a>
-      <li><a href="#wording-valarray.syn"><span class="secno">5.2</span> <span class="content">[valarray.syn]</span></a>
-      <li><a href="#wording-template.valarray.overview"><span class="secno">5.3</span> <span class="content">[template.valarray.overview]</span></a>
-      <li><a href="#wording-valarray.members"><span class="secno">5.4</span> <span class="content">[valarray.members]</span></a>
-      <li><a href="#wording-support.initlist"><span class="secno">5.5</span> <span class="content">[support.initlist]</span></a>
-      <li><a href="#wording-iterator.synopsis"><span class="secno">5.6</span> <span class="content">[iterator.synopsis]</span></a>
-      <li><a href="#wording-iterator.range"><span class="secno">5.7</span> <span class="content">[iterator.range]</span></a>
-      <li><a href="#wording-depr"><span class="secno">5.8</span> <span class="content">[depr]</span></a>
+      <li><a href="#wording-version.syn"><span class="secno">4.1</span> <span class="content">[version.syn]</span></a>
+      <li><a href="#wording-valarray.syn"><span class="secno">4.2</span> <span class="content">[valarray.syn]</span></a>
+      <li><a href="#wording-template.valarray.overview"><span class="secno">4.3</span> <span class="content">[template.valarray.overview]</span></a>
+      <li><a href="#wording-valarray.members"><span class="secno">4.4</span> <span class="content">[valarray.members]</span></a>
+      <li><a href="#wording-support.initlist"><span class="secno">4.5</span> <span class="content">[support.initlist]</span></a>
+      <li><a href="#wording-iterator.synopsis"><span class="secno">4.6</span> <span class="content">[iterator.synopsis]</span></a>
+      <li><a href="#wording-iterator.range"><span class="secno">4.7</span> <span class="content">[iterator.range]</span></a>
       <li>
-       <a href="#wording-cleanup"><span class="secno">5.9</span> <span class="content">.data+.size cleanup</span></a>
+       <a href="#wording-cleanup"><span class="secno">4.8</span> <span class="content">.data+.size cleanup</span></a>
        <ol class="toc">
-        <li><a href="#wording-string.cons"><span class="secno">5.9.1</span> <span class="content">[string.cons]</span></a>
-        <li><a href="#wording-string.append"><span class="secno">5.9.2</span> <span class="content">[string.append]</span></a>
-        <li><a href="#wording-string.assign"><span class="secno">5.9.3</span> <span class="content">[string.assign]</span></a>
-        <li><a href="#wording-string.replace"><span class="secno">5.9.4</span> <span class="content">[string.replace]</span></a>
-        <li><a href="#wording-span.cons"><span class="secno">5.9.5</span> <span class="content">[span.cons]</span></a>
-        <li><a href="#wording-valarray.cons"><span class="secno">5.9.6</span> <span class="content">[valarray.cons]</span></a>
+        <li><a href="#wording-string.cons"><span class="secno">4.8.1</span> <span class="content">[string.cons]</span></a>
+        <li><a href="#wording-string.append"><span class="secno">4.8.2</span> <span class="content">[string.append]</span></a>
+        <li><a href="#wording-string.assign"><span class="secno">4.8.3</span> <span class="content">[string.assign]</span></a>
+        <li><a href="#wording-string.replace"><span class="secno">4.8.4</span> <span class="content">[string.replace]</span></a>
+        <li><a href="#wording-span.cons"><span class="secno">4.8.5</span> <span class="content">[span.cons]</span></a>
+        <li><a href="#wording-valarray.cons"><span class="secno">4.8.6</span> <span class="content">[valarray.cons]</span></a>
        </ol>
+      <li><a href="#wording-lwg3624"><span class="secno">4.9</span> <span class="content">Resolutions for LWG3624 and LWG3625</span></a>
      </ol>
-    <li><a href="#straw-polls"><span class="secno">6</span> <span class="content">Proposed straw polls</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -2166,22 +2163,29 @@ for C++26.</p>
      <p>R2:</p>
      <ul>
       <li data-md>
-       <p>Mention <a data-link-type="biblio" href="#biblio-p2613" title="Add the missing empty to mdspan">[P2613]</a> and <a data-link-type="biblio" href="#biblio-lwg4035" title="single_view should provide empty">[LWG4035]</a> as further precedent for <code class="highlight"><c- n>initializer_list</c-><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code>.</p>
+       <p>Give <a href="#wording-lwg3624">resolutions for LWG3624 and LWG3625</a></p>
       <li data-md>
-       <p>Address concerns about <a href="#availability-concerns">breaking code</a> by making the generic <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code> available via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code>; but mark
-  that availability "deprecated from birth."</p>
+       <p>Rebut concerns about <a href="#availability-concerns">breaking code</a>;
+  discuss how a deprecation period for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>initializer_list</c-><c- p>)</c-></code> is basically
+  unimplementable</p>
       <li data-md>
-       <p>Add feature-test macros <code class="highlight"><c- n>__cpp_lib_initializer_list</c-></code> and <code class="highlight"><c- n>__cpp_lib_valarray</c-></code>.</p>
+       <p>Make <code class="highlight"><c- n>valarray</c-><c- o>::</c-><c- n>iterator</c-></code> non-exposition-only</p>
+      <li data-md>
+       <p>Remove R1’s <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p3016r1.html#history">Historical Background</a> section, as basically distracting at this point</p>
+      <li data-md>
+       <p>Mention <a data-link-type="biblio" href="#biblio-p2613" title="Add the missing empty to mdspan">[P2613]</a> and <a data-link-type="biblio" href="#biblio-lwg4035" title="single_view should provide empty">[LWG4035]</a> as further precedent for <code class="highlight"><c- n>initializer_list</c-><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code></p>
+      <li data-md>
+       <p>Add feature-test macros <code class="highlight"><c- n>__cpp_lib_initializer_list</c-></code> and <code class="highlight"><c- n>__cpp_lib_valarray</c-></code></p>
      </ul>
     <li data-md>
      <p>R1:</p>
      <ul>
       <li data-md>
-       <p>Split <a data-link-type="biblio" href="#biblio-cwg2825" title="Range-based for statement using a braced-init-list">[CWG2825]</a> from this paper; this paper is now library-only.</p>
+       <p>Split <a data-link-type="biblio" href="#biblio-cwg2825" title="Range-based for statement using a braced-init-list">[CWG2825]</a> from this paper; this paper is now library-only</p>
       <li data-md>
-       <p>Add discussion of <code class="highlight"><c- p>.</c-><c- n>data</c-><c- p>()</c-></code> and <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code> overloads (proposed but undiscussed in R0).</p>
+       <p>Add discussion of <code class="highlight"><c- p>.</c-><c- n>data</c-><c- p>()</c-></code> and <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code> overloads</p>
       <li data-md>
-       <p>Add wording for ".data+.size cleanup."</p>
+       <p>Add wording for ".data+.size cleanup"</p>
      </ul>
    </ul>
    <h2 class="heading settled" data-level="2" id="proposal"><span class="secno">2. </span><span class="content">Motivation and proposal</span><a class="self-link" href="#proposal"></a></h2>
@@ -2209,13 +2213,13 @@ the deduced <code class="highlight"><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-
 But it <em>can</em> bind to the <code class="highlight"><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-></code> in the non-member, non-hidden-friend overload <a href="https://en.cppreference.com/w/cpp/utility/initializer_list/begin2"><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-><c- p>)</c-></code></a> (defined in <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code>).</p>
    <p>Notice that <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code> returns an iterator that will dangle at the end of the full-expression,
 and that the return values of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>end</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code> do not form a range
-(because the two lists' backing arrays may be different). Therefore this overload’s functionality is
+(because the two lists' backing arrays may be different). Therefore this overload is
 more harmful than helpful.</p>
    <p class="note" role="note"><span class="marker">Note:</span> Be careful to distinguish the scenario of calling <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> on <em>an object of type <code class="highlight"><c- n>initializer_list</c-></code></em> (helpful!) from calling it on <em>a braced-initializer-list</em> (harmful).</p>
    <p>We propose to resolve <code class="highlight"><c- n>valarray</c-></code>’s <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>cbegin</c-></code> inconsistency in favor of "make it work"
-and to resolve <em>braced-initializer-list</em>’s inconsistency in favor of "make it ill-formed."</p>
-   <h3 class="heading settled" data-level="2.1" id="data-empty"><span class="secno">2.1. </span><span class="content">.data and .empty</span><a class="self-link" href="#data-empty"></a></h3>
-   <p>We also propose two additional member functions for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code>: <code class="highlight"><c- p>.</c-><c- n>data</c-><c- p>()</c-></code> and <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code>.</p>
+and to resolve <em>braced-initializer-list</em>’s <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>cbegin</c-></code> inconsistency in favor of "make it ill-formed."</p>
+   <h3 class="heading settled" data-level="2.1" id="data-empty"><span class="secno">2.1. </span><span class="content"><code class="highlight"><c- n>data</c-></code> and <code class="highlight"><c- n>empty</c-></code></span><a class="self-link" href="#data-empty"></a></h3>
+   <p>We also propose two more member functions for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code>: <code class="highlight"><c- p>.</c-><c- n>data</c-><c- p>()</c-></code> and <code class="highlight"><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code>.</p>
    <p>Many places in the library clauses would like to operate on
 the contiguous data of an <code class="highlight"><c- n>initializer_list</c-></code> using the "data + size" idiom, but since <code class="highlight"><c- n>initializer_list</c-></code> lacks <code class="highlight"><c- p>.</c-><c- n>data</c-><c- p>()</c-></code>, they’re forced to use an awkward "begin + size" approach instead. This (1) looks unnatural
 and (2) causes extra mental effort for library writers. Part of P3016’s proposed wording is to update
@@ -2286,89 +2290,66 @@ their special overloads for <code class="highlight"><c- n>initializer_list</c-><
    <h3 class="heading settled" data-level="2.2" id="availability-concerns"><span class="secno">2.2. </span><span class="content">Availability of <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>end</c-></code></span><a class="self-link" href="#availability-concerns"></a></h3>
    <p>The following snippet tries to use <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>)</c-></code> without first including <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> nor any of the 15 other headers
 listed in <a href="https://eel.is/c++draft/iterator.range#1">[iterator.range]/1</a> that declare the generic <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code>. This code works in C++23.</p>
-   <p>P3016R1 proposed simply to break this code, and force the programmer to
-write the right-hand snippet instead. Alisdair Meredith expressed concern that
+   <p>We propose simply to break the left-hand snippet, and force the programmer to
+write the right-hand snippet instead. One LEWG reviewer expressed concern that
 we were breaking valid code without a deprecation period.</p>
-   <p>Therefore, P3016R2 proposes to make the generic function templates <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code> available via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> (as well as via those
-other 16 headers). This keeps <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>)</c-></code> working (although it still
-changes it from <code class="highlight"><c- k>noexcept</c-><c- p>(</c->true<c- p>)</c-></code> to <code class="highlight"><c- k>noexcept</c-><c- p>(</c->false<c- p>)</c-></code>). However, we propose
-to immediately deprecate this availability. That is, rather than simply <em>break</em> the snippet, we propose to <em>deprecate</em> its legality so that we can
-still come back and clean up this area in 3 or 6 years from now.</p>
-   <p><a data-link-type="biblio" href="#biblio-lwg3624" title="Inconsistency of &amp;lt;typeinfo>, &amp;lt;initializer_list>, and &amp;lt;compare>">[LWG3624]</a> and <a data-link-type="biblio" href="#biblio-lwg3625" title="Should &amp;lt;stacktrace> provide range access function templates?">[LWG3625]</a> are related. <a data-link-type="biblio" href="#biblio-lwg3625" title="Should &amp;lt;stacktrace> provide range access function templates?">[LWG3625]</a> is particularly
-nettlesome: <code class="highlight"><c- o>&lt;</c-><c- n>stacktrace</c-><c- o>></c-></code> wants to provide [iterator.range]'s generic <code class="highlight"><c- n>begin</c-></code>,
-but simply adding <code class="highlight"><c- o>&lt;</c-><c- n>stacktrace</c-><c- o>></c-></code> to [iterator.range]/1 will force it also to
-drag in [iterator.range]'s <code class="highlight"><c- n>rbegin</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-><c- p>)</c-></code>, which forces it
-to drag in all of <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> although that header is otherwise unnecessary.
-The right solution is probably to exempt <code class="highlight"><c- n>rbegin</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-><c- p>)</c-></code> and <code class="highlight"><c- n>rend</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-><c- p>)</c-></code> from [iterator.range]/1. In fact, we could just say:</p>
+   <table>
+    <tbody>
+     <tr>
+      <td>
+<pre class="language-cpp highlight"><c- cp>#include</c-> &lt;initializer_list>
+<c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>il</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
+<c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>b</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// OK, calls the initializer_list overload</c->
+  <c- c1>// specially provided in &lt;initializer_list></c->
+<c- k>const</c-> <c- k>auto</c-> <c- n>r</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>rbegin</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// Error, not declared in &lt;initializer_list></c->
+<c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>c</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>cbegin</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// Error, not declared in &lt;initializer_list></c->
+<c- b>size_t</c-> <c- n>s</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>size</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// Error, not declared in &lt;initializer_list></c->
+</pre>
+      <td>
+<pre class="language-cpp highlight"><c- cp>#include</c-> &lt;iterator>
+<c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>il</c-> <c- o>=</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>};</c->
+<c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>b</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// OK, calls the primary template</c->
+<c- k>const</c-> <c- k>auto</c-> <c- n>r</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>rbegin</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// OK, calls the initializer_list overload</c->
+  <c- c1>// specially provided in &lt;iterator></c->
+<c- k>const</c-> <c- b>int</c-> <c- o>*</c-><c- n>c</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>cbegin</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// OK, calls the primary template</c->
+<c- b>size_t</c-> <c- n>s</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>size</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
+  <c- c1>// OK, calls the primary template</c->
+</pre>
+   </table>
+   <p>At first, I was amenable to the idea that the declarations of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>end</c-></code> in <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> should merely
+be deprecated, not fully removed in C++26, so that the behavior of
+the code on the left would be (temporarily) preserved. To do that,
+we’d modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> like this:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <p><small>1. In addition to being available via inclusion of the <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> header, the function templates in [iterator.range] <ins>having a template type parameter <code class="highlight"><c- n>C</c-></code></ins> are available when any of the following headers are included: <code class="highlight"><c- o>&lt;</c-><c- n>array</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>deque</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>forward_list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>regex</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>span</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string_view</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_set</c-><c- o>></c-></code>, and <code class="highlight"><c- o>&lt;</c-><c- n>vector</c-><c- o>></c-></code>. </small></p>
+    <small> <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>C</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>auto</c-> <c- n>begin</c-><c- p>(</c-><c- n>C</c-><c- o>&amp;</c-> <c- n>c</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->
+<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>C</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>auto</c-> <c- n>begin</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-> <c- n>c</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->
+</pre><p>2. <em>Returns:</em> <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code>. </p><p><ins>x. <em>Remarks:</em> In addition to being available via inclusion of the <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> header,
+these function templates are available when <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> is included.
+This availability is deprecated.</ins> </p></small>
    </blockquote>
-   <p>This would exempt <code class="highlight"><c- n>begin</c-><c- p>(</c-><c- n>T</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-></code>, <code class="highlight"><c- n>end</c-><c- p>(</c-><c- n>T</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-></code>, <code class="highlight"><c- n>rbegin</c-><c- p>(</c-><c- n>T</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-></code>, <code class="highlight"><c- n>rend</c-><c- p>(</c-><c- n>T</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-></code>, <code class="highlight"><c- n>rbegin</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-><c- p>)</c-></code>, <code class="highlight"><c- n>rend</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-><c- p>)</c-></code>, <code class="highlight"><c- n>size</c-><c- p>(</c-><c- n>T</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-></code>, <code class="highlight"><c- n>ssize</c-><c- p>(</c-><c- n>T</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-></code>, <code class="highlight"><c- n>empty</c-><c- p>(</c-><c- n>T</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-></code>, and <code class="highlight"><c- n>data</c-><c- p>(</c-><c- n>T</c-><c- p>(</c-><c- o>&amp;</c-><c- p>)[</c-><c- n>N</c-><c- p>])</c-></code>; i.e., those overloads would no longer need to be provided
-via the <code class="highlight"><c- o>&lt;</c-><c- n>vector</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>list</c-><c- o>></c-></code>, etc. header files, but would now be available <em>only</em> via <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>.</p>
-   <p>However, if we proposed this we’d presumably run into the same objection about removing
-availability without a deprecation period; and it’s unclear how to address that
-objection without a lot of new wording.</p>
-   <h2 class="heading settled" data-level="3" id="history"><span class="secno">3. </span><span class="content">Historical background</span><a class="self-link" href="#history"></a></h2>
-   <p><a data-link-type="biblio" href="#biblio-n2930" title="Range-Based For Loop Wording (Without Concepts)">[N2930]</a> "Range-Based For Loop Wording (Without Concepts)" (2009) proposed that <a href="https://eel.is/c++draft/stmt.ranged">[stmt.ranged]</a> should consider only free function <code class="highlight"><c- n>begin</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> plus a special case
-for built-in arrays; therefore N2930 added both <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> and <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code>’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> — because they wanted <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> not to pull in <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>, and <code class="highlight"><c- n>initializer_list</c-></code>’s member function <code class="highlight"><c- n>begin</c-><c- p>()</c-></code> wasn’t going to be found by
-their proposed [stmt.ranged].</p>
-   <p>Then, <a data-link-type="biblio" href="#biblio-n3271" title="Wording for Range-Based For Loop (Option #5)">[N3271]</a> "Wording for Range-Based For Loop (Option #5)" (2011) added the middle
-bullet point in today’s version of [stmt.ranged]:</p>
-   <blockquote>
-    <small> <ul><li data-md><p>if <code class="highlight"><c- n>_RangeT</c-></code> is an array type, <em>begin-expr</em> and <em>end-expr</em> are <code class="highlight"><c- n>__range</c-></code> and <code class="highlight"><c- n>__range</c-> <c- o>+</c-> <c- n>__bound</c-></code>,
-respectively, where <code class="highlight"><c- n>__bound</c-></code> is the array bound. If <code class="highlight"><c- n>_RangeT</c-></code> is an array of unknown size
-or an array of incomplete type, the program is ill-formed;</p> </li><li data-md><ins>if <code class="highlight"><c- n>_RangeT</c-></code> is a class type, the <em>unqualified-ids</em> <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code> are looked up in the
-scope of class <code class="highlight"><c- n>_RangeT</c-></code> as if by class member access lookup, and if either (or both)
-finds at least one declaration, <em>begin-expr</em> and <em>end-expr</em> are <code class="highlight"><c- n>__range</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> and <code class="highlight"><c- n>__range</c-><c- p>.</c-><c- n>end</c-><c- p>()</c-></code>, respectively;</ins> </li><li data-md><p>otherwise, <em>begin-expr</em> and <em>end-expr</em> are <code class="highlight"><c- n>begin</c-><c- p>(</c-><c- n>__range</c-><c- p>)</c-></code> and <code class="highlight"><c- n>end</c-><c- p>(</c-><c- n>__range</c-><c- p>)</c-></code>, respectively,
-where <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code> are looked up with argument-dependent lookup. For the purposes of
-this name lookup, namespace <code class="highlight"><c- n>std</c-></code> is an associated namespace.</p> </li></ul> </small>
-    <p><small></small></p>
-   </blockquote>
-   <p></p>
-   <p>This change meant that <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code> no longer needed to provide
-free <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>end</c-></code>: The new second bullet lets us use <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> and <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>end</c-><c- p>()</c-></code>,
-so the third bullet is never reached when <code class="highlight"><c- k>decltype</c-><c- p>(</c-><c- n>__range</c-><c- p>)</c-></code> is <code class="highlight"><c- n>initializer_list</c-></code>.
-(Loops of the form <code class="highlight"><c- k>for</c-> <c- p>(</c-><c- b>int</c-> <c- n>i</c-> <c- o>:</c-> <c- p>{</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code> are subtle because the <em>for-range-initializer</em> is a <em>braced-initializer-list</em> with no type. <a data-link-type="biblio" href="#biblio-cwg2825" title="Range-based for statement using a braced-init-list">[CWG2825]</a> addressed this; GCC, Clang, and EDG
-already implement the resolution.)</p>
-   <p>Meanwhile, since the prioritized customization point in [stmt.ranged] had shifted from
-non-member <code class="highlight"><c- n>begin</c-></code> to member <code class="highlight"><c- n>begin</c-></code>, it would have made sense for <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>valarray</c-></code>’s <code class="highlight"><c- n>begin</c-></code> to change from a non-member to a member. But this was not done — possibly out of C++0x–era
-concerns that giving <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>valarray</c-></code> member <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>end</c-></code> would make it "too much like a container." <a data-link-type="biblio" href="#biblio-lwg2058" title="valarray and begin/end">[LWG2058]</a> (2011) contains comments like: "The intent of these overloads is entirely to support
-the new for syntax, and not to create new containers." In other words, we wanted <code class="highlight"><c- n>valarray</c-></code> to be iterable, without looking too much like a new kind of STL container. In 2011, we didn’t have a word for
-that. In 2023, we do: <code class="highlight"><c- n>valarray</c-></code> is a <em>range</em>, just like <code class="highlight"><c- n>array</c-></code> or <code class="highlight"><c- n>span</c-></code>, and there’s
-nothing wrong with a <em>range</em> having member <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code>. (P3016 proposes to make it so.)</p>
-   <p>Similarly, <code class="highlight"><c- n>valarray</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>::</c-><c- n>iterator</c-></code> is currently ill-formed even though <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>iterator_t</c-><c- o>&lt;</c-><c- n>valarray</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-></code> is well-formed; <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rbegin</c-><c- p>(</c-><c- n>valarray</c-><c- p>)</c-></code> is ill-formed even though <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>rbegin</c-><c- p>(</c-><c- n>valarray</c-><c- p>)</c-></code> is well-formed; and so on.</p>
-   <p>Finally, <a data-link-type="biblio" href="#biblio-lwg2128" title="Absence of global functions cbegin/cend">[LWG2128]</a> added overloads of <code class="highlight"><c- n>rbegin</c-></code>/<code class="highlight"><c- n>rend</c-></code> for <code class="highlight"><c- n>initializer_list</c-></code>.
-The primary template for <code class="highlight"><c- n>rbegin</c-></code> doesn’t work for <code class="highlight"><c- n>initializer_list</c-></code> because it
-simply calls <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>rbegin</c-><c- p>()</c-></code> — it never attempts to do <code class="highlight"><c- n>make_reverse_iterator</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>end</c-><c- p>())</c-></code> because <code class="highlight"><c- n>make_reverse_iterator</c-></code> isn’t SFINAE-friendly. LWG2128’s overloads are important
-because they allow us to write (<a href="https://godbolt.org/z/n75jeM3h6">Godbolt</a>):</p>
-<pre class="language-cpp highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>C</c-><c- o>></c->
-<c- b>void</c-> <c- n>f</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-> <c- n>c</c-><c- p>)</c-> <c- p>{</c->
-  <c- k>using</c-> <c- n>std</c-><c- o>::</c-><c- n>rbegin</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>rend</c-><c- p>;</c->
-  <c- k>for</c-> <c- p>(</c-><c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>rbegin</c-><c- p>(</c-><c- n>c</c-><c- p>);</c-> <c- n>it</c-> <c- o>!=</c-> <c- n>rend</c-><c- p>(</c-><c- n>c</c-><c- p>);</c-> <c- o>++</c-><c- n>it</c-><c- p>)</c-> <c- p>{}</c->
-<c- p>}</c->
-<c- b>void</c-> <c- n>g</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- p>{</c->
-  <c- n>f</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
-<c- p>}</c->
-<c- b>int</c-> <c- n>main</c-><c- p>()</c-> <c- p>{</c->
-  <c- n>g</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c->
-<c- p>}</c->
-</pre>
-   <p>These were added in <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>, not in <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code>, because they depend on <code class="highlight"><c- n>reverse_iterator</c-></code>.</p>
-   <p>However, notice that LWG2128 did <em>not</em> add two things:</p>
-   <ul>
-    <li data-md>
-     <p><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>cbegin</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-><c- p>)</c-></code>. This omission indicates that it was not considered important
-to support <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>cbegin</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>})</c-></code>. Unsurprising, as the returned iterator would dangle.</p>
-    <li data-md>
-     <p><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>cbegin</c-><c- p>(</c-><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-><c- p>)</c-></code>, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rbegin</c-><c- p>(</c-><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-><c- p>)</c-></code>, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>rbegin</c-><c- p>(</c-><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-><c- p>)</c-></code>, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>crbegin</c-><c- p>(</c-><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-><c- p>)</c-></code>.
-These omissions might have been accidental; <code class="highlight"><c- o>&lt;</c-><c- n>valarray</c-><c- o>></c-></code> is easy to overlook.
-Or, they might indicate the <a data-link-type="biblio" href="#biblio-lwg2058" title="valarray and begin/end">[LWG2058]</a> mindset: <code class="highlight"><c- n>valarray</c-></code> wasn’t intended to be fully rangified,
-merely iterable with [stmt.ranged], and [stmt.ranged] didn’t need <code class="highlight"><c- n>cbegin</c-></code> or <code class="highlight"><c- n>rbegin</c-></code>.</p>
-   </ul>
-   <h2 class="heading settled" data-level="4" id="experience"><span class="secno">4. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
-   <p>Arthur has implemented <a href="#wording">§ 5 Proposed wording</a> in his fork of libc++, and used it to compile
+   <p>But library vendors can’t implement that wording! We have <code class="highlight"><c- p>[[</c-><c- n>deprecated</c-><c- p>]]</c-></code> to mark
+an <em>entity</em> as deprecated, but we have no way to mark a <em>single declaration</em> as
+deprecated. (I.e., "If, hypothetically, removing this declaration would make the call
+ill-formed, then give a deprecation warning; otherwise don’t.") Three years from now,
+we’d come back asking "Can we remove this deprecated feature yet?" and the answer would
+be "No, vendors haven’t started giving a warning for it yet," because it’s physically
+impossible to give a warning for it. This would be a silly situation to get into.
+And the feature itself is <em>so</em> obscure (using <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> specifically on an <code class="highlight"><c- n>initializer_list</c-></code> without including any of more than a dozen STL headers) and <em>so</em> specific (as shown,
+it already doesn’t work for <code class="highlight"><c- n>cbegin</c-></code>, <code class="highlight"><c- n>rbegin</c-></code>, or <code class="highlight"><c- n>size</c-></code>), and the fix in code is <em>so</em> surgical (include <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> or <code class="highlight"><c- o>&lt;</c-><c- n>span</c-><c- o>></c-></code>) that I don’t think the lack of
+deprecation period will matter.</p>
+   <p><a data-link-type="biblio" href="#biblio-lwg3624" title="Inconsistency of <typeinfo>, <initializer_list>, and <compare>">[LWG3624]</a> and <a data-link-type="biblio" href="#biblio-lwg3625" title="Should <stacktrace> provide range access function templates?">[LWG3625]</a> somewhat intersect this proposal, but do not conflict with it.
+We expect these issues to be resolved along the lines given in <a href="#wording-lwg3624">§ 4.9 Resolutions for LWG3624 and LWG3625</a>.</p>
+   <h2 class="heading settled" data-level="3" id="experience"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
+   <p>Arthur has implemented <a href="#wording">§ 4 Proposed wording</a> in his fork of libc++, and used it to compile
 both LLVM/Clang/libc++ and another large C++17 codebase. Naturally, it caused
 no problems except in this single test from libc++'s own test suite:</p>
 <pre class="language-cpp highlight"><c- cp>#include</c-> &lt;initializer_list><c- c1> // but not &lt;iterator></c->
@@ -2381,24 +2362,7 @@ but the primary template <code class="highlight"><c- n>begin</c-><c- p>(</c-><c-
 (per <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf">P0884</a> guidance).</p>
    <p><code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> and <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>)</c-></code> remain noexcept.</p>
    <p><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>valarray</c-><c- p>)</c-></code> remains non-noexcept.</p>
-   <h3 class="heading settled" data-level="4.1" id="tony-table"><span class="secno">4.1. </span><span class="content">Tony Table</span><a class="self-link" href="#tony-table"></a></h3>
-   <table>
-    <tbody>
-     <tr>
-      <td>
-<pre class="language-cpp highlight"><c- cp>#include</c-> &lt;initializer_list>
-<c- b>void</c-> <c- nf>f</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- p>{</c->
-  <c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
-<c- p>}</c->
-</pre>
-      <td>
-<pre class="language-cpp highlight"><c- cp>#include</c-> &lt;initializer_list>
-<c- cp>#include</c-> &lt;iterator><c- c1> // for std::begin</c->
-<c- b>void</c-> <c- nf>f</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- p>{</c->
-  <c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>);</c->
-<c- p>}</c->
-</pre>
-   </table>
+   <h3 class="heading settled" data-level="3.1" id="tony-table"><span class="secno">3.1. </span><span class="content">Tony Table</span><a class="self-link" href="#tony-table"></a></h3>
    <table>
     <tbody>
      <tr>
@@ -2427,6 +2391,9 @@ but the primary template <code class="highlight"><c- n>begin</c-><c- p>(</c-><c-
      <tr>
       <td>
 <pre class="language-cpp highlight"><c- k>auto</c-> <c- n>dangle</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c->
+  <c- c1>// calls the initializer_list overload</c->
+  <c- c1>// specially provided in &lt;initializer_list>,</c->
+  <c- c1>// and immediately dangles</c->
 </pre>
       <td>
 <pre class="language-cpp highlight"><c- c1>// no longer compiles</c->
@@ -2439,8 +2406,7 @@ but the primary template <code class="highlight"><c- n>begin</c-><c- p>(</c-><c-
   <c- c1>// yielding false</c->
 </pre>
       <td>
-<pre class="language-cpp highlight"><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>empty</c-><c- p>({</c-><c- mi>1</c-><c- p>,</c-><c- mi>2</c-><c- p>,</c-><c- mi>3</c-><c- p>});</c->
-  <c- c1>// does not compile</c->
+<pre class="language-cpp highlight"><c- c1>// no longer compiles</c->
 </pre>
      <tr>
       <td>
@@ -2456,10 +2422,10 @@ but the primary template <code class="highlight"><c- n>begin</c-><c- p>(</c-><c-
 <c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>cbegin</c-><c- p>(</c-><c- n>va</c-><c- p>);</c->
 </pre>
    </table>
-   <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
+   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <p class="note" role="note"><span class="marker">Note:</span> Vendors should provide <code class="highlight"><c- n>__cpp_lib_initializer_list</c-></code> if <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>()</c-></code> and <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>empty</c-><c- p>()</c-></code> are well-formed. Vendors should provide <code class="highlight"><c- n>__cpp_lib_valarray</c-></code> if <code class="highlight"><c- n>va</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> and <code class="highlight"><c- n>va</c-><c- p>.</c-><c- n>end</c-><c- p>()</c-></code> are well-formed
 and the free-function <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code> have been removed from <code class="highlight"><c- o>&lt;</c-><c- n>valarray</c-><c- o>></c-></code>.</p>
-   <h3 class="heading settled" data-level="5.1" id="wording-version.syn"><span class="secno">5.1. </span><span class="content">[version.syn]</span><a class="self-link" href="#wording-version.syn"></a></h3>
+   <h3 class="heading settled" data-level="4.1" id="wording-version.syn"><span class="secno">4.1. </span><span class="content">[version.syn]</span><a class="self-link" href="#wording-version.syn"></a></h3>
    <p>Add two feature-test macros to <a href="https://eel.is/c++draft/version.syn">[version.syn]/2</a>:</p>
    <p><small></small></p>
    <blockquote>
@@ -2473,7 +2439,7 @@ and the free-function <code class="highlight"><c- n>begin</c-></code> and <code 
 <c- cp>#define __cpp_lib_variant                           202306L </c-><c- c1>// also in &lt;variant></c->
 </pre></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.2" id="wording-valarray.syn"><span class="secno">5.2. </span><span class="content">[valarray.syn]</span><a class="self-link" href="#wording-valarray.syn"></a></h3>
+   <h3 class="heading settled" data-level="4.2" id="wording-valarray.syn"><span class="secno">4.2. </span><span class="content">[valarray.syn]</span><a class="self-link" href="#wording-valarray.syn"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/valarray.syn">[valarray.syn]</a> as follows:</p>
    <p><small></small></p>
    <blockquote><small> [...]<p></p> <pre class="highlight">  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>tan</c->  <c- p>(</c-><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-><c- p>);</c->
@@ -2490,11 +2456,12 @@ This return type shall not add more than two levels of template nesting over the
 identical functions taking the replacement types shall be added;</p> </li><li data-md><p>(4.2) for every function taking two <code class="highlight"><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-></code> arguments,
 identical functions taking every combination of <code class="highlight"><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-></code> and replacement types shall be added.</p> </li></ul> <p>5․ In particular, an implementation shall allow a <code class="highlight"><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> to be constructed from such replacement types
 and shall allow assignments and compound assignments of such types to <code class="highlight"><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code>, <code class="highlight"><c- n>slice_array</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code>, <code class="highlight"><c- n>gslice_array</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code>, <code class="highlight"><c- n>mask_array</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> and <code class="highlight"><c- n>indirect_array</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> objects.</p> <p>[...]</p> </small></blockquote>
-   <h3 class="heading settled" data-level="5.3" id="wording-template.valarray.overview"><span class="secno">5.3. </span><span class="content">[template.valarray.overview]</span><a class="self-link" href="#wording-template.valarray.overview"></a></h3>
-   <p class="note" role="note"><span class="marker">Note:</span> We propose exposition-only <code class="highlight"><c- n>iterator</c-></code> and <code class="highlight"><c- n>const_iterator</c-></code> typedefs, but would
-love to make them non-exposition-only.</p>
-   <p class="note" role="note"><span class="marker">Note:</span> The <code class="highlight"><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> and <code class="highlight"><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> members of every STL container are marked noexcept. <code class="highlight"><c- n>valarray</c-></code>’s <code class="highlight"><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> are non-noexcept. We propose <code class="highlight"><c- n>valarray</c-></code>’s <code class="highlight"><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> should also be non-noexcept, for consistency. If we add any <code class="highlight"><c- k>noexcept</c-></code> markings to <code class="highlight"><c- n>valarray</c-></code>,
-we should add them consistently throughout the class — not <em>only</em> on its <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code>.</p>
+   <h3 class="heading settled" data-level="4.3" id="wording-template.valarray.overview"><span class="secno">4.3. </span><span class="content">[template.valarray.overview]</span><a class="self-link" href="#wording-template.valarray.overview"></a></h3>
+   <p class="note" role="note"><span class="marker">Note:</span> R1 proposed the <code class="highlight"><c- n>iterator</c-></code> and <code class="highlight"><c- n>const_iterator</c-></code> typedefs as exposition-only,
+but since LEWG didn’t seem to object, R2 makes them non-exposition-only.</p>
+   <p class="note" role="note"><span class="marker">Note:</span> We propose that <code class="highlight"><c- n>valarray</c-></code>’s <code class="highlight"><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code> should be non-noexcept, for consistency
+with <code class="highlight"><c- p>.</c-><c- n>size</c-><c- p>()</c-></code>. Adding <code class="highlight"><c- k>noexcept</c-></code> consistently throughout <code class="highlight"><c- o>&lt;</c-><c- n>valarray</c-><c- o>></c-></code> would be cool,
+but is out of scope.</p>
    <p>Modify <a href="https://eel.is/c++draft/template.valarray.overview">[template.valarray.overview]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2503,18 +2470,18 @@ we should add them consistently throughout the class — not <em>only</em> on it
   <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <c- k>class</c-> <c- nc>valarray</c-> <c- p>{</c->
   <c- k>public</c-><c- o>:</c->
     <c- k>using</c-> <c- n>value_type</c-> <c- o>=</c-> <c- n>T</c-><c- p>;</c->
-    <ins><c- k>using</c-> <i><c- n>iterator</c-></i> <c- o>=</c-> <i><c- n>unspecified</c-></i><c- p>;</c-> <c- c1>// exposition only</c-></ins>
-    <ins><c- k>using</c-> <i><c- n>const_iterator</c-></i> <c- o>=</c-> <i><c- n>unspecified</c-></i><c- p>;</c-> <c- c1>// exposition only</c-></ins>
+    <ins><c- k>using</c-> <c- n>iterator</c-> <c- o>=</c-> <i><c- n>unspecified</c-></i><c- p>;</c-></ins>
+    <ins><c- k>using</c-> <c- n>const_iterator</c-> <c- o>=</c-> <i><c- n>unspecified</c-></i><c- p>;</c-></ins>
 
     <i><c- c1>// [valarray.cons], construct/destroy</c-></i>
     <c- n>valarray</c-><c- p>();</c->
     <c- k>explicit</c-> <c- n>valarray</c-><c- p>(</c-><c- b>size_t</c-><c- p>);</c->
 </pre><p>[...]</p> <pre class="highlight">  <ins><i><c- c1>// [valarray.range], range access</c-></i></ins>
 
-  <ins><i><c- n>iterator</c-></i> <c- nf>begin</c-><c- p>();</c-></ins>
-  <ins><i><c- n>iterator</c-></i> <c- nf>end</c-><c- p>();</c-></ins>
-  <ins><i><c- n>const_iterator</c-></i> <c- nf>begin</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-></ins>
-  <ins><i><c- n>const_iterator</c-></i> <c- nf>end</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-></ins>
+  <ins><c- n>iterator</c-> <c- nf>begin</c-><c- p>();</c-></ins>
+  <ins><c- n>iterator</c-> <c- nf>end</c-><c- p>();</c-></ins>
+  <ins><c- n>const_iterator</c-> <c- nf>begin</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-></ins>
+  <ins><c- n>const_iterator</c-> <c- nf>end</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-></ins>
 
   <i><c- c1>// [valarray.members], member functions</c-></i>
   <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>valarray</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
@@ -2533,26 +2500,26 @@ we should add them consistently throughout the class — not <em>only</em> on it
 <c- p>};</c->
 </pre></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.4" id="wording-valarray.members"><span class="secno">5.4. </span><span class="content">[valarray.members]</span><a class="self-link" href="#wording-valarray.members"></a></h3>
+   <h3 class="heading settled" data-level="4.4" id="wording-valarray.members"><span class="secno">4.4. </span><span class="content">[valarray.members]</span><a class="self-link" href="#wording-valarray.members"></a></h3>
    <p>Move the existing section <a href="https://eel.is/c++draft/valarray.range">[valarray.range]</a> from its current location to make it a sibling of <a href="https://eel.is/c++draft/valarray.members">[valarray.members]</a>; then
 modify it as follows:</p>
    <p><small></small></p>
    <blockquote><small> <b><del>28.6.10</del> <ins>28.6.2.x</ins> <del><code class="highlight"><c- n>valarray</c-></code></del> range access [valarray.range]</b><p></p> <p>1․ <del>In the <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code> function templates that
-follow, <code class="highlight"><i><c- n>unspecified1</c-></i></code> is a type that</del> <ins>The exposition-only <code class="highlight"><i><c- n>iterator</c-></i></code></ins> type meets
+follow, <code class="highlight"><i><c- n>unspecified1</c-></i></code> is a type that</del> <ins>The <code class="highlight"><c- n>iterator</c-></code></ins> type meets
 the requirements of a mutable <em>Cpp17RandomAccessIterator</em> ([random.access.iterators])
 and models <code class="highlight"><c- n>contiguous_iterator</c-></code> ([iterator.concept.contiguous])<del>, whose</del> <ins>. Its</ins> <code class="highlight"><c- n>value_type</c-></code> is the template parameter <code class="highlight"><c- n>T</c-></code> and <del>whose</del> <ins>its</ins> <code class="highlight"><c- n>reference</c-></code> type is <code class="highlight"><c- n>T</c-><c- o>&amp;</c-></code>. <del><code class="highlight"><i><c- n>unspecified2</c-></i></code> is
-a type that</del> <ins>The exposition-only <code class="highlight"><i><c- n>const_iterator</c-></i></code></ins> type meets
+a type that</del> <ins>The <code class="highlight"><c- n>const_iterator</c-></code></ins> type meets
 the requirements of a constant <em>Cpp17RandomAccessIterator</em> and models <code class="highlight"><c- n>contiguous_iterator</c-></code><del>, whose</del> <ins>. Its</ins> <code class="highlight"><c- n>value_type</c-></code> is the template parameter <code class="highlight"><c- n>T</c-></code> and <del>whose</del> <ins>its</ins> <code class="highlight"><c- n>reference</c-></code> type is <code class="highlight"><c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-></code>.</p> <p>2․ The iterators returned by <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code> for an array are guaranteed to be valid until the member function <code class="highlight"><c- n>resize</c-><c- p>(</c-><c- b>size_t</c-><c- p>,</c-> <c- n>T</c-><c- p>)</c-></code> is called for that array or until the lifetime of that array ends, whichever happens first.</p> <pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <i><c- n>unspecified1</c-></i> <c- n>begin</c-><c- p>(</c-><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-> <c- n>v</c-><c- p>);</c-></del>
 <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <i><c- n>unspecified2</c-></i> <c- n>begin</c-><c- p>(</c-><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-> <c- n>v</c-><c- p>);</c-></del>
-<ins><i><c- n>iterator</c-></i> <c- nf>begin</c-><c- p>();</c-></ins>
-<ins><i><c- n>const_iterator</c-></i> <c- nf>begin</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-></ins>
+<ins><c- n>iterator</c-> <c- nf>begin</c-><c- p>();</c-></ins>
+<ins><c- n>const_iterator</c-> <c- nf>begin</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-></ins>
 </pre><p>3․ Returns: An iterator referencing the first value in the array.</p> <pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <i><c- n>unspecified1</c-></i> <c- n>end</c-><c- p>(</c-><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-> <c- n>v</c-><c- p>);</c-></del>
 <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <i><c- n>unspecified2</c-></i> <c- n>end</c-><c- p>(</c-><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-> <c- n>v</c-><c- p>);</c-></del>
-<ins><i><c- n>iterator</c-></i> <c- nf>end</c-><c- p>();</c-></ins>
-<ins><i><c- n>const_iterator</c-></i> <c- nf>end</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-></ins>
+<ins><c- n>iterator</c-> <c- nf>end</c-><c- p>();</c-></ins>
+<ins><c- n>const_iterator</c-> <c- nf>end</c-><c- p>()</c-> <c- k>const</c-><c- p>;</c-></ins>
 </pre><p>4․ Returns: An iterator referencing one past the last value in the array.</p> <p><b>28.6.2.8 Member functions [valarray.members]</b></p> <pre class="highlight"><c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>valarray</c-><c- o>&amp;</c-> <c- n>v</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c->
 </pre><p>1․ Effects: <code class="highlight"><c- o>*</c-><c- k>this</c-></code> obtains the value of <code class="highlight"><c- n>v</c-></code>. <code class="highlight"><c- n>v</c-></code> obtains the value of <code class="highlight"><c- o>*</c-><c- k>this</c-></code>. </p><p>2․ Complexity: Constant. </p></small></blockquote>
-   <h3 class="heading settled" data-level="5.5" id="wording-support.initlist"><span class="secno">5.5. </span><span class="content">[support.initlist]</span><a class="self-link" href="#wording-support.initlist"></a></h3>
+   <h3 class="heading settled" data-level="4.5" id="wording-support.initlist"><span class="secno">4.5. </span><span class="content">[support.initlist]</span><a class="self-link" href="#wording-support.initlist"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/support.initlist">[support.initlist]</a> as follows:</p>
    <p><small></small></p>
    <blockquote><small> [...]<p></p> <p><b>17.10.2 Header <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> synopsis [initializer.list.syn]</b></p> <pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c->
@@ -2589,7 +2556,7 @@ Copying an <code class="highlight"><c- n>initializer_list</c-></code> does not c
 </pre><p><ins>x․ Returns: <code class="highlight"><c- n>size</c-><c- p>()</c-> <c- o>==</c-> <c- mi>0</c-></code>.</ins> </p><p><del><b>17.10.5 Initializer list range access [support.initlist.range]</b></del> </p><pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>E</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>const</c-> <c- n>E</c-><c- o>*</c-> <c- n>begin</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
 </pre><del>1․ Returns: <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code>.</del> <pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>E</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>const</c-> <c- n>E</c-><c- o>*</c-> <c- n>end</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
 </pre><del>2․ Returns: <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>end</c-><c- p>()</c-></code>.</del> </small></blockquote>
-   <h3 class="heading settled" data-level="5.6" id="wording-iterator.synopsis"><span class="secno">5.6. </span><span class="content">[iterator.synopsis]</span><a class="self-link" href="#wording-iterator.synopsis"></a></h3>
+   <h3 class="heading settled" data-level="4.6" id="wording-iterator.synopsis"><span class="secno">4.6. </span><span class="content">[iterator.synopsis]</span><a class="self-link" href="#wording-iterator.synopsis"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:</p>
    <p><small></small></p>
    <blockquote><small> <b>25.2 Header <iterator> synopsis [iterator.synopsis]</iterator></b><p></p> <pre class="highlight"><c- cp>#include</c-> &lt;compare><c- c1>              // see [compare.syn]</c->
@@ -2647,34 +2614,18 @@ Copying an <code class="highlight"><c- n>initializer_list</c-></code> does not c
   <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>E</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>const</c-> <c- n>E</c-><c- o>*</c-> <c- n>data</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
 <c- p>}</c->
 </pre></small></blockquote>
-   <h3 class="heading settled" data-level="5.7" id="wording-iterator.range"><span class="secno">5.7. </span><span class="content">[iterator.range]</span><a class="self-link" href="#wording-iterator.range"></a></h3>
+   <h3 class="heading settled" data-level="4.7" id="wording-iterator.range"><span class="secno">4.7. </span><span class="content">[iterator.range]</span><a class="self-link" href="#wording-iterator.range"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
     <small> <p>1. In addition to being available via inclusion of the <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> header, the function templates in [iterator.range]
-are available when any of the following headers are included: <code class="highlight"><c- o>&lt;</c-><c- n>array</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>deque</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>forward_list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>regex</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>span</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string_view</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_set</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>valarray</c-><c- o>></c-></code>,</ins> and <code class="highlight"><c- o>&lt;</c-><c- n>vector</c-><c- o>></c-></code>. </p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>C</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>auto</c-> <c- n>begin</c-><c- p>(</c-><c- n>C</c-><c- o>&amp;</c-> <c- n>c</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->
-<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>C</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>auto</c-> <c- n>begin</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-> <c- n>c</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>begin</c-><c- p>());</c->
-</pre><p>2. <em>Returns:</em> <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code>. </p><p><ins>x. <em>Remarks:</em> In addition to being available via inclusion of the <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> header,
-these function templates are available when <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> is included.
-This availability is deprecated.</ins> </p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>C</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>auto</c-> <c- n>end</c-><c- p>(</c-><c- n>C</c-><c- o>&amp;</c-> <c- n>c</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>end</c-><c- p>());</c->
-<c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>C</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>auto</c-> <c- n>end</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-> <c- n>c</c-><c- p>)</c-> <c- o>-></c-> <c- k>decltype</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>end</c-><c- p>());</c->
-</pre><p>3. <em>Returns:</em> <code class="highlight"><c- n>c</c-><c- p>.</c-><c- n>end</c-><c- p>()</c-></code>. </p><p><ins>x. <em>Remarks:</em> In addition to being available via inclusion of the <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> header,
-these function templates are available when <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> is included.
-This availability is deprecated.</ins> </p><p>[...]</p> <pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>E</c-><c- o>></c-> <c- p>[[</c-><c- n>nodiscard</c-><c- p>]]</c-> <c- k>constexpr</c-> <c- b>bool</c-> <c- n>empty</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
+are available when any of the following headers are included: <code class="highlight"><c- o>&lt;</c-><c- n>array</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>deque</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>forward_list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>regex</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>span</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string_view</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_set</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>valarray</c-><c- o>></c-></code>,</ins> and <code class="highlight"><c- o>&lt;</c-><c- n>vector</c-><c- o>></c-></code>. </p><p>[...]</p> <pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>E</c-><c- o>></c-> <c- p>[[</c-><c- n>nodiscard</c-><c- p>]]</c-> <c- k>constexpr</c-> <c- b>bool</c-> <c- n>empty</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
 </pre><p><del>22․ Returns: <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-> <c- o>==</c-> <c- mi>0</c-></code>.</del> </p><p>[...] </p><pre class="highlight"><del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>E</c-><c- o>></c-> <c- k>constexpr</c-> <c- k>const</c-> <c- n>E</c-><c- o>*</c-> <c- n>data</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>E</c-><c- o>></c-> <c- n>il</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
 </pre><p><del>25․ Returns: <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code>.</del> </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.8" id="wording-depr"><span class="secno">5.8. </span><span class="content">[depr]</span><a class="self-link" href="#wording-depr"></a></h3>
-   <p>Add a new subsection <a href="https://eel.is/c++draft/depr">[depr.iterator.range]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote><small> <b>D.x Deprecated availability of iterator-access templates [depr.iterator.range]</b><p></p> <ins>The free function templates <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code> ([iterator.range]) are available not only via the
-headers listed in [iterator.range] but also via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code>. The availability of these
-two templates via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code> is deprecated. [<em>Note:</em> The other function templates in
-[iterator.range], such as <code class="highlight"><c- n>rbegin</c-></code>, <code class="highlight"><c- n>cbegin</c-></code>, and <code class="highlight"><c- n>size</c-></code>, have never been available
-via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c-></code>.]</ins> </small></blockquote>
-   <h3 class="heading settled" data-level="5.9" id="wording-cleanup"><span class="secno">5.9. </span><span class="content">.data+.size cleanup</span><a class="self-link" href="#wording-cleanup"></a></h3>
-   <h4 class="heading settled" data-level="5.9.1" id="wording-string.cons"><span class="secno">5.9.1. </span><span class="content">[string.cons]</span><a class="self-link" href="#wording-string.cons"></a></h4>
+   <h3 class="heading settled" data-level="4.8" id="wording-cleanup"><span class="secno">4.8. </span><span class="content">.data+.size cleanup</span><a class="self-link" href="#wording-cleanup"></a></h3>
+   <h4 class="heading settled" data-level="4.8.1" id="wording-string.cons"><span class="secno">4.8.1. </span><span class="content">[string.cons]</span><a class="self-link" href="#wording-string.cons"></a></h4>
    <p>Modify <a href="https://eel.is/c++draft/string.cons">[string.cons]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2682,7 +2633,7 @@ via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c
     <small> <pre class="highlight"><c- k>constexpr</c-> <c- n>basic_string</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>charT</c-><c- o>></c-> <c- n>il</c-><c- p>);</c->
 </pre><p>36․ <em>Effects:</em> Equivalent to:<br></p> <pre class="highlight"><c- k>return</c-> <c- o>*</c-><c- k>this</c-> <c- o>=</c-> <c- n>basic_string_view</c-><c- o>&lt;</c-><c- n>charT</c-><c- p>,</c-> <c- n>traits</c-><c- o>></c-><c- p>(</c-><del><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></del> <ins><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>()</c-></ins><c- p>,</c-> <c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>());</c-></pre></small>
    </blockquote>
-   <h4 class="heading settled" data-level="5.9.2" id="wording-string.append"><span class="secno">5.9.2. </span><span class="content">[string.append]</span><a class="self-link" href="#wording-string.append"></a></h4>
+   <h4 class="heading settled" data-level="4.8.2" id="wording-string.append"><span class="secno">4.8.2. </span><span class="content">[string.append]</span><a class="self-link" href="#wording-string.append"></a></h4>
    <p>Modify <a href="https://eel.is/c++draft/string.append">[string.append]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2690,7 +2641,7 @@ via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c
     <small> <pre class="highlight"><c- k>constexpr</c-> <c- n>basic_string</c-><c- o>&amp;</c-> <c- nf>append</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>charT</c-><c- o>></c-> <c- n>il</c-><c- p>);</c->
 </pre><p>16․ <em>Effects:</em> Equivalent to: <code class="highlight"><c- k>return</c-> <c- n>append</c-><c- p>(</c-><del><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></del> <ins><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>()</c-></ins><c- p>,</c-> <c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>());</c-></code></p> </small>
    </blockquote>
-   <h4 class="heading settled" data-level="5.9.3" id="wording-string.assign"><span class="secno">5.9.3. </span><span class="content">[string.assign]</span><a class="self-link" href="#wording-string.assign"></a></h4>
+   <h4 class="heading settled" data-level="4.8.3" id="wording-string.assign"><span class="secno">4.8.3. </span><span class="content">[string.assign]</span><a class="self-link" href="#wording-string.assign"></a></h4>
    <p>Modify <a href="https://eel.is/c++draft/string.assign">[string.assign]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2698,7 +2649,7 @@ via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c
     <small> <pre class="highlight"><c- k>constexpr</c-> <c- n>basic_string</c-><c- o>&amp;</c-> <c- nf>assign</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>charT</c-><c- o>></c-> <c- n>il</c-><c- p>);</c->
 </pre><p>12․ <em>Effects:</em> Equivalent to: <code class="highlight"><c- k>return</c-> <c- n>assign</c-><c- p>(</c-><del><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></del> <ins><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>()</c-></ins><c- p>,</c-> <c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>());</c-></code></p> </small>
    </blockquote>
-   <h4 class="heading settled" data-level="5.9.4" id="wording-string.replace"><span class="secno">5.9.4. </span><span class="content">[string.replace]</span><a class="self-link" href="#wording-string.replace"></a></h4>
+   <h4 class="heading settled" data-level="4.8.4" id="wording-string.replace"><span class="secno">4.8.4. </span><span class="content">[string.replace]</span><a class="self-link" href="#wording-string.replace"></a></h4>
    <p>Modify <a href="https://eel.is/c++draft/string.replace">[string.replace]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2706,7 +2657,7 @@ via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c
     <small> <pre class="highlight"><c- k>constexpr</c-> <c- n>basic_string</c-><c- o>&amp;</c-> <c- nf>replace</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>i1</c-><c- p>,</c-> <c- n>const_iterator</c-> <c- n>i2</c-><c- p>,</c-> <c- n>initializer_list</c-><c- o>&lt;</c-><c- n>charT</c-><c- o>></c-> <c- n>il</c-><c- p>);</c->
 </pre><p>12․ <em>Effects:</em> Equivalent to: <code class="highlight"><c- k>return</c-> <c- n>replace</c-><c- p>(</c-><c- n>i1</c-><c- p>,</c-> <c- n>i2</c-><c- p>,</c-> <del><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></del> <ins><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>()</c-></ins><c- p>,</c-> <c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>());</c-></code></p> </small>
    </blockquote>
-   <h4 class="heading settled" data-level="5.9.5" id="wording-span.cons"><span class="secno">5.9.5. </span><span class="content">[span.cons]</span><a class="self-link" href="#wording-span.cons"></a></h4>
+   <h4 class="heading settled" data-level="4.8.5" id="wording-span.cons"><span class="secno">4.8.5. </span><span class="content">[span.cons]</span><a class="self-link" href="#wording-span.cons"></a></h4>
    <p>Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2714,7 +2665,7 @@ via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c
     <small> <pre class="highlight"><c- k>constexpr</c-> <c- k>explicit</c-><c- p>(</c-><c- n>extent</c-> <c- o>!=</c-> <c- n>dynamic_extent</c-><c- p>)</c-> <c- n>span</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><value_type> <c- n>il</c-><c- p>);</c->
 </value_type></pre><p>18․ <em>Constraints:</em> <code class="highlight"><c- n>is_const_v</c-><c- o>&lt;</c-><c- n>element_type</c-><c- o>></c-></code> is <code class="highlight">true</code>. </p><p>19․ <em>Preconditions:</em> If <code class="highlight"><c- n>extent</c-></code> is not equal to <code class="highlight"><c- n>dynamic_extent</c-></code>, then <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code> is equal to <code class="highlight"><c- n>extent</c-></code>. </p><p>20․ <em>Effects:</em> Initializes <i><code class="highlight"><c- n>data_</c-></code></i> with <del><code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></code></del> <ins><code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>()</c-></code></ins> and <i><code class="highlight"><c- n>size_</c-></code></i> with <code class="highlight"><c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>()</c-></code>. </p></small>
    </blockquote>
-   <h4 class="heading settled" data-level="5.9.6" id="wording-valarray.cons"><span class="secno">5.9.6. </span><span class="content">[valarray.cons]</span><a class="self-link" href="#wording-valarray.cons"></a></h4>
+   <h4 class="heading settled" data-level="4.8.6" id="wording-valarray.cons"><span class="secno">4.8.6. </span><span class="content">[valarray.cons]</span><a class="self-link" href="#wording-valarray.cons"></a></h4>
    <p>Modify <a href="https://eel.is/c++draft/valarray.cons">[valarray.cons]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2722,32 +2673,50 @@ via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c
     <small> <pre class="highlight"><c- n>valarray</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>il</c-><c- p>);</c->
 </pre><p>9․ <em>Effects:</em> Equivalent to <code class="highlight"><c- n>valarray</c-><c- p>(</c-><del><c- n>il</c-><c- p>.</c-><c- n>begin</c-><c- p>()</c-></del> <ins><c- n>il</c-><c- p>.</c-><c- n>data</c-><c- p>()</c-></ins><c- p>,</c-> <c- n>il</c-><c- p>.</c-><c- n>size</c-><c- p>())</c-></code>.</p> </small>
    </blockquote>
-   <h2 class="heading settled" data-level="6" id="straw-polls"><span class="secno">6. </span><span class="content">Proposed straw polls</span><a class="self-link" href="#straw-polls"></a></h2>
-   <p>The next revision of this paper (if any) will be guided by the outcomes of these two straw polls.</p>
-   <table class="def">
-    <tbody>
-     <tr>
-      <th style="width: 70%;">
-      <th><strong>SF</strong>
-      <th><strong>F</strong>
-      <th><strong>N</strong>
-      <th><strong>A</strong>
-      <th><strong>SA</strong>
-     <tr>
-      <th><small>Pursue the <code class="highlight"><c- n>initializer_list</c-></code> changes and associated library-clause cleanup.</small>
-      <th> – 
-      <th> — 
-      <th> — 
-      <th> — 
-      <th> — 
-     <tr>
-      <th><small>Pursue the <code class="highlight"><c- n>valarray</c-></code> changes.</small>
-      <th> – 
-      <th> — 
-      <th> — 
-      <th> — 
-      <th> — 
-   </table>
+   <h3 class="heading settled" data-level="4.9" id="wording-lwg3624"><span class="secno">4.9. </span><span class="content">Resolutions for LWG3624 and LWG3625</span><a class="self-link" href="#wording-lwg3624"></a></h3>
+   <p>Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <p>1. In addition to being available via inclusion of the <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> header, the function templates in [iterator.range]
+are available when any of the following headers are included: <code class="highlight"><c- o>&lt;</c-><c- n>array</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>deque</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>forward_list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>regex</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>span</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>stacktrace</c-><c- o>></c-></code>,</ins> <code class="highlight"><c- o>&lt;</c-><c- n>string</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string_view</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_set</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>valarray</c-><c- o>></c-></code>,</ins> and <code class="highlight"><c- o>&lt;</c-><c- n>vector</c-><c- o>></c-></code>. </p></small>
+   </blockquote>
+   <p>Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><c- cp>#include</c-> &lt;compare><c- c1>              // see [compare.syn]</c->
+<c- cp>#include</c-> &lt;concepts><c- c1>             // see [concepts.syn]</c->
+<ins><c- cp>#include</c-> &lt;initializer_list><c- c1>     // see [initializer.list.syn]</c-></ins>
+</pre></small>
+   </blockquote>
+   <p>Modify <a href="https://eel.is/c++draft/any.synop">[any.synop]</a> as follows
+(since <a href="https://eel.is/c++draft/any.class">[any.class]</a> requires both <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code> and <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>type_info</c-></code>):</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><ins><c- cp>#include</c-> &lt;initializer_list><c- c1>     // see [initializer.list.syn]</c-></ins>
+<ins><c- cp>#include</c-> &lt;typeinfo><c- c1>             // see [typeinfo.syn]</c-></ins>
+
+<c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c->
+</pre></small>
+   </blockquote>
+   <p>Modify <a href="https://eel.is/c++draft/functional.syn">[functional.syn]</a> as follows
+(since <a href="https://eel.is/c++draft/func.wrap.move">[func.wrap.move]</a> requires <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code> and <a href="https://eel.is/c++draft/func.wrap.func">[func.wrap.func]</a> requires <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>type_info</c-></code>):</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><ins><c- cp>#include</c-> &lt;initializer_list><c- c1>     // see [initializer.list.syn]</c-></ins>
+<ins><c- cp>#include</c-> &lt;typeinfo><c- c1>             // see [typeinfo.syn]</c-></ins>
+
+<c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c->
+</pre></small>
+   </blockquote>
+   <p>Contra LWG3624, do not modify <a href="https://eel.is/c++draft/type.index.synopsis">[type.index.synopsis]</a>;
+its only use of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>type_info</c-></code> is exposition-only.</p>
+   <p>Contra LWG3624, do not modify <a href="https://eel.is/c++draft/stacktrace.syn">[stacktrace.syn]</a>.
+It uses <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-></code> indirectly, via <a href="#wording-lwg3624">[iterator.range]/1</a> —​but it uses <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>reverse_iterator</c-></code> indirectly in the same way, and we certainly don’t expect it to include <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code>!
+The exact mechanism by which the library vendor satisfies <a href="https://eel.is/c++draft/dcl.init.list#2.sentence-4">[dcl.init.list]/2</a> should be left unspecified in this case.</p>
   </main>
 <script>
 (function() {
@@ -2883,22 +2852,14 @@ via <code class="highlight"><c- o>&lt;</c-><c- n>initializer_list</c-><c- o>></c
   <dl>
    <dt id="biblio-cwg2825">[CWG2825]
    <dd>Arthur O'Dwyer. <a href="https://cplusplus.github.io/CWG/issues/2825.html"><cite>Range-based for statement using a braced-init-list</cite></a>. November 2023. URL: <a href="https://cplusplus.github.io/CWG/issues/2825.html">https://cplusplus.github.io/CWG/issues/2825.html</a>
-   <dt id="biblio-lwg2058">[LWG2058]
-   <dd>Gabriel Dos Reis. <a href="https://cplusplus.github.io/LWG/issue2058"><cite>valarray and begin/end</cite></a>. May 2011–October 2012. URL: <a href="https://cplusplus.github.io/LWG/issue2058">https://cplusplus.github.io/LWG/issue2058</a>
-   <dt id="biblio-lwg2128">[LWG2128]
-   <dd>Dmitry Polukhin. <a href="https://cplusplus.github.io/LWG/issue2128"><cite>Absence of global functions cbegin/cend</cite></a>. January 2012–January 2016. URL: <a href="https://cplusplus.github.io/LWG/issue2128">https://cplusplus.github.io/LWG/issue2128</a>
    <dt id="biblio-lwg3624">[LWG3624]
-   <dd>Jiang An. <a href="https://cplusplus.github.io/LWG/issue3624"><cite>Inconsistency of &amp;lt;typeinfo>, &amp;lt;initializer_list>, and &amp;lt;compare></cite></a>. October 2021. URL: <a href="https://cplusplus.github.io/LWG/issue3624">https://cplusplus.github.io/LWG/issue3624</a>
+   <dd>Jiang An. <a href="https://cplusplus.github.io/LWG/issue3624"><cite>Inconsistency of &lt;typeinfo>, &lt;initializer_list>, and &lt;compare></cite></a>. October 2021. URL: <a href="https://cplusplus.github.io/LWG/issue3624">https://cplusplus.github.io/LWG/issue3624</a>
    <dt id="biblio-lwg3625">[LWG3625]
-   <dd>Jiang An. <a href="https://cplusplus.github.io/LWG/issue3625"><cite>Should &amp;lt;stacktrace> provide range access function templates?</cite></a>. October 2021. URL: <a href="https://cplusplus.github.io/LWG/issue3625">https://cplusplus.github.io/LWG/issue3625</a>
+   <dd>Jiang An. <a href="https://cplusplus.github.io/LWG/issue3625"><cite>Should &lt;stacktrace> provide range access function templates?</cite></a>. October 2021. URL: <a href="https://cplusplus.github.io/LWG/issue3625">https://cplusplus.github.io/LWG/issue3625</a>
    <dt id="biblio-lwg4001">[LWG4001]
    <dd>Hewill Kang. <a href="https://cplusplus.github.io/LWG/issue4001"><cite>iota_view should provide empty</cite></a>. October 2023. URL: <a href="https://cplusplus.github.io/LWG/issue4001">https://cplusplus.github.io/LWG/issue4001</a>
    <dt id="biblio-lwg4035">[LWG4035]
    <dd>Hewill Kang. <a href="https://cplusplus.github.io/LWG/issue4035"><cite>single_view should provide empty</cite></a>. December 2023. URL: <a href="https://cplusplus.github.io/LWG/issue4035">https://cplusplus.github.io/LWG/issue4035</a>
-   <dt id="biblio-n2930">[N2930]
-   <dd>Doug Gregor; Beman Dawes. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2009/n2930.html"><cite>Range-Based For Loop Wording (Without Concepts)</cite></a>. July 2009. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2009/n2930.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2009/n2930.html</a>
-   <dt id="biblio-n3271">[N3271]
-   <dd>Doug Gregor. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3271.htm"><cite>Wording for Range-Based For Loop (Option #5)</cite></a>. March 2011. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3271.htm">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3271.htm</a>
    <dt id="biblio-p2613">[P2613]
    <dd>Yihe Li. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2613r1.html"><cite>Add the missing empty to mdspan</cite></a>. June 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2613r1.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2613r1.html</a>
   </dl>
