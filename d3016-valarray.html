@@ -2091,7 +2091,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D3016R2<br>Resolve inconsistencies in begin/end for <code class="highlight"><c- n>valarray</c-></code> and braced initializer lists</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-02-10">2024-02-10</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-02-12">2024-02-12</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2101,7 +2101,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>11
+     <dd>12
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2349,9 +2349,9 @@ deprecation period will matter.</p>
    <p><a data-link-type="biblio" href="#biblio-lwg3624" title="Inconsistency of <typeinfo>, <initializer_list>, and <compare>">[LWG3624]</a> and <a data-link-type="biblio" href="#biblio-lwg3625" title="Should <stacktrace> provide range access function templates?">[LWG3625]</a> somewhat intersect this proposal, but do not conflict with it.
 We expect these issues to be resolved along the lines given in <a href="#wording-lwg3624">§ 4.9 Resolutions for LWG3624 and LWG3625</a>.</p>
    <h2 class="heading settled" data-level="3" id="experience"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
-   <p>Arthur has implemented <a href="#wording">§ 4 Proposed wording</a> in his fork of libc++, and used it to compile
-both LLVM/Clang/libc++ and another large C++17 codebase. Naturally, it caused
-no problems except in this single test from libc++'s own test suite:</p>
+   <p>Arthur has implemented <a href="#wording">§ 4 Proposed wording</a> in his fork of libc++ (<a href="https://github.com/Quuxplusone/llvm-project/commit/p3016-valarray-and-initializer-list">source</a>),
+and used it to compile both LLVM/Clang/libc++ and another large C++17 codebase.
+Naturally, it caused no problems except in this single test from libc++'s own test suite:</p>
 <pre class="language-cpp highlight"><c- cp>#include</c-> &lt;initializer_list><c- c1> // but not &lt;iterator></c->
 <c- n>std</c-><c- o>::</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-> <c- n>il</c-><c- p>;</c->
 <c- k>static_assert</c-><c- p>(</c-><c- k>noexcept</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>begin</c-><c- p>(</c-><c- n>il</c-><c- p>)));</c->
@@ -2451,7 +2451,8 @@ and the free-function <code class="highlight"><c- n>begin</c-></code> and <code 
   <del><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <c- n>unspecified2</c-> <c- n>end</c-><c- p>(</c-><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-> <c- n>v</c-><c- p>);</c-></del>
 <c- p>}</c->
 </pre> <p>[...]</p> <p>3․ Any function returning a <code class="highlight"><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is permitted to return an object of another type,
-provided all the const member functions of <code class="highlight"><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> are also applicable to this type.
+provided all the const member functions of <code class="highlight"><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> <ins>other
+than <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code></ins> are also applicable to this type.
 This return type shall not add more than two levels of template nesting over the most deeply nested argument type.</p> <p>4․ Implementations introducing such replacement types shall provide additional functions and operators as follows:</p> <ul><li data-md><p>(4.1) for every function taking a <code class="highlight"><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-></code> <del>other than <code class="highlight"><c- n>begin</c-></code> and <code class="highlight"><c- n>end</c-></code></del>,
 identical functions taking the replacement types shall be added;</p> </li><li data-md><p>(4.2) for every function taking two <code class="highlight"><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-></code> arguments,
 identical functions taking every combination of <code class="highlight"><c- k>const</c-> <c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-></code> and replacement types shall be added.</p> </li></ul> <p>5․ In particular, an implementation shall allow a <code class="highlight"><c- n>valarray</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> to be constructed from such replacement types
