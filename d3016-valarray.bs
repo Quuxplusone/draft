@@ -2,7 +2,7 @@
 Title: Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists
 Shortname: D3016
 Revision: 2
-!Draft Revision: 11
+!Draft Revision: 12
 Audience: LEWG
 Status: D
 Group: WG21
@@ -13,7 +13,7 @@ Abstract:
   We resolve some inconsistencies among [iterator.range] functions, notably
   `begin`/`end`, `data`, and `empty`, as applied to `valarray`, `initializer_list`,
   and braced initializer lists. We also resolve LWG3624 and LWG3625.
-Date: 2024-02-10
+Date: 2024-02-12
 </pre>
 
 <style>
@@ -280,9 +280,9 @@ We expect these issues to be resolved along the lines given in [[#wording-lwg362
 
 # Implementation experience # {#experience}
 
-Arthur has implemented [[#wording]] in his fork of libc++, and used it to compile
-both LLVM/Clang/libc++ and another large C++17 codebase. Naturally, it caused
-no problems except in this single test from libc++'s own test suite:
+Arthur has implemented [[#wording]] in his fork of libc++ ([source](https://github.com/Quuxplusone/llvm-project/commit/p3016-valarray-and-initializer-list)),
+and used it to compile both LLVM/Clang/libc++ and another large C++17 codebase.
+Naturally, it caused no problems except in this single test from libc++'s own test suite:
 
 ```cpp
     #include <initializer_list> // but not <iterator>
@@ -429,7 +429,8 @@ Modify <a href="https://eel.is/c++draft/valarray.syn">[valarray.syn]</a> as foll
 [...]
 
 3․ Any function returning a `valarray<T>` is permitted to return an object of another type,
-provided all the const member functions of `valarray<T>` are also applicable to this type.
+provided all the const member functions of `valarray<T>` <ins>other
+than `begin` and `end`</ins> are also applicable to this type.
 This return type shall not add more than two levels of template nesting over the most deeply nested argument type.
 
 4․ Implementations introducing such replacement types shall provide additional functions and operators as follows:
