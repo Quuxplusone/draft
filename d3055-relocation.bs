@@ -2,7 +2,7 @@
 Title: Relax wording to permit relocation optimizations in the STL
 Shortname: D3055
 Revision: 1
-!Draft Revision: 6
+!Draft Revision: 7
 Audience: LEWG
 Status: D
 Group: WG21
@@ -15,7 +15,7 @@ Abstract:
   their current overspecification so that such optimizations become legal
   (but not mandatory), even in the absence of a standardized vocabulary
   for relocation.
-Date: 2023-12-28
+Date: 2024-02-12
 </pre>
 
 <style>
@@ -180,7 +180,7 @@ Arthur's P1144 fork of libc++ compiles it into 18 lines. ([Godbolt.](https://god
 ```
 
 This propagates back up the call-stack as high as we're willing to let it propagate.
-Arthur's libc++ effectively applies this paper P3055's proposed wording already,
+Arthur's libc++ applies this paper P3055's proposed wording already,
 permitting `rotate` to be implemented in terms of `swap` and `erase` to be implemented
 in terms of `rotate`.
 
@@ -292,10 +292,10 @@ hurt to harmonize the wording of all four type-erasure types, so we do so <a hre
 
 # Breakage of existing code # {#breakage}
 
-Since the proposed wording is looser than the existing wording, all vendors already conform to it by definition;
-we're not asking any vendor to change their implementation for C++26. However, a vendor who takes advantage of
+The proposed wording is looser than the existing wording, so all vendors already conform to it by definition.
+We're not asking any vendor to change their implementation for C++26. But a vendor who takes advantage of
 the new freedom may change the behavior of certain algorithms and containers for non-regular types.
-Following [[P2959]], we'll use `tuple<int&>` as our canonical example. `tuple<int&>` assigns-through on
+As in [[P2959]], we'll use `tuple<int&>` as our canonical example. `tuple<int&>` assigns-through on
 assignment and swap; it never rebinds (except on initial construction). This is the polar opposite of
 `reference_wrapper<int>`, which rebinds on assignment and swap, and never assigns-through. In P1144's
 terminology, `reference_wrapper<int>` is trivially relocatable and `tuple<int&>` is not trivially relocatable.
@@ -346,8 +346,8 @@ continue mandating the old behavior.)
 
 # Implementation experience # {#experience}
 
-Since the proposed wording is looser than the existing wording, all vendors already conform to it
-by definition; we're not asking any vendor to change their implementation for C++26.
+The proposed wording is looser than the existing wording, so all vendors already conform to it
+by definition. We're not asking any vendor to change their implementation for C++26.
 
 Arthur has implemented trivial-relocation optimizations in his fork of libc++, and used it to compile
 both LLVM/Clang/libc++ and another large C++17 codebase. No problems were found (naturally).
@@ -635,7 +635,7 @@ template&lt;class T>
 
 <pre>
 template&lt;class T, size_t N>
-  constexpr void swap(T (&a)\[N], T (&b)\[N]) noexcept(is_nothrow_swappable_v&lt;T>);
+  constexpr void swap(T (&amp;a)\[N], T (&amp;b)\[N]) noexcept(is_nothrow_swappable_v&lt;T>);
 </pre>
 <p>5. <i>Constraints:</i> `is_swappable_v<T>` is `true`.
 <p>6. <i>Preconditions:</i> `a[i]` is swappable with ([swappable.requirements]) `b[i]` for all `i` in the range `[0, N)`.
