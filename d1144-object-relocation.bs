@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: std::is_trivially_relocatable
 Shortname: D1144
-Revision: 10
-!Draft Revision: 62
+Revision: 11
+!Draft Revision: 63
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
   Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2024-02-14
+Date: 2024-02-17
 </pre>
 
 <style>
@@ -26,6 +26,10 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 
 # Changelog # {#changelog}
+
+- R11:
+
+    - Updated [[ParlayLib]] status; it conforms with P1144 since February 2024.
 
 - R10 (pre-Tokyo 2024):
 
@@ -910,12 +914,12 @@ Here's how current implementations define "is trivially relocatable":
 - [[Amadeus]] AMC's `amc::is_trivially_relocatable<T>`: `is_trivially_copyable<T>` or has member typedef `T::trivially_relocatable`
 - Nvidia [[Thrust]]'s `thrust::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or `proclaim_trivially_relocatable` is specialized for `T`
 - [[HPX]]'s `hpx::experimental::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or the trait is specialized for `T`
-- [[ParlayLib]]'s `parlay::is_trivially_relocatable<T>`: currently "`is_trivially_move_constructible_v<T> && is_trivially_destructible_v<T>`,"
-    but after [#67](https://github.com/cmuparlay/parlaylib/pull/67) it'll be "`is_trivially_copyable<T>`, or the trait is specialized for `T`"
+- [[ParlayLib]]'s `parlay::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or `__is_trivially_relocatable(T)` on Clang;
+    or the trait is specialized for `T`
 
 </small>
 
-Notice that all library implementors (except ParlayLib trunk and Abseil on Linux Clang due to the Clang builtin's
+Notice that all library implementors (except Parlay on Clang and Abseil on Linux Clang due to the Clang builtin's
 current behavior) agree that a type with trivial move-constructor, trivial destructor, *and non-trivial assignment operator*
 is considered non-trivially relocatable. That is, the assignment operator is relevant!
 
@@ -1502,8 +1506,8 @@ See [[#applications|table §2.1]] for more details on most of these library impl
       "Guy Blelloch"
     ],
     "title": "ParlayLib, a toolkit for programming parallel algorithms on shared-memory multicore machines",
-    "href": "https://github.com/cmuparlay/parlaylib/blob/4579f39/include/parlay/relocation.h",
-    "date": "October 2020"
+    "href": "https://github.com/cmuparlay/parlaylib/blob/36459f4/include/parlay/relocation.h",
+    "date": "February 2024"
   },
   "Polymorphic": {
     "authors": [
