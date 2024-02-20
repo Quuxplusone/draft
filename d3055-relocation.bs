@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Relax wording to permit relocation optimizations in the STL
 Shortname: D3055
-Revision: 1
-!Draft Revision: 7
+Revision: 2
+!Draft Revision: 8
 Audience: LEWG
 Status: D
 Group: WG21
@@ -10,12 +10,12 @@ URL:
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  We catalog the STL containers and algorithms that could benefit from
-  optimizations related to relocation (P1144, P2786), and propose to loosen
-  their current overspecification so that such optimizations become legal
-  (but not mandatory), even in the absence of a standardized vocabulary
-  for relocation.
-Date: 2024-02-12
+  STL containers and algorithms, notably `vector::erase` and `std::rotate`,
+  would like to go fast, but they're hobbled by *Complexity* elements
+  setting exact (not upper!) bounds on their number of operations.
+  We loosen the wording so that optimizations already mainstreamed by Folly, Qt, BSL,
+  Abseil, and AMC become legal for `std::vector` too.
+Date: 2024-02-20
 </pre>
 
 <style>
@@ -26,15 +26,26 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
+- R2:
+
+    - Per LEWG direction on `optional` (2–5–3–4–2; [minutes](https://wiki.edg.com/bin/view/Wg21telecons2024/P3055#Library-Evolution-2024-02-20)),
+          re-remove wording for `optional`, `function`, and `any`.
+          This paper is now "STL Classic" (containers and algorithms) only.
+          LEWG didn't seem opposed to bringing a *separate* paper to loosen
+          `optional`'s move-assignment or clean up the type-erasure types'
+          special members; that's just no longer *this* paper.
+
+    - Add direct hyperlinks to the prior art in
+          <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1232-L1259">`folly::fbvector::erase`</a>,
+          <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L842-L863">`qt::QList::erase`</a>,
+          <a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslalg/bslalg_arrayprimitives.h#L3769-L3800">`bsl::vector::erase`</a>,
+          and <a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/vectorcommon.hpp#L171-L180">`amc::Vector::erase_at`</a>.
+
 - R1:
 
     - Add wording for <a href="#wording-alg.shift">[alg.shift]</a>.
 
     - Add discussion and wording for `optional`, `function`, and `any`.
-
-- R0:
-
-    - Initial revision.
 
 
 # Motivation and proposal # {#proposal}
@@ -44,19 +55,23 @@ and Bloomberg's [[P2786]] / [[P2959]] / [[P2967]]. We also have two recent propo
 for "non-trivial relocation" as a new fundamental operation: Bloomberg's [[P2839]] (rejected by EWG
 in Varna) and Bini and Catmur's [[P2785]] (still active).
 
-A major motivation for "(trivial) relocation" is that it allows library authors to choose "fast paths"
-for (trivially) relocatable types. For example, `vector::erase(it)` for non-relocatable `T` must
-use `operator=` in a loop (represented here by `std::move`), but for trivially relocatable `T`
-it can avoid `operator=` and use the moral equivalent of memcpy
-(represented here by P1144 `std::uninitialized_relocate`).
+A major motivation for relocation is that it allows library authors to choose "fast paths"
+for relocatable types. For example:
+<a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1232-L1259">`folly::fbvector::erase`</a>,
+<a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L842-L863">`qt::QList::erase`</a>,
+<a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslalg/bslalg_arrayprimitives.h#L3769-L3800">`bsl::vector::erase`</a>,
+and <a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/vectorcommon.hpp#L171-L180">`amc::Vector::erase_at`</a>
+all do the same optimization:
 
 ```cpp
     void erase(iterator it) {
         if constexpr (std::is_trivially_relocatable_v<value_type>) {
+            // Fast path, using destroy + a single memcpy
             std::destroy_at(it);
             std::uninitialized_relocate(it + 1, end_, it);
         } else {
-            std::move(it + 1, end_, it); // operator=
+            // Slow path, using a loop over assignment + destroy
+            std::move(it + 1, end_, it);
             std::destroy_at(end_ - 1);
         }
         --end_;
@@ -64,11 +79,11 @@ it can avoid `operator=` and use the moral equivalent of memcpy
 ```
 
 The exact details of that snippet are up for debate: should the library provide a trait
-`is_nothrow_relocatable_v`? should `uninitialized_relocate` be guaranteed, or merely encouraged,
-to use memcpy instead of move-and-destroy-in-a-loop? and so on. This paper P3055 considers all
-those little details to be "out of scope"; they don't affect the gist of this paper.
+`is_nothrow_relocatable_v`? should `uninitialized_relocate` be guaranteed
+to use memcpy instead of move-and-destroy-in-a-loop? and so on. This paper P3055 considers
+those details to be "out of scope"; they don't affect the gist of this paper.
 
-This paper concerns itself with one giant problem — anything like the above implementation
+This paper concerns itself with one giant problem — the above implementation
 is, formally, forbidden by the current Standard! To permit the above implementation, we must
 loosen the specification of `vector::erase`
 (<a href="https://eel.is/c++draft/vector.modifiers">[vector.modifiers]/3</a>)
@@ -98,7 +113,7 @@ strategy. So for example it would become legal for the implementation to do just
     }
 ```
 
-according to `std::rotate`'s current wording. But furthermore, we propose to loosen `std::rotate`'s wording
+according to `std::rotate`'s current wording. Furthermore, we propose to loosen `std::rotate`'s wording
 (<a href="https://eel.is/c++draft/alg.rotate">[alg.rotate]</a>) too:
 
 <small><blockquote>
@@ -150,13 +165,19 @@ which are present in the actual library.
     }
 ```
 
-In other words, this paper P3055 is needed, even after P1144/P2786. If one of those papers
+This paper P3055 is needed, even after P1144/P2786. If one of those papers
 is adopted without P3055, then conforming implementations will still be technically forbidden to do
-the optimizations we want to enable (which are already done by `bsl::vector`, `folly::FBVector`, etc).
-Vice versa, as soon as P3055 is adopted (even without P1144/P2786), a conforming implementation will
-be able to use these optimizations on types it knows to be trivially relocatable
-(e.g. `std::deque<int>`), even if we continue to lack a standardized vocabulary
-for relocatable user-defined types.
+the optimizations we want to enable (which
+<a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1232-L1259">Folly</a>,
+<a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L842-L863">Qt</a>,
+<a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslalg/bslalg_arrayprimitives.h#L3769-L3800">BSL</a>,
+<a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/vectorcommon.hpp#L171-L180">Amadeus</a>
+already do).
+Vice versa, as soon as P3055 is adopted (even without P1144/P2786), STL vendors will
+be able to use these optimizations on types *they* know to be trivially relocatable (e.g.
+<a href="https://github.com/gcc-mirror/gcc/blob/83ffe9c/libstdc%2B%2B-v3/include/bits/stl_deque.h#L2374-L2380">libstdc++'s `deque`</a> or
+<a href="https://github.com/llvm/llvm-project/blob/ed4bdb86b084bf633770136d005426adeeb2cd57/libcxx/include/__memory/unique_ptr.h#L125-L143">libc++'s `unique_ptr`</a>),
+even as we continue to lack a standardized vocabulary for relocatable user-defined types.
 
 
 ## Benchmark ## {#benchmark}
@@ -191,111 +212,12 @@ in terms of `rotate`.
 <tr><td><a href="https://godbolt.org/z/E5vobhhd1"><pre>vector&lt;S>::erase(it)</pre></a></td><td>108</td><td>39</td></tr>
 </table>
 
-# Utility types # {#utility}
-
-Relocation can be useful in two more places: the "disengageable" algebraic types
-such as `optional` and `inplace_vector`, and the "disengageable" type-erasure types such as `any` and `function`.
-
-## `optional` ## {#utility-optional}
-
-C++17 specifically requires `optional`'s move-constructor to leave the right-hand `optional` engaged.
-We can imagine a world in which `optional`'s move-constructor was permitted to relocate from the right-hand
-`optional`'s value, leaving the right-hand `optional` disengaged ([Godbolt](https://godbolt.org/z/Ecxzj8e8T)):
-
-<table>
-<tr><th>Today</th><th>Tomorrow?</th></tr>
-<tr><td><pre>using U = std::array&lt;int, 100>;
-std::optional&lt;U> src = U();
-std::optional&lt;U> dst = std::move(src);
-  // trivial (tantamount to memcpy)
-assert(src.has_value());
-</pre></td><td><pre>using U = std::array&lt;int, 100>;
-std::optional&lt;U> src = U();
-std::optional&lt;U> dst = std::move(src);
-  // trivial (tantamount to memcpy)
-assert(src.has_value());
-</pre></td></tr>
-<tr><td><pre>using T = std::array&lt;std::vector&lt;int>, 100>;
-std::optional&lt;T> src = T();
-std::optional&lt;T> dst = std::move(src);
-  // must move-construct 100 vectors
-  // (tantamount to memcpy + memset)
-assert(src.has_value());
-</pre></td><td><pre>using T = std::array&lt;std::vector&lt;int>, 100>;
-std::optional&lt;T> src = T();
-std::optional&lt;T> dst = std::move(src);
-  // trivially relocate the array object
-  // (tantamount to memcpy alone),
-  // then disengage src
-assert(!src.has_value());
-</pre></td></tr>
-</table>
-
-This would be more efficient for types like `T`, but also less predictable. Now, when [[N3672]]
-originally proposed `optional` for C++14 (before it was moved to LFv1 and then back into C++17),
-[the authors gave a rationale for move-construction](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3672.html#rationale.moved_from)
-specifically in terms of performance — they assumed "move" must be faster than "move and destroy,"
-because "relocate" wasn't a well-known verb in 2014. They also implicitly assumed that
-since `optional<U>` obviously should not disengage-on-move, therefore `optional<T>` should not either.
-The conclusion is defensible from a teachability perspective, but it's not self-evident.
-
-[[P0843]] `inplace_vector` specifically permits a moved-from `inplace_vector<T>` to become cleared,
-while normatively requiring that a moved-from `inplace_vector<U>` must retain its old value (i.e.,
-`inplace_vector`'s move constructor must be trivial whenever `U`'s is). We could retroactively change
-the semantics of `optional` to match `inplace_vector`'s. However, this is likely controversial;
-notice <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html#Move-semantics">the 6–9–1–5–6 straw poll</a>
-that delivered `inplace_vector`'s current semantics.
-
-We provide wording for `optional` <a href="#wording-optional">below</a>, but we're not married to it.
-
-What about `variant` and `expected`? Those types deliberately pretend not to have a disengaged state,
-and we should respect that:
-
-```cpp
-using T = std::array<std::vector<int>, 100>;
-
-std::variant<T> v = T();
-std::variant<T> w = std::move(v);
-assert(!v.valueless_by_exception()); // important
-
-std::expected<void, T> e = std::unexpected(T());
-std::expected<void, T> f = std::move(e);
-assert(!e.has_value());              // important
-```
-
-## `function` and `any` ## {#utility-function-and-any}
-
-The type-erasure types like `std::function` use stronger and stronger language to permit
-relocation optimization the further forward you go chronologically. `any`'s wording is
-stronger than `function`'s, and `copyable_function`/`move_only_function`'s are stronger
-than `any`'s.
-
-- `function`'s move-ctor leaves the right-hand object "in a valid state with an unspecified value"
-    (<a href="https://eel.is/c++draft/func.wrap.func#con-6.sentence-1">[func.wrap.func.con]/6</a>)
-    and its assignment operator doesn't explicitly specify
-    (<a href="https://eel.is/c++draft/func.wrap.func#con-21.sentence-1">[func.wrap.func.con]/21</a>)
-- `any`'s move-ctor doesn't explicitly specify
-    (<a href="https://eel.is/c++draft/any#cons-4">[any.cons]/4</a>)
-    and its assignment operator is "as if by" move-construct and swap
-    (<a href="https://eel.is/c++draft/any#assign-4">[any.assign]/4</a>)
-- `move_only_function`'s move-ctor leaves the right-hand object "in a valid state with an unspecified value"
-    (<a href="https://eel.is/c++draft/func.wrap#move.ctor-3">[func.wrap.move.ctor]/3</a>)
-    and its assignment operator is "equivalent to" move-construct and swap
-    (<a href="https://eel.is/c++draft/func.wrap#move.ctor-22">[func.wrap.move.ctor]/22</a>)
-- `copyable_function`'s move-ctor leaves the right-hand object "in a valid state with an unspecified value"
-    (<a href="https://eel.is/c++draft/func.wrap#copy.ctor-5">[func.wrap.copy.ctor]/5</a>)
-    and its assignment operator is "equivalent to" move-construct and swap
-    (<a href="https://eel.is/c++draft/func.wrap#copy.ctor-26">[func.wrap.copy.ctor]/26</a>)
-
-I'm not sure whether "doesn't explicitly specify" is a defect or not. However, it can't
-hurt to harmonize the wording of all four type-erasure types, so we do so <a href="#wording-type-erasure">below</a>.
-
 # Breakage of existing code # {#breakage}
 
-The proposed wording is looser than the existing wording, so all vendors already conform to it by definition.
-We're not asking any vendor to change their implementation for C++26. But a vendor who takes advantage of
+The proposed wording is looser than the existing wording, so all vendors already conform to it.
+No vendor need change their implementation for C++26. But a vendor who takes advantage of
 the new freedom may change the behavior of certain algorithms and containers for non-regular types.
-As in [[P2959]], we'll use `tuple<int&>` as our canonical example. `tuple<int&>` assigns-through on
+We'll use [[P2959]]'s `tuple<int&>` as our canonical example. `tuple<int&>` assigns-through on
 assignment and swap; it never rebinds (except on initial construction). This is the polar opposite of
 `reference_wrapper<int>`, which rebinds on assignment and swap, and never assigns-through. In P1144's
 terminology, `reference_wrapper<int>` is trivially relocatable and `tuple<int&>` is not trivially relocatable.
@@ -337,7 +259,7 @@ which we propose to remove. After that change, a vendor might reasonably constru
 ```
 
 ...was no longer strictly mandated. They might choose to "erase the element pointed to"
-(<a href="https://eel.is/c++draft/sequence.reqmts#47">[sequence.reqmts]/47</a>) as-if-by relocation,
+(<a href="https://eel.is/c++draft/sequence.reqmts#lib:erase,containers">[sequence.reqmts]/46</a>) as-if-by relocation,
 rebinding each `tuple<int&>` and leaving the array `a` untouched. As [[P2959]] points out, this is
 exactly what happens anyway if you switch out `vector` for `list`. (Again, Arthur's libc++ doesn't change
 this behavior, because `tuple<int&>` is not trivially relocatable; but we certainly have no desire to
@@ -346,8 +268,8 @@ continue mandating the old behavior.)
 
 # Implementation experience # {#experience}
 
-The proposed wording is looser than the existing wording, so all vendors already conform to it
-by definition. We're not asking any vendor to change their implementation for C++26.
+The proposed wording is looser than the existing wording, so all vendors already conform to it.
+No vendor need change their implementation for C++26.
 
 Arthur has implemented trivial-relocation optimizations in his fork of libc++, and used it to compile
 both LLVM/Clang/libc++ and another large C++17 codebase. No problems were found (naturally).
@@ -693,218 +615,15 @@ return old_value;
 
 </blockquote></small>
 
-## [optional] ## {#wording-optional}
-
-Note: As noted <a href="#utility-optional">above</a>, we're not married to this one.
-P3055R1 provides this wording so that LEWG has something concrete to straw-poll and reject.
-
-### [optional.ctor] ### {#wording-optional.ctor}
-
-Modify <a href="https://eel.is/c++draft/optional.ctor">[optional.ctor]</a> as follows:
-
-<small><blockquote>
-<pre>
-constexpr optional(optional&& rhs) noexcept(<i>see below</i>);
-</pre>
-<p>8. *Constraints:* `is_move_constructible_v<T>` is `true`.
-<p>9. *Effects:* If `rhs` contains a value, direct-non-list-initializes the contained value with `std::move(*rhs)`.
-<del>`rhs.has_value()` is unchanged.</del> <ins>`rhs` is left in a valid state with an unspecified value.</ins>
-<p><del>10. *Postconditions:* `rhs.has_value() == this->has_value()`.</del>
-<p>11. *Throws:* Any exception thrown by the selected constructor of `T`.
-<p>12. *Remarks:* The exception specification is equivalent to `is_nothrow_move_constructible_v<T>`.
-If `is_trivially_move_constructible_v<T>` is `true`, this constructor is trivial.
-
-[...]
-
-<pre>
-template&lt;class U> constexpr explicit(<i>see below</i>) optional(optional&lt;U>&& rhs);
-</pre>
-<p>33. *Constraints:*
-
-- `is_constructible_v<T, U>` is `true`, and
-- if `T` is not *cv* `bool`, <code><i>converts-from-any-cvref</i>&lt;T, optional&lt;U>></code> is `false`.
-
-<p>34. *Effects:* If `rhs` contains a value, direct-non-list-initializes the contained value with `std::move(*rhs)`. <del>`rhs.has_value()` is
-unchanged.</del> <ins>`rhs` is left in a valid state with an unspecified value.</ins>
-<p><del>35. *Postconditions:* `rhs.has_value() == this->has_value()`.</del>
-<p>36. *Throws:* Any exception thrown by the selected constructor of `T`.
-<p>37. *Remarks:* The expression inside `explicit` is equivalent to:
-<pre>!is_convertible_v&lt;U, T></pre>
-</blockquote></small>
-
-### [optional.assign] ### {#wording-optional.assign}
-
-Modify <a href="https://eel.is/c++draft/optional.assign">[optional.assign]</a> as follows:
-
-<small><blockquote>
-<pre>
-constexpr optional& operator=(optional&& rhs) noexcept(<i>see below</i>);
-</pre>
-Constraints: is_move_constructible_v<T> is true and is_move_assignable_v<T> is true.
-<p>9. *Effects:* See Table 59. <del>The result of the expression `rhs.has_value()` remains unchanged.</del> <ins>`rhs` is left in a valid state with an unspecified value.</ins>
-
-<table>
-<tr><th colspan="3"><code>optional::operator=(optional&&)</code> effects</th></tr>
-<tr><th></th><th>`*this` contains a value</th><th>`*this` does not contain a value</th></tr>
-<tr><th>`rhs` contains a value</th><td>assigns `std::move(*rhs)` to the contained value</td><td>direct-non-list-initializes the contained value with `std::move(*rhs)`</td></tr>
-<tr><th>`rhs` does not contain a value</th><td>destroys the contained value by calling `val->T::~T()`</td><td>no effect</td></tr>
-</table>
-
-<p><del>10. Postconditions: `rhs.has_value() == this->has_value()`.</del>
-<p>11. Returns: `*this`.
-<p>12. Remarks: The exception specification is equivalent to:
-<pre>is_nothrow_move_assignable_v&lt;T> && is_nothrow_move_constructible_v&lt;T></pre>
-<p>13. If any exception is thrown, the result of the expression `this->has_value()` remains unchanged.
-If an exception is thrown during the call to `T`'s move constructor, the state of `*rhs.val` is determined by the exception safety guarantee of `T`'s move constructor.
-If an exception is thrown during the call to `T`'s move assignment <ins>operator</ins>, the state of `*val` and `*rhs.val` is determined by
-the exception safety guarantee of `T`'s move assignment <ins>operator</ins>.
-If `is_trivially_move_constructible_v<T> && is_trivially_move_assignable_v<T> && is_trivially_destructible_v<T>` is `true`, this assignment operator is trivial.
-
-[...]
-
-<pre>
-template&lt;class U> constexpr optional&lt;T>& operator=(optional&lt;U>&& rhs);
-</pre>
-<p>24. *Constraints:*
-
-- `is_constructible_v<T, U>` is `true`,
-- `is_assignable_v<T&, U>` is `true`,
-- <code><i>converts-from-any-cvref</i>&lt;T, optional&lt;U>></code> is `false`,
-- `is_assignable_v<T&, optional<U>&>` is `false`,
-- `is_assignable_v<T&, optional<U>&&>` is `false`,
-- `is_assignable_v<T&, const optional<U>&>` is `false`, and
-- `is_assignable_v<T&, const optional<U>&&>` is `false`.
-
-<p>25. *Effects:* See Table 61. <del>The result of the expression `rhs.has_value()` remains unchanged.</del> <ins>`rhs` is left in a valid state with an unspecified value.</ins>
-
-<table>
-<tr><th colspan="3"><code>optional::operator=(optional&lt;U>&&)</code> effects</th></tr>
-<tr><th></th><th>`*this` contains a value</th><th>`*this` does not contain a value</th></tr>
-<tr><th>`rhs` contains a value</th><td>assigns `std::move(*rhs)` to the contained value</td><td>direct-non-list-initializes the contained value with `std::move(*rhs)`</td></tr>
-<tr><th>`rhs` does not contain a value</th><td>destroys the contained value by calling `val->T::~T()`</td><td>no effect</td></tr>
-</table>
-
-<p><del>26. *Postconditions:* `rhs.has_value() == this->has_value()`.</del>
-<p>27. *Returns:* `*this`.
-<p>28. *Remarks:* If any exception is thrown, the result of the expression `this->has_value()` remains unchanged.
-If an exception is thrown during <del>the</del> <ins>a</ins> call to `T`'s constructor, the state of `*rhs.val` is determined by the exception safety guarantee of `T`'s constructor.
-If an exception is thrown during <del>the</del> <ins>a</ins> call to `T`'s assignment <ins>operator</ins>, the state of `*val` and `*rhs.val` is determined by the exception safety guarantee of `T`'s assignment <ins>operator</ins>.
-</blockquote></small>
-
-## Type-erasure types ## {#wording-type-erasure}
-
-### [func.wrap.move.ctor] (unchanged) ### {#wording-func.wrap.move.ctor}
-
-<a href="https://eel.is/c++draft/func.wrap.move.ctor">[func.wrap.move.ctor]</a> doesn't seem to require any changes:
-
-<small><blockquote>
-<pre>
-move_only_function(move_only_function&& f) noexcept;
-</pre>
-<p>3. *Postconditions:* The target object of `*this` is the target object `f` had before the construction,
-and `f` is in a valid state with an unspecified value.
-
-[...]
-
-<pre>
-move_only_function& operator=(move_only_function&& f);
-</pre>
-<p>22. *Effects:* Equivalent to: `move_only_function(std::move(f)).swap(*this);`
-<p>23. *Returns:* `*this`.
-</blockquote></small>
-
-### [any.cons] ### {#wording-any.cons}
-
-Modify <a href="https://eel.is/c++draft/any.cons">[any.cons]</a> as follows:
-
-<small><blockquote>
-<pre>
-any(any&& other) noexcept;
-</pre>
-<p><del>4. *Effects:* If `other.has_value()` is `false`, constructs an object that has no value.
-Otherwise, constructs an object of type `any` that contains either the contained value of `other`,
-or contains an object of the same type constructed from the contained value of `other` considering that contained value as an rvalue.</del>
-<p><ins>x. *Postconditions:* The contained value of `*this` is the value contained by `other` before the construction,
-and `other` is in a valid state with an unspecified value.</ins>
-</blockquote></small>
-
-### [any.assign] ### {#wording-any.assign}
-
-Modify <a href="https://eel.is/c++draft/any.assign">[any.assign]</a> as follows:
-
-<small><blockquote>
-<pre>
-any& operator=(const any& rhs);
-</pre>
-<p>1. *Effects:* <del>As if by any(rhs).swap(*this). No effects if an exception is thrown.</del> <ins>Equivalent to: `any(rhs).swap(*this);`</ins>
-<p>2. *Returns:* `*this`.
-<p><del>3. *Throws:* Any exceptions arising from the copy constructor for the contained value.</del>
-
-<pre>
-any& operator=(any&& rhs) noexcept;
-</pre>
-<p>4. *Effects:* <del>As if by `any(std::move(rhs)).swap(*this)`.</del> <ins>Equivalent to: `any(std::move(rhs)).swap(*this);`</ins>
-<p><del>5. *Postconditions:* The state of `*this` is equivalent to the original state of `rhs`.</del>
-<p>6. *Returns:* `*this`.
-</blockquote></small>
-
-### [func.wrap.func.con] ### {#wording-func.wrap.func.con}
-
-Modify <a href="https://eel.is/c++draft/func.wrap.func.con">[func.wrap.func.con]</a> as follows:
-
-<small><blockquote>
-<pre>
-function(function&& f) noexcept;
-</pre>
-<p>6. *Postconditions:* If `!f`, `*this` has no target; otherwise, the target of `*this` is equivalent to the target of `f`
-before the construction, and `f` is in a valid state with an unspecified value.
-<p>7. *Recommended practice:* Implementations should avoid the use of dynamically allocated memory for small callable objects,
-for example, where `f`'s target is an object holding only a pointer or reference to an object and a member function pointer.
-
-[...]
-
-<pre>
-function& operator=(const function& f);
-</pre>
-<p>19. *Effects:* <del>As if by `function(f).swap(*this);`</del> <ins>Equivalent to: `function(f).swap(*this);`</ins>
-<p>20. *Returns:* `*this`.
-
-<pre>
-function& operator=(function&& f);
-</pre>
-<p>21. *Effects:* <del>Replaces the target of `*this` with the target of `f`.</del> <ins>Equivalent to: `function(std::move(f)).swap(*this);`</ins>
-<p>22. *Returns:* `*this`.
-</blockquote></small>
-
 <pre class=biblio>
 {
-  "N3672": {
-    "title": "A utility class to represent optional objects",
-    "authors": [
-      "Fernando Cacciola",
-      "Andrzej Krzemieński"
-    ],
-    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2013/n3672.html",
-    "date": "April 2013"
-  },
-  "P0843": {
-    "title": "inplace_vector",
-    "authors": [
-      "Gonzalo Brito Gadeschi",
-      "Timur Doumler",
-      "Nevin Liber",
-      "David Sankel"
-    ],
-    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p0843r9.html",
-    "date": "September 2023"
-  },
   "P1144": {
     "title": "std::is_trivially_relocatable",
     "authors": [
       "Arthur O'Dwyer"
     ],
-    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p1144r9.html",
-    "date": "October 2023"
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1144r10.html",
+    "date": "February 2024"
   },
   "P2785": {
     "title": "Relocating prvalues",
