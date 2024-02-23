@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 11
-!Draft Revision: 63
+!Draft Revision: 65
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
   Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2024-02-17
+Date: 2024-03-04
 </pre>
 
 <style>
@@ -30,6 +30,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 - R11:
 
     - Updated [[ParlayLib]] status; it conforms with P1144 since February 2024.
+            Updated [[Abseil]] and [[Folly]] status.
 
 - R10 (pre-Tokyo 2024):
 
@@ -142,11 +143,11 @@ trivial relocatability. Here's who does these optimizations in practice:
      no </td>
 </tr><tr>
 <td> [[Folly]] `folly::IsRelocatable<T>` </td><td>
-     <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L945-L966">`fbvector`</a> </td><td>
-     <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/Function.h#L749-L755">no</a> </td><td>
-     <a href="https://github.com/facebook/folly/blob/b6762ac6b9/folly/small_vector.h#L554-L559">`small_vector`</td><td>
-     <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1232-L1259">`fbvector`</a> </td><td>
-     <a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1273-L1292">`fbvector`</a> </td><td>
+     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/FBVector.h#L972">`fbvector`</a> </td><td>
+     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/Function.h#L706-L712">no</a> </td><td>
+     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/small_vector.h#L545-L546">`small_vector`</td><td>
+     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/FBVector.h#L1255-L1261">`fbvector`</a> </td><td>
+     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/FBVector.h#L1353-L1355">`fbvector`</a> </td><td>
      N/A </td><td>
      N/A </td>
 </tr><tr>
@@ -162,11 +163,11 @@ trivial relocatability. Here's who does these optimizations in practice:
 <td> [[Abseil]] `absl::is_trivially_relocatable<T>` </td><td>
     no </td><td>
     N/A </td><td>
-    <a href="https://github.com/abseil/abseil-cpp/blob/6d17d4b/absl/container/internal/inlined_vector.h#L304-L321">partial</a><br>in `inlined_vector` </td><td>
-    [proposed](https://github.com/abseil/abseil-cpp/pull/1615) for `inlined_vector` </td><td>
+    <a href="https://github.com/abseil/abseil-cpp/blob/7bd9ff910d489658da58251de1317eb3f790a2c6/absl/container/inlined_vector.h#L220-L230">`inlined_vector`</a> </td><td>
+    <a href="https://github.com/abseil/abseil-cpp/blob/7bd9ff910d489658da58251de1317eb3f790a2c6/absl/container/internal/inlined_vector.h#L896-L919">`inlined_vector`</a> </td><td>
     no </td><td>
     N/A </td><td>
-    [proposed](https://github.com/abseil/abseil-cpp/pull/1618) for `inlined_vector` </td>
+    <a href="https://github.com/abseil/abseil-cpp/blob/7bd9ff910d489658da58251de1317eb3f790a2c6/absl/container/internal/inlined_vector.h#L323-L335">`inlined_vector`</a> </td>
 </tr><tr>
 <td> [[Amadeus]] `amc::is_trivially_relocatable<T>` </td><td>
     <a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/smallvector.hpp#L41-L48">`Vector`</a> </td><td>
@@ -909,8 +910,7 @@ Here's how current implementations define "is trivially relocatable":
 - Bloomberg [[BSL]]'s `bslmf::IsBitwiseMoveable<T>`: Has a conversion to `bslmf::NestedTraitDeclaration<T, bslmf::IsBitwiseMoveable, true>`,
     or has a conversion to `bslmf::NestedTraitDeclaration<T, bslmf::IsBitwiseCopyable, true>`, or `is_trivially_copyable<T>`,
     or `sizeof(T) == 1`
-- Google [[Abseil]]'s `absl::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or `__is_trivially_relocatable(T)` on Linux Clang (not Windows or Apple);
-    after [#1625](https://github.com/abseil/abseil-cpp/pull/1625) it'll be "`is_trivially_copyable<T>`"
+- Google [[Abseil]]'s `absl::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`
 - [[Amadeus]] AMC's `amc::is_trivially_relocatable<T>`: `is_trivially_copyable<T>` or has member typedef `T::trivially_relocatable`
 - Nvidia [[Thrust]]'s `thrust::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or `proclaim_trivially_relocatable` is specialized for `T`
 - [[HPX]]'s `hpx::experimental::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or the trait is specialized for `T`
@@ -919,8 +919,8 @@ Here's how current implementations define "is trivially relocatable":
 
 </small>
 
-Notice that all library implementors (except Parlay on Clang and Abseil on Linux Clang due to the Clang builtin's
-current behavior) agree that a type with trivial move-constructor, trivial destructor, *and non-trivial assignment operator*
+Notice that all library implementors (except Parlay on Clang, due to the Clang builtin's current behavior)
+agree that a type with trivial move-constructor, trivial destructor, *and non-trivial assignment operator*
 is considered non-trivially relocatable. That is, the assignment operator is relevant!
 
 P1144 preserves that behavior, and justifies it by pointing out that relocation
