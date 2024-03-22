@@ -1,9 +1,9 @@
 <pre class='metadata'>
 Title: Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists
 Shortname: D3016
-Revision: 2
-!Draft Revision: 12
-Audience: LEWG
+Revision: 3
+!Draft Revision: 14
+Audience: LWG
 Status: D
 Group: WG21
 URL:
@@ -13,7 +13,7 @@ Abstract:
   We resolve some inconsistencies among [iterator.range] functions, notably
   `begin`/`end`, `data`, and `empty`, as applied to `valarray`, `initializer_list`,
   and braced initializer lists. We also resolve LWG3624 and LWG3625.
-Date: 2024-02-12
+Date: 2024-03-22
 </pre>
 
 <style>
@@ -23,6 +23,14 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R3 (post-LEWG in Tokyo):
+
+    - Move [possible resolutions for LWG3624 and LWG3625](#wording-lwg3624) out of the "Proposed Wording" section;
+          LEWG didn't want to step on LWG's toes by seeming to bless these issue resolutions
+
+    - For the same reason, remove `#include <initializer_list>` from the proposed wording of [iterator.synopsis];
+          it remains in the [possible resolutions for LWG3624 and LWG3625](#wording-lwg3624).
 
 - R2:
 
@@ -386,6 +394,63 @@ but the primary template `begin(C&)` is non-noexcept
 </tr>
 </table>
 
+# Possible resolutions for LWG3624 and LWG3625 # {#wording-lwg3624}
+
+Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:
+
+<small><blockquote>
+<p>1. In addition to being available via inclusion of the `<iterator>` header, the function templates in [iterator.range]
+are available when any of the following headers are included: `<array>`, `<deque>`, `<flat_map>`, `<flat_set>`,
+`<forward_list>`, `<list>`, `<map>`, `<regex>`, `<set>`, `<span>`, <ins>`<stacktrace>`,</ins> `<string>`, `<string_view>`,
+`<unordered_map>`, `<unordered_set>`, <ins><code>&lt;valarray></code>,</ins> and `<vector>`.
+</blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:
+
+<small><blockquote>
+<pre>
+#include &lt;compare>              // see [compare.syn]
+#include &lt;concepts>             // see [concepts.syn]
+<ins>#include &lt;initializer_list>     // see [initializer.list.syn]</ins>
+</pre>
+</blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/any.synop">[any.synop]</a> as follows
+(since <a href="https://eel.is/c++draft/any.class">[any.class]</a> requires both
+`std::initializer_list` and `std::type_info`):
+
+<small><blockquote>
+<pre>
+<ins>#include &lt;initializer_list>     // see [initializer.list.syn]</ins>
+<ins>#include &lt;typeinfo>             // see [typeinfo.syn]</ins>
+
+namespace std {
+</pre>
+</blockquote></small>
+
+Modify <a href="https://eel.is/c++draft/functional.syn">[functional.syn]</a> as follows
+(since <a href="https://eel.is/c++draft/func.wrap.move">[func.wrap.move]</a> requires `std::initializer_list`
+and <a href="https://eel.is/c++draft/func.wrap.func">[func.wrap.func]</a> requires `std::type_info`):
+
+<small><blockquote>
+<pre>
+<ins>#include &lt;initializer_list>     // see [initializer.list.syn]</ins>
+<ins>#include &lt;typeinfo>             // see [typeinfo.syn]</ins>
+
+namespace std {
+</pre>
+</blockquote></small>
+
+Contra LWG3624, do not modify <a href="https://eel.is/c++draft/type.index.synopsis">[type.index.synopsis]</a>;
+its only use of `std::type_info` is exposition-only.
+
+Contra LWG3624, do not modify <a href="https://eel.is/c++draft/stacktrace.syn">[stacktrace.syn]</a>.
+It uses `std::initializer_list` indirectly, via <a href="#wording-lwg3624">[iterator.range]/1</a> —
+but it uses `std::reverse_iterator` indirectly in the same way, and we certainly don't expect it to include `<iterator>`!
+The exact mechanism by which the library vendor satisfies
+<a href="https://eel.is/c++draft/dcl.init.list#2.sentence-4">[dcl.init.list]/2</a>
+should be left unspecified in this case.
+
 # Proposed wording # {#wording}
 
 Note: Vendors should provide `__cpp_lib_initializer_list` if `il.data()` and `il.empty()`
@@ -638,7 +703,6 @@ Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</
 <pre>
 #include &lt;compare>              // see [compare.syn]
 #include &lt;concepts>             // see [concepts.syn]
-<ins>#include &lt;initializer_list>     // see [initializer.list.syn]</ins>
 
 namespace std {
 </pre>
@@ -771,7 +835,7 @@ Modify <a href="https://eel.is/c++draft/span.cons">[span.cons]</a> as follows:
 
 <small><blockquote>
 <pre>
-constexpr explicit(extent != dynamic_extent) span(std::initializer_list<value_type> il);
+constexpr explicit(extent != dynamic_extent) span(std::initializer_list&lt;value_type> il);
 </pre>
 <p>18․ *Constraints:* `is_const_v<element_type>` is `true`.
 <p>19․ *Preconditions:* If `extent` is not equal to `dynamic_extent`, then `il.size()` is equal to `extent`.
@@ -788,63 +852,6 @@ valarray(initializer_list&lt;T> il);
 </pre>
 9․ *Effects:* Equivalent to <code>valarray(<del>il.begin()</del> <ins>il.data()</ins>, il.size())</code>.
 </blockquote></small>
-
-## Resolutions for LWG3624 and LWG3625 ## {#wording-lwg3624}
-
-Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:
-
-<small><blockquote>
-<p>1. In addition to being available via inclusion of the `<iterator>` header, the function templates in [iterator.range]
-are available when any of the following headers are included: `<array>`, `<deque>`, `<flat_map>`, `<flat_set>`,
-`<forward_list>`, `<list>`, `<map>`, `<regex>`, `<set>`, `<span>`, <ins>`<stacktrace>`,</ins> `<string>`, `<string_view>`,
-`<unordered_map>`, `<unordered_set>`, <ins><code>&lt;valarray></code>,</ins> and `<vector>`.
-</blockquote></small>
-
-Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:
-
-<small><blockquote>
-<pre>
-#include &lt;compare>              // see [compare.syn]
-#include &lt;concepts>             // see [concepts.syn]
-<ins>#include &lt;initializer_list>     // see [initializer.list.syn]</ins>
-</pre>
-</blockquote></small>
-
-Modify <a href="https://eel.is/c++draft/any.synop">[any.synop]</a> as follows
-(since <a href="https://eel.is/c++draft/any.class">[any.class]</a> requires both
-`std::initializer_list` and `std::type_info`):
-
-<small><blockquote>
-<pre>
-<ins>#include &lt;initializer_list>     // see [initializer.list.syn]</ins>
-<ins>#include &lt;typeinfo>             // see [typeinfo.syn]</ins>
-
-namespace std {
-</pre>
-</blockquote></small>
-
-Modify <a href="https://eel.is/c++draft/functional.syn">[functional.syn]</a> as follows
-(since <a href="https://eel.is/c++draft/func.wrap.move">[func.wrap.move]</a> requires `std::initializer_list`
-and <a href="https://eel.is/c++draft/func.wrap.func">[func.wrap.func]</a> requires `std::type_info`):
-
-<small><blockquote>
-<pre>
-<ins>#include &lt;initializer_list>     // see [initializer.list.syn]</ins>
-<ins>#include &lt;typeinfo>             // see [typeinfo.syn]</ins>
-
-namespace std {
-</pre>
-</blockquote></small>
-
-Contra LWG3624, do not modify <a href="https://eel.is/c++draft/type.index.synopsis">[type.index.synopsis]</a>;
-its only use of `std::type_info` is exposition-only.
-
-Contra LWG3624, do not modify <a href="https://eel.is/c++draft/stacktrace.syn">[stacktrace.syn]</a>.
-It uses `std::initializer_list` indirectly, via <a href="#wording-lwg3624">[iterator.range]/1</a> —
-but it uses `std::reverse_iterator` indirectly in the same way, and we certainly don't expect it to include `<iterator>`!
-The exact mechanism by which the library vendor satisfies
-<a href="https://eel.is/c++draft/dcl.init.list#2.sentence-4">[dcl.init.list]/2</a>
-should be left unspecified in this case.
 
 <pre class=biblio>
 {
