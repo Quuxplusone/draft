@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 11
-!Draft Revision: 66
+!Draft Revision: 67
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -16,7 +16,7 @@ Abstract:
   We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
   Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
   to the implementation that it is trivially relocatable.
-Date: 2024-03-22
+Date: 2024-05-06
 </pre>
 
 <style>
@@ -31,6 +31,8 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
     - Updated [[ParlayLib]] status; it conforms with P1144 since February 2024.
             Updated [[Abseil]] and [[Folly]] status.
+
+    - Introduce `NoThrowInputIterator` for the benefit of `uninitialized_relocate_n`.
 
 - R10 (pre-Tokyo 2024):
 
@@ -683,19 +685,31 @@ associated with the relocation of the object's value might not happen.</ins>
 Modify <a href="https://eel.is/c++draft/algorithms.requirements">[algorithms.requirements]</a> as follows:
 
 <small><blockquote>
-* If an algorithm's template parameter is named `ForwardIterator`, `ForwardIterator1`, `ForwardIterator2`, or `NoThrowForwardIterator`,
-    the template argument shall meet the *Cpp17ForwardIterator* requirements ([forward.iterators]) if it is required to be a mutable iterator,
+
+* If an algorithm's template parameter is named `InputIterator`, `InputIterator1`, <del>or</del> `InputIterator2`, <ins>or
+    `NoThrowInputIterator`,</ins> the template argument shall meet the *Cpp17InputIterator* requirements ([input.iterators]).
+
+* If an algorithm's template parameter is named `OutputIterator`, `OutputIterator1`, or `OutputIterator2`, the template argument
+    shall meet the `Cpp17OutputIterator` requirements ([output.iterators]).
+
+* If an algorithm's template parameter is named `ForwardIterator`, `ForwardIterator1`,
+    `ForwardIterator2`, <del>or</del> `NoThrowForwardIterator`, <ins>`NoThrowForwardIterator1`, or `NoThrowForwardIterator2`,</ins> the
+    template argument shall meet the *Cpp17ForwardIterator* requirements ([forward.iterators]) if it is required to be a mutable iterator,
     or model `forward_iterator` ([iterator.concept.forward]) otherwise.
 
-* If an algorithm's template parameter is named `NoThrowForwardIterator`, the template argument is also required to have the property
-    that no exceptions are thrown from increment, assignment, or comparison of, or indirection through, valid iterators.
+* If an algorithm's template parameter is
+    named <ins>`NoThrowInputIterator`,</ins> `NoThrowForwardIterator`, <ins>`NoThrowForwardIterator1`, or `NoThrowForwardIterator2`,</ins> the
+    template argument is also required to have the property that no exceptions are thrown
+    from increment, assignment, or comparison of, or indirection through, valid iterators.
 
-* If an algorithm's template parameter is named `BidirectionalIterator`, `BidirectionalIterator1`, <del>or</del> `BidirectionalIterator2`, <ins>or
-    `NoThrowBidirectionalIterator`,</ins> the template argument shall meet the *Cpp17BidirectionalIterator* requirements ([bidirectional.iterators])
+* If an algorithm's template parameter is named `BidirectionalIterator`,
+    `BidirectionalIterator1`, <del>or</del> `BidirectionalIterator2`, <ins>`NoThrowBidirectionalIterator1`, or `NoThrowBidirectionalIterator2`,</ins> the
+    template argument shall meet the *Cpp17BidirectionalIterator* requirements ([bidirectional.iterators])
     if it is required to be a mutable iterator, or model `bidirectional_iterator` ([iterator.concept.bidir]) otherwise.
 
-* <ins>If an algorithm's template parameter is named `NoThrowBidirectionalIterator`, the template argument is also required to have the property
-    that no exceptions are thrown from increment, decrement, assignment, or comparison of, or indirection through, valid iterators.</ins>
+* <ins>If an algorithm's template parameter is named `NoThrowBidirectionalIterator1` or `NoThrowBidirectionalIterator2`, the
+    template argument is also required to have the property that no exceptions are thrown
+    from increment, decrement, assignment, or comparison of, or indirection through, valid iterators.</ins>
 
 </blockquote></small>
 
@@ -756,34 +770,34 @@ Modify <a href="http://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:
                                O ofirst, S olast);
   }
 
-  <ins>template&lt;class InputIterator, class NoThrowForwardIterator></ins>
-    <ins>NoThrowForwardIterator uninitialized_relocate(InputIterator first,</ins>
-                                                  <ins>InputIterator last,</ins>
-                                                  <ins>NoThrowForwardIterator result);</ins>  <ins>// freestanding</ins>
-  <ins>template&lt;class ExecutionPolicy, class ForwardIterator, class NoThrowForwardIterator></ins>
-    <ins>NoThrowForwardIterator uninitialized_relocate(ExecutionPolicy&& exec,</ins>           <ins>// see [algorithms.parallel.overloads]</ins>
-                                                  <ins>ForwardIterator first, ForwardIterator last,</ins>
-                                                  <ins>NoThrowForwardIterator result);</ins>
+  <ins>template&lt;class NoThrowInputIterator, class NoThrowForwardIterator></ins>
+    <ins>NoThrowForwardIterator uninitialized_relocate(NoThrowInputIterator first,</ins>
+                                                  <ins>NoThrowInputIterator last,</ins>
+                                                  <ins>NoThrowForwardIterator result);</ins>   <ins>// freestanding</ins>
+  <ins>template&lt;class ExecutionPolicy, class NoThrowForwardIterator1, class NoThrowForwardIterator2></ins>
+    <ins>NoThrowForwardIterator2 uninitialized_relocate(ExecutionPolicy&& exec,</ins>          <ins>// see [algorithms.parallel.overloads]</ins>
+                                                   <ins>NoThrowForwardIterator1 first, NoThrowForwardIterator1 last,</ins>
+                                                   <ins>NoThrowForwardIterator2 result);</ins>
 
-  <ins>template&lt;class InputIterator, class Size, class NoThrowForwardIterator></ins>
-    <ins>pair&lt;InputIterator, NoThrowForwardIterator></ins>
-      <ins>uninitialized_relocate_n(InputIterator first, Size n,</ins>
+  <ins>template&lt;class NoThrowInputIterator, class Size, class NoThrowForwardIterator></ins>
+    <ins>pair&lt;NoThrowInputIterator, NoThrowForwardIterator></ins>
+      <ins>uninitialized_relocate_n(NoThrowInputIterator first, Size n,</ins>
                                <ins>NoThrowForwardIterator result);</ins>                      <ins>// freestanding</ins>
-  <ins>template&lt;class ExecutionPolicy, class ForwardIterator, class Size,</ins>
-           <ins>class NoThrowForwardIterator></ins>
-    <ins>pair&lt;ForwardIterator, NoThrowForwardIterator></ins>
+  <ins>template&lt;class ExecutionPolicy, class NoThrowForwardIterator1, class Size,</ins>
+           <ins>class NoThrowForwardIterator2></ins>
+    <ins>pair&lt;NoThrowForwardIterator1, NoThrowForwardIterator2></ins>
       <ins>uninitialized_relocate_n(ExecutionPolicy&& exec,</ins>                              <ins>// see [algorithms.parallel.overloads]</ins>
-                               <ins>ForwardIterator first, Size n, NoThrowForwardIterator result);</ins>
+                               <ins>NoThrowForwardIterator1 first, Size n, NoThrowForwardIterator2 result);</ins>
 
-  <ins>template&lt;class BidirectionalIterator, class NoThrowBidirectionalIterator></ins>
-    <ins>NoThrowBidirectionalIterator</ins>
-      <ins>uninitialized_relocate_backward(BidirectionalIterator first, BidirectionalIterator last,</ins>
-                                      <ins>NoThrowBidirectionalIterator result);</ins>         <ins>// freestanding</ins>
-  <ins>template&lt;class ExecutionPolicy, class BidirectionalIterator, class NoThrowBidirectionalIterator></ins>
-    <ins>NoThrowBidirectionalIterator</ins>
+  <ins>template&lt;class NoThrowBidirectionalIterator1, class NoThrowBidirectionalIterator2></ins>
+    <ins>NoThrowBidirectionalIterator2</ins>
+      <ins>uninitialized_relocate_backward(NoThrowBidirectionalIterator1 first, BidirectionalIterator1 last,</ins>
+                                      <ins>NoThrowBidirectionalIterator2 result);</ins>        <ins>// freestanding</ins>
+  <ins>template&lt;class ExecutionPolicy, class NoThrowBidirectionalIterator1, class NoThrowBidirectionalIterator2></ins>
+    <ins>NoThrowBidirectionalIterator2</ins>
       <ins>uninitialized_relocate_backward(ExecutionPolicy&& exec,</ins>
-                                      <ins>BidirectionalIterator first, BidirectionalIterator last,</ins>
-                                      <ins>NoThrowBidirectionalIterator result);</ins>         <ins>// freestanding</ins>
+                                      <ins>NoThrowBidirectionalIterator1 first, NoThrowBidirectionalIterator1 last,</ins>
+                                      <ins>NoThrowBidirectionalIterator2 result);</ins>        <ins>// freestanding</ins>
 
   template&lt;class NoThrowForwardIterator, class T>
     void uninitialized_fill(NoThrowForwardIterator first,                           // freestanding
@@ -797,8 +811,8 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
 <small><blockquote>
 <ins><b><code>uninitialized_relocate</code> [uninitialized.relocate]</b></ins>
 <pre>
-  <ins>template&lt;class InputIterator, class NoThrowForwardIterator></ins>
-  <ins>NoThrowForwardIterator uninitialized_relocate(InputIterator first, InputIterator last,</ins>
+  <ins>template&lt;class NoThrowInputIterator, class NoThrowForwardIterator></ins>
+  <ins>NoThrowForwardIterator uninitialized_relocate(NoThrowInputIterator first, NoThrowInputIterator last,</ins>
                                                 <ins>NoThrowForwardIterator result);</ins>
 </pre>
 <p><ins>1․ *Effects:* Equivalent to:</ins>
@@ -821,9 +835,9 @@ associated with the relocation of the object's value might not happen.</ins>
 ranges are destroyed.</ins>
 
 <pre>
-  <ins>template&lt;class InputIterator, class Size, class NoThrowForwardIterator></ins>
-    <ins>pair&lt;InputIterator, NoThrowForwardIterator></ins>
-      <ins>uninitialized_relocate_n(InputIterator first, Size n, NoThrowForwardIterator result);</ins>
+  <ins>template&lt;class NoThrowInputIterator, class Size, class NoThrowForwardIterator></ins>
+    <ins>pair&lt;NoThrowInputIterator, NoThrowForwardIterator></ins>
+      <ins>uninitialized_relocate_n(NoThrowInputIterator first, Size n, NoThrowForwardIterator result);</ins>
 </pre>
 <p><ins>3․ *Effects:* Equivalent to:</ins>
 <pre>
@@ -841,15 +855,14 @@ ranges are destroyed.</ins>
 </pre>
 <ins>except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.</ins>
-
 <p><ins>4․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.</ins>
 
 <pre>
-  <ins>template&lt;class BidirectionalIterator, class NoThrowBidirectionalIterator></ins>
-    <ins>NoThrowBidirectionalIterator</ins>
-      <ins>uninitialized_relocate_backward(BidirectionalIterator first, BidirectionalIterator last,</ins>
-                                      <ins>NoThrowBidirectionalIterator result);</ins>
+  <ins>template&lt;class NoThrowBidirectionalIterator1, class NoThrowBidirectionalIterator2></ins>
+    <ins>NoThrowBidirectionalIterator2</ins>
+      <ins>uninitialized_relocate_backward(NoThrowBidirectionalIterator1 first, NoThrowBidirectionalIterator1 last,</ins>
+                                      <ins>NoThrowBidirectionalIterator2 result);</ins>
 </pre>
 
 <ins>5․ *Effects:* Equivalent to:</ins>
@@ -859,7 +872,7 @@ ranges are destroyed.</ins>
       <ins>--last;</ins>
       <ins>--result;</ins>
       <ins>::new (<i>voidify</i>(*result))</ins>
-        <ins>typename iterator_traits&lt;NoThrowBidirectionalIterator>::value_type(std::move(*last));</ins>
+        <ins>typename iterator_traits&lt;NoThrowBidirectionalIterator2>::value_type(std::move(*last));</ins>
       <ins>destroy_at(addressof(*last));</ins>
     <ins>}</ins>
     <ins>return result;</ins>
@@ -870,7 +883,6 @@ ranges are destroyed.</ins>
 </pre>
 <ins>except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object's value might not happen.</ins>
-
 <p><ins>6․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.</ins>
 </blockquote></small>
@@ -1148,6 +1160,9 @@ of an attribute). EWGI took the following [straw polls](https://wiki.edg.com/bin
 <tr><th><small>The annotation should "trust the user" as in P1144R6's `[[trivially_relocatable]]` ("sharp knife"),
                instead of diagnosing as in P1144R6's `[[clang::maybe_trivially_relocatable]]` and P2786R0's `trivially_relocatable` ("dull knife"). Three-way poll.</th>
 <th> — </th><th> 7 </th><th> 5 </th><th> 6 </th><th> — </th></tr>
+
+<tr><th><small>Forward P1144 to EWG.</th>
+<th> 0 </th><th> 7 </th><th> 4 </th><th> 3 </th><th> 1 </th></tr>
 </table>
 
 ## Polls taken at EWGI at Prague on 2020-02-13 ## {#taken-polls-2020-02-13}
