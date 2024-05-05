@@ -2091,7 +2091,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R11<br>std::is_trivially_relocatable</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-03-22">2024-03-22</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-05-05">2024-05-05</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2101,7 +2101,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>66
+     <dd>67
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2197,6 +2197,8 @@ to the implementation that it is trivially relocatable.</p>
       <li data-md>
        <p>Updated <a data-link-type="biblio" href="#biblio-parlaylib" title="ParlayLib, a toolkit for programming parallel algorithms on shared-memory multicore machines">[ParlayLib]</a> status; it conforms with P1144 since February 2024.
     Updated <a data-link-type="biblio" href="#biblio-abseil" title="Abseil C++ Common Libraries">[Abseil]</a> and <a data-link-type="biblio" href="#biblio-folly" title="Folly documentation on &quot;Object Relocation&quot;">[Folly]</a> status.</p>
+      <li data-md>
+       <p>Introduce <code class="highlight"><c- n>NoThrowInputIterator</c-></code> for the benefit of <code class="highlight"><c- n>uninitialized_relocate_n</c-></code>.</p>
      </ul>
     <li data-md>
      <p>R10 (pre-Tokyo 2024):</p>
@@ -2632,12 +2634,17 @@ associated with the relocation of the object’s value might not happen.</ins> <
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <ul><li data-md><p>If an algorithm’s template parameter is named <code class="highlight"><c- n>ForwardIterator</c-></code>, <code class="highlight"><c- n>ForwardIterator1</c-></code>, <code class="highlight"><c- n>ForwardIterator2</c-></code>, or <code class="highlight"><c- n>NoThrowForwardIterator</c-></code>,
-the template argument shall meet the <em>Cpp17ForwardIterator</em> requirements ([forward.iterators]) if it is required to be a mutable iterator,
-or model <code class="highlight"><c- n>forward_iterator</c-></code> ([iterator.concept.forward]) otherwise.</p> </li><li data-md><p>If an algorithm’s template parameter is named <code class="highlight"><c- n>NoThrowForwardIterator</c-></code>, the template argument is also required to have the property
-that no exceptions are thrown from increment, assignment, or comparison of, or indirection through, valid iterators.</p> </li><li data-md><p>If an algorithm’s template parameter is named <code class="highlight"><c- n>BidirectionalIterator</c-></code>, <code class="highlight"><c- n>BidirectionalIterator1</c-></code>, <del>or</del> <code class="highlight"><c- n>BidirectionalIterator2</c-></code>, <ins>or <code class="highlight"><c- n>NoThrowBidirectionalIterator</c-></code>,</ins> the template argument shall meet the <em>Cpp17BidirectionalIterator</em> requirements ([bidirectional.iterators])
-if it is required to be a mutable iterator, or model <code class="highlight"><c- n>bidirectional_iterator</c-></code> ([iterator.concept.bidir]) otherwise.</p> </li><li data-md><ins>If an algorithm’s template parameter is named <code class="highlight"><c- n>NoThrowBidirectionalIterator</c-></code>, the template argument is also required to have the property
-that no exceptions are thrown from increment, decrement, assignment, or comparison of, or indirection through, valid iterators.</ins> </li></ul> </small>
+    <small> <ul><li data-md><p>If an algorithm’s template parameter is named <code class="highlight"><c- n>InputIterator</c-></code>, <code class="highlight"><c- n>InputIterator1</c-></code>, <del>or</del> <code class="highlight"><c- n>InputIterator2</c-></code>, <ins>or <code class="highlight"><c- n>NoThrowInputIterator</c-></code>,</ins> the template argument shall meet the <em>Cpp17InputIterator</em> requirements ([input.iterators]).</p> </li><li data-md><p>If an algorithm’s template parameter is named <code class="highlight"><c- n>OutputIterator</c-></code>, <code class="highlight"><c- n>OutputIterator1</c-></code>, or <code class="highlight"><c- n>OutputIterator2</c-></code>, the template argument
+shall meet the <code class="highlight"><c- n>Cpp17OutputIterator</c-></code> requirements ([output.iterators]).</p> </li><li data-md><p>If an algorithm’s template parameter is named <code class="highlight"><c- n>ForwardIterator</c-></code>, <code class="highlight"><c- n>ForwardIterator1</c-></code>, <code class="highlight"><c- n>ForwardIterator2</c-></code>, <del>or</del> <code class="highlight"><c- n>NoThrowForwardIterator</c-></code>, <ins><code class="highlight"><c- n>NoThrowForwardIterator1</c-></code>, or <code class="highlight"><c- n>NoThrowForwardIterator2</c-></code>,</ins> the
+template argument shall meet the <em>Cpp17ForwardIterator</em> requirements ([forward.iterators]) if it is required to be a mutable iterator,
+or model <code class="highlight"><c- n>forward_iterator</c-></code> ([iterator.concept.forward]) otherwise.</p> </li><li data-md><p>If an algorithm’s template parameter is
+named <ins><code class="highlight"><c- n>NoThrowInputIterator</c-></code>,</ins> <code class="highlight"><c- n>NoThrowForwardIterator</c-></code>, <ins><code class="highlight"><c- n>NoThrowForwardIterator1</c-></code>, or <code class="highlight"><c- n>NoThrowForwardIterator2</c-></code>,</ins> the
+template argument is also required to have the property that no exceptions are thrown
+from increment, assignment, or comparison of, or indirection through, valid iterators.</p> </li><li data-md><p>If an algorithm’s template parameter is named <code class="highlight"><c- n>BidirectionalIterator</c-></code>, <code class="highlight"><c- n>BidirectionalIterator1</c-></code>, <del>or</del> <code class="highlight"><c- n>BidirectionalIterator2</c-></code>, <ins><code class="highlight"><c- n>NoThrowBidirectionalIterator1</c-></code>, or <code class="highlight"><c- n>NoThrowBidirectionalIterator2</c-></code>,</ins> the
+template argument shall meet the <em>Cpp17BidirectionalIterator</em> requirements ([bidirectional.iterators])
+if it is required to be a mutable iterator, or model <code class="highlight"><c- n>bidirectional_iterator</c-></code> ([iterator.concept.bidir]) otherwise.</p> </li><li data-md><ins>If an algorithm’s template parameter is named <code class="highlight"><c- n>NoThrowBidirectionalIterator1</c-></code> or <code class="highlight"><c- n>NoThrowBidirectionalIterator2</c-></code>, the
+template argument is also required to have the property that no exceptions are thrown
+from increment, decrement, assignment, or comparison of, or indirection through, valid iterators.</ins> </li></ul> </small>
    </blockquote>
    <h3 class="heading settled" data-level="4.11" id="wording-uninitialized.relocate"><span class="secno">4.11. </span><span class="content"><code class="highlight"><c- n>uninitialized_relocate</c-></code>, <code class="highlight"><c- n>uninitialized_relocate_n</c-></code>, <code class="highlight"><c- n>uninitialized_relocate_backward</c-></code> [uninitialized.relocate]</span><a class="self-link" href="#wording-uninitialized.relocate"></a></h3>
    <p class="note" role="note"><span class="marker">Note:</span> Compare to <a href="https://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a> and <a href="https://eel.is/c++draft/alg.copy">[alg.copy]</a>. The <i>Remarks</i> allude to blanket wording
@@ -2689,34 +2696,34 @@ That’s a bad contract. Therefore, we omit the <code class="highlight"><c- n>ra
                              <c- n>O</c-> <c- n>ofirst</c-><c- p>,</c-> <c- n>S</c-> <c- n>olast</c-><c- p>);</c->
 <c- p>}</c->
 
-<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
-  <ins><c- n>NoThrowForwardIterator</c-> <c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-></ins>
-                                                <ins><c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-></ins>
-                                                <ins><c- n>NoThrowForwardIterator</c-> <c- n>result</c-><c- p>);</c-></ins>  <ins><c- c1>// freestanding</c-></ins>
-<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ExecutionPolicy</c-><c- p>,</c-> <c- k>class</c-> <c- nc>ForwardIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
-  <ins><c- n>NoThrowForwardIterator</c-> <c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>ExecutionPolicy</c-><c- o>&amp;&amp;</c-> <c- n>exec</c-><c- p>,</c-></ins>           <ins><c- c1>// see [algorithms.parallel.overloads]</c-></ins>
-                                                <ins><c- n>ForwardIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>ForwardIterator</c-> <c- n>last</c-><c- p>,</c-></ins>
-                                                <ins><c- n>NoThrowForwardIterator</c-> <c- n>result</c-><c- p>);</c-></ins>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>NoThrowInputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
+  <ins><c- n>NoThrowForwardIterator</c-> <c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>NoThrowInputIterator</c-> <c- n>first</c-><c- p>,</c-></ins>
+                                                <ins><c- n>NoThrowInputIterator</c-> <c- n>last</c-><c- p>,</c-></ins>
+                                                <ins><c- n>NoThrowForwardIterator</c-> <c- n>result</c-><c- p>);</c-></ins>   <ins><c- c1>// freestanding</c-></ins>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ExecutionPolicy</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator1</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator2</c-><c- o>></c-></ins>
+  <ins><c- n>NoThrowForwardIterator2</c-> <c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>ExecutionPolicy</c-><c- o>&amp;&amp;</c-> <c- n>exec</c-><c- p>,</c-></ins>          <ins><c- c1>// see [algorithms.parallel.overloads]</c-></ins>
+                                                 <ins><c- n>NoThrowForwardIterator1</c-> <c- n>first</c-><c- p>,</c-> <c- n>NoThrowForwardIterator1</c-> <c- n>last</c-><c- p>,</c-></ins>
+                                                 <ins><c- n>NoThrowForwardIterator2</c-> <c- n>result</c-><c- p>);</c-></ins>
 
-<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Size</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
-  <ins><c- n>pair</c-><c- o>&lt;</c-><c- n>InputIterator</c-><c- p>,</c-> <c- n>NoThrowForwardIterator</c-><c- o>></c-></ins>
-    <ins><c- n>uninitialized_relocate_n</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>Size</c-> <c- n>n</c-><c- p>,</c-></ins>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>NoThrowInputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Size</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
+  <ins><c- n>pair</c-><c- o>&lt;</c-><c- n>NoThrowInputIterator</c-><c- p>,</c-> <c- n>NoThrowForwardIterator</c-><c- o>></c-></ins>
+    <ins><c- n>uninitialized_relocate_n</c-><c- p>(</c-><c- n>NoThrowInputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>Size</c-> <c- n>n</c-><c- p>,</c-></ins>
                              <ins><c- n>NoThrowForwardIterator</c-> <c- n>result</c-><c- p>);</c-></ins>                      <ins><c- c1>// freestanding</c-></ins>
-<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ExecutionPolicy</c-><c- p>,</c-> <c- k>class</c-> <c- nc>ForwardIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Size</c-><c- p>,</c-></ins>
-         <ins><c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
-  <ins><c- n>pair</c-><c- o>&lt;</c-><c- n>ForwardIterator</c-><c- p>,</c-> <c- n>NoThrowForwardIterator</c-><c- o>></c-></ins>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ExecutionPolicy</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator1</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Size</c-><c- p>,</c-></ins>
+         <ins><c- k>class</c-> <c- nc>NoThrowForwardIterator2</c-><c- o>></c-></ins>
+  <ins><c- n>pair</c-><c- o>&lt;</c-><c- n>NoThrowForwardIterator1</c-><c- p>,</c-> <c- n>NoThrowForwardIterator2</c-><c- o>></c-></ins>
     <ins><c- n>uninitialized_relocate_n</c-><c- p>(</c-><c- n>ExecutionPolicy</c-><c- o>&amp;&amp;</c-> <c- n>exec</c-><c- p>,</c-></ins>                              <ins><c- c1>// see [algorithms.parallel.overloads]</c-></ins>
-                             <ins><c- n>ForwardIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>Size</c-> <c- n>n</c-><c- p>,</c-> <c- n>NoThrowForwardIterator</c-> <c- n>result</c-><c- p>);</c-></ins>
+                             <ins><c- n>NoThrowForwardIterator1</c-> <c- n>first</c-><c- p>,</c-> <c- n>Size</c-> <c- n>n</c-><c- p>,</c-> <c- n>NoThrowForwardIterator2</c-> <c- n>result</c-><c- p>);</c-></ins>
 
-<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>BidirectionalIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowBidirectionalIterator</c-><c- o>></c-></ins>
-  <ins><c- n>NoThrowBidirectionalIterator</c-></ins>
-    <ins><c- n>uninitialized_relocate_backward</c-><c- p>(</c-><c- n>BidirectionalIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>BidirectionalIterator</c-> <c- n>last</c-><c- p>,</c-></ins>
-                                    <ins><c- n>NoThrowBidirectionalIterator</c-> <c- n>result</c-><c- p>);</c-></ins>         <ins><c- c1>// freestanding</c-></ins>
-<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ExecutionPolicy</c-><c- p>,</c-> <c- k>class</c-> <c- nc>BidirectionalIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowBidirectionalIterator</c-><c- o>></c-></ins>
-  <ins><c- n>NoThrowBidirectionalIterator</c-></ins>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>NoThrowBidirectionalIterator1</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowBidirectionalIterator2</c-><c- o>></c-></ins>
+  <ins><c- n>NoThrowBidirectionalIterator2</c-></ins>
+    <ins><c- n>uninitialized_relocate_backward</c-><c- p>(</c-><c- n>NoThrowBidirectionalIterator1</c-> <c- n>first</c-><c- p>,</c-> <c- n>BidirectionalIterator1</c-> <c- n>last</c-><c- p>,</c-></ins>
+                                    <ins><c- n>NoThrowBidirectionalIterator2</c-> <c- n>result</c-><c- p>);</c-></ins>        <ins><c- c1>// freestanding</c-></ins>
+<ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>ExecutionPolicy</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowBidirectionalIterator1</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowBidirectionalIterator2</c-><c- o>></c-></ins>
+  <ins><c- n>NoThrowBidirectionalIterator2</c-></ins>
     <ins><c- n>uninitialized_relocate_backward</c-><c- p>(</c-><c- n>ExecutionPolicy</c-><c- o>&amp;&amp;</c-> <c- n>exec</c-><c- p>,</c-></ins>
-                                    <ins><c- n>BidirectionalIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>BidirectionalIterator</c-> <c- n>last</c-><c- p>,</c-></ins>
-                                    <ins><c- n>NoThrowBidirectionalIterator</c-> <c- n>result</c-><c- p>);</c-></ins>         <ins><c- c1>// freestanding</c-></ins>
+                                    <ins><c- n>NoThrowBidirectionalIterator1</c-> <c- n>first</c-><c- p>,</c-> <c- n>NoThrowBidirectionalIterator1</c-> <c- n>last</c-><c- p>,</c-></ins>
+                                    <ins><c- n>NoThrowBidirectionalIterator2</c-> <c- n>result</c-><c- p>);</c-></ins>        <ins><c- c1>// freestanding</c-></ins>
 
 <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>T</c-><c- o>></c->
   <c- b>void</c-> <c- n>uninitialized_fill</c-><c- p>(</c-><c- n>NoThrowForwardIterator</c-> <c- n>first</c-><c- p>,</c->                           <c- c1>// freestanding</c->
@@ -2728,8 +2735,8 @@ That’s a bad contract. Therefore, we omit the <code class="highlight"><c- n>ra
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <ins><b><code class="highlight"><c- n>uninitialized_relocate</c-></code> [uninitialized.relocate]</b></ins> <pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
-<ins><c- n>NoThrowForwardIterator</c-> <c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-></ins>
+    <small> <ins><b><code class="highlight"><c- n>uninitialized_relocate</c-></code> [uninitialized.relocate]</b></ins> <pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>NoThrowInputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
+<ins><c- n>NoThrowForwardIterator</c-> <c- n>uninitialized_relocate</c-><c- p>(</c-><c- n>NoThrowInputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>NoThrowInputIterator</c-> <c- n>last</c-><c- p>,</c-></ins>
                                               <ins><c- n>NoThrowForwardIterator</c-> <c- n>result</c-><c- p>);</c-></ins>
 </pre><p><ins>1․ <em>Effects:</em> Equivalent to:</ins> </p><pre class="highlight"><ins><c- k>try</c-> <c- p>{</c-></ins>
   <ins><c- k>for</c-> <c- p>(;</c-> <c- n>first</c-> <c- o>!=</c-> <c- n>last</c-><c- p>;</c-> <c- o>++</c-><c- n>result</c-><c- p>,</c-> <c- p>(</c-><c- b>void</c-><c- p>)</c-><c- o>++</c-><c- n>first</c-><c- p>)</c-> <c- p>{</c-></ins>
@@ -2744,9 +2751,9 @@ That’s a bad contract. Therefore, we omit the <code class="highlight"><c- n>ra
 <ins><c- p>}</c-></ins>
 </pre><ins>except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object’s value might not happen.</ins> <p><ins>2․ <em>Remarks:</em> If an exception is thrown, all objects in both the source and destination
-ranges are destroyed.</ins> </p><pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Size</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
-  <ins><c- n>pair</c-><c- o>&lt;</c-><c- n>InputIterator</c-><c- p>,</c-> <c- n>NoThrowForwardIterator</c-><c- o>></c-></ins>
-    <ins><c- n>uninitialized_relocate_n</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>Size</c-> <c- n>n</c-><c- p>,</c-> <c- n>NoThrowForwardIterator</c-> <c- n>result</c-><c- p>);</c-></ins>
+ranges are destroyed.</ins> </p><pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>NoThrowInputIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Size</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowForwardIterator</c-><c- o>></c-></ins>
+  <ins><c- n>pair</c-><c- o>&lt;</c-><c- n>NoThrowInputIterator</c-><c- p>,</c-> <c- n>NoThrowForwardIterator</c-><c- o>></c-></ins>
+    <ins><c- n>uninitialized_relocate_n</c-><c- p>(</c-><c- n>NoThrowInputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>Size</c-> <c- n>n</c-><c- p>,</c-> <c- n>NoThrowForwardIterator</c-> <c- n>result</c-><c- p>);</c-></ins>
 </pre><p><ins>3․ <em>Effects:</em> Equivalent to:</ins> </p><pre class="highlight"><ins><c- k>try</c-> <c- p>{</c-></ins>
   <ins><c- k>for</c-> <c- p>(;</c-> <c- n>n</c-> <c- o>></c-> <c- mi>0</c-><c- p>;</c-> <c- o>++</c-><c- n>result</c-><c- p>,</c-> <c- p>(</c-><c- b>void</c-><c- p>)</c-><c- o>++</c-><c- n>first</c-><c- p>,</c-> <c- o>--</c-><c- n>n</c-><c- p>)</c-> <c- p>{</c-></ins>
     <ins><c- o>::</c-><c- k>new</c-> <c- p>(</c-><i><c- n>voidify</c-></i><c- p>(</c-><c- o>*</c-><c- n>result</c-><c- p>))</c-></ins>
@@ -2760,16 +2767,16 @@ ranges are destroyed.</ins> </p><pre class="highlight"><ins><c- k>template</c-><
 <ins><c- p>}</c-></ins>
 </pre><ins>except that if the iterators' common value type is trivially relocatable, side effects
 associated with the relocation of the object’s value might not happen.</ins> <p><ins>4․ <em>Remarks:</em> If an exception is thrown, all objects in both the source and destination
-ranges are destroyed.</ins> </p><pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>BidirectionalIterator</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowBidirectionalIterator</c-><c- o>></c-></ins>
-  <ins><c- n>NoThrowBidirectionalIterator</c-></ins>
-    <ins><c- n>uninitialized_relocate_backward</c-><c- p>(</c-><c- n>BidirectionalIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>BidirectionalIterator</c-> <c- n>last</c-><c- p>,</c-></ins>
-                                    <ins><c- n>NoThrowBidirectionalIterator</c-> <c- n>result</c-><c- p>);</c-></ins>
+ranges are destroyed.</ins> </p><pre class="highlight"><ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>NoThrowBidirectionalIterator1</c-><c- p>,</c-> <c- k>class</c-> <c- nc>NoThrowBidirectionalIterator2</c-><c- o>></c-></ins>
+  <ins><c- n>NoThrowBidirectionalIterator2</c-></ins>
+    <ins><c- n>uninitialized_relocate_backward</c-><c- p>(</c-><c- n>NoThrowBidirectionalIterator1</c-> <c- n>first</c-><c- p>,</c-> <c- n>NoThrowBidirectionalIterator1</c-> <c- n>last</c-><c- p>,</c-></ins>
+                                    <ins><c- n>NoThrowBidirectionalIterator2</c-> <c- n>result</c-><c- p>);</c-></ins>
 </pre> <ins>5․ <em>Effects:</em> Equivalent to:</ins> <pre class="highlight"><ins><c- k>try</c-> <c- p>{</c-></ins>
   <ins><c- k>for</c-> <c- p>(;</c-> <c- n>last</c-> <c- o>!=</c-> <c- n>first</c-><c- p>;</c-> <c- p>)</c-> <c- p>{</c-></ins>
     <ins><c- o>--</c-><c- n>last</c-><c- p>;</c-></ins>
     <ins><c- o>--</c-><c- n>result</c-><c- p>;</c-></ins>
     <ins><c- o>::</c-><c- k>new</c-> <c- p>(</c-><i><c- n>voidify</c-></i><c- p>(</c-><c- o>*</c-><c- n>result</c-><c- p>))</c-></ins>
-      <ins><c- k>typename</c-> <c- nc>iterator_traits</c-><c- o>&lt;</c-><c- n>NoThrowBidirectionalIterator</c-><c- o>>::</c-><c- n>value_type</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>last</c-><c- p>));</c-></ins>
+      <ins><c- k>typename</c-> <c- nc>iterator_traits</c-><c- o>&lt;</c-><c- n>NoThrowBidirectionalIterator2</c-><c- o>>::</c-><c- n>value_type</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>move</c-><c- p>(</c-><c- o>*</c-><c- n>last</c-><c- p>));</c-></ins>
     <ins><c- n>destroy_at</c-><c- p>(</c-><c- n>addressof</c-><c- p>(</c-><c- o>*</c-><c- n>last</c-><c- p>));</c-></ins>
   <ins><c- p>}</c-></ins>
   <ins><c- k>return</c-> <c- n>result</c-><c- p>;</c-></ins>
