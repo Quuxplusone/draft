@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 11
-!Draft Revision: 67
+!Draft Revision: 68
 Audience: LEWG, EWG
 Status: D
 Group: WG21
@@ -30,7 +30,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 - R11:
 
     - Updated [[ParlayLib]] status; it conforms with P1144 since February 2024.
-            Updated [[Abseil]] and [[Folly]] status.
+            Updated [[Abseil]] and [[Folly]] status. Added [[PocketPy]] status.
 
     - Introduce `NoThrowInputIterator` for the benefit of `uninitialized_relocate_n`.
 
@@ -928,6 +928,7 @@ Here's how current implementations define "is trivially relocatable":
 - [[HPX]]'s `hpx::experimental::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or the trait is specialized for `T`
 - [[ParlayLib]]'s `parlay::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or `__is_trivially_relocatable(T)` on Clang;
     or the trait is specialized for `T`
+- [[PocketPy]]'s `pkpy::is_trivially_relocatable_v<T>`: `is_trivially_copyable<T>` and `is_trivially_destructible<T>`, or `TriviallyRelocatable` is specialized for `T`
 
 </small>
 
@@ -1116,10 +1117,12 @@ Thanks to Elias Kosunen, Niall Douglas, John Bandela, and Nicolas Lesser for the
 Thanks to Jens Maurer for his feedback on P1144R3 at Kona 2019, and to Corentin Jabot for championing
 P1144R4 at Prague 2020.
 
-Thanks to Nicolas Lesser and John McCall for their review comments on the Clang implementation [[D50119]].
-
 Many thanks to Matt Godbolt for allowing me to install my Clang fork on Compiler Explorer
 (<a href="https://p1144.godbolt.org/z/oWEd_X">godbolt.org</a>). See also [[Announcing]].
+
+Thanks to Nicolas Lesser and John McCall for their review comments on the original Clang pull request [[D50119]].
+Thanks to Amirreza Ashouri for reviving the Clang effort in 2024 as
+<a href="https://github.com/llvm/llvm-project/pull/84621">#84621</a>.
 
 Thanks to Howard Hinnant for appearing with me on [[CppChat]], and to Jon Kalb and Phil Nash for hosting us.
 
@@ -1134,6 +1137,12 @@ and to Giuseppe D'Angelo for extensive review comments and discussion.
 Thanks to Charles Salvia (`stdx::error`), Isidoros Tsaousis-Seiras (HPX), Orvid King (Folly),
 Daniel Anderson (Parlay), and Derek Mauro (Abseil) for their work integrating P1144 into their
 respective libraries.
+
+Thanks to Giuseppe D'Angelo for [[P3233]]. Thanks to
+Alan de Freitas, Daniel Liam Anderson, Giuseppe D'Angelo, Hans Goudey, Hartmut Kaiser, Isidoros Tsaousis,
+Jacques Lucke, Krystian Stasiowski, Shreyas Atre, Stéphane Janel, and Thiago Maciera for [[P3236]].
+
+
 
 
 Appendix A: Straw polls {#polls}
@@ -1267,7 +1276,7 @@ for types that manually specialize `std::__is_bitwise_relocatable`.
 As of February 2024, the only libstdc++ library type for which `__is_bitwise_relocatable` has
 been specialized is `deque`. See [[Deque]].
 
-[[ParlayLib]], [[HPX]], [[Thrust]], [[Qt]], [[Folly]], and [[BSL]] all provide "type traits" that are intended
+[[ParlayLib]], [[PocketPy]], [[HPX]], [[Thrust]], [[Qt]], [[Folly]], and [[BSL]] all provide "type traits" that are intended
 to be manually specialized by the client programmer. When compiled with a P1144-compliant compiler,
 [[HPX]] and [[ParlayLib]] do not require (in fact, they forbid) the client programmer to specialize
 these type traits.
@@ -1515,6 +1524,32 @@ See [[#applications|table §2.1]] for more details on most of these library impl
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3055r1.html",
     "date": "February 2024"
   },
+  "P3233": {
+    "authors": [
+      "Giuseppe D'Angelo"
+    ],
+    "title": "Issues with P2786 ('Trivial Relocatability For C++26')",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3233r0.html",
+    "date": "April 2024"
+  },
+  "P3236": {
+    "authors": [
+      "Alan de Freitas",
+      "Daniel Liam Anderson",
+      "Giuseppe D'Angelo",
+      "Hans Goudey",
+      "Hartmut Kaiser",
+      "Isidoros Tsaousis",
+      "Jacques Lucke",
+      "Krystian Stasiowski",
+      "Shreyas Atre",
+      "Stéphane Janel",
+      "Thiago Maciera"
+    ],
+    "title": "Please reject P2786 and adopt P1144",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3236r0.html",
+    "date": "April 2024"
+  },
   "ParlayLib": {
     "authors": [
       "Daniel Anderson",
@@ -1522,6 +1557,15 @@ See [[#applications|table §2.1]] for more details on most of these library impl
     ],
     "title": "ParlayLib, a toolkit for programming parallel algorithms on shared-memory multicore machines",
     "href": "https://github.com/cmuparlay/parlaylib/blob/36459f4/include/parlay/relocation.h",
+    "date": "February 2024"
+  },
+  "PocketPy": {
+    "authors": [
+      "blueloveTH",
+      "ykiko"
+    ],
+    "title": "pocketpy: single-file Python interpreter",
+    "href": "https://github.com/pocketpy/pocketpy/blob/2929add/include/pocketpy/vector.h",
     "date": "February 2024"
   },
   "Polymorphic": {
