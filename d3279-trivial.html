@@ -2253,12 +2253,13 @@ the set of types actually considered TC by C++ includes some types violating thi
    <p>Our previous two intuitions were driven by the physics of TC: what library operations can we do efficiently for TC types,
 and how can we efficiently compute the TC-ness of a type inside the compiler.
 The abstract-machine-lawyer’s intuition is not driven by physics, but by the circular logic of the Standard itself. <a href="https://eel.is/c++draft/basic.types#general-2">[basic.types.general]/2–3</a> says:</p>
+   <p><small></small></p>
    <blockquote>
-    <p>2\. For any [complete object] of TC type <code class="highlight"><c- n>T</c-></code> [...]
+    <p></p>
+    <small> <p>2. For any [complete object] of TC type <code class="highlight"><c- n>T</c-></code> [...]
 the underlying bytes making up the object can be copied into an array of char[, and when]
-that array is copied back into the object, the object shall subsequently hold its original value.</p>
-    <p>3\. For two distinct [complete] objects <code class="highlight"><c- n>obj1</c-></code> and <code class="highlight"><c- n>obj2</c-></code> of TC type <code class="highlight"><c- n>T</c-></code>[,]
-if the underlying bytes making up <code class="highlight"><c- n>obj1</c-></code> are copied into <code class="highlight"><c- n>obj2</c-></code>, <code class="highlight"><c- n>obj2</c-></code> shall subsequently hold the same value as <code class="highlight"><c- n>obj1</c-></code>.</p>
+that array is copied back into the object, the object shall subsequently hold its original value. </p><p>3. For two distinct [complete] objects <code class="highlight"><c- n>obj1</c-></code> and <code class="highlight"><c- n>obj2</c-></code> of TC type <code class="highlight"><c- n>T</c-></code>,
+if the underlying bytes making up <code class="highlight"><c- n>obj1</c-></code> are copied into <code class="highlight"><c- n>obj2</c-></code>, <code class="highlight"><c- n>obj2</c-></code> shall subsequently hold the same value as <code class="highlight"><c- n>obj1</c-></code>. </p></small>
    </blockquote>
    <p>This means that (by some mystical process) you can use <code class="highlight"><c- n>memcpy</c-></code> to perform the same Platonic operation as assignment,
 even when <code class="highlight"><c- n>T</c-></code> itself is not assignable. For example:</p>
@@ -2326,30 +2327,18 @@ because each false negative means a program that works correctly in practice, bu
 This is just TC plus an eligible trivial default constructor.
 It is not useful in practice (like <code class="highlight"><c- n>is_literal</c-></code>) and we’re getting rid of it via <a data-link-type="biblio" href="#biblio-p3247" title="Deprecate the notion of trivial types">[P3247]</a>. It doesn’t need to change.</p>
    <p><b>2.</b> <code class="highlight"><c- n>is_trivially_copyable</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> (<a href="https://eel.is/c++draft/class.prop#1">[class.prop]/1</a>, <a href="https://eel.is/c++draft/basic#def:type,trivially_copyable">[basic.types.general]/9</a>, <a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>).</p>
-   <blockquote>
-    <p>A <em>trivially copyable class</em> is a class:</p>
-    <ul>
-     <li data-md>
-      <p>that has at least one eligible copy constructor, move constructor, copy assignment operator, or move assignment operator,</p>
-     <li data-md>
-      <p>where each eligible copy constructor, move constructor, copy assignment operator, and move assignment operator is trivial, and</p>
-     <li data-md>
-      <p>that has a trivial, non-deleted destructor.</p>
-    </ul>
-    <p>Scalar types, trivially copyable class types, arrays of such types, and cv-qualified versions of these types
-are collectively called <em>trivially copyable types.</em></p>
-   </blockquote>
+   <p><small></small></p>
+   <blockquote><small> A <em>trivially copyable class</em> is a class:<p></p> <ul><li data-md><p>that has at least one eligible copy constructor, move constructor, copy assignment operator, or move assignment operator,</p> </li><li data-md><p>where each eligible copy constructor, move constructor, copy assignment operator, and move assignment operator is trivial, and</p> </li><li data-md><p>that has a trivial, non-deleted destructor.</p> </li></ul> <p>Scalar types, trivially copyable class types, arrays of such types, and cv-qualified versions of these types
+are collectively called <em>trivially copyable types.</em></p> </small></blockquote>
    <p><b>3.</b> <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>Args</c-><c- p>...</c-><c- o>></c-></code> (<a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>, <a href="https://eel.is/c++draft/meta#unary.prop-9">[meta.unary.prop]/9</a>) and <code class="highlight"><c- n>is_trivially_assignable</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>U</c-><c- o>></c-></code> (<a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>).</p>
-   <blockquote>
-    <p>[<code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>Args</c-><c- p>...</c-><c- o>></c-></code> is true whenever]
+   <p><small></small></p>
+   <blockquote><small> [<code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>Args</c-><c- p>...</c-><c- o>></c-></code> is true whenever]
 the variable definition <code class="highlight"><c- n>T</c-> <c- nf>t</c-><c- p>(</c-><c- n>declval</c-><c- o>&lt;</c-><c- n>Args</c-><c- o>></c-><c- p>()...);</c-></code> is well-formed
 and is known to call no operation that is not trivial.
-Access checking is performed as if in a context unrelated to <code class="highlight"><c- n>T</c-></code> and <code class="highlight"><c- n>Args</c-></code>.</p>
-    <p>[<code class="highlight"><c- n>is_trivially_assignable</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>U</c-><c- o>></c-></code> is true whenever]
+Access checking is performed as if in a context unrelated to <code class="highlight"><c- n>T</c-></code> and any of the <code class="highlight"><c- n>Args</c-></code>.<p></p> <p>[<code class="highlight"><c- n>is_trivially_assignable</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>U</c-><c- o>></c-></code> is true whenever]
 the expression <code class="highlight"><c- n>declval</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>()</c-> <c- o>=</c-> <c- n>declval</c-><c- o>&lt;</c-><c- n>U</c-><c- o>></c-><c- p>()</c-></code> is well-formed when treated as an unevaluated operand.
 and is known to call no operation that is not trivial.
-Access checking is performed as if in a context unrelated to <code class="highlight"><c- n>T</c-></code> and <code class="highlight"><c- n>U</c-></code>.</p>
-   </blockquote>
+Access checking is performed as if in a context unrelated to <code class="highlight"><c- n>T</c-></code> and <code class="highlight"><c- n>U</c-></code>.</p> </small></blockquote>
    <p>Now, this wording depends on the definition of "trivial operation," which the Standard conspicuously fails to define.
 In practice, compiler vendors treat every operation as trivial <em>unless</em> it is a function call, in which case it
 is trivial if-and-only-if it calls a trivial special member function (as defined below).
@@ -2364,23 +2353,34 @@ also trivial:</p>
 despite acting like user-defined conversion functions.
 EDG+MSVC say that <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- b>void</c-><c- p>(</c-><c- o>*</c-><c- p>)(),</c-> <c- k>decltype</c-><c- p>([]{})</c-><c- o>></c-></code> is true; Clang+GCC say false.
 EDG+MSVC say that <code class="highlight"><c- n>is_trivially_assignable</c-><c- o>&lt;</c-><c- b>void</c-><c- p>(</c-><c- o>*&amp;</c-><c- p>)(),</c-> <c- k>decltype</c-><c- p>([]{})</c-><c- o>></c-></code> is true; Clang+GCC say false.</p>
-   <p class="note" role="note"><span class="marker">Note:</span> There is implementation divergence on NSDMIs, which are arguably "known" to the compiler
-despite acting like user-defined additions to the default constructor.
+   <p class="note" role="note"><span class="marker">Note:</span> There is implementation divergence on NSDMIs, which are arguably "known" to the compiler.
 Given <code class="highlight"><c- k>struct</c-> <c- nc>X</c-> <c- p>{</c-> <c- b>int</c-> <c- n>a</c-><c- o>=</c-><c- mi>42</c-><c- p>;</c-> <c- p>}</c-></code> and <code class="highlight"><c- k>struct</c-> <c- nc>Q</c-> <c- p>{</c-> <c- n>X</c-> <c- n>a</c-><c- p>,</c-> <c- n>b</c-><c- p>;</c-> <c- p>}</c-></code>,
 EDG+GCC+MSVC say that <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>Q</c-><c- p>,</c-> <c- n>X</c-><c- o>></c-></code> is true; Clang says that it’s false.
-(EDG keeps it true even when you change <code class="highlight"><c- mi>42</c-></code> to any arbitrary computation <code class="highlight"><c- n>f</c-><c- p>()</c-></code>; that’s likely accidental.)</p>
-   <p class="note" role="note"><span class="marker">Note:</span> There is likely-accidental implementation divergence on aggregate initialization.
+(EDG keeps it true even when you change <code class="highlight"><c- mi>42</c-></code> to any arbitrary computation <code class="highlight"><c- n>f</c-><c- p>()</c-></code>; that’s likely accidental.) <br>Given <code class="highlight"><c- k>struct</c-> <c- nc>E</c-> <c- p>{}</c-></code> and <code class="highlight"><c- k>struct</c-> <c- nc>R</c-> <c- p>{</c-> <c- n>E</c-> <c- n>a</c-><c- p>;</c-> <c- b>int</c-> <c- n>b</c-><c- o>=</c-><c- mi>42</c-><c- p>;</c-> <c- p>}</c-></code>,
+all vendors agree that <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>R</c-><c- p>,</c-> <c- n>E</c-><c- o>></c-></code> is true. Yet <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-></code> is false, because it calls a non-trivial default constructor
+(<a href="https://eel.is/c++draft/class.mem#class.default.ctor-3">[class.default.ctor]/3</a>).</p>
+   <p class="note" role="note"><span class="marker">Note:</span> There is likely-accidental implementation divergence on aggregate initialization from
+multiple arguments.
 Given <code class="highlight"><c- k>struct</c-> <c- nc>P</c-> <c- p>{</c-> <c- b>int</c-> <c- n>a</c-><c- p>,</c-> <c- n>b</c-><c- p>;</c-> <c- p>}</c-></code>,
-EDG says that <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>P</c-><c- p>,</c-> <c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-></code> is false; Clang+GCC+MSVC say true.</p>
-   <p><b>5.</b> A special member function is <em>trivial</em> in specific circumstances.</p>
+EDG says that <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>P</c-><c- p>,</c-> <c- b>int</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-></code> is false; Clang+GCC+MSVC say true.
+We propose to deprecate the three-argument type trait, anyway.</p>
+   <p><b>5.</b> A special member function is <em>trivial</em> in specific circumstances
+(<a href="https://eel.is/c++draft/class.mem#class.default.ctor-3">[class.default.ctor]/3</a>, <a href="https://eel.is/c++draft/class.mem#class.copy.ctor-11">[class.copy.ctor]/11</a>, <a href="https://eel.is/c++draft/class.mem#class.copy.assign-9">[class.copy.assign]/9</a>, <a href="https://eel.is/c++draft/class.mem#class.dtor-8">[class.dtor]/8</a>).</p>
    <p><small></small></p>
-   <blockquote><small> A copy/move constructor for class <code class="highlight"><c- n>X</c-></code> is <em>trivial</em> if it is not user-provided and if:<p></p> <ul><li data-md><p>class <code class="highlight"><c- n>X</c-></code> has no virtual functions and no virtual base classes, and</p> </li><li data-md><p>the constructor selected to copy/move each direct base class subobject is trivial, and</p> </li><li data-md><p>for each non-static data member of <code class="highlight"><c- n>X</c-></code> that is of class type (or array thereof),
+   <blockquote><small> A default constructor is <em>trivial</em> if it is not user-provided and if:<p></p> <ul><li data-md><p>its class has no virtual functions and no virtual base classes, and</p> </li><li data-md><p>no non-static data member of its class has a default member initializer, and</p> </li><li data-md><p>all the direct base classes of its class have trivial default constructors, and</p> </li><li data-md><p>for all the non-static data members of its class that are of class type (or array thereof),
+each such class has a trivial default constructor.</p> </li></ul> <p>A copy/move constructor for class <code class="highlight"><c- n>X</c-></code> is <em>trivial</em> if it is not user-provided and if:</p> <ul><li data-md><p>class <code class="highlight"><c- n>X</c-></code> has no virtual functions and no virtual base classes, and</p> </li><li data-md><p>the constructor selected to copy/move each direct base class subobject is trivial, and</p> </li><li data-md><p>for each non-static data member of <code class="highlight"><c- n>X</c-></code> that is of class type (or array thereof),
 the constructor selected to copy/move that member is trivial.</p> </li></ul> <p>A copy/move assignment operator for class <code class="highlight"><c- n>X</c-></code> is <em>trivial</em> if it is not user-provided and if:</p> <ul><li data-md><p>class <code class="highlight"><c- n>X</c-></code> has no virtual functions and no virtual base classes, and</p> </li><li data-md><p>the assignment operator selected to copy/move each direct base class subobject is trivial, and</p> </li><li data-md><p>for each non-static data member of <code class="highlight"><c- n>X</c-></code> that is of class type (or array thereof), the assignment
-operator selected to copy/move that member is trivial.</p> </li></ul> </small></blockquote>
-   <p>Notice that <code class="highlight"><c- n>is_trivially_constructible</c-></code> and <code class="highlight"><c- n>is_trivially_assignable</c-></code> check the results of overload resolution,
+operator selected to copy/move that member is trivial.</p> </li></ul> <p>A destructor is <em>trivial</em> if it is not user-provided and if:</p> <ul><li data-md><p>the destructor is not virtual,</p> </li><li data-md><p>all of the direct base classes of its class have trivial destructors, and</p> </li><li data-md><p>for all of the non-static data members of its class that are of class type (or array thereof),
+each such class has a trivial destructor.</p> </li></ul> </small></blockquote>
+   <p class="note" role="note"><span class="marker">Note:</span> [class.default.ctor] conspicuously doesn’t require that "the constructor selected to initialize
+that member is trivial"; it simply requires that each base and member have a (possibly ineligible)
+trivial default constructor. Naturally, there is implementation divergence here (<a href="https://godbolt.org/z/1sYo5z8xq">Godbolt</a>).
+EDG seems to follow the letter of the law; Clang+GCC+MSVC hew closer to the library-writer’s intuition.</p>
+   <p>Notice that <code class="highlight"><c- n>is_trivially_constructible</c-></code>, <code class="highlight"><c- n>is_trivially_assignable</c-></code>, [class.copy.ctor], and [class.copy.assign]
+check the results of overload resolution,
 i.e., they are friendly to the library-writer’s intuition that what matters is not what <em>special member functions</em> happen to be defined, but which (possibly non-special) functions are actually called by overload resolution for
-a given C++ expression. Vice versa, <code class="highlight"><c- n>is_trivially_copyable</c-></code> is hostile to the library-writer’s intuition; it is
-defined only in terms of the special member functions; it ignores overload resolution entirely.</p>
+a given C++ expression. Vice versa, <code class="highlight"><c- n>is_trivially_copyable</c-></code> and [class.default.ctor] are hostile to the
+library-writer’s intuition; they are defined only in terms of special member functions, ignoring overload resolution.</p>
    <p>Two more critical things to keep in mind for the following examples:</p>
    <ul>
     <li data-md>
@@ -2389,7 +2389,7 @@ trivial copy constructor living alongside a non-trivial constructor template tha
 yet this will not cause <code class="highlight"><c- n>is_trivially_copyable</c-></code> to become false, because a constructor template
 is not a copy constructor. All of your copy constructors remain trivial.</p>
     <li data-md>
-     <p>The rule for calling a special member function "trivial" lacks context. Once trivial, always trivial.
+     <p>The rule for calling a special member function "trivial" is context-independent. Once trivial, always trivial.
 So if you inherit a member function from your base class, it will continue to "be trivial" for you,
 just like it was trivial for your base class.</p>
    </ul>
@@ -2417,8 +2417,7 @@ That is, this example is problematic to the abstract-machine-lawyer intuition th
 It doesn’t really make sense to say that <code class="highlight"><c- n>memcpy</c-></code> is capable of transferring the value of a <code class="highlight"><c- n>Hamlet</c-></code> object only
 when it’s a subobject of a <code class="highlight"><c- n>Nutshell</c-></code> and not otherwise.</p>
    <p>But to the library-writer intuition, this example is perfectly sane: TC means "all provided operations are tantamount to <code class="highlight"><c- n>memcpy</c-></code>,"
-which is clearly untrue of <code class="highlight"><c- n>Hamlet</c-></code> and clearly true of <code class="highlight"><c- n>Nutshell</c-></code> — because <code class="highlight"><c- n>Nutshell</c-></code> (implicitly) deletes the only way to get at <code class="highlight"><c- n>Hamlet</c-></code>’s
-non-trivial copy constructor.
+which is clearly untrue of <code class="highlight"><c- n>Hamlet</c-></code> and clearly true of <code class="highlight"><c- n>Nutshell</c-></code> — because <code class="highlight"><c- n>Nutshell</c-></code> provides fewer operations. <code class="highlight"><c- n>Nutshell</c-></code> snips away <code class="highlight"><c- n>Hamlet</c-></code>’s non-trivial copy constructor, so that all the remaining operations are in fact trivial.
 We need <code class="highlight"><c- n>Hamlet</c-></code> to remain non-TC so that we don’t misoptimize <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_copy</c-><c- p>(</c-><c- n>Hamlet</c-><c- p>)</c-></code>; but we are
 happy for <code class="highlight"><c- n>Nutshell</c-></code> to be TC so that we can optimize <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_move</c-><c- p>(</c-><c- n>Nutshell</c-><c- p>)</c-></code>. We aren’t worried about misoptimizing <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>uninitialized_copy</c-><c- p>(</c-><c- n>Nutshell</c-><c- p>)</c-></code> because that’s already ill-formed diagnostic required.</p>
    <p>Finally, this example is problematic for the compiler-writer intuition. We want to be able to track a single bit, "<code class="highlight"><c- n>Hamlet</c-></code> is non-TC,"
@@ -2461,16 +2460,16 @@ member). <a href="https://godbolt.org/z/Mo95zjTsc">Godbolt</a>:</p>
 </pre>
    <p>Microsoft STL’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>reverse_copy</c-></code> will see that <code class="highlight"><c- n>Plum</c-></code> is trivially copyable and assume (following the library-writer’s
 intuition) that it can be lowered to <code class="highlight"><c- n>memcpy</c-></code>. So <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>reverse_copy</c-><c- p>(</c-><c- n>Plum</c-><c- p>)</c-></code> is miscompiled. (By luck, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>reverse_copy</c-><c- p>(</c-><c- n>pair</c-><c- p>)</c-></code> is
-not miscompiled, at least not on x86-64, because Microsoft’s <code class="highlight"><c- n>reverse_copy</c-></code> optimization is also gated on <code class="highlight"><c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code> and <code class="highlight"><c- n>pair</c-></code> is slightly too big
-to fit through that gate.) libstdc++ will also miscompile <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>copy</c-><c- p>(</c-><c- n>Plum</c-><c- p>)</c-></code> (<a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=114817">bug #114817</a>)
+miscompiled only on 32-bit platforms, because Microsoft’s <code class="highlight"><c- n>reverse_copy</c-></code> optimization is also gated on <code class="highlight"><c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-> <c- o>&lt;=</c-> <c- mi>8</c-></code>.)
+libstdc++ will miscompile <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>copy</c-><c- p>(</c-><c- n>Plum</c-><c- p>)</c-></code> (<a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=114817">bug #114817</a>)
 and several other algorithms.</p>
    <p>This example isn’t problematic for the compiler-writer nor the abstract-machine-lawyer. But it is shocking to
 everyone’s intuition because it shows that we can easily use corner cases in the wording to decouple the
-"advertised" TC-ness of a type from its "proper" semantic TC-ness. (See e.g. <a data-link-type="biblio" href="#biblio-mller" title="Trivially copyable does not mean trivially copy constructible">[Müller]</a>.)</p>
+"advertised" TC-ness of a type from its "proper" semantic TC-ness. (See <a data-link-type="biblio" href="#biblio-mller" title="Trivially copyable does not mean trivially copy constructible">[Müller]</a> and <a data-link-type="biblio" href="#biblio-odwyer" title="Types that falsely advertise trivial copyability">[ODwyer]</a>.)</p>
    <p>Show this example to the library-writer and when they recover from the shock they’ll say:
 "Okay, so we shouldn’t gate our <code class="highlight"><c- n>copy</c-></code> and <code class="highlight"><c- n>reverse_copy</c-></code> optimizations on TC. We’ll gate them on
 the more granular <code class="highlight"><c- n>is_trivially_copy_assignable</c-></code> trait, instead." The next section shows how that
-gate, also, can be broken.</p>
+gate, also, is broken.</p>
    <h3 class="heading settled" data-level="4.3" id="surprise-leopard"><span class="secno">4.3. </span><span class="content">"Trivial" Rule-of-Five functions can act unlike memcpy</span><a class="self-link" href="#surprise-leopard"></a></h3>
    <p>The rule for calling a special member function "trivial" lacks context. Once trivial, always trivial.
 So if you inherit a member function from your base class, it will continue to "be trivial" for you,
@@ -2500,9 +2499,9 @@ is to fix the definition of triviality in the core language.</p>
    <ul>
     <li data-md>
      <p><code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> should mean precisely that constructing a <code class="highlight"><c- n>T</c-></code> from no arguments
-can be lowered to a no-op. (This is the status quo in practice.)</p>
+can be lowered to a no-op. (This is basically the status quo in practice.)</p>
     <li data-md>
-     <p><code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>To</c-><c- p>,</c-> <c- n>From</c-><c- o>></c-></code> should mean precisely that constructing a (complete) <code class="highlight"><c- n>To</c-></code> from a <code class="highlight"><c- n>From</c-></code> can be lowered to memcpy. (E.g. <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- b>float</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-></code> should become false.)</p>
+     <p><code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>To</c-><c- p>,</c-> <c- n>From</c-><c- o>></c-></code> should mean precisely that constructing a (complete) <code class="highlight"><c- n>To</c-></code> from a <code class="highlight"><c- n>From</c-></code> can be lowered to memcpy. (E.g. <code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- b>float</c-><c- p>,</c-> <c- b>int</c-><c- o>></c-></code> should become false; but <code class="highlight"><c- n>is_trivially_copy_constructible</c-><c- o>&lt;</c-><c- n>Polymorphic</c-><c- o>></c-></code> should become frequently true.)</p>
     <li data-md>
      <p><code class="highlight"><c- n>is_trivially_constructible</c-><c- o>&lt;</c-><c- n>To</c-><c- p>,</c-> <c- n>Args</c-><c- p>...</c-><c- o>></c-></code> for any number of <code class="highlight"><c- n>Args</c-><c- p>...</c-></code> greater than 1 should be invariably false,
 and we should deprecate it. That trait is useless because it corresponds to nothing physical.</p>
@@ -2592,6 +2591,15 @@ of <code class="highlight"><c- n>unique_ptr</c-><c- o>&lt;</c-><c- b>int</c-><c-
    <p>I believe this proposal completely eliminates all references to "trivial operations" and "trivial functions"
 (other than trivial special members). That’s nice, because the Standard never defines what those are.
 By removing all references to them, we <em>never</em> have to define what they are.</p>
+   <p>By permitting vendors to define <code class="highlight"><c- n>is_trivially_copy_constructible</c-><c- o>&lt;</c-><c- n>FinalPolymorphic</c-><c- o>></c-></code>, this proposal solves an issue
+recently raised for Clang by Haojian Wu; see <a data-link-type="biblio" href="#biblio-bitwisecopyable" title="[clang] Implement a bitwise_copyable builtin type trait">[BitwiseCopyable]</a>. Library authors really want to be able to
+memcpy and/or start-the-lifetime-of polymorphic types. That works in practice, but today it’s technically UB
+because polymorphic types never have any trivial constructors and therefore are never implicit-lifetime types
+(<a href="https://eel.is/c++draft/class.prop#9">[class.prop]/9</a>). But the compiler knows that a <code class="highlight"><c- k>final</c-></code> polymorphic type can be trivially copied, and therefore could consider it to be implicit-lifetime. This
+could solve a large swath of Haojian’s problem without needing Clang to provide a separate builtin,
+although it probably doesn’t solve the whole problem.</p>
+   <p class="note" role="note"><span class="marker">Note:</span> Non-<code class="highlight"><c- k>final</c-></code> polymorphic types can never be trivially copied nor trivially assigned, because of slicing.
+See <a href="https://quuxplusone.github.io/blog/2023/06/24/polymorphic-types-arent-trivially-relocatable/">my blog post of June 2023</a>.</p>
    <p>Finally, we need to do something with <a href="https://eel.is/c++draft/basic.types#general-2">[basic.types.general]/2–3</a>.
 Given the proposed wording above, I think we could just
 strike [basic.types.general]/2–3 as redundant:
@@ -2746,10 +2754,14 @@ experience in my fork of Clang. Assistance will be gratefully accepted.</p>
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
+   <dt id="biblio-bitwisecopyable">[BitwiseCopyable]
+   <dd>Haojian Wu. <a href="https://github.com/llvm/llvm-project/pull/86512"><cite>[clang] Implement a bitwise_copyable builtin type trait</cite></a>. March 2024—. URL: <a href="https://github.com/llvm/llvm-project/pull/86512">https://github.com/llvm/llvm-project/pull/86512</a>
    <dt id="biblio-cwg2463">[CWG2463]
    <dd>Daveed Vandevoorde. <a href="https://cplusplus.github.io/CWG/issues/2463.html"><cite>Trivial copyability and unions with non-trivial members</cite></a>. November 2020—. URL: <a href="https://cplusplus.github.io/CWG/issues/2463.html">https://cplusplus.github.io/CWG/issues/2463.html</a>
    <dt id="biblio-mller">[Müller]
    <dd>Jonathan Müller. <a href="https://www.foonathan.net/2021/03/trivially-copyable/"><cite>Trivially copyable does not mean trivially copy constructible</cite></a>. March 2021. URL: <a href="https://www.foonathan.net/2021/03/trivially-copyable/">https://www.foonathan.net/2021/03/trivially-copyable/</a>
+   <dt id="biblio-odwyer">[ODwyer]
+   <dd>Arthur O'Dwyer. <a href="https://quuxplusone.github.io/blog/2024/05/15/false-advertising/"><cite>Types that falsely advertise trivial copyability</cite></a>. May 2024. URL: <a href="https://quuxplusone.github.io/blog/2024/05/15/false-advertising/">https://quuxplusone.github.io/blog/2024/05/15/false-advertising/</a>
    <dt id="biblio-p2782">[P2782]
    <dd>Giuseppe D'Angelo. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2782r0.html"><cite>A type trait to detect if value initialization can be achieved by zero-filling</cite></a>. January 2023. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2782r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2782r0.html</a>
    <dt id="biblio-p3247">[P3247]
