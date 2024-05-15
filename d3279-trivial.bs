@@ -146,13 +146,15 @@ and how can we efficiently compute the TC-ness of a type inside the compiler.
 The abstract-machine-lawyer's intuition is not driven by physics, but by the circular logic of the Standard itself.
 <a href="https://eel.is/c++draft/basic.types#general-2">[basic.types.general]/2–3</a> says:
 
-> 2\. For any [complete object] of TC type `T` [...]
-> the underlying bytes making up the object can be copied into an array of char[, and when]
-> that array is copied back into the object, the object shall subsequently hold its original value.
->
-> 3\. For two distinct [complete] objects `obj1` and `obj2` of TC type `T`[,]
-> if the underlying bytes making up `obj1` are copied into `obj2`,
-> `obj2` shall subsequently hold the same value as `obj1`.
+<small><blockquote>
+<p>2. For any [complete object] of TC type `T` [...]
+the underlying bytes making up the object can be copied into an array of char[, and when]
+that array is copied back into the object, the object shall subsequently hold its original value.
+
+<p>3. For two distinct [complete] objects `obj1` and `obj2` of TC type `T`,
+if the underlying bytes making up `obj1` are copied into `obj2`,
+`obj2` shall subsequently hold the same value as `obj1`.
+</blockquote></small>
 
 This means that (by some mystical process) you can use `memcpy` to perform the same Platonic operation as assignment,
 even when `T` itself is not assignable. For example:
@@ -249,28 +251,32 @@ It is not useful in practice (like `is_literal`) and we're getting rid of it via
 <a href="https://eel.is/c++draft/basic#def:type,trivially_copyable">[basic.types.general]/9</a>,
 <a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>).
 
-> A *trivially copyable class* is a class:
->
-> - that has at least one eligible copy constructor, move constructor, copy assignment operator, or move assignment operator,
-> - where each eligible copy constructor, move constructor, copy assignment operator, and move assignment operator is trivial, and
-> - that has a trivial, non-deleted destructor.
->
-> Scalar types, trivially copyable class types, arrays of such types, and cv-qualified versions of these types
-> are collectively called *trivially copyable types.*
+<small><blockquote>
+A *trivially copyable class* is a class:
+
+- that has at least one eligible copy constructor, move constructor, copy assignment operator, or move assignment operator,
+- where each eligible copy constructor, move constructor, copy assignment operator, and move assignment operator is trivial, and
+- that has a trivial, non-deleted destructor.
+
+Scalar types, trivially copyable class types, arrays of such types, and cv-qualified versions of these types
+are collectively called *trivially copyable types.*
+</blockquote></small>
 
 <b>3.</b> `is_trivially_constructible<T, Args...>` (<a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>,
 <a href="https://eel.is/c++draft/meta#unary.prop-9">[meta.unary.prop]/9</a>) and
 `is_trivially_assignable<T, U>` (<a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>).
 
-> [`is_trivially_constructible<T, Args...>` is true whenever]
-> the variable definition `T t(declval<Args>()...);` is well-formed
-> and is known to call no operation that is not trivial.
-> Access checking is performed as if in a context unrelated to `T` and `Args`.
->
-> [`is_trivially_assignable<T, U>` is true whenever]
-> the expression `declval<T>() = declval<U>()` is well-formed when treated as an unevaluated operand.
-> and is known to call no operation that is not trivial.
-> Access checking is performed as if in a context unrelated to `T` and `U`.
+<small><blockquote>
+[`is_trivially_constructible<T, Args...>` is true whenever]
+the variable definition `T t(declval<Args>()...);` is well-formed
+and is known to call no operation that is not trivial.
+Access checking is performed as if in a context unrelated to `T` and any of the `Args`.
+
+[`is_trivially_assignable<T, U>` is true whenever]
+the expression `declval<T>() = declval<U>()` is well-formed when treated as an unevaluated operand.
+and is known to call no operation that is not trivial.
+Access checking is performed as if in a context unrelated to `T` and `U`.
+</blockquote></small>
 
 Now, this wording depends on the definition of "trivial operation," which the Standard conspicuously fails to define.
 In practice, compiler vendors treat every operation as trivial *unless* it is a function call, in which case it
@@ -290,20 +296,36 @@ despite acting like user-defined conversion functions.
 EDG+MSVC say that `is_trivially_constructible<void(*)(), decltype([]{})>` is true; Clang+GCC say false.
 EDG+MSVC say that `is_trivially_assignable<void(*&)(), decltype([]{})>` is true; Clang+GCC say false.
 
-Note: There is implementation divergence on NSDMIs, which are arguably "known" to the compiler
-despite acting like user-defined additions to the default constructor.
+Note: There is implementation divergence on NSDMIs, which are arguably "known" to the compiler.
 Given `struct X { int a=42; }` and `struct Q { X a, b; }`,
 EDG+GCC+MSVC say that `is_trivially_constructible<Q, X>` is true; Clang says that it's false.
 (EDG keeps it true even when you change `42` to any arbitrary computation `f()`; that's likely accidental.)
+<br>Given `struct E {}` and `struct R { E a; int b=42; }`,
+all vendors agree that `is_trivially_constructible<R, E>` is true. Yet
+`is_trivially_constructible<R>` is false, because it calls a non-trivial default constructor
+(<a href="https://eel.is/c++draft/class.mem#class.default.ctor-3">[class.default.ctor]/3</a>).
 
-Note: There is likely-accidental implementation divergence on aggregate initialization.
+Note: There is likely-accidental implementation divergence on aggregate initialization from
+multiple arguments.
 Given `struct P { int a, b; }`,
 EDG says that `is_trivially_constructible<P, int, int>` is false; Clang+GCC+MSVC say true.
+We propose to deprecate the three-argument type trait, anyway.
 
-
-<b>5.</b> A special member function is *trivial* in specific circumstances.
+<b>5.</b> A special member function is *trivial* in specific circumstances
+(<a href="https://eel.is/c++draft/class.mem#class.default.ctor-3">[class.default.ctor]/3</a>,
+<a href="https://eel.is/c++draft/class.mem#class.copy.ctor-11">[class.copy.ctor]/11</a>,
+<a href="https://eel.is/c++draft/class.mem#class.copy.assign-9">[class.copy.assign]/9</a>,
+<a href="https://eel.is/c++draft/class.mem#class.dtor-8">[class.dtor]/8</a>).
 
 <small><blockquote>
+A default constructor is *trivial* if it is not user-provided and if:
+
+- its class has no virtual functions and no virtual base classes, and
+- no non-static data member of its class has a default member initializer, and
+- all the direct base classes of its class have trivial default constructors, and
+- for all the non-static data members of its class that are of class type (or array thereof),
+    each such class has a trivial default constructor.
+
 A copy/move constructor for class `X` is *trivial* if it is not user-provided and if:
 
 - class `X` has no virtual functions and no virtual base classes, and
@@ -318,13 +340,26 @@ A copy/move assignment operator for class `X` is *trivial* if it is not user-pro
 - for each non-static data member of `X` that is of class type (or array thereof), the assignment
     operator selected to copy/move that member is trivial.
 
+A destructor is *trivial* if it is not user-provided and if:
+
+- the destructor is not virtual,
+- all of the direct base classes of its class have trivial destructors, and
+- for all of the non-static data members of its class that are of class type (or array thereof),
+    each such class has a trivial destructor.
+
 </blockquote></small>
 
-Notice that `is_trivially_constructible` and `is_trivially_assignable` check the results of overload resolution,
+Note: [class.default.ctor] conspicuously doesn't require that "the constructor selected to initialize
+that member is trivial"; it simply requires that each base and member have a (possibly ineligible)
+trivial default constructor. Naturally, there is implementation divergence here ([Godbolt](https://godbolt.org/z/1sYo5z8xq)).
+EDG seems to follow the letter of the law; Clang+GCC+MSVC hew closer to the library-writer's intuition.
+
+Notice that `is_trivially_constructible`, `is_trivially_assignable`, [class.copy.ctor], and [class.copy.assign]
+check the results of overload resolution,
 i.e., they are friendly to the library-writer's intuition that what matters is not what *special member functions*
 happen to be defined, but which (possibly non-special) functions are actually called by overload resolution for
-a given C++ expression. Vice versa, `is_trivially_copyable` is hostile to the library-writer's intuition; it is
-defined only in terms of the special member functions; it ignores overload resolution entirely.
+a given C++ expression. Vice versa, `is_trivially_copyable` and [class.default.ctor] are hostile to the
+library-writer's intuition; they are defined only in terms of special member functions, ignoring overload resolution.
 
 Two more critical things to keep in mind for the following examples:
 
@@ -333,7 +368,7 @@ Two more critical things to keep in mind for the following examples:
     yet this will not cause `is_trivially_copyable` to become false, because a constructor template
     is not a copy constructor. All of your copy constructors remain trivial.
 
-* The rule for calling a special member function "trivial" lacks context. Once trivial, always trivial.
+* The rule for calling a special member function "trivial" is context-independent. Once trivial, always trivial.
     So if you inherit a member function from your base class, it will continue to "be trivial" for you,
     just like it was trivial for your base class.
 
@@ -368,8 +403,8 @@ It doesn't really make sense to say that `memcpy` is capable of transferring the
 when it's a subobject of a `Nutshell` and not otherwise.
 
 But to the library-writer intuition, this example is perfectly sane: TC means "all provided operations are tantamount to `memcpy`,"
-which is clearly untrue of `Hamlet` and clearly true of `Nutshell` — because `Nutshell` (implicitly) deletes the only way to get at `Hamlet`'s
-non-trivial copy constructor.
+which is clearly untrue of `Hamlet` and clearly true of `Nutshell` — because `Nutshell` provides fewer operations. `Nutshell` snips away
+`Hamlet`'s non-trivial copy constructor, so that all the remaining operations are in fact trivial.
 We need `Hamlet` to remain non-TC so that we don't misoptimize `std::uninitialized_copy(Hamlet)`; but we are
 happy for `Nutshell` to be TC so that we can optimize `std::uninitialized_move(Nutshell)`. We aren't worried about misoptimizing
 `std::uninitialized_copy(Nutshell)` because that's already ill-formed diagnostic required.
@@ -423,18 +458,18 @@ static_assert(!std::is_trivially_assignable_v<Plum&, const Plum&>);
 
 Microsoft STL's `std::reverse_copy` will see that `Plum` is trivially copyable and assume (following the library-writer's
 intuition) that it can be lowered to `memcpy`. So `std::reverse_copy(Plum)` is miscompiled. (By luck, `std::reverse_copy(pair)` is
-not miscompiled, at least not on x86-64, because Microsoft's `reverse_copy` optimization is also gated on `sizeof(T)` and `pair` is slightly too big
-to fit through that gate.) libstdc++ will also miscompile `std::copy(Plum)` ([bug #114817](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=114817))
+miscompiled only on 32-bit platforms, because Microsoft's `reverse_copy` optimization is also gated on `sizeof(T) <= 8`.)
+libstdc++ will miscompile `std::copy(Plum)` ([bug #114817](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=114817))
 and several other algorithms.
 
 This example isn't problematic for the compiler-writer nor the abstract-machine-lawyer. But it is shocking to
 everyone's intuition because it shows that we can easily use corner cases in the wording to decouple the
-"advertised" TC-ness of a type from its "proper" semantic TC-ness. (See e.g. [[Müller]].)
+"advertised" TC-ness of a type from its "proper" semantic TC-ness. (See [[Müller]] and [[ODwyer]].)
 
 Show this example to the library-writer and when they recover from the shock they'll say:
 "Okay, so we shouldn't gate our `copy` and `reverse_copy` optimizations on TC. We'll gate them on
 the more granular `is_trivially_copy_assignable` trait, instead." The next section shows how that
-gate, also, can be broken.
+gate, also, is broken.
 
 
 ## "Trivial" Rule-of-Five functions can act unlike memcpy ## {#surprise-leopard}
@@ -473,10 +508,11 @@ Basically, we propose to respecify all of the traits to conform with the library
 (For each case below, read "can be" as "is known to the compiler to be able to be".)
 
 - `is_trivially_constructible<T>` should mean precisely that constructing a `T` from no arguments
-    can be lowered to a no-op. (This is the status quo in practice.)
+    can be lowered to a no-op. (This is basically the status quo in practice.)
 
 - `is_trivially_constructible<To, From>` should mean precisely that constructing a (complete) `To` from a `From`
-    can be lowered to memcpy. (E.g. `is_trivially_constructible<float, int>` should become false.)
+    can be lowered to memcpy. (E.g. `is_trivially_constructible<float, int>` should become false; but
+    `is_trivially_copy_constructible<Polymorphic>` should become frequently true.)
 
 - `is_trivially_constructible<To, Args...>` for any number of `Args...` greater than 1 should be invariably false,
     and we should deprecate it. That trait is useless because it corresponds to nothing physical.
@@ -601,6 +637,18 @@ I believe this proposal completely eliminates all references to "trivial operati
 (other than trivial special members). That's nice, because the Standard never defines what those are.
 By removing all references to them, we *never* have to define what they are.
 
+By permitting vendors to define `is_trivially_copy_constructible<FinalPolymorphic>`, this proposal solves an issue
+recently raised for Clang by Haojian Wu; see [[BitwiseCopyable]]. Library authors really want to be able to
+memcpy and/or start-the-lifetime-of polymorphic types. That works in practice, but today it's technically UB
+because polymorphic types never have any trivial constructors and therefore are never implicit-lifetime types
+(<a href="https://eel.is/c++draft/class.prop#9">[class.prop]/9</a>). But the compiler knows that a `final`
+polymorphic type can be trivially copied, and therefore could consider it to be implicit-lifetime. This
+could solve a large swath of Haojian's problem without needing Clang to provide a separate builtin,
+although it probably doesn't solve the whole problem.
+
+Note: Non-`final` polymorphic types can never be trivially copied nor trivially assigned, because of slicing.
+See <a href="https://quuxplusone.github.io/blog/2023/06/24/polymorphic-types-arent-trivially-relocatable/">my blog post of June 2023</a>.
+
 Finally, we need to do something with <a href="https://eel.is/c++draft/basic.types#general-2">[basic.types.general]/2–3</a>.
 Given the proposed wording above, I think we could just
 strike [basic.types.general]/2–3 as redundant:
@@ -635,6 +683,14 @@ Thanks to the regulars on the cpplang Slack for rubber-ducking a lot of these ex
 
 <pre class=biblio>
 {
+  "BitwiseCopyable": {
+    "title": "[clang] Implement a bitwise_copyable builtin type trait",
+    "authors": [
+      "Haojian Wu"
+    ],
+    "href": "https://github.com/llvm/llvm-project/pull/86512",
+    "date": "March 2024—"
+  },
   "CWG1734": {
     "title": "Nontrivial deleted copy functions",
     "authors": [
@@ -658,6 +714,14 @@ Thanks to the regulars on the cpplang Slack for rubber-ducking a lot of these ex
     ],
     "href": "https://www.foonathan.net/2021/03/trivially-copyable/",
     "date": "March 2021"
+  },
+  "ODwyer": {
+    "title": "Types that falsely advertise trivial copyability",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://quuxplusone.github.io/blog/2024/05/15/false-advertising/",
+    "date": "May 2024"
   },
   "P2782": {
     "title": "A type trait to detect if value initialization can be achieved by zero-filling",
