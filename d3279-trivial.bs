@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: CWG2463: What "trivially fooable" should mean
 Shortname: D3279
-Revision: 0
-!Draft Revision: 1
+Revision: 1
+!Draft Revision: 2
 Audience: EWGI
 Status: D
 Group: WG21
@@ -13,10 +13,11 @@ Abstract:
   The core-language specification of "trivially copyable," "trivially copy constructible," and "trivially copy assignable"
   fail to match library-writers' expectations. In CWG2463, Core asked for a paper laying out the issues and proposing
   a direction. This is such a paper.
-Date: 2024-05-15
+Date: 2024-05-26
 </pre>
 
 <style>
+prins  {background-color: #DDFFDD; }
 ins    {background-color: #CCFFCC; text-decoration: underline;}
 del    {background-color: #FFCACA; text-decoration: line-through;}
 p      {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
@@ -237,15 +238,79 @@ The abstract-machine-lawyer tends to want a liberal "TC" label, with as few as p
 because each false negative means a program that works correctly in practice, but formally has UB.
 
 
+# Context is important # {#context}
+
+The previous section was about "trivial copyability" in particular; we move now to "trivial fooability"
+in general. The C++ Standard doesn't currently recognize it, but *context* is important in two ways.
+
+## SMF "trivial for `X`" ## {#trivial-for-x}
+
+```
+struct Cat {};
+struct Leopard : Cat {
+  int spots_;
+  Leopard& operator=(Leopard&) = delete;
+  using Cat::operator=;
+};
+static_assert(std::is_trivially_assignable<Leopard&, const Leopard&>);
+```
+
+Today, `Leopard` is `is_trivially_copy_assignable` because when you try to copy-assign a `Leopard`,
+overload resolution selects the inherited `Cat::operator=(const Cat&)`. The assignment operator
+`Cat::operator=(const Cat&)` is *trivial* (<a href="https://eel.is/c++draft/class.copy.assign#9">[class.copy.assign]/9</a>).
+What we're missing is a sense that `Cat::operator=(const Cat&)` is trivial *for `Cat`* but not trivial
+*for `Leopard`*.
+
+What should matter to `is_trivially_assignable` (<a href="https://eel.is/c++draft/tab:meta.unary.prop">[meta.unary.prop]</a>)
+is not merely that the assignment `declval<Cat&>() = declval<const Cat&>()` call no operation that is not trivial,
+but that it call *only* an assignment operation that is *trivial for `Cat`.*
+
+## Type "trivially fooable" in a context ## {#trivial-in-context}
+
+```
+class Secretive {
+  Secretive(const Secretive&) = default;
+  Secretive& operator=(const Secretive&) = default;
+  friend class Leaker;
+};
+```
+
+Today, `Secretive` is `is_trivially_copyable` because all of its special members are trivial.
+But `Secretive` is not `is_trivially_copy_assignable`, because it is not `is_copy_assignable` at all.
+It is not `is_copy_assignable` because `declval<Secretive&>() = declval<const Secretive&>()`
+is not well-formed *in a context unrelated to `Secretive`.*
+
+This is good behavior by the type-trait `is_trivially_copy_assignable`. When library authors use that type-trait,
+that's what they're expecting: that a type `X` will be trivially fooable only if it is actually possible for
+*my library* (unrelated to `X`) to foo it.
+
+But — important! — this is *not* the behavior we care about when it comes to *propagating* the property.
+
+```
+struct Leaker {
+  Secretive m_;
+  Leaker(const Leaker&) = default;
+  Leaker& operator=(const Leaker&) = default;
+};
+```
+
+`Leaker::operator=(const Leaker&)` is a trivial assignment operator, because overload resolution
+*in the context of `Leaker`* successfully selects the trivial `Secretive::operator=(const Secretive&)`
+to copy member `m_`.
+
+So `Leaker` is `is_trivially_copy_assignable`, even though it has a member of type `Secretive` which is
+not `is_trivially_copy_assignable`.
+
+
 # Status quo # {#status-quo}
 
-The Standard defines several kinds of "triviality." Let's cover each of them quickly.
+The status quo in the draft Standard today is effectively modified by the proposed resolutions of a lot of CWG issues:
 
-<b>1.</b> `is_trivial<T>` (<a href="https://eel.is/c++draft/class.prop#def:class,trivial">[class.prop]/2</a>,
-<a href="https://eel.is/c++draft/basic#def:type,trivial">[basic.types.general]/9</a>,
-<a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>).
-This is just TC plus an eligible trivial default constructor.
-It is not useful in practice (like `is_literal`) and we're getting rid of it via [[P3247]]. It doesn't need to change.
+- [CWG 1928](https://cplusplus.github.io/CWG/issues/1928.html) "CWG feels that the triviality of a deleted function should be irrelevant"
+- [CWG 2885](https://cplusplus.github.io/CWG/issues/2885.html) "A default constructor for class `X` is *trivial* if..."
+- [CWG 2859](https://cplusplus.github.io/CWG/issues/2859.html) "A variable is said to have *vacuous initialization* if..."
+- [[P3247]] "Deprecate the notion of trivial types" (i.e. `is_trivial`)
+
 
 <b>2.</b> `is_trivially_copyable<T>` (<a href="https://eel.is/c++draft/class.prop#1">[class.prop]/1</a>,
 <a href="https://eel.is/c++draft/basic#def:type,trivially_copyable">[basic.types.general]/9</a>,
@@ -317,14 +382,16 @@ We propose to deprecate the three-argument type trait, anyway.
 <a href="https://eel.is/c++draft/class.mem#class.copy.assign-9">[class.copy.assign]/9</a>,
 <a href="https://eel.is/c++draft/class.mem#class.dtor-8">[class.dtor]/8</a>).
 
+This wording is <prins>modified</prins> by <a href="https://cplusplus.github.io/CWG/issues/2885.html">CWG 2885</a>.
+
 <small><blockquote>
 A default constructor is *trivial* if it is not user-provided and if:
 
-- its class has no virtual functions and no virtual base classes, and
-- no non-static data member of its class has a default member initializer, and
-- all the direct base classes of its class have trivial default constructors, and
-- for all the non-static data members of its class that are of class type (or array thereof),
-    each such class has a trivial default constructor.
+- <prins title="CWG 2885">`X`</prins> has no virtual functions and no virtual base classes, and
+- no non-static data member of <prins>`X`</prins> has a default member initializer, and
+- <prins title="CWG 2885">the constructor selected to default-initialize each direct base class subobject of X is trivial,</prins> and
+- for all the non-static data members of its class that are of class type (or array
+    thereof), <prins title="CWG 2885">the constructor selected to default-initialize that member (or an array element of that member) is trivial</prins>.
 
 A copy/move constructor for class `X` is *trivial* if it is not user-provided and if:
 
@@ -349,18 +416,6 @@ A destructor is *trivial* if it is not user-provided and if:
 
 </blockquote></small>
 
-Note: [class.default.ctor] conspicuously doesn't require that "the constructor selected to initialize
-that member is trivial"; it simply requires that each base and member have a (possibly ineligible)
-trivial default constructor. Naturally, there is implementation divergence here ([Godbolt](https://godbolt.org/z/1sYo5z8xq)).
-EDG seems to follow the letter of the law; Clang+GCC+MSVC hew closer to the library-writer's intuition.
-
-Notice that `is_trivially_constructible`, `is_trivially_assignable`, [class.copy.ctor], and [class.copy.assign]
-check the results of overload resolution,
-i.e., they are friendly to the library-writer's intuition that what matters is not what *special member functions*
-happen to be defined, but which (possibly non-special) functions are actually called by overload resolution for
-a given C++ expression. Vice versa, `is_trivially_copyable` and [class.default.ctor] are hostile to the
-library-writer's intuition; they are defined only in terms of special member functions, ignoring overload resolution.
-
 Two more critical things to keep in mind for the following examples:
 
 * A copy constructor, copy assignment operator, etc, is never a template. So you can have a poorly-matching
@@ -368,9 +423,9 @@ Two more critical things to keep in mind for the following examples:
     yet this will not cause `is_trivially_copyable` to become false, because a constructor template
     is not a copy constructor. All of your copy constructors remain trivial.
 
-* The rule for calling a special member function "trivial" is context-independent. Once trivial, always trivial.
-    So if you inherit a member function from your base class, it will continue to "be trivial" for you,
-    just like it was trivial for your base class.
+* The current Standard lacks the notion of "trivial *for* `X`" that we introduced in [[#trivial-for-x]].
+    An inherited member will continue to be "trivial" in the child just as it was (correctly) trivial in
+    the parent.
 
 # Surprising behaviors # {#surprise}
 

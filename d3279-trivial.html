@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D3279R0: CWG2463: What "trivially fooable" should mean</title>
+  <title>D3279R1: CWG2463: What "trivially fooable" should mean</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1565,6 +1565,7 @@ Possible extra rowspan handling
   <link href="https://isocpp.org/favicon.ico" rel="icon">
   <meta content="dark light" name="color-scheme">
 <style>
+prins  {background-color: #DDFFDD; }
 ins    {background-color: #CCFFCC; text-decoration: underline;}
 del    {background-color: #FFCACA; text-decoration: line-through;}
 p      {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
@@ -2091,8 +2092,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D3279R0<br>CWG2463: What "trivially fooable" should mean</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-05-15">2024-05-15</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D3279R1<br>CWG2463: What "trivially fooable" should mean</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-05-26">2024-05-26</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2102,7 +2103,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>1
+     <dd>2
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2126,20 +2127,26 @@ a direction. This is such a paper.</p>
       <li><a href="#intuition-ama"><span class="secno">2.3</span> <span class="content">Abstract-machine-lawyer’s intuition</span></a>
       <li><a href="#intuition-conclusion"><span class="secno">2.4</span> <span class="content">Bottom line</span></a>
      </ol>
-    <li><a href="#status-quo"><span class="secno">3</span> <span class="content">Status quo</span></a>
     <li>
-     <a href="#surprise"><span class="secno">4</span> <span class="content">Surprising behaviors</span></a>
+     <a href="#context"><span class="secno">3</span> <span class="content">Context is important</span></a>
      <ol class="toc">
-      <li><a href="#surprise-cwg2463"><span class="secno">4.1</span> <span class="content">TC types can have non-TC members</span></a>
-      <li><a href="#surprise-false-advertising"><span class="secno">4.2</span> <span class="content">Types can act non-trivially while publicly advertising TC</span></a>
-      <li><a href="#surprise-leopard"><span class="secno">4.3</span> <span class="content">"Trivial" Rule-of-Five functions can act unlike memcpy</span></a>
+      <li><a href="#trivial-for-x"><span class="secno">3.1</span> <span class="content">SMF "trivial for <code class="highlight"><c- n>X</c-></code>"</span></a>
+      <li><a href="#trivial-in-context"><span class="secno">3.2</span> <span class="content">Type "trivially fooable" in a context</span></a>
+     </ol>
+    <li><a href="#status-quo"><span class="secno">4</span> <span class="content">Status quo</span></a>
+    <li>
+     <a href="#surprise"><span class="secno">5</span> <span class="content">Surprising behaviors</span></a>
+     <ol class="toc">
+      <li><a href="#surprise-cwg2463"><span class="secno">5.1</span> <span class="content">TC types can have non-TC members</span></a>
+      <li><a href="#surprise-false-advertising"><span class="secno">5.2</span> <span class="content">Types can act non-trivially while publicly advertising TC</span></a>
+      <li><a href="#surprise-leopard"><span class="secno">5.3</span> <span class="content">"Trivial" Rule-of-Five functions can act unlike memcpy</span></a>
      </ol>
     <li>
-     <a href="#proposal"><span class="secno">5</span> <span class="content">Proposal</span></a>
+     <a href="#proposal"><span class="secno">6</span> <span class="content">Proposal</span></a>
      <ol class="toc">
-      <li><a href="#conclusion"><span class="secno">5.1</span> <span class="content">Conclusion</span></a>
+      <li><a href="#conclusion"><span class="secno">6.1</span> <span class="content">Conclusion</span></a>
      </ol>
-    <li><a href="#acknowledgments"><span class="secno">6</span> <span class="content">Acknowledgments</span></a>
+    <li><a href="#acknowledgments"><span class="secno">7</span> <span class="content">Acknowledgments</span></a>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
      <ol class="toc">
@@ -2321,11 +2328,60 @@ because each false positive means misbehavior at runtime.
 (We’ll see some false positives below.)
 The abstract-machine-lawyer tends to want a liberal "TC" label, with as few as possible false negatives,
 because each false negative means a program that works correctly in practice, but formally has UB.</p>
-   <h2 class="heading settled" data-level="3" id="status-quo"><span class="secno">3. </span><span class="content">Status quo</span><a class="self-link" href="#status-quo"></a></h2>
-   <p>The Standard defines several kinds of "triviality." Let’s cover each of them quickly.</p>
-   <p><b>1.</b> <code class="highlight"><c- n>is_trivial</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> (<a href="https://eel.is/c++draft/class.prop#def:class,trivial">[class.prop]/2</a>, <a href="https://eel.is/c++draft/basic#def:type,trivial">[basic.types.general]/9</a>, <a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>).
-This is just TC plus an eligible trivial default constructor.
-It is not useful in practice (like <code class="highlight"><c- n>is_literal</c-></code>) and we’re getting rid of it via <a data-link-type="biblio" href="#biblio-p3247" title="Deprecate the notion of trivial types">[P3247]</a>. It doesn’t need to change.</p>
+   <h2 class="heading settled" data-level="3" id="context"><span class="secno">3. </span><span class="content">Context is important</span><a class="self-link" href="#context"></a></h2>
+   <p>The previous section was about "trivial copyability" in particular; we move now to "trivial fooability"
+in general. The C++ Standard doesn’t currently recognize it, but <em>context</em> is important in two ways.</p>
+   <h3 class="heading settled" data-level="3.1" id="trivial-for-x"><span class="secno">3.1. </span><span class="content">SMF "trivial for <code class="highlight"><c- n>X</c-></code>"</span><a class="self-link" href="#trivial-for-x"></a></h3>
+<pre class="highlight"><c- k>struct</c-> <c- nc>Cat</c-> <c- p>{};</c->
+<c- k>struct</c-> <c- nc>Leopard</c-> <c- o>:</c-> <c- n>Cat</c-> <c- p>{</c->
+  <c- b>int</c-> <c- n>spots_</c-><c- p>;</c->
+  <c- n>Leopard</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>Leopard</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>delete</c-><c- p>;</c->
+  <c- k>using</c-> <c- n>Cat</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>;</c->
+<c- p>};</c->
+<c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>is_trivially_assignable</c-><c- o>&lt;</c-><c- n>Leopard</c-><c- o>&amp;</c-><c- p>,</c-> <c- k>const</c-> <c- n>Leopard</c-><c- o>&amp;></c-><c- p>);</c->
+</pre>
+   <p>Today, <code class="highlight"><c- n>Leopard</c-></code> is <code class="highlight"><c- n>is_trivially_copy_assignable</c-></code> because when you try to copy-assign a <code class="highlight"><c- n>Leopard</c-></code>,
+overload resolution selects the inherited <code class="highlight"><c- n>Cat</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>Cat</c-><c- o>&amp;</c-><c- p>)</c-></code>. The assignment operator <code class="highlight"><c- n>Cat</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>Cat</c-><c- o>&amp;</c-><c- p>)</c-></code> is <em>trivial</em> (<a href="https://eel.is/c++draft/class.copy.assign#9">[class.copy.assign]/9</a>).
+What we’re missing is a sense that <code class="highlight"><c- n>Cat</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>Cat</c-><c- o>&amp;</c-><c- p>)</c-></code> is trivial *for <code class="highlight"><c- n>Cat</c-></code>* but not trivial
+*for <code class="highlight"><c- n>Leopard</c-></code>*.</p>
+   <p>What should matter to <code class="highlight"><c- n>is_trivially_assignable</c-></code> (<a href="https://eel.is/c++draft/tab:meta.unary.prop">[meta.unary.prop]</a>)
+is not merely that the assignment <code class="highlight"><c- n>declval</c-><c- o>&lt;</c-><c- n>Cat</c-><c- o>&amp;></c-><c- p>()</c-> <c- o>=</c-> <c- n>declval</c-><c- o>&lt;</c-><c- k>const</c-> <c- n>Cat</c-><c- o>&amp;></c-><c- p>()</c-></code> call no operation that is not trivial,
+but that it call <em>only</em> an assignment operation that is *trivial for <code class="highlight"><c- n>Cat</c-></code>.*</p>
+   <h3 class="heading settled" data-level="3.2" id="trivial-in-context"><span class="secno">3.2. </span><span class="content">Type "trivially fooable" in a context</span><a class="self-link" href="#trivial-in-context"></a></h3>
+<pre class="highlight"><c- k>class</c-> <c- nc>Secretive</c-> <c- p>{</c->
+  <c- n>Secretive</c-><c- p>(</c-><c- k>const</c-> <c- n>Secretive</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+  <c- n>Secretive</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>Secretive</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+  <c- k>friend</c-> <c- k>class</c-> <c- nc>Leaker</c-><c- p>;</c->
+<c- p>};</c->
+</pre>
+   <p>Today, <code class="highlight"><c- n>Secretive</c-></code> is <code class="highlight"><c- n>is_trivially_copyable</c-></code> because all of its special members are trivial.
+But <code class="highlight"><c- n>Secretive</c-></code> is not <code class="highlight"><c- n>is_trivially_copy_assignable</c-></code>, because it is not <code class="highlight"><c- n>is_copy_assignable</c-></code> at all.
+It is not <code class="highlight"><c- n>is_copy_assignable</c-></code> because <code class="highlight"><c- n>declval</c-><c- o>&lt;</c-><c- n>Secretive</c-><c- o>&amp;></c-><c- p>()</c-> <c- o>=</c-> <c- n>declval</c-><c- o>&lt;</c-><c- k>const</c-> <c- n>Secretive</c-><c- o>&amp;></c-><c- p>()</c-></code> is not well-formed *in a context unrelated to <code class="highlight"><c- n>Secretive</c-></code>.*</p>
+   <p>This is good behavior by the type-trait <code class="highlight"><c- n>is_trivially_copy_assignable</c-></code>. When library authors use that type-trait,
+that’s what they’re expecting: that a type <code class="highlight"><c- n>X</c-></code> will be trivially fooable only if it is actually possible for <em>my library</em> (unrelated to <code class="highlight"><c- n>X</c-></code>) to foo it.</p>
+   <p>But — important! — this is <em>not</em> the behavior we care about when it comes to <em>propagating</em> the property.</p>
+<pre class="highlight"><c- k>struct</c-> <c- nc>Leaker</c-> <c- p>{</c->
+  <c- n>Secretive</c-> <c- n>m_</c-><c- p>;</c->
+  <c- n>Leaker</c-><c- p>(</c-><c- k>const</c-> <c- n>Leaker</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+  <c- n>Leaker</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>Leaker</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- p>};</c->
+</pre>
+   <p><code class="highlight"><c- n>Leaker</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>Leaker</c-><c- o>&amp;</c-><c- p>)</c-></code> is a trivial assignment operator, because overload resolution
+*in the context of <code class="highlight"><c- n>Leaker</c-></code>* successfully selects the trivial <code class="highlight"><c- n>Secretive</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>Secretive</c-><c- o>&amp;</c-><c- p>)</c-></code> to copy member <code class="highlight"><c- n>m_</c-></code>.</p>
+   <p>So <code class="highlight"><c- n>Leaker</c-></code> is <code class="highlight"><c- n>is_trivially_copy_assignable</c-></code>, even though it has a member of type <code class="highlight"><c- n>Secretive</c-></code> which is
+not <code class="highlight"><c- n>is_trivially_copy_assignable</c-></code>.</p>
+   <h2 class="heading settled" data-level="4" id="status-quo"><span class="secno">4. </span><span class="content">Status quo</span><a class="self-link" href="#status-quo"></a></h2>
+   <p>The status quo in the draft Standard today is effectively modified by the proposed resolutions of a lot of CWG issues:</p>
+   <ul>
+    <li data-md>
+     <p><a href="https://cplusplus.github.io/CWG/issues/1928.html">CWG 1928</a> "CWG feels that the triviality of a deleted function should be irrelevant"</p>
+    <li data-md>
+     <p><a href="https://cplusplus.github.io/CWG/issues/2885.html">CWG 2885</a> "A default constructor for class <code class="highlight"><c- n>X</c-></code> is <em>trivial</em> if..."</p>
+    <li data-md>
+     <p><a href="https://cplusplus.github.io/CWG/issues/2859.html">CWG 2859</a> "A variable is said to have <em>vacuous initialization</em> if..."</p>
+    <li data-md>
+     <p><a data-link-type="biblio" href="#biblio-p3247" title="Deprecate the notion of trivial types">[P3247]</a> "Deprecate the notion of trivial types" (i.e. <code class="highlight"><c- n>is_trivial</c-></code>)</p>
+   </ul>
    <p><b>2.</b> <code class="highlight"><c- n>is_trivially_copyable</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> (<a href="https://eel.is/c++draft/class.prop#1">[class.prop]/1</a>, <a href="https://eel.is/c++draft/basic#def:type,trivially_copyable">[basic.types.general]/9</a>, <a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>).</p>
    <p><small></small></p>
    <blockquote><small> A <em>trivially copyable class</em> is a class:<p></p> <ul><li data-md><p>that has at least one eligible copy constructor, move constructor, copy assignment operator, or move assignment operator,</p> </li><li data-md><p>where each eligible copy constructor, move constructor, copy assignment operator, and move assignment operator is trivial, and</p> </li><li data-md><p>that has a trivial, non-deleted destructor.</p> </li></ul> <p>Scalar types, trivially copyable class types, arrays of such types, and cv-qualified versions of these types
@@ -2366,21 +2422,17 @@ EDG says that <code class="highlight"><c- n>is_trivially_constructible</c-><c- o
 We propose to deprecate the three-argument type trait, anyway.</p>
    <p><b>5.</b> A special member function is <em>trivial</em> in specific circumstances
 (<a href="https://eel.is/c++draft/class.mem#class.default.ctor-3">[class.default.ctor]/3</a>, <a href="https://eel.is/c++draft/class.mem#class.copy.ctor-11">[class.copy.ctor]/11</a>, <a href="https://eel.is/c++draft/class.mem#class.copy.assign-9">[class.copy.assign]/9</a>, <a href="https://eel.is/c++draft/class.mem#class.dtor-8">[class.dtor]/8</a>).</p>
+   <p>
+    This wording is 
+    <prins>modified</prins>
+     by <a href="https://cplusplus.github.io/CWG/issues/2885.html">CWG 2885</a>.
+   </p>
    <p><small></small></p>
-   <blockquote><small> A default constructor is <em>trivial</em> if it is not user-provided and if:<p></p> <ul><li data-md><p>its class has no virtual functions and no virtual base classes, and</p> </li><li data-md><p>no non-static data member of its class has a default member initializer, and</p> </li><li data-md><p>all the direct base classes of its class have trivial default constructors, and</p> </li><li data-md><p>for all the non-static data members of its class that are of class type (or array thereof),
-each such class has a trivial default constructor.</p> </li></ul> <p>A copy/move constructor for class <code class="highlight"><c- n>X</c-></code> is <em>trivial</em> if it is not user-provided and if:</p> <ul><li data-md><p>class <code class="highlight"><c- n>X</c-></code> has no virtual functions and no virtual base classes, and</p> </li><li data-md><p>the constructor selected to copy/move each direct base class subobject is trivial, and</p> </li><li data-md><p>for each non-static data member of <code class="highlight"><c- n>X</c-></code> that is of class type (or array thereof),
+   <blockquote><small> A default constructor is <em>trivial</em> if it is not user-provided and if:<p></p> <ul><li data-md><prins title="CWG 2885"><code class="highlight"><c- n>X</c-></code></prins> has no virtual functions and no virtual base classes, and </li><li data-md><p>no non-static data member of <prins><code class="highlight"><c- n>X</c-></code></prins> has a default member initializer, and</p> </li><li data-md><prins title="CWG 2885">the constructor selected to default-initialize each direct base class subobject of X is trivial,</prins> and </li><li data-md><p>for all the non-static data members of its class that are of class type (or array
+thereof), <prins title="CWG 2885">the constructor selected to default-initialize that member (or an array element of that member) is trivial</prins>.</p> </li></ul> <p>A copy/move constructor for class <code class="highlight"><c- n>X</c-></code> is <em>trivial</em> if it is not user-provided and if:</p> <ul><li data-md><p>class <code class="highlight"><c- n>X</c-></code> has no virtual functions and no virtual base classes, and</p> </li><li data-md><p>the constructor selected to copy/move each direct base class subobject is trivial, and</p> </li><li data-md><p>for each non-static data member of <code class="highlight"><c- n>X</c-></code> that is of class type (or array thereof),
 the constructor selected to copy/move that member is trivial.</p> </li></ul> <p>A copy/move assignment operator for class <code class="highlight"><c- n>X</c-></code> is <em>trivial</em> if it is not user-provided and if:</p> <ul><li data-md><p>class <code class="highlight"><c- n>X</c-></code> has no virtual functions and no virtual base classes, and</p> </li><li data-md><p>the assignment operator selected to copy/move each direct base class subobject is trivial, and</p> </li><li data-md><p>for each non-static data member of <code class="highlight"><c- n>X</c-></code> that is of class type (or array thereof), the assignment
 operator selected to copy/move that member is trivial.</p> </li></ul> <p>A destructor is <em>trivial</em> if it is not user-provided and if:</p> <ul><li data-md><p>the destructor is not virtual,</p> </li><li data-md><p>all of the direct base classes of its class have trivial destructors, and</p> </li><li data-md><p>for all of the non-static data members of its class that are of class type (or array thereof),
 each such class has a trivial destructor.</p> </li></ul> </small></blockquote>
-   <p class="note" role="note"><span class="marker">Note:</span> [class.default.ctor] conspicuously doesn’t require that "the constructor selected to initialize
-that member is trivial"; it simply requires that each base and member have a (possibly ineligible)
-trivial default constructor. Naturally, there is implementation divergence here (<a href="https://godbolt.org/z/1sYo5z8xq">Godbolt</a>).
-EDG seems to follow the letter of the law; Clang+GCC+MSVC hew closer to the library-writer’s intuition.</p>
-   <p>Notice that <code class="highlight"><c- n>is_trivially_constructible</c-></code>, <code class="highlight"><c- n>is_trivially_assignable</c-></code>, [class.copy.ctor], and [class.copy.assign]
-check the results of overload resolution,
-i.e., they are friendly to the library-writer’s intuition that what matters is not what <em>special member functions</em> happen to be defined, but which (possibly non-special) functions are actually called by overload resolution for
-a given C++ expression. Vice versa, <code class="highlight"><c- n>is_trivially_copyable</c-></code> and [class.default.ctor] are hostile to the
-library-writer’s intuition; they are defined only in terms of special member functions, ignoring overload resolution.</p>
    <p>Two more critical things to keep in mind for the following examples:</p>
    <ul>
     <li data-md>
@@ -2389,12 +2441,12 @@ trivial copy constructor living alongside a non-trivial constructor template tha
 yet this will not cause <code class="highlight"><c- n>is_trivially_copyable</c-></code> to become false, because a constructor template
 is not a copy constructor. All of your copy constructors remain trivial.</p>
     <li data-md>
-     <p>The rule for calling a special member function "trivial" is context-independent. Once trivial, always trivial.
-So if you inherit a member function from your base class, it will continue to "be trivial" for you,
-just like it was trivial for your base class.</p>
+     <p>The current Standard lacks the notion of "trivial <em>for</em> <code class="highlight"><c- n>X</c-></code>" that we introduced in <a href="#trivial-for-x">§ 3.1 SMF "trivial for X"</a>.
+An inherited member will continue to be "trivial" in the child just as it was (correctly) trivial in
+the parent.</p>
    </ul>
-   <h2 class="heading settled" data-level="4" id="surprise"><span class="secno">4. </span><span class="content">Surprising behaviors</span><a class="self-link" href="#surprise"></a></h2>
-   <h3 class="heading settled" data-level="4.1" id="surprise-cwg2463"><span class="secno">4.1. </span><span class="content">TC types can have non-TC members</span><a class="self-link" href="#surprise-cwg2463"></a></h3>
+   <h2 class="heading settled" data-level="5" id="surprise"><span class="secno">5. </span><span class="content">Surprising behaviors</span><a class="self-link" href="#surprise"></a></h2>
+   <h3 class="heading settled" data-level="5.1" id="surprise-cwg2463"><span class="secno">5.1. </span><span class="content">TC types can have non-TC members</span><a class="self-link" href="#surprise-cwg2463"></a></h3>
    <p>This is <a data-link-type="biblio" href="#biblio-cwg2463" title="Trivial copyability and unions with non-trivial members">[CWG2463]</a> (<a href="https://godbolt.org/z/jhaEd6YYY">Godbolt</a>):</p>
 <pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Hamlet</c-> <c- p>{</c->
   <c- n>Hamlet</c-><c- p>(</c-><c- k>const</c-> <c- n>Hamlet</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- n>puts</c-><c- p>(</c-><c- s>"copied"</c-><c- p>);</c-> <c- p>}</c->
@@ -2439,7 +2491,7 @@ This <code class="highlight"><c- n>Hamlet2</c-></code> differs only in that it h
    <p>Non-TC <code class="highlight"><c- n>Hamlet</c-></code> embedded in a <code class="highlight"><c- n>Nutshell</c-></code> becomes TC; non-TC <code class="highlight"><c- n>Hamlet2</c-></code> embedded in the same <code class="highlight"><c- n>Nutshell</c-></code> stubbornly remains non-TC.
 So it’s not the TC-ness of <code class="highlight"><c- n>Hamlet</c-></code> that matters; it’s something else — something that takes more than one bit to represent
 in the compiler.</p>
-   <h3 class="heading settled" data-level="4.2" id="surprise-false-advertising"><span class="secno">4.2. </span><span class="content">Types can act non-trivially while publicly advertising TC</span><a class="self-link" href="#surprise-false-advertising"></a></h3>
+   <h3 class="heading settled" data-level="5.2" id="surprise-false-advertising"><span class="secno">5.2. </span><span class="content">Types can act non-trivially while publicly advertising TC</span><a class="self-link" href="#surprise-false-advertising"></a></h3>
    <p>Microsoft STL’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pair</c-><c- o>&lt;</c-><c- b>int</c-><c- o>&amp;</c-><c- p>,</c-> <c- b>int</c-><c- o>&amp;></c-></code> advertises itself as TC, despite not modeling trivial copyability.
 To falsely advertise yourself as TC, recall that there are several possible signatures for a "copy assignment operator,"
 and user-declaring any such signature (even an out-of-the-way one, even deleted) suffices to keep the compiler
@@ -2470,7 +2522,7 @@ everyone’s intuition because it shows that we can easily use corner cases in t
 "Okay, so we shouldn’t gate our <code class="highlight"><c- n>copy</c-></code> and <code class="highlight"><c- n>reverse_copy</c-></code> optimizations on TC. We’ll gate them on
 the more granular <code class="highlight"><c- n>is_trivially_copy_assignable</c-></code> trait, instead." The next section shows how that
 gate, also, is broken.</p>
-   <h3 class="heading settled" data-level="4.3" id="surprise-leopard"><span class="secno">4.3. </span><span class="content">"Trivial" Rule-of-Five functions can act unlike memcpy</span><a class="self-link" href="#surprise-leopard"></a></h3>
+   <h3 class="heading settled" data-level="5.3" id="surprise-leopard"><span class="secno">5.3. </span><span class="content">"Trivial" Rule-of-Five functions can act unlike memcpy</span><a class="self-link" href="#surprise-leopard"></a></h3>
    <p>The rule for calling a special member function "trivial" lacks context. Once trivial, always trivial.
 So if you inherit a member function from your base class, it will continue to "be trivial" for you,
 just like it was trivial for your base class. This allows us to make class <code class="highlight"><c- n>Leopard</c-></code> which never
@@ -2493,7 +2545,7 @@ changes its <code class="highlight"><c- n>spots_</c-></code> — and yet, the ty
 of <code class="highlight"><c- n>Leopard</c-></code> can be lowered to <code class="highlight"><c- n>memmove</c-></code>. But in fact that’s wrong.</p>
    <p>I see no way to fix everybody’s <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>copy</c-><c- p>(</c-><c- n>Leopard</c-><c- p>)</c-></code> on the library side. The only way forward
 is to fix the definition of triviality in the core language.</p>
-   <h2 class="heading settled" data-level="5" id="proposal"><span class="secno">5. </span><span class="content">Proposal</span><a class="self-link" href="#proposal"></a></h2>
+   <h2 class="heading settled" data-level="6" id="proposal"><span class="secno">6. </span><span class="content">Proposal</span><a class="self-link" href="#proposal"></a></h2>
    <p>Basically, we propose to respecify all of the traits to conform with the library-writer’s intuition.
 (For each case below, read "can be" as "is known to the compiler to be able to be".)</p>
    <ul>
@@ -2610,7 +2662,7 @@ what the "[original] value" of an object means, standardese-wise.</p>
 "For trivially copyable types, the <em>value representation</em> is a set of bits in the object representation
 that determines a value, which is one discrete element of an implementation-defined set of values."
 This sentence doesn’t seem useful, but also isn’t harmful; we can let it be.</p>
-   <h3 class="heading settled" data-level="5.1" id="conclusion"><span class="secno">5.1. </span><span class="content">Conclusion</span><a class="self-link" href="#conclusion"></a></h3>
+   <h3 class="heading settled" data-level="6.1" id="conclusion"><span class="secno">6.1. </span><span class="content">Conclusion</span><a class="self-link" href="#conclusion"></a></h3>
    <p>This proposal is drastic and breaks a lot of eggs, but makes a good omelet.
 We would come out the other side with a type-traits library that is actually usable
 by library-writers. Library-writers are already quietly assuming that the traits
@@ -2618,7 +2670,7 @@ work this way, so bringing the Standard into line with those assumptions would
 immediately close a lot of library bugs.</p>
    <p>I plan to bring an R1 with formal wording, and hope to also gain some implementation
 experience in my fork of Clang. Assistance will be gratefully accepted.</p>
-   <h2 class="heading settled" data-level="6" id="acknowledgments"><span class="secno">6. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
+   <h2 class="heading settled" data-level="7" id="acknowledgments"><span class="secno">7. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
    <p>Thanks to Ville Voutilainen and Giuseppe D’Angelo for their encouragement and discussion.</p>
    <p>Thanks to the regulars on the cpplang Slack for rubber-ducking a lot of these examples.</p>
   </main>
