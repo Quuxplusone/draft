@@ -31,121 +31,317 @@ p      {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: n
         <a href="https://wiki.edg.com/bin/view/Wg21kona2022/CoreWorkingGroup#A_2463._Trivial_copyability_and_unions_with_non_45trivial_members">Kona 2022</a>,
         <a href="https://wiki.edg.com/bin/view/Wg21issaquah2023/NotesEWGCWG2463">Issaquah 2023</a>.
 
+# A consistent mental model (CMM) of triviality # {#consistent}
 
-# Three intuitions for TC # {#intuition}
+<div style="float:right;">
+<p>... et positae sunt, non quia sic sit, sed ut sentiat discens ...<br>
+Dante Alighieri, <i>Quaestio de aquae et terrae</i>
 
-Different audiences think about trivial copyability (TC) in different ways.
-Here are three points of view I've identified: the library-writer, the compiler-writer,
-and the abstract-machine-lawyer.
+<p>[A] noteworthy characteristic of this manual is that it doesn't always tell the truth.
+When certain concepts of TeX are introduced informally, general rules will be stated;
+afterwards you will find that the rules aren't strictly true. [...]
+The author feels that this technique of deliberate lying will actually make it easier
+for you to learn the ideas. Once you understand a simple but false rule,
+it will not be hard to supplement that rule with its exceptions.<br>
+Donald Knuth, <i>The TeXbook</i>
+</div>
 
-## Library-writer's intuition ## {#intuition-lw}
+## Definition of triviality ## {#consistent-defn}
 
-The library-writer's view is also shared by the trainer/instructor; it's the view that you need
-to have in order to understand most C++ codebases these days.
-
-> When a type is trivially copyable, all of its Rule-of-Five operations can be lowered to simple `memcpy`s.
-> Furthermore, its Rule-of-Five operations are non-throwing and have no visible side effects.
-
-This is the intuition by which every STL vendor writes things like this,
-which assumes that assignment of TC types can always be lowered to `memcpy`:
-
-```c++
-template<class T, class U>
-U* std_copy(T* first, T* last, U* dfirst) {
-  static_assert(is_assignable_v<T&, U&>);
-  if constexpr (same_as<T, U> && is_trivially_copyable_v<T>) {
-    memmove(dfirst, first, (last - first) * sizeof(T));
-    return dfirst + (last - first);
-  } else {
-    while (first != last) *dfirst++ = *first++;
-    return dfirst;
-  }
-}
-```
-
-And this, which assumes that assignment and construction can both be lowered:
+Certain special member functions are *trivial*. The notion of triviality makes sense
+only in relation to some *operation*; for example, we might say that type `T` is trivially default-constructible,
+or trivially equality-comparable, or trivially copy-assignable. What it means is precisely
+"This operation, performed on `T`'s own value, generates exactly the same code as if we performed
+that same operation on `T`'s object representation." (The *object representation* of a `T` object is
+the array of bytes that make up its bit-pattern.) [Example:](https://godbolt.org/z/a8YoPznn4)
 
 ```c++
 template<class T>
-void std_vector<T>::insert(std_vector<T>::const_iterator it, T value) {
-  size_t i = it - begin();
-  ensure_capacity();
-  if constexpr (is_trivially_copyable_v<T>) {
-    memmove(data() + i + 1, data() + i, size_ - i);
-    size_ += 1;
+struct ObjectRepr {
+  alignas(T) char data_[sizeof(T)];
+  bool operator==(const ObjectRepr&) const = default;
+};
+
+struct TrivDefCt {
+  int i;
+};
+template<class T> void default_construct(T *p) { ::new (p) T; }
+template void default_construct(TrivDefCt *);
+template void default_construct(ObjectRepr<TrivDefCt> *);
+static_assert(__is_trivially_constructible(TrivDefCt));
+
+struct TrivEqCmp {
+  int i, j;
+  friend bool operator==(TrivEqCmp, TrivEqCmp) = default;
+};
+template<class T> bool equality_compare(T& p, T& q) { return p == q; }
+template bool equality_compare(TrivEqCmp&, TrivEqCmp&);
+template bool equality_compare(ObjectRepr<TrivEqCmp>&, ObjectRepr<TrivEqCmp>&);
+static_assert(__is_trivially_equality_comparable(TrivEqCmp));
+```
+
+It is possible to make a type `T` which is "Platonically" trivially
+fooable — that is, `operation_foo(T*)` and `operation_foo(ObjectRepr<T>*)` generate the same code —
+even though the compiler doesn't "know" that `T` is trivially fooable — that is, the type-trait returns
+false rather than true. This happens for two reasons:
+
+- The compiler never likes to "crack open the curly braces" of a user-defined function to inspect what
+    it does — curly-braced bodies are "opaque" to the compiler. So if you implement a curly-braced body
+    that does the same thing as `=default`, but you don't actually *spell* it as `=default`, you're
+    basically hiding information from the compiler. ([Example.](https://godbolt.org/z/KdKsdvnhh))
+
+- Certain compilers don't understand the notion of "trivially fooable" for certain operations "foo" at all.
+    For example, Clang understands the notion of "trivially equality comparable," but GCC does not.
+    WG21 occasionally sees proposals for new trivialities; for example, [[P2786]] proposes "relocate"
+    as an operation that can be trivial; [[P2782]] proposes "value-initialize" as an operation that can
+    be trivial. A compiler that doesn't recognize or track these properties at all, certainly will not
+    be able to expose them to the programmer. ([Example.](https://godbolt.org/z/1zzjdaaes))
+
+## Public reductionistic `<type_traits>` ## {#consistent-reductionistic}
+
+Each individual operation that can be trivial, comes with a set of three dedicated type-traits
+that expose the (1) accessibility, (2) nothrow-ness, and (3) triviality of that individual operation.
+
+`is_fooable_v<T>` expresses that `T`'s foo operation is public and unambiguous; e.g. `is_copy_assignable_v<T>`
+expresses that `t = t` is a well-formed expression.
+
+`is_nothrow_fooable_v<T>` expresses that `T`'s foo operation is public and unambiguous and nothrow, i.e. `noexcept(t = t)`.
+
+`is_trivially_fooable_v<T>` expresses that `T`'s foo operation is public and unambiguous and *trivial*, in the
+sense defined above. This kind of trait is useful for algorithm authors, because it lets them optimize
+some specific operation foo into memfoo. For example, `std::copy` wants to optimize copy-assignment:
+
+```c++
+template<class T>
+void stl_copy(T *first, T *last, T *dest) {
+  if constexpr (std::is_trivially_copy_assignable_v<T>) {
+    memmove(dest, first, (last - first) * sizeof(T));
   } else {
-    ::new (data()[size_]) T(std::move(data()[size_ - 1]));
-    size_ += 1;
-    move(data() + i, data() + size_ - 1, data() + i + 1);
+    while (first != last) {
+      *dest++ = *first++;
+    }
   }
-  data()[i] = value;
 }
 ```
 
-A library might even assume that copying a TC type is "free" because it
-cannot have visible side effects:
+## Holistic `<type_traits>` ## {#consistent-holistic}
+
+There is one very special type-trait: `is_trivially_copyable_v<T>`.
+This exposes a *holistic property* of the type `T`: whether `T`'s *value semantics as a whole*
+follow `T`'s object representation. This trait is useful for authors of more complicated
+algorithms, like `std::sort`, where it's left unclear or deliberately underspecified exactly
+what operations are going to be used. For a *trivially copyable* type `T`, the neat thing is
+that it doesn't matter what operations you use to shuffle `T`-values from place to place:
+whether you use construction or assignment or swap, copy or move, the values of the `T` objects
+will simply follow their object representations.
+
+For example, `std::sort` wants to optimize a conditional-swap function. For trivially copyable
+types, we can do it branchlessly ([example](https://godbolt.org/z/z9f5qEjnj)):
 
 ```c++
-template<class T, class Compare>
-void sort3(T *x, T *y, T *z, Compare& c) {
-  if constexpr (is_trivially_copyable_v<T> &&
-                is_constructible_v<T, T&> && is_assignable_v<T&, T&>) {
-    // cond swap
-    bool r = c(*z, *y);
-    T tmp = r ? *z : *y;
-    *z = r ? *y : *z;
-    *y = tmp;
-    // partially sorted swap
-    r = c(*z, *x);
-    tmp = r ? *z : *x;
-    *z = r ? *x : *z;
-    r = c(tmp, *y);
-    *x = r ? *x : *y;
-    *y = r ? *y : tmp;
+template<class T>
+void cond_swap(T *x, T *y) {
+  if constexpr (std::is_trivially_copyable_v<T>) { 
+    bool r = (*y < *x);
+    alignas(T) char bigger[sizeof(T)];
+    memcpy(bigger, r ? x : y, sizeof(T)); // cmovg
+    memmove(x, r ? y : x, sizeof(T));     // cmovl
+    memcpy(y, bigger, sizeof(T));
   } else {
-    // use swap alone, which is slower
-    if (c(*y, *x)) {
-      if (c(*z, *y)) {
-        swap(*x, *z);
-      } else {
-        swap(*x, *y);
-        if (c(*z, *y)) {
-          swap(*y, *z);
-        }
-      }
-    } else if (c(*z, *y)) {
-      swap(*y, *z);
-      if (c(*y, *x)) {
-        swap(*x, *y);
-      }
+    if (*y < *x) {
+      std::swap(*x, *y);
     }
   }
+}
 ```
 
-The library-writer's intuition is the most fruitful, because it leads to all these cool optimizations.
-Unfortunately, we'll see that each of these optimizations has corner cases today which are unsafe, because
-the set of types actually considered TC by C++ includes some types for which these optimizations are unsafe.
+`is_trivially_copyable` doesn't look at any one specific operation — it looks
+at the entire array of value-semantic operations holistically. Therefore, knowing that
+a type is trivially copyable doesn't tell you whether that type can actually *be copied*.
+Its copy constructor might be `private`; it might be move-only; etc. Most algorithms
+will want to check a type-trait (or use a `requires`-expression) to verify that the
+caller's `T`'s public API meets their documented requirements. But that verification
+is independent of our *optimized implementation*.
 
-## Compiler-writer's intuition ## {#intuition-cw}
+[[P1144]] proposes "`is_trivially_relocatable`" as a holistic trait: whether
+`T`'s value semantics follow `T`'s object representation as long as `T` is treated
+like an affine type (i.e. the `T`-values themselves are conserved, albeit perhaps
+relocated from one memory address to another). This would be, by definition, a
+superset of `is_trivially_copyable`: every trivially copyable type is trivially relocatable
+by definition, but not necessarily vice versa.
 
-The compiler-writer's intuition is that all types start out "naturally" TC, and then get "made non-TC"
-in various ways. For example, if we see that any of `T`'s Rule-of-Five members are user-defined, we mark `T` as non-TC.
-If it has a subobject of non-TC type, we mark it non-TC. If it has a virtual base class, we mark it non-TC.
-And so on.
 
-This paradigm is extremely easy to implement. It's also powerful and general: the compiler-writer
-can use the same technique to track "trivial relocatability," "trivial equality-comparability,"
-"trivial value-initializability," etc.
-Unfortunately, we'll see that this paradigm doesn't work perfectly without some tweaks, because
-the set of types actually considered TC by C++ includes some types violating this paradigm.
-(For example, a TC type *can* have a non-TC type as a data member.)
+# Today's C++ breaks the mental model # {#breaks}
 
-## Abstract-machine-lawyer's intuition ## {#intuition-ama}
+The preceding section laid out a consistent mental model ("the CMM") for thinking about triviality.
+This is the model taught and understood today in all codebases and organizations
+to whom triviality is relevant.
 
-Our previous two intuitions were driven by the physics of TC: what library operations can we do efficiently for TC types,
-and how can we efficiently compute the TC-ness of a type inside the compiler.
-The abstract-machine-lawyer's intuition is not driven by physics, but by the circular logic of the Standard itself.
-<a href="https://eel.is/c++draft/basic.types#general-2">[basic.types.general]/2–3</a> says:
+But this is *not* the model defined in the C++ Standard!
+
+Let's see some problems with the C++ Standard's model.
+
+## `Leopard` ## {#breaks-leopard}
+
+The C++ Standard starts with the term "trivial operation" — which it never defines.
+The library defines e.g. `is_trivially_copy_assignable<T>` as true if and only if
+the expression `t = t` is well-formed and "is known to call no operation that is not trivial"
+(<a href="https://eel.is/c++draft/meta#tab:meta.unary.prop">[meta.unary.prop]</a>).
+
+It is generally understood by vendors that calling a user-defined function is "not trivial";
+that calling a defaulted but non-trivial special member function is "not trivial"; and that
+any other operation at all *is* "trivial."
+
+Notice the major difference between the Standard's notions and the CMM's. The CMM would say
+that "`T` is trivially copy assignable" because of a *relationship* between
+the operation `t = t` and the assignment operation of `T`'s object representation: namely,
+that those two operations have the same *effect*. The Standard,
+in contrast, says that "`T` is trivially copy assignable" because of a property of `t = t`
+in isolation, regardless of what *effect* it has on the `T` object's value.
+
+The CMM never needs to talk about whether a given *function implementation* is "trivial,"
+except in the colloquial sense that if `t = t` calls `T`'s copy-assignment operator, and
+`T` is in fact trivially copy-assignable, then we might colloquially say that `T` "has a
+trivial copy-assignment operator" — that is, `T::operator=` implements an assignment operation
+that is trivial *for `T`* (with respect to `T`'s object representation specifically).
+The Standard, in contrast, lays much significance on the idea that any function at all
+can "be trivial" in a vacuum.
+
+[Example:](https://godbolt.org/z/16Y5zsscT)
+
+```c++
+struct Cat {};
+struct Leopard : Cat {
+    int spots_;
+    void operator=(Leopard&) = delete;
+    using Cat::operator=;
+};
+static_assert(__is_trivially_assignable(Leopard&, const Leopard&));
+```
+
+This `Leopard` has an assignment operator of the form `Cat& Cat::operator=(const Cat&)`,
+which is not user-provided.
+The expression `leopard = constleopard` calls that assignment operator; therefore it "calls
+no operation that is not trivial." Therefore `Leopard` is trivially copy-assignable,
+according to the C++ Standard.
+Copy-assigning a `Leopard` generates visibly different code from copy-assigning its
+object representation; namely, assigning to a `Leopard` does not change its `spots_`.
+According to the CMM, `Leopard` *should not* be considered trivially copy-assignable.
+Yet, in today's C++, it is.
+
+
+## `is_trivially_assignable<int&, float>` ## {breaks-int-float}
+
+Today's C++ Standard permits us to talk about whether an expression is "trivial,"
+independent of its semantics. So for example the expression `myInt = myFloat` is
+considered "trivial" because it "calls no operation that is not trivial" — in fact
+it calls no operations at all.
+
+```c++
+static_assert(std::is_trivially_assignable_v<int&, float>); // (!)
+
+struct Base { int i; };
+struct Pad { int pad; };
+struct Simple : Base {};
+struct Offset : Pad, Base {};
+static_assert(std::is_trivially_assignable_v<Base*&, Simple*>);
+static_assert(std::is_trivially_assignable_v<Base*&, Offset*>); // (!)
+```
+
+There is a meaningful interpretation of `is_trivially_assignable<T, U>`: By the CMM
+it *should* mean that assigning a value of type `U` into an object of type `T` can
+be done by copying the object representation, and this will have the correct semantic
+effect. But this isn't what it means in today's C++ Standard.
+
+If we adopt the CMM, then we permit library authors to write e.g.
+
+```c++
+template<class T, class U>
+void stl_copy(T *first, T *last, U *dest) {
+  if constexpr (std::is_trivially_assignable_v<U&, T&>) {
+    static_assert(sizeof(T) == sizeof(U));
+    memmove(dest, first, (last - first) * sizeof(T));
+  } else {
+    while (first != last) {
+      *dest++ = *first++;
+    }
+  }
+}
+```
+
+This would permit efficient codegen for e.g. `stl_copy<int, unsigned>` and `stl_copy<Simple*, Base*>`,
+while still giving correct (non-trivial) codegen for `stl_copy<float, int>` and `stl_copy<Offset*, Base*>`.
+Library vendors can't do this today. [Example:](https://godbolt.org/z/EY7YdafbY)
+
+```c++
+void copy_same_type(int **p, int **q) {
+    std::copy_n(p, 100, q); // optimal memmove codegen
+}
+
+void copy_similar_type(int **p, const int **q) {
+    std::copy_n(p, 100, q); // bad looping codegen
+}
+```
+
+We could give them the tools they need.
+
+
+## Vendor divergence ## {#breaks-divergence}
+
+```c++
+static_assert(!is_trivially_constructible_v<void(*)(), decltype([]{})>);
+static_assert(!is_trivially_assignable_v<void(*&)(), decltype([]{})>);
+  // Clang, GCC, CMM: Succeed
+  // EDG, MSVC: Fail
+  // Today's Standard: Unspecified
+
+struct X { int a = 42; };
+struct Q { X a, b; };
+static_assert(!is_trivially_constructible_v<Q, X>);
+  // Clang, CMM: Succeed
+  // GCC, EDG, MSVC: Fail
+  // Today's Standard: Unclear?
+
+int f();
+struct X2 { int a = f(); };
+struct Q2 { X2 a, b; };
+static_assert(!is_trivially_constructible_v<Q2, X2>);
+  // Clang, GCC, MSVC, Today's Standard, CMM: Succeed
+  // EDG: Fail
+
+struct E {};
+struct R { E a; int b = 42; };
+static_assert(!is_trivially_constructible_v<R>);
+  // Clang, GCC, MSVC, EDG, Today's Standard, CMM: Succeed
+static_assert(!is_trivially_constructible_v<R, E>);
+  // CMM: Succeed
+  // Clang, GCC, MSVC, EDG, Today's Standard: Fail
+```
+
+Notice the divergence on `is_trivially_constructible_v<P, int, int>` below.
+This illustrates again the difference between the CMM's notion that only an
+operation with meaningful value semantics can ever be implemented *trivially*,
+versus the Standard's current notion that any expression at all can be "trivial"
+in a vacuum. There is no value-semantic operation "construct `P` from two `int`s"
+(because there's no accepted way to make one value out of two values, or one
+object representation out of two object representations)
+so the CMM doesn't think we ought even to ask whether that operation "is trivial."
+
+```
+struct P { int a, b; };
+static_assert(is_trivially_constructible_v<P, int, int>);
+  // Clang, GCC, MSVC, Today's Standard: Succeed
+  // EDG: Fail
+  // CMM: Meaningless, therefore deprecated
+```
+
+
+
+
+
+
+
+
 
 <small><blockquote>
 <p>2. For any [complete object] of TC type `T` [...]
