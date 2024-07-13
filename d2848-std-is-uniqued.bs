@@ -1,23 +1,23 @@
 <pre class='metadata'>
 Title: std::is_uniqued
 Shortname: D2848
-Revision: 0
-!Draft Revision: 3
-Audience: EWG
+Revision: 1
+!Draft Revision: 4
+Audience: LEWG
 Status: D
 Group: WG21
 URL:
 !Current Source: <a href="https://github.com/Quuxplusone/draft/blob/gh-pages/d2848-std-is-uniqued.bs">github.com/Quuxplusone/draft/blob/gh-pages/d2848-std-is-uniqued.bs</a>
 !Current: <a href="https://rawgit.com/Quuxplusone/draft/gh-pages/d2848-std-is-uniqued.html">rawgit.com/Quuxplusone/draft/gh-pages/d2848-std-is-uniqued.html</a>
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
-Editor: Enrico Mauro, aurumpuro@gmail.com
+Editor: Enrico Mauro, kaffedesk@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   The STL provides the triples (<code>std::sort</code>, <code>std::is_sorted_until</code>, <code>std::is_sorted</code>)
   and (<code>std::make_heap</code>, <code>std::is_heap_until</code>, <code>std::is_heap</code>)
   and (<code>std::unique</code>, <code>std::adjacent_find</code>, [blank]). We fill in the blank
   by proposing <code>std::is_uniqued</code>.
-Date: 2023-04-22
+Date: 2024-07-13
 </pre>
 
 <style>
@@ -28,9 +28,13 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R0:
+- R1 (post-St Louis 2024):
 
-    - Initial revision.
+    - Minor wording nits (thanks Tim Song!)
+
+    - Add feature test macro
+
+    - Add SG9's naming ideas; also discuss the editorial section-naming question
 
 
 # Motivation and solution # {#motivation}
@@ -87,7 +91,7 @@ The missing algorithm is what would fill in the blank in the following invariant
 
 We propose that this algorithm should exist, and should be spelled `std::is_uniqued`.
 
-## Prior art in other languages ## {#prior-art}
+## Prior art and alternative names ## {#prior-art}
 
 The C++ STL verb `std::unique` is derived from Unix's <a href="https://linux.die.net/man/1/uniq">`uniq`</a> filter,
 which filters adjacent matching lines from the input.
@@ -104,6 +108,16 @@ Still, this is prior art for the idea of treating "unique, uniqued, uniquing" as
     let u = Array(animals.uniqued())
     // 'u' is now ["dog", "pig", "cat", "ox"]
 </xmp>
+
+SG9 Ranges discussed P2848R0 in St Louis (June 2024). Two participants expressed discomfort with "is uniqued"
+as a verb form (although at least two others expressed that it was surely the correct name, given the names
+nearby it semantically). Alternatives proposed, without full discussion, were `is_unique` and `is_adjacent_unique`.
+
+We believe that `is_unique(first, last)` is a dangerously wrong name, because the algorithm specifically does not
+check whether the range is in some sense "unique," and *certainly* does not check whether the range contains
+no duplicates. It checks specifically for *adjacent* duplicates, i.e., it checks that the range has had the
+mutating algorithm `unique` performed on it.
+
 
 ## Should we require `pred` to be an equivalence relation? ## {#gratuitous-ub}
 
@@ -148,7 +162,56 @@ This implementation is [available on Godbolt Compiler Explorer](https://godbolt.
 
 # Proposed wording relative to C++23 # {#wording}
 
-Add a new section after <a href="https://eel.is/c++draft/alg.adjacent.find">[alg.adjacent.find]</a>.
+Note: The three other families are organized in umbrella sections:
+[alg.partitions] contains `is_partitioned`, `partition`, `partition_point`, and others, with no internal divisions.
+[alg.sort] is internally divided into [sort] `sort`, [is.sorted] `is_sorted` and `is_sorted_until`, and others.
+[alg.heap.operations] is internally divided into [make.heap] `make_heap`, [is.heap] `is_heap` and `is_heap_until`, and others.
+Should we therefore extract `adjacent_find` from [alg.nonmodifying]>[alg.adjacent.find] and `unique` from [alg.modifying.operations]>[alg.unique]
+into a new umbrella section [alg.uniquing] internally divided into [alg.unique], [alg.is.uniqued], and [alg.adjacent.find]?
+That is an editorial question to be decided by LWG during wording review. The proposed wording below doesn't do it (yet).
+
+## Header `<algorithm>` synopsis [algorithm.syn] ## {#wording-algorithm.syn}
+
+Modify <a href="https://eel.is/c++draft/algorithm.syn">[algorithm.syn]</a> as follows:
+
+<small><blockquote>
+<pre>
+      constexpr borrowed_iterator_t&lt;R>
+        adjacent_find(R&& r, Pred pred = {}, Proj proj = {});
+  }
+
+  <ins>// [alg.is.uniqued], is uniqued</ins>
+  <ins>template&lt;class ForwardIterator></ins>
+    <ins>constexpr bool is_uniqued(ForwardIterator first, ForwardIterator last);</ins>
+  <ins>template&lt;class ForwardIterator, class BinaryPredicate></ins>
+    <ins>constexpr bool is_uniqued(ForwardIterator first, ForwardIterator last,</ins>
+                              <ins>BinaryPredicate pred);</ins>
+  <ins>template&lt;class ExecutionPolicy, class ForwardIterator></ins>
+    <ins>bool is_uniqued(ExecutionPolicy&& exec,                            // see [algorithms.parallel.overloads]</ins>
+                    <ins>ForwardIterator first, ForwardIterator last);</ins>
+  <ins>template&lt;class ExecutionPolicy, class ForwardIterator, class BinaryPredicate></ins>
+    <ins>bool is_uniqued(ExecutionPolicy&& exec,                            // see [algorithms.parallel.overloads]</ins>
+                    <ins>ForwardIterator first, ForwardIterator last,</ins>
+                    <ins>BinaryPredicate pred);</ins>
+  <ins>namespace ranges {</ins>
+    <ins>template&lt;forward_iterator I, sentinel_for&lt;I> S, class Proj = identity,</ins>
+             <ins>indirect_binary_predicate&lt;projected&lt;I, Proj>,</ins>
+                                       <ins>projected&lt;I, Proj>> Pred = ranges::equal_to></ins>
+      <ins>constexpr bool is_uniqued(I first, S last, Pred pred = {}, Proj proj = {});</ins>
+    <ins>template&lt;forward_range R, class Proj = identity,</ins>
+             <ins>indirect_binary_predicate&lt;projected&lt;iterator_t&lt;R>, Proj>,</ins>
+                                       <ins>projected&lt;iterator_t&lt;R>, Proj>> Pred = ranges::equal_to></ins>
+      <ins>constexpr bool is_uniqued(R&& r, Pred pred = {}, Proj proj = {});</ins>
+  <ins>}</ins>
+
+  // [alg.count], count
+  template&lt;class InputIterator, class T = iterator_traits&lt;InputIterator>::value_type>
+    constexpr typename iterator_traits&lt;InputIterator>::difference_type
+      count(InputIterator first, InputIterator last, const T& value);
+</pre>
+</blockquote></small>
+
+## `is_uniqued` [alg.is.uniqued] ## {#wording-alg.is.uniqued}
 
 Note: This wording is copied straight from <a href="https://eel.is/c++draft/is.sorted">[is.sorted]</a>,
 with these mechanical replacements: `is_sorted` becomes `is_uniqued`, `is_sorted_until` becomes `adjacent_find`,
@@ -156,7 +219,8 @@ with these mechanical replacements: `is_sorted` becomes `is_uniqued`, `is_sorted
 `indirect_strict_weak_order` becomes `indirect_binary_predicate` (ditto), and `ranges::less` becomes
 `ranges::equal_to` (ditto).
 
-## `is_uniqued` [alg.is.uniqued] ## {#wording-alg.is.uniqued}
+Add this new section between <a href="https://eel.is/c++draft/alg.adjacent.find">[alg.adjacent.find]</a>
+and <a href="https://eel.is/c++draft/alg.count">[alg.count]</a>.
 
 <small><blockquote>
 <xmp>
@@ -164,7 +228,7 @@ with these mechanical replacements: `is_sorted` becomes `is_uniqued`, `is_sorted
     constexpr bool is_uniqued(ForwardIterator first, ForwardIterator last);
 </xmp>
 
-*Effects:* Equivalent to: `return adjacent_find(first, last) == last;`
+*Returns:* `adjacent_find(first, last) == last`.
 
 <xmp>
   template<class ExecutionPolicy, class ForwardIterator>
@@ -172,8 +236,7 @@ with these mechanical replacements: `is_sorted` becomes `is_uniqued`, `is_sorted
                     ForwardIterator first, ForwardIterator last);
 </xmp>
 
-*Effects:* Equivalent to:
-`return adjacent_find(std::forward<ExecutionPolicy>(exec), first, last) == last;`
+*Returns:* `adjacent_find(std::forward<ExecutionPolicy>(exec), first, last) == last`.
 
 <xmp>
   template<class ForwardIterator, class BinaryPredicate>
@@ -181,7 +244,7 @@ with these mechanical replacements: `is_sorted` becomes `is_uniqued`, `is_sorted
                               BinaryPredicate pred);
 </xmp>
 
-*Effects:* Equivalent to: `return adjacent_find(first, last, pred) == last;`
+*Returns:* `adjacent_find(first, last, pred) == last`.
 
 <xmp>
   template<class ExecutionPolicy, class ForwardIterator, class BinaryPredicate>
@@ -190,8 +253,7 @@ with these mechanical replacements: `is_sorted` becomes `is_uniqued`, `is_sorted
                     BinaryPredicate pred);
 </xmp>
 
-*Effects:* Equivalent to:
-`return adjacent_find(std::forward<ExecutionPolicy>(exec), first, last, pred) == last;`
+*Returns:* `adjacent_find(std::forward<ExecutionPolicy>(exec), first, last, pred) == last`.
 
 <xmp>
   template<forward_iterator I, sentinel_for<I> S, class Proj = identity,
@@ -204,5 +266,17 @@ with these mechanical replacements: `is_sorted` becomes `is_uniqued`, `is_sorted
     constexpr bool ranges::is_uniqued(R&& r, Pred pred = {}, Proj proj = {});
 </xmp>
 
-*Effects:* Equivalent to: `return ranges::adjacent_find(first, last, pred, proj) == last;`
+*Returns:* `ranges::adjacent_find(first, last, pred, proj) == last`.
+</blockquote></small>
+
+## Header `<version>` synopsis [version.syn] ## {#wording-version.syn}
+
+Modify <a href="https://eel.is/c++draft/version.syn">[version.syn]</a> as follows:
+
+<small><blockquote>
+<pre>
+#define __cpp_lib_is_swappable                      201603L // freestanding, also in &lt;type_traits>
+<ins>#define __cpp_lib_is_uniqued                        20XXYYL // also in &lt;algorithm></ins>
+#define __cpp_lib_is_within_lifetime                202306L // also in &lt;type_traits>
+</pre>
 </blockquote></small>
