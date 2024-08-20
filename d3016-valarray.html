@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D3016R3: Resolve inconsistencies in begin/end for valarray and braced initializer lists</title>
+  <title>D3016R4: Resolve inconsistencies in begin/end for valarray and braced initializer lists</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1561,7 +1561,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version d765c696b, updated Fri Mar 8 15:58:52 2024 -0800" name="generator">
+  <meta content="Bikeshed version 6270e4735, updated Tue Aug 6 12:12:30 2024 -0700" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
   <meta content="dark light" name="color-scheme">
 <style>
@@ -2091,8 +2091,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D3016R3<br>Resolve inconsistencies in begin/end for <code class="highlight"><c- n>valarray</c-></code> and braced initializer lists</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-03-22">2024-03-22</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D3016R4<br>Resolve inconsistencies in begin/end for <code class="highlight"><c- n>valarray</c-></code> and braced initializer lists</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-08-19">2024-08-19</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2102,7 +2102,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>14
+     <dd>15
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2111,7 +2111,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
    <p>We resolve some inconsistencies among [iterator.range] functions, notably <code class="highlight"><c- n>begin</c-></code>/<code class="highlight"><c- n>end</c-></code>, <code class="highlight"><c- n>data</c-></code>, and <code class="highlight"><c- n>empty</c-></code>, as applied to <code class="highlight"><c- n>valarray</c-></code>, <code class="highlight"><c- n>initializer_list</c-></code>,
-and braced initializer lists. We also resolve LWG3624 and LWG3625.</p>
+and braced initializer lists. We also resolve LWG3624, LWG3625, and LWG4131.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -2128,7 +2128,7 @@ and braced initializer lists. We also resolve LWG3624 and LWG3625.</p>
      <ol class="toc">
       <li><a href="#tony-table"><span class="secno">3.1</span> <span class="content">Tony Table</span></a>
      </ol>
-    <li><a href="#wording-lwg3624"><span class="secno">4</span> <span class="content">Possible resolutions for LWG3624 and LWG3625</span></a>
+    <li><a href="#wording-lwg3624"><span class="secno">4</span> <span class="content">Possible resolutions for LWG3624, LWG3625, and LWG4131</span></a>
     <li>
      <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording</span></a>
      <ol class="toc">
@@ -2160,6 +2160,12 @@ and braced initializer lists. We also resolve LWG3624 and LWG3625.</p>
   <main>
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
+    <li data-md>
+     <p>R4 (pre-LWG in Wrocław):</p>
+     <ul>
+      <li data-md>
+       <p>Add <a href="#wording-lwg3624">resolution for LWG4131</a>.</p>
+     </ul>
     <li data-md>
      <p>R3 (post-LEWG in Tokyo):</p>
      <ul>
@@ -2357,8 +2363,8 @@ impossible to give a warning for it. This would be a silly situation to get into
 And the feature itself is <em>so</em> obscure (using <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>begin</c-></code> specifically on an <code class="highlight"><c- n>initializer_list</c-></code> without including any of more than a dozen STL headers) and <em>so</em> specific (as shown,
 it already doesn’t work for <code class="highlight"><c- n>cbegin</c-></code>, <code class="highlight"><c- n>rbegin</c-></code>, or <code class="highlight"><c- n>size</c-></code>), and the fix in code is <em>so</em> surgical (include <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> or <code class="highlight"><c- o>&lt;</c-><c- n>span</c-><c- o>></c-></code>) that I don’t think the lack of
 deprecation period will matter.</p>
-   <p><a data-link-type="biblio" href="#biblio-lwg3624" title="Inconsistency of <typeinfo>, <initializer_list>, and <compare>">[LWG3624]</a> and <a data-link-type="biblio" href="#biblio-lwg3625" title="Should <stacktrace> provide range access function templates?">[LWG3625]</a> somewhat intersect this proposal, but do not conflict with it.
-We expect these issues to be resolved along the lines given in <a href="#wording-lwg3624">§ 4 Possible resolutions for LWG3624 and LWG3625</a>.</p>
+   <p><a data-link-type="biblio" href="#biblio-lwg3624" title="Inconsistency of <typeinfo>, <initializer_list>, and <compare>">[LWG3624]</a>, <a data-link-type="biblio" href="#biblio-lwg3625" title="Should <stacktrace> provide range access function templates?">[LWG3625]</a>, and <a data-link-type="biblio" href="#biblio-lwg4131" title="Including <optional> doesn&apos;t provide std::begin/end">[LWG4131]</a> somewhat intersect this proposal, but do not conflict with it.
+We expect these issues to be resolved along the lines given in <a href="#wording-lwg3624">§ 4 Possible resolutions for LWG3624, LWG3625, and LWG4131</a>.</p>
    <h2 class="heading settled" data-level="3" id="experience"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>Arthur has implemented <a href="#wording">§ 5 Proposed wording</a> in his fork of libc++ (<a href="https://github.com/Quuxplusone/llvm-project/commit/p3016-valarray-and-initializer-list">source</a>),
 and used it to compile both LLVM/Clang/libc++ and another large C++17 codebase.
@@ -2433,13 +2439,13 @@ but the primary template <code class="highlight"><c- n>begin</c-><c- p>(</c-><c-
 <c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>cbegin</c-><c- p>(</c-><c- n>va</c-><c- p>);</c->
 </pre>
    </table>
-   <h2 class="heading settled" data-level="4" id="wording-lwg3624"><span class="secno">4. </span><span class="content">Possible resolutions for LWG3624 and LWG3625</span><a class="self-link" href="#wording-lwg3624"></a></h2>
+   <h2 class="heading settled" data-level="4" id="wording-lwg3624"><span class="secno">4. </span><span class="content">Possible resolutions for LWG3624, LWG3625, and LWG4131</span><a class="self-link" href="#wording-lwg3624"></a></h2>
    <p>Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
     <small> <p>1. In addition to being available via inclusion of the <code class="highlight"><c- o>&lt;</c-><c- n>iterator</c-><c- o>></c-></code> header, the function templates in [iterator.range]
-are available when any of the following headers are included: <code class="highlight"><c- o>&lt;</c-><c- n>array</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>deque</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>forward_list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>regex</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>span</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>stacktrace</c-><c- o>></c-></code>,</ins> <code class="highlight"><c- o>&lt;</c-><c- n>string</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string_view</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_set</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>valarray</c-><c- o>></c-></code>,</ins> and <code class="highlight"><c- o>&lt;</c-><c- n>vector</c-><c- o>></c-></code>. </p></small>
+are available when any of the following headers are included: <code class="highlight"><c- o>&lt;</c-><c- n>array</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>deque</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>flat_set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>forward_list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>list</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>map</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>optional</c-><c- o>></c-></code>,</ins> <code class="highlight"><c- o>&lt;</c-><c- n>regex</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>set</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>span</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>stacktrace</c-><c- o>></c-></code>,</ins> <code class="highlight"><c- o>&lt;</c-><c- n>string</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>string_view</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_map</c-><c- o>></c-></code>, <code class="highlight"><c- o>&lt;</c-><c- n>unordered_set</c-><c- o>></c-></code>, <ins><code class="highlight"><c- o>&lt;</c-><c- n>valarray</c-><c- o>></c-></code>,</ins> and <code class="highlight"><c- o>&lt;</c-><c- n>vector</c-><c- o>></c-></code>. </p></small>
    </blockquote>
    <p>Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:</p>
    <p><small></small></p>
@@ -2871,6 +2877,8 @@ are available when any of the following headers are included: <code class="highl
    <dd>Hewill Kang. <a href="https://cplusplus.github.io/LWG/issue4001"><cite>iota_view should provide empty</cite></a>. October 2023. URL: <a href="https://cplusplus.github.io/LWG/issue4001">https://cplusplus.github.io/LWG/issue4001</a>
    <dt id="biblio-lwg4035">[LWG4035]
    <dd>Hewill Kang. <a href="https://cplusplus.github.io/LWG/issue4035"><cite>single_view should provide empty</cite></a>. December 2023. URL: <a href="https://cplusplus.github.io/LWG/issue4035">https://cplusplus.github.io/LWG/issue4035</a>
+   <dt id="biblio-lwg4131">[LWG4131]
+   <dd>Hewill Kang. <a href="https://cplusplus.github.io/LWG/issue4131"><cite>Including &lt;optional> doesn't provide std::begin/end</cite></a>. August 2024. URL: <a href="https://cplusplus.github.io/LWG/issue4131">https://cplusplus.github.io/LWG/issue4131</a>
    <dt id="biblio-p2613">[P2613]
    <dd>Yihe Li. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2613r1.html"><cite>Add the missing empty to mdspan</cite></a>. June 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2613r1.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2613r1.html</a>
   </dl>
