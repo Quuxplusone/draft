@@ -1,8 +1,8 @@
 <pre class='metadata'>
-Title: Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists
+Title: Allocator-aware <code>inplace_vector</code>
 Shortname: Dxxxx
 Revision: 0
-!Draft Revision: 1
+!Draft Revision: 2
 Audience: LEWG
 Status: D
 Group: WG21
@@ -10,8 +10,8 @@ URL:
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  Allocator-aware `inplace_vector`.
-Date: 2024-08-19
+  We make `inplace_vector` an allocator-aware container, and make `allocator` partially freestanding.
+Date: 2024-08-26
 </pre>
 
 <style>
@@ -31,9 +31,11 @@ p.p     {margin: 0em 2em 0.5em 2em;}
 
 # Motivation and proposal # {#proposal}
 
-We propose that `inplace_vector` should support an allocator parameter.
+[[P0843]] introduced `inplace_vector<T, N>` to the C++26 working draft.
+We propose that `inplace_vector` should support an allocator parameter, thus allowing it
+to use that allocator's `construct` and `destroy` members, even though it never needs to `allocate`.
 
-(1) This permits it to interoperate with allocator-extended client code. For example:
+(1) This permits `inplace_vector` to interoperate with allocator-extended client code. For example:
 
 <table>
 <tr>
@@ -115,12 +117,11 @@ See <a href="https://quuxplusone.github.io/blog/2024/08/23/boost-interprocess-tu
 
 (4) This gives the programmer control over the `size_type` and `difference_type` members
 of `inplace_vector`, permitting a predictably smaller (or larger) memory footprint.
-(<a href="https://godbolt.org/z/x1Mxnhb1h">The same example on Godbolt.</a>)
 Now, STL vendors *could* implement memory-footprint optimizations to store the `size` member
 in fewer bits when `N` was small; but we have seen from our experience with `variant`
 that vendors do not do such optimizations in practice, and then get locked out of them
 forever by ABI. Giving control to the programmer is more general *and* reduces the
-STL vendor's own workload.
+STL vendor's own workload. (<a href="https://godbolt.org/z/onofT6oMa">Godbolt.</a>)
 
 <table>
 <tr>
@@ -137,6 +138,8 @@ namespace Tiny {
   struct Alloc {
     using value_type = T;
     using size_type = uint8_t;
+    static T* allocate(size_t) { assert(false); }
+    static void deallocate(T*) { assert(false); }
   };
   template&lt;class T, size_t N>
   using inplace_vector = std::inplace_vector&lt;T, N, Tiny::Alloc&lt;T>>;
@@ -147,6 +150,36 @@ static_assert(sizeof(std::inplace_vector&lt;char, 3>) == 16);
 </td>
 </tr>
 </table>
+
+## Notes on freestanding ## {#freestanding}
+
+`inplace_vector<T, N>` is freestanding. We don't propose to change that.
+But now it's a synonym for `inplace_vector<T, N, allocator<T>>`.
+So, `allocator<T>` needs to become freestanding.
+Freestanding implementations lack a heap, so `allocator<T>::allocate` becomes
+a <i>freestanding-deleted</i> member function (<a href="https://eel.is/c++draft/library#freestanding.item-3">[freestanding.item]/3</a>),
+which means that it must be `=delete`'d if not provided by a freestanding implementation.
+This is fine because `inplace_vector` doesn't use `allocate` or `deallocate`.
+
+`allocator_traits` is already freestanding in C++23, thanks to Ben Craig's [[P1642]].
+But it is UB to instantiate `allocator_traits<A>` unless `A` meets
+the allocator requirements (<a href="https://eel.is/c++draft/library#allocator.requirements.general-3.sentence-2">[allocator.requirements]/3</a>),
+and the allocator requirements require that `A::allocate` must not be deleted!
+
+We could solve this conundrum in any of the following ways:
+
+- Declare by fiat: "All specializations of `allocator` meet the allocator requirements,
+    regardless of whether they provide `allocate` and `deallocate` member functions."
+    (But what about program-defined types that derive from `allocator`?)
+
+- Change the effects of `allocator<T>::allocate` to permit it to Do Something Else on
+    freestanding implementations. (But this makes it untrustworthy. This is a bad idea.)
+
+- Change the allocator requirements to permit `allocate` and `deallocate` to be missing
+    on freestanding implementations (only).
+
+We've chosen the third option, as it has the fewest obvious downsides.
+We do not propose to change the allocator requirements on hosted implementations.
 
 
 # Implementation experience # {#experience}
@@ -333,20 +366,17 @@ leaving it up to the vendor to strengthen the noexcept guarantee if they choose 
 
 # Proposed wording # {#wording}
 
-## Feature-test macro ## {#wording-ftm}
+## Feature-test macros ## {#wording-ftm}
 
-Since `inplace_vector` hasn't shipped yet, we think we don't need a feature-test macro for this paper.
+Since `inplace_vector` hasn't shipped yet, we think we don't need a feature-test macro for its changes.
 But if LWG decides we need one, then we should simply bump the value of `__cpp_lib_inplace_vector` from `202406L` to `YYYYMML`.
 
-## [container.alloc.reqmts] ## {#wording-container.alloc.reqmts}
-
-Modify <a href="https://eel.is/c++draft/container.requirements#container.alloc.reqmts">[container.alloc.reqmts]</a> as follows:
-
-<small><blockquote>
-<p>1․ Except for `array` <del>and `inplace_vector`</del>, all of the containers defined in [containers], [stacktrace.basic],
-[basic.string], and [re.results] meet the additional requirements of an <i>allocator-aware container</i>, as described below.
-<p>[...]
-</blockquote></small>
+The changes to make `allocator` partially freestanding, and the corresponding changes
+to permit `allocator_traits` to be meaningfully used with a freestanding `allocator`,
+should receive a feature-test macro.
+We propose simply to bump the value of `__cpp_lib_freestanding_memory` from `202306L` to `YYYYMML`.
+This situation seems to fall under [[P2198]]'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding";
+but we still don't know what would be the best approach.
 
 ## [memory.syn] ## {#wording-memory.syn}
 
@@ -355,7 +385,7 @@ Modify <a href="https://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:
 <small><blockquote>
 <pre>
 <i>// [default.allocator], the default allocator</i>
-template&lt;class T> class allocator;                                              <ins>// freestanding</ins>
+template&lt;class T> class allocator;                                              <ins>// partially freestanding</ins>
 template&lt;class T, class U>
   constexpr bool operator==(const allocator&lt;T>&, const allocator&lt;U>&) noexcept; <ins>// freestanding</ins>
 </pre>
@@ -385,6 +415,126 @@ namespace std {
     constexpr allocation_result&lt;T*> allocate_at_least(size_t n);  <ins>// freestanding-deleted</ins>
     constexpr void deallocate(T* p, size_t n);                    <ins>// freestanding-deleted</ins>
   };
+}
+</pre>
+</blockquote></small>
+
+## [allocator.requirements.general] ## {#wording-allocator.requirements.general}
+
+Modify <a href="https://eel.is/c++draft/allocator.requirements.general">[allocator.requirements.general]</a> as follows:
+
+<small><blockquote>
+<p>1․ The library describes a standard set of requirements for allocators, which are class-type objects
+that encapsulate the information about an allocation model. This information includes the knowledge of
+pointer types, the type of their difference, the type of the size of objects in this allocation model,
+as well as the memory allocation and deallocation primitives for it. All of the string types ([strings]),
+containers ([containers]) (except `array` <del>and `inplace_vector`</del>), string buffers and string streams ([input.output]),
+and `match_results` are parameterized in terms of allocators.
+
+<p>[...]
+
+<p>3․ The class template `allocator_traits` ([allocator.traits]) supplies a uniform interface to all allocator types.
+This subclause describes the requirements on allocator types and thus on types used to instantiate `allocator_traits`.
+A requirement is optional if a default for a given type or expression is specified.
+Within the standard library `allocator_traits` template, an optional requirement that is not supplied by an allocator
+is replaced by the specified default type or expression.
+
+<p>[...]
+
+<p><pre>
+a.allocate(n)
+</pre>
+<p class="p">35․ *Result:* `XX::pointer`
+<p class="p">36․ *Effects:* Memory is allocated for an array of `n` `T` and such an object is created but array elements are not constructed.
+<p class="p">[<i>Example 1:</i> When reusing storage denoted by some pointer value `p`, `launder(reinterpret_cast<T*>(new (p) byte[n * sizeof(T)]))`
+can be used to implicitly create a suitable array object and obtain a pointer to it. <i>— end example</i>]
+<p class="p">37․ *Throws:* `allocate` may throw an appropriate exception.
+<p class="p">38․ [<i>Note 3:</i> It is intended that `a.allocate` be an efficient means of allocating a single object of type `T`,
+even when `sizeof(T)` is small. That is, there is no need for a container to maintain its own free list. <i>— end note</i>]
+<p class="p">39․ *Remarks:* If `n == 0`, the return value is unspecified.
+<p class="p"><ins>x․ Default: On freestanding implementations, `(std::unreachable(), XX::pointer())`.
+[<i>Note:</i> This default ensures that `allocator<T>` meets the allocator requirements
+even though `allocate` is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins>
+
+<p>[...]
+
+<p><pre>
+a.deallocate(p, n)
+</pre>
+<p class="p">47․ *Result:* (not used)
+<p class="p">48․ *Preconditions:*
+<ul>
+<li>(48.1) If `p` is memory that was obtained by a call to `a.allocate_at_least`, let `ret` be the value returned
+and `req` be the value passed as the first argument of that call. `p` is equal to `ret.ptr` and `n` is a value
+such that `req` ≤ `n` ≤ `ret.count`.</li>
+<li>(48.2) Otherwise, `p` is a pointer value obtained from `allocate`. `n` equals the value passed as the first argument
+to the invocation of `allocate` which returned `p`.
+</ul>
+`p` has not been invalidated by an intervening call to `deallocate`.
+<p class="p">49․ *Throws:* Nothing.
+<p class="p"><ins>x․ *Remarks:* Default: On freestanding implementations, `std::unreachable()`.
+[<i>Note:</i> This default ensures that `allocator<T>` meets the allocator requirements
+even though `deallocate` is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins>
+</blockquote></small>
+
+## [allocator.traits.members] ## {#wording-allocator.traits.members}
+
+Modify <a href="https://eel.is/c++draft/allocator.traits#members">[allocator.traits.members]</a> as follows:
+
+<small><blockquote>
+<p><pre>
+static constexpr pointer allocate(Alloc& a, size_type n);
+</pre>
+<p class="p"><ins>x․ *Mandates:* `a.allocate(n)` is well-formed.</ins>
+<p class="p">1․ *Returns:* `a.allocate(n)`.
+<p><pre>
+static constexpr pointer allocate(Alloc& a, size_type n, const_void_pointer hint);
+</pre>
+<p class="p">2․ *Returns:* `a.allocate(n, hint)` if that expression is well-formed; otherwise, `a.allocate(n)`.
+<p><pre>
+static constexpr allocation_result&lt;pointer, size_type> allocate_at_least(Alloc& a, size_type n);
+</pre>
+<p class="p">3․ *Returns:* `a.allocate_at_least(n)` if that expression is well-formed; otherwise, `{a.allocate(n), n}`.
+<p><pre>
+static constexpr void deallocate(Alloc& a, pointer p, size_type n);
+</pre>
+<p class="p"><ins>x․ *Mandates:* `a.deallocate(p, n)` is well-formed.</ins>
+<p class="p">4․ *Effects:* Calls `a.deallocate(p, n)`.
+<p class="p">5․ *Throws:* Nothing.
+</blockquote></small>
+
+## [container.alloc.reqmts] ## {#wording-container.alloc.reqmts}
+
+Modify <a href="https://eel.is/c++draft/container.requirements#container.alloc.reqmts">[container.alloc.reqmts]</a> as follows:
+
+<small><blockquote>
+<p>1․ Except for `array` <del>and `inplace_vector`</del>, all of the containers defined in [containers], [stacktrace.basic],
+[basic.string], and [re.results] meet the additional requirements of an <i>allocator-aware container</i>, as described below.
+<p>[...]
+</blockquote></small>
+
+## [inplace.vector.syn] ## {#wording-inplace.vector.syn}
+
+Modify <a href="https://eel.is/c++draft/inplace.vector.syn">[inplace.vector.syn]</a> as follows:
+
+<small><blockquote>
+<p><b>24.3.7 Header `<inplace_vector>` synopsis [inplace.vector.syn]</b>
+<p><pre>
+<i>// mostly freestanding</i>
+#include &lt;compare>              <i>// see [compare.syn]</i>
+#include &lt;initializer_list>     <i>// see [initializer.list.syn]</i>
+
+namespace std {
+  <i>// [inplace.vector], class template inplace_vector</i>
+  template&lt;class T, size_t N<ins>, class Allocator</ins>> class inplace_vector; <i>// partially freestanding</i>
+&nbsp;
+  <i>// [inplace.vector.erasure], erasure</i>
+  template&lt;class T, size_t N, <ins>class Allocator,</ins> class U = T>
+    constexpr typename inplace_vector&lt;T, N<ins>, Allocator</ins>>::size_type
+      erase(inplace_vector&lt;T, N<ins>, Allocator</ins>>& c, const U& value);
+  template&lt;class T, size_t N, <ins>class Allocator,</ins> class Predicate>
+    constexpr typename inplace_vector&lt;T, N<ins>, Allocator</ins>>::size_type
+      erase_if(inplace_vector&lt;T, N<ins>, Allocator</ins>>& c, Predicate pred);
 }
 </pre>
 </blockquote></small>
@@ -818,21 +968,29 @@ template&lt;class T, size_t N, <ins>class Allocator,</ins> class Predicate>
 
 <pre class=biblio>
 {
-  "CWG2825": {
-    "title": "Range-based for statement using a braced-init-list",
+  "P0843": {
+    "title": "inplace_vector",
     "authors": [
-      "Arthur O'Dwyer"
+      "Gonzalo Brito Gadeschi", "Timur Doumler", "Nevin Liber", "David Sankel"
     ],
-    "href": "https://cplusplus.github.io/CWG/issues/2825.html",
-    "date": "November 2023"
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0843r14.html",
+    "date": "June 2024"
   },
-  "P2613": {
-    "title": "Add the missing empty to mdspan",
+  "P1642": {
+    "title": "Freestanding Library: Easy [utilities], [ranges], and [iterators]",
     "authors": [
-      "Yihe Li"
+      "Ben Craig"
     ],
-    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2613r1.html",
-    "date": "June 2022"
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1642r11.html",
+    "date": "July 2022"
+  },
+  "P2198": {
+    "title": "Freestanding Feature-Test Macros and Implementation-Defined Extensions",
+    "authors": [
+      "Ben Craig"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html",
+    "date": "December 2022"
   },
   "QuuxplusoneSG14": {
     "title": "Quuxplusone/SG14: Allocator-aware in-place vector (future > C++20)",
