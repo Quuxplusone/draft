@@ -2094,7 +2094,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">DxxxxR0<br>Allocator-aware <code class="highlight"><c- n>inplace_vector</c-></code></h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-08-26">2024-08-26</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-08-28">2024-08-28</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2104,7 +2104,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>3
+     <dd>4
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2434,14 +2434,68 @@ but again that idea would complicate the spec, for no obvious benefit to users. 
 leaving it up to the vendor to strengthen the noexcept guarantee if they choose to.</p>
    <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <h3 class="heading settled" data-level="4.1" id="wording-ftm"><span class="secno">4.1. </span><span class="content">Feature-test macros</span><a class="self-link" href="#wording-ftm"></a></h3>
-   <p>Since <code class="highlight"><c- n>inplace_vector</c-></code> hasn’t shipped yet, we think we don’t need a feature-test macro for its changes.
-But if LWG decides we need one, then we should simply bump the value of <code class="highlight"><c- n>__cpp_lib_inplace_vector</c-></code> from <code class="highlight"><c- mf>202406L</c-></code> to <code class="highlight"><c- n>YYYYMML</c-></code>.</p>
-   <p>The changes to make <code class="highlight"><c- n>allocator</c-></code> partially freestanding, and the corresponding changes
-to permit <code class="highlight"><c- n>allocator_traits</c-></code> to be meaningfully used with a freestanding <code class="highlight"><c- n>allocator</c-></code>,
-should receive a feature-test macro.
-We propose simply to bump the value of <code class="highlight"><c- n>__cpp_lib_freestanding_memory</c-></code> from <code class="highlight"><c- mf>202306L</c-></code> to <code class="highlight"><c- n>YYYYMML</c-></code>.
-This situation seems to fall under <a data-link-type="biblio" href="#biblio-p2198" title="Freestanding Feature-Test Macros and Implementation-Defined Extensions">[P2198]</a>'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding";
-but we still don’t know what would be the best approach.</p>
+   <p>This situation seems to fall under <a data-link-type="biblio" href="#biblio-p2198" title="Freestanding Feature-Test Macros and Implementation-Defined Extensions">[P2198]</a>'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding";
+but that example doesn’t help much.</p>
+   <p>We propose to bump the value of <code class="highlight"><c- n>__cpp_lib_inplace_vector</c-></code> from <code class="highlight"><c- mf>202406L</c-></code> to <code class="highlight"><c- n>YYYYMML</c-></code>.
+We add a new macro <code class="highlight"><c- n>__cpp_lib_freestanding_inplace_vector</c-></code> to track freestanding support.
+Finally, we add a new macro <code class="highlight"><c- n>__cpp_lib_freestanding_allocator</c-></code> to track the freestanding-only changes to <code class="highlight"><c- n>allocator</c-></code> and <code class="highlight"><c- n>allocator_traits</c-></code>.</p>
+   <p>Alternatively, instead of adding <code class="highlight"><c- n>__cpp_lib_freestanding_allocator</c-></code>, LEWG/LWG might consider
+just bumping the value of <code class="highlight"><c- n>__cpp_lib_freestanding_memory</c-></code> from <code class="highlight"><c- mf>202306L</c-></code> to <code class="highlight"><c- n>YYYYMML</c-></code>.</p>
+   <table>
+    <tbody>
+     <tr>
+      <td>
+      <th><code class="highlight"><c- n>__cpp_lib_</c-></code> <code class="highlight"><c- n>inplace_vector</c-></code>
+      <th><code class="highlight"><c- n>__cpp_lib_</c-></code> <code class="highlight"><c- n>freestanding_</c-></code> <code class="highlight"><c- n>inplace_vector</c-></code>
+      <th><code class="highlight"><c- n>__cpp_lib_</c-></code> <code class="highlight"><c- n>freestanding_</c-></code> <code class="highlight"><c- n>allocator</c-></code>
+      <th>
+     <tr>
+      <th>No support for <code class="highlight"><c- n>inplace_vector</c-></code>
+      <td>—
+      <td>—
+      <td>—
+     <tr>
+      <th>Freestanding <code class="highlight"><c- n>allocator</c-></code> but no <code class="highlight"><c- n>inplace_vector</c-></code>
+      <td>—
+      <td>—
+      <td><code class="highlight"><c- n>YYYYMML</c-></code>
+     <tr>
+      <th>P0843 <code class="highlight"><c- n>inplace_vector</c-></code>, hosted only
+      <td><code class="highlight"><c- mf>202406L</c-></code>
+      <td>—
+      <td>—
+     <tr>
+      <th>P0843 <code class="highlight"><c- n>inplace_vector</c-></code> (status quo)
+      <td><code class="highlight"><c- mf>202406L</c-></code>
+      <td><code class="highlight"><c- mf>202406L</c-></code>
+      <td>—
+     <tr>
+      <th>P0843 <code class="highlight"><c- n>inplace_vector</c-></code>, plus freestanding <code class="highlight"><c- n>allocator</c-></code>
+      <td><code class="highlight"><c- mf>202406L</c-></code>
+      <td><code class="highlight"><c- mf>202406L</c-></code>
+      <td><code class="highlight"><c- n>YYYYMML</c-></code>
+     <tr>
+      <th>AA <code class="highlight"><c- n>inplace_vector</c-></code>, hosted only
+      <td><code class="highlight"><c- n>YYYYMML</c-></code>
+      <td>—
+      <td>—
+     <tr>
+      <th>AA <code class="highlight"><c- n>inplace_vector</c-></code> but no freestanding <code class="highlight"><c- n>allocator</c-></code>
+      <td><code class="highlight"><c- n>YYYYMML</c-></code>
+      <td><code class="highlight"><c- n>YYYYMML</c-></code>
+      <td>—
+     <tr>
+      <th>AA <code class="highlight"><c- n>inplace_vector</c-></code> and freestanding <code class="highlight"><c- n>allocator</c-></code>
+      <td><code class="highlight"><c- n>YYYYMML</c-></code>
+      <td><code class="highlight"><c- n>YYYYMML</c-></code>
+      <td><code class="highlight"><c- n>YYYYMML</c-></code>
+     <tr>
+      <th>P0843 <code class="highlight"><c- n>inplace_vector</c-></code> on freestanding and AA <code class="highlight"><c- n>inplace_vector</c-></code> on hosted
+      <td colspan="3">should never happen
+     <tr>
+      <th>AA <code class="highlight"><c- n>inplace_vector</c-></code> on freestanding and P0843 <code class="highlight"><c- n>inplace_vector</c-></code> on hosted
+      <td colspan="3">should never happen
+   </table>
    <h3 class="heading settled" data-level="4.2" id="wording-memory.syn"><span class="secno">4.2. </span><span class="content">[memory.syn]</span><a class="self-link" href="#wording-memory.syn"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:</p>
    <p><small></small></p>
@@ -2495,14 +2549,14 @@ A requirement is optional if a default for a given type or expression is specifi
 Within the standard library <code class="highlight"><c- n>allocator_traits</c-></code> template, an optional requirement that is not supplied by an allocator
 is replaced by the specified default type or expression. </p><p>[...] </p><p></p><pre class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>)</c->
 </pre> <p class="p">35․ <em>Result:</em> <code class="highlight"><c- n>XX</c-><c- o>::</c-><c- n>pointer</c-></code> </p><p class="p">36․ <em>Effects:</em> Memory is allocated for an array of <code class="highlight"><c- n>n</c-></code> <code class="highlight"><c- n>T</c-></code> and such an object is created but array elements are not constructed. </p><p class="p">[<i>Example 1:</i> When reusing storage denoted by some pointer value <code class="highlight"><c- n>p</c-></code>, <code class="highlight"><c- n>launder</c-><c- p>(</c-><c- k>reinterpret_cast</c-><c- o>&lt;</c-><c- n>T</c-><c- o>*></c-><c- p>(</c-><c- k>new</c-> <c- p>(</c-><c- n>p</c-><c- p>)</c-> <c- n>byte</c-><c- p>[</c-><c- n>n</c-> <c- o>*</c-> <c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)]))</c-></code> can be used to implicitly create a suitable array object and obtain a pointer to it. <i>— end example</i>] </p><p class="p">37․ <em>Throws:</em> <code class="highlight"><c- n>allocate</c-></code> may throw an appropriate exception. </p><p class="p">38․ [<i>Note 3:</i> It is intended that <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate</c-></code> be an efficient means of allocating a single object of type <code class="highlight"><c- n>T</c-></code>,
-even when <code class="highlight"><c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code> is small. That is, there is no need for a container to maintain its own free list. <i>— end note</i>] </p><p class="p">39․ <em>Remarks:</em> If <code class="highlight"><c- n>n</c-> <c- o>==</c-> <c- mi>0</c-></code>, the return value is unspecified. </p><p class="p"><ins>x․ Default: On freestanding implementations, <code class="highlight"><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>unreachable</c-><c- p>(),</c-> <c- n>XX</c-><c- o>::</c-><c- n>pointer</c-><c- p>())</c-></code>.
-[<i>Note:</i> This default ensures that <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> meets the allocator requirements
+even when <code class="highlight"><c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code> is small. That is, there is no need for a container to maintain its own free list. <i>— end note</i>] </p><p class="p">39․ <em>Remarks:</em> If <code class="highlight"><c- n>n</c-> <c- o>==</c-> <c- mi>0</c-></code>, the return value is unspecified. </p><p class="p"><ins>x․ Default: On freestanding implementations, <code class="highlight"><c- n>XX</c-><c- o>::</c-><c- n>pointer</c-><c- p>()</c-></code>.
+[<i>Note:</i> This default is never used by <code class="highlight"><c- n>allocator_traits</c-></code>, but it ensures that <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> always meets the allocator requirements
 even though <code class="highlight"><c- n>allocate</c-></code> is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins> </p><p>[...] </p><p></p><pre class="highlight"><c- n>a</c-><c- p>.</c-><c- n>deallocate</c-><c- p>(</c-><c- n>p</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c->
 </pre> <p class="p">47․ <em>Result:</em> (not used) </p><p class="p">48․ <em>Preconditions:</em> </p><ul> <li>(48.1) If <code class="highlight"><c- n>p</c-></code> is memory that was obtained by a call to <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-></code>, let <code class="highlight"><c- n>ret</c-></code> be the value returned
 and <code class="highlight"><c- n>req</c-></code> be the value passed as the first argument of that call. <code class="highlight"><c- n>p</c-></code> is equal to <code class="highlight"><c- n>ret</c-><c- p>.</c-><c- n>ptr</c-></code> and <code class="highlight"><c- n>n</c-></code> is a value
 such that <code class="highlight"><c- n>req</c-></code> ≤ <code class="highlight"><c- n>n</c-></code> ≤ <code class="highlight"><c- n>ret</c-><c- p>.</c-><c- n>count</c-></code>.</li> <li>(48.2) Otherwise, <code class="highlight"><c- n>p</c-></code> is a pointer value obtained from <code class="highlight"><c- n>allocate</c-></code>. <code class="highlight"><c- n>n</c-></code> equals the value passed as the first argument
-to the invocation of <code class="highlight"><c- n>allocate</c-></code> which returned <code class="highlight"><c- n>p</c-></code>. </li></ul> <code class="highlight"><c- n>p</c-></code> has not been invalidated by an intervening call to <code class="highlight"><c- n>deallocate</c-></code>. <p class="p">49․ <em>Throws:</em> Nothing. </p><p class="p"><ins>x․ <em>Remarks:</em> Default: On freestanding implementations, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>unreachable</c-><c- p>()</c-></code>.
-[<i>Note:</i> This default ensures that <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> meets the allocator requirements
+to the invocation of <code class="highlight"><c- n>allocate</c-></code> which returned <code class="highlight"><c- n>p</c-></code>. </li></ul> <code class="highlight"><c- n>p</c-></code> has not been invalidated by an intervening call to <code class="highlight"><c- n>deallocate</c-></code>. <p class="p">49․ <em>Throws:</em> Nothing. </p><p class="p"><ins>x․ <em>Remarks:</em> Default: On freestanding implementations, <code class="highlight"><c- b>void</c-><c- p>()</c-></code>.
+[<i>Note:</i> This default is never used by <code class="highlight"><c- n>allocator_traits</c-></code>, but it ensures that <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> always meets the allocator requirements
 even though <code class="highlight"><c- n>deallocate</c-></code> is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins> </p></small>
    </blockquote>
    <h3 class="heading settled" data-level="4.5" id="wording-allocator.traits.members"><span class="secno">4.5. </span><span class="content">[allocator.traits.members]</span><a class="self-link" href="#wording-allocator.traits.members"></a></h3>
