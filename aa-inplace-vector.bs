@@ -2,7 +2,7 @@
 Title: Allocator-aware <code>inplace_vector</code>
 Shortname: Dxxxx
 Revision: 0
-!Draft Revision: 3
+!Draft Revision: 4
 Audience: LEWG
 Status: D
 Group: WG21
@@ -11,7 +11,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   We make `inplace_vector` an allocator-aware container, and make `allocator` partially freestanding.
-Date: 2024-08-26
+Date: 2024-08-28
 </pre>
 
 <style>
@@ -368,15 +368,29 @@ leaving it up to the vendor to strengthen the noexcept guarantee if they choose 
 
 ## Feature-test macros ## {#wording-ftm}
 
-Since `inplace_vector` hasn't shipped yet, we think we don't need a feature-test macro for its changes.
-But if LWG decides we need one, then we should simply bump the value of `__cpp_lib_inplace_vector` from `202406L` to `YYYYMML`.
-
-The changes to make `allocator` partially freestanding, and the corresponding changes
-to permit `allocator_traits` to be meaningfully used with a freestanding `allocator`,
-should receive a feature-test macro.
-We propose simply to bump the value of `__cpp_lib_freestanding_memory` from `202306L` to `YYYYMML`.
 This situation seems to fall under [[P2198]]'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding";
-but we still don't know what would be the best approach.
+but that example doesn't help much.
+
+We propose to bump the value of `__cpp_lib_inplace_vector` from `202406L` to `YYYYMML`.
+We add a new macro `__cpp_lib_freestanding_inplace_vector` to track freestanding support.
+Finally, we add a new macro `__cpp_lib_freestanding_allocator` to track the freestanding-only changes to `allocator` and `allocator_traits`.
+
+Alternatively, instead of adding `__cpp_lib_freestanding_allocator`, LEWG/LWG might consider
+just bumping the value of `__cpp_lib_freestanding_memory` from `202306L` to `YYYYMML`.
+
+<table>
+<tr><td></td><th>`__cpp_lib_` `inplace_vector`</th><th>`__cpp_lib_` `freestanding_` `inplace_vector`</th><th>`__cpp_lib_` `freestanding_` `allocator`</th><th></th></tr>
+<tr><th>No support for `inplace_vector`</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>Freestanding `allocator` but no `inplace_vector`</th><td>—</td><td>—</td><td>`YYYYMML`</td></tr>
+<tr><th>P0843 `inplace_vector`, hosted only</th><td>`202406L`</td><td>—</td><td>—</td></tr>
+<tr><th>P0843 `inplace_vector` (status quo)</th><td>`202406L`</td><td>`202406L`</td><td>—</td></tr>
+<tr><th>P0843 `inplace_vector`, plus freestanding `allocator`</th><td>`202406L`</td><td>`202406L`</td><td>`YYYYMML`</td></tr>
+<tr><th>AA `inplace_vector`, hosted only</th><td>`YYYYMML`</td><td>—</td><td>—</td></tr>
+<tr><th>AA `inplace_vector` but no freestanding `allocator`</th><td>`YYYYMML`</td><td>`YYYYMML`</td><td>—</td></tr>
+<tr><th>AA `inplace_vector` and freestanding `allocator`</th><td>`YYYYMML`</td><td>`YYYYMML`</td><td>`YYYYMML`</td></tr>
+<tr><th>P0843 `inplace_vector` on freestanding and AA `inplace_vector` on hosted</th><td colspan="3">should never happen</td></tr>
+<tr><th>AA `inplace_vector` on freestanding and P0843 `inplace_vector` on hosted</th><td colspan="3">should never happen</td></tr>
+</table>
 
 ## [memory.syn] ## {#wording-memory.syn}
 
@@ -452,8 +466,8 @@ can be used to implicitly create a suitable array object and obtain a pointer to
 <p class="p">38․ [<i>Note 3:</i> It is intended that `a.allocate` be an efficient means of allocating a single object of type `T`,
 even when `sizeof(T)` is small. That is, there is no need for a container to maintain its own free list. <i>— end note</i>]
 <p class="p">39․ *Remarks:* If `n == 0`, the return value is unspecified.
-<p class="p"><ins>x․ Default: On freestanding implementations, `(std::unreachable(), XX::pointer())`.
-[<i>Note:</i> This default ensures that `allocator<T>` meets the allocator requirements
+<p class="p"><ins>x․ Default: On freestanding implementations, `XX::pointer()`.
+[<i>Note:</i> This default is never used by `allocator_traits`, but it ensures that `allocator<T>` always meets the allocator requirements
 even though `allocate` is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins>
 
 <p>[...]
@@ -472,8 +486,8 @@ to the invocation of `allocate` which returned `p`.
 </ul>
 `p` has not been invalidated by an intervening call to `deallocate`.
 <p class="p">49․ *Throws:* Nothing.
-<p class="p"><ins>x․ *Remarks:* Default: On freestanding implementations, `std::unreachable()`.
-[<i>Note:</i> This default ensures that `allocator<T>` meets the allocator requirements
+<p class="p"><ins>x․ *Remarks:* Default: On freestanding implementations, `void()`.
+[<i>Note:</i> This default is never used by `allocator_traits`, but it ensures that `allocator<T>` always meets the allocator requirements
 even though `deallocate` is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins>
 </blockquote></small>
 
