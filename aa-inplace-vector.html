@@ -2094,7 +2094,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">DxxxxR0<br>Allocator-aware <code class="highlight"><c- n>inplace_vector</c-></code></h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-08-28">2024-08-28</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-08-29">2024-08-29</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2104,7 +2104,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>4
+     <dd>5
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2122,6 +2122,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <a href="#proposal"><span class="secno">2</span> <span class="content">Motivation and proposal</span></a>
      <ol class="toc">
       <li><a href="#freestanding"><span class="secno">2.1</span> <span class="content">Notes on freestanding</span></a>
+      <li><a href="#wording-ftm"><span class="secno">2.2</span> <span class="content">Notes on feature-test macros</span></a>
      </ol>
     <li>
      <a href="#experience"><span class="secno">3</span> <span class="content">Implementation experience</span></a>
@@ -2132,7 +2133,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     <li>
      <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording</span></a>
      <ol class="toc">
-      <li><a href="#wording-ftm"><span class="secno">4.1</span> <span class="content">Feature-test macros</span></a>
+      <li><a href="#wording-version.syn"><span class="secno">4.1</span> <span class="content">[version.syn]</span></a>
       <li><a href="#wording-memory.syn"><span class="secno">4.2</span> <span class="content">[memory.syn]</span></a>
       <li><a href="#wording-default.allocator"><span class="secno">4.3</span> <span class="content">[default.allocator]</span></a>
       <li><a href="#wording-allocator.requirements.general"><span class="secno">4.4</span> <span class="content">[allocator.requirements.general]</span></a>
@@ -2279,6 +2280,45 @@ on freestanding implementations (only).</p>
    </ul>
    <p>We’ve chosen the third option, as it has the fewest obvious downsides.
 We do not propose to change the allocator requirements on hosted implementations.</p>
+   <p>For another take on freestanding <code class="highlight"><c- n>allocator</c-></code>, see Ben Craig’s <a data-link-type="biblio" href="#biblio-p3295" title="Freestanding constexpr containers and constexpr exception types">[P3295]</a>,
+which proposes that <code class="highlight"><c- n>allocate</c-></code> and <code class="highlight"><c- n>deallocate</c-></code> could be marked
+with a new "freestanding-consteval" category. That proposal would merge-conflict
+with this one, but does not semantically conflict.
+Its semantics are a pure extension of this one, as far as either of us can tell.</p>
+   <h3 class="heading settled" data-level="2.2" id="wording-ftm"><span class="secno">2.2. </span><span class="content">Notes on feature-test macros</span><a class="self-link" href="#wording-ftm"></a></h3>
+   <p>For the non-freestanding case, it’s easy: vendors just bump <code class="highlight"><c- n>__cpp_lib_inplace_vector</c-></code> and are done.
+This note section exists only because the freestanding situation is messier than that,
+because we are making <code class="highlight"><c- n>allocator</c-></code> partially freestanding.</p>
+   <p>This situation falls under <a data-link-type="biblio" href="#biblio-p2198" title="Freestanding Feature-Test Macros and Implementation-Defined Extensions">[P2198]</a>'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding."
+Ben Craig, in email, suggests this four-macro design.</p>
+   <table>
+    <tbody>
+     <tr>
+      <th>Macro
+      <th>Meaning
+     <tr>
+      <td><code class="highlight"><c- n>__cpp_lib_inplace_vector</c-></code> (exists)
+      <td>If <code class="highlight"><c- mf>202406L</c-></code>, P0843 is fully implemented; if <code class="highlight"><c- n>YYYYMML</c-></code>, allocator-aware <code class="highlight"><c- n>inplace_vector</c-></code> is fully implemented
+     <tr>
+      <td><code class="highlight"><c- n>__cpp_lib_freestanding_inplace_vector</c-></code> (new)
+      <td>Only the freestanding subset of <code class="highlight"><c- n>inplace_vector</c-></code> is available (e.g. the iterator-pair ctor is <code class="highlight"><c- o>=</c-><c- k>delete</c-></code>d)
+     <tr>
+      <td><code class="highlight"><c- n>__cpp_lib_allocator</c-></code> (new)
+      <td><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>allocator</c-></code> is fully implemented (including <code class="highlight"><c- n>allocate</c-></code> and <code class="highlight"><c- n>deallocate</c-></code>)
+     <tr>
+      <td><code class="highlight"><c- n>__cpp_lib_freestanding_allocator</c-></code> (new)
+      <td>Only the freestanding subset of <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>allocator</c-></code> is available
+   </table>
+   <p>The first pair of macros are mutually exclusive: <code class="highlight"><c- n>__cpp_lib_inplace_vector</c-></code> indicates <em>full</em> support (even on freestanding, our vendor might
+be generous enough to provide the full API), while <code class="highlight"><c- n>__cpp_lib_freestanding_inplace_vector</c-></code> indicates the fallback subset which freestanding
+C++26 vendors (but not hosted vendors) might legally provide instead.</p>
+   <p class="note" role="note"><span class="marker">Note:</span> The freestanding-deleted members, such as the
+iterator-pair constructor, are freestanding-deleted not because they <em>allocate</em> (they don’t) but because they <em>throw.</em></p>
+   <p>The second pair of macros are mutually exclusive: <code class="highlight"><c- n>__cpp_lib_allocator</c-></code> indicates <em>full</em> support (i.e., a generous freestanding vendor
+or any hosted vendor up-to-date enough to know about this new macro), while <code class="highlight"><c- n>__cpp_lib_freestanding_allocator</c-></code> indicates the fallback subset
+which freestanding C++26 vendors might legally provide instead.</p>
+   <p>The existing feature-test macros related to allocator support on freestanding are C++23’s <code class="highlight"><c- n>__cpp_lib_allocate_at_least</c-></code> (the last major
+change to <code class="highlight"><c- n>allocator</c-></code>/<code class="highlight"><c- n>allocator_traits</c-></code>), C++26’s <code class="highlight"><c- n>__cpp_lib_freestanding_memory</c-></code>, and C++26’s <code class="highlight"><c- n>__cpp_lib_freestanding_operator_new</c-></code> (effectively indicates whether heap allocation is available).</p>
    <h2 class="heading settled" data-level="3" id="experience"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>Arthur has implemented <a href="#wording">§ 4 Proposed wording</a> in <a data-link-type="biblio" href="#biblio-quuxplusonesg14" title="Quuxplusone/SG14: Allocator-aware in-place vector (future > C++20)">[QuuxplusoneSG14]</a>. This includes extensive
 unit tests verifying that:</p>
@@ -2433,69 +2473,19 @@ operations to throw (on pain of UB).</p>
 but again that idea would complicate the spec, for no obvious benefit to users. So we don’t mandate that special case,
 leaving it up to the vendor to strengthen the noexcept guarantee if they choose to.</p>
    <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
-   <h3 class="heading settled" data-level="4.1" id="wording-ftm"><span class="secno">4.1. </span><span class="content">Feature-test macros</span><a class="self-link" href="#wording-ftm"></a></h3>
-   <p>This situation seems to fall under <a data-link-type="biblio" href="#biblio-p2198" title="Freestanding Feature-Test Macros and Implementation-Defined Extensions">[P2198]</a>'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding";
-but that example doesn’t help much.</p>
-   <p>We propose to bump the value of <code class="highlight"><c- n>__cpp_lib_inplace_vector</c-></code> from <code class="highlight"><c- mf>202406L</c-></code> to <code class="highlight"><c- n>YYYYMML</c-></code>.
-We add a new macro <code class="highlight"><c- n>__cpp_lib_freestanding_inplace_vector</c-></code> to track freestanding support.
-Finally, we add a new macro <code class="highlight"><c- n>__cpp_lib_freestanding_allocator</c-></code> to track the freestanding-only changes to <code class="highlight"><c- n>allocator</c-></code> and <code class="highlight"><c- n>allocator_traits</c-></code>.</p>
-   <p>Alternatively, instead of adding <code class="highlight"><c- n>__cpp_lib_freestanding_allocator</c-></code>, LEWG/LWG might consider
-just bumping the value of <code class="highlight"><c- n>__cpp_lib_freestanding_memory</c-></code> from <code class="highlight"><c- mf>202306L</c-></code> to <code class="highlight"><c- n>YYYYMML</c-></code>.</p>
-   <table>
-    <tbody>
-     <tr>
-      <td>
-      <th><code class="highlight"><c- n>__cpp_lib_</c-></code> <code class="highlight"><c- n>inplace_vector</c-></code>
-      <th><code class="highlight"><c- n>__cpp_lib_</c-></code> <code class="highlight"><c- n>freestanding_</c-></code> <code class="highlight"><c- n>inplace_vector</c-></code>
-      <th><code class="highlight"><c- n>__cpp_lib_</c-></code> <code class="highlight"><c- n>freestanding_</c-></code> <code class="highlight"><c- n>allocator</c-></code>
-      <th>
-     <tr>
-      <th>No support for <code class="highlight"><c- n>inplace_vector</c-></code>
-      <td>—
-      <td>—
-      <td>—
-     <tr>
-      <th>Freestanding <code class="highlight"><c- n>allocator</c-></code> but no <code class="highlight"><c- n>inplace_vector</c-></code>
-      <td>—
-      <td>—
-      <td><code class="highlight"><c- n>YYYYMML</c-></code>
-     <tr>
-      <th>P0843 <code class="highlight"><c- n>inplace_vector</c-></code>, hosted only
-      <td><code class="highlight"><c- mf>202406L</c-></code>
-      <td>—
-      <td>—
-     <tr>
-      <th>P0843 <code class="highlight"><c- n>inplace_vector</c-></code> (status quo)
-      <td><code class="highlight"><c- mf>202406L</c-></code>
-      <td><code class="highlight"><c- mf>202406L</c-></code>
-      <td>—
-     <tr>
-      <th>P0843 <code class="highlight"><c- n>inplace_vector</c-></code>, plus freestanding <code class="highlight"><c- n>allocator</c-></code>
-      <td><code class="highlight"><c- mf>202406L</c-></code>
-      <td><code class="highlight"><c- mf>202406L</c-></code>
-      <td><code class="highlight"><c- n>YYYYMML</c-></code>
-     <tr>
-      <th>AA <code class="highlight"><c- n>inplace_vector</c-></code>, hosted only
-      <td><code class="highlight"><c- n>YYYYMML</c-></code>
-      <td>—
-      <td>—
-     <tr>
-      <th>AA <code class="highlight"><c- n>inplace_vector</c-></code> but no freestanding <code class="highlight"><c- n>allocator</c-></code>
-      <td><code class="highlight"><c- n>YYYYMML</c-></code>
-      <td><code class="highlight"><c- n>YYYYMML</c-></code>
-      <td>—
-     <tr>
-      <th>AA <code class="highlight"><c- n>inplace_vector</c-></code> and freestanding <code class="highlight"><c- n>allocator</c-></code>
-      <td><code class="highlight"><c- n>YYYYMML</c-></code>
-      <td><code class="highlight"><c- n>YYYYMML</c-></code>
-      <td><code class="highlight"><c- n>YYYYMML</c-></code>
-     <tr>
-      <th>P0843 <code class="highlight"><c- n>inplace_vector</c-></code> on freestanding and AA <code class="highlight"><c- n>inplace_vector</c-></code> on hosted
-      <td colspan="3">should never happen
-     <tr>
-      <th>AA <code class="highlight"><c- n>inplace_vector</c-></code> on freestanding and P0843 <code class="highlight"><c- n>inplace_vector</c-></code> on hosted
-      <td colspan="3">should never happen
-   </table>
+   <h3 class="heading settled" data-level="4.1" id="wording-version.syn"><span class="secno">4.1. </span><span class="content">[version.syn]</span><a class="self-link" href="#wording-version.syn"></a></h3>
+   <p>Modify &lt;"a href="https://eel.is/c++draft/version.syn">[version.syn] as follows,
+inserting these macros into the list in the proper alphabetical positions:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <pre class="highlight"><ins><c- cp>#define __cpp_lib_allocator                    YYYYMML </c-><c- c1>// also in &lt;memory></c-></ins>
+<ins><c- cp>#define __cpp_lib_freestanding_allocator       YYYYMML </c-><c- c1>// freestanding, also in &lt;memory></c-></ins>
+<del><c- cp>#define __cpp_lib_inplace_vector               202406L </c-><c- c1>// also in &lt;inplace_vector></c-></del>
+<ins><c- cp>#define __cpp_lib_inplace_vector               YYYYMML </c-><c- c1>// also in &lt;inplace_vector></c-></ins>
+<ins><c- cp>#define __cpp_lib_freestanding_inplace_vector  YYYYMML </c-><c- c1>// freestanding, also in &lt;inplace_vector></c-></ins>
+</pre></small>
+   </blockquote>
    <h3 class="heading settled" data-level="4.2" id="wording-memory.syn"><span class="secno">4.2. </span><span class="content">[memory.syn]</span><a class="self-link" href="#wording-memory.syn"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:</p>
    <p><small></small></p>
@@ -2611,7 +2601,8 @@ even though <code class="highlight"><c- n>deallocate</c-></code> is a freestandi
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <p><b>24.3.14 Class template <code class="highlight"><c- n>inplace_vector</c-></code> [inplace.vector]</b> </p><p><b>24.3.14.1 Overview [inplace.vector.overview]</b> </p><p>1․ An <code class="highlight"><c- n>inplace_vector</c-></code> is a contiguous container. Its capacity is fixed and its elements are stored within the <code class="highlight"><c- n>inplace_vector</c-></code> object itself. </p><p>2․ An <code class="highlight"><c- n>inplace_vector</c-></code> meets all of the requirements of a container ([container.reqmts]), of a reversible container ([container.rev.reqmts]), <ins>of an allocator-aware container ([container.alloc.reqmts]),</ins> of a contiguous container, and of a sequence container, including most of the optional sequence container requirements ([sequence.reqmts]).
+    <small> <p><b>24.3.14 Class template <code class="highlight"><c- n>inplace_vector</c-></code> [inplace.vector]</b> </p><p><b>24.3.14.1 Overview [inplace.vector.overview]</b> </p><p>1․ An <code class="highlight"><c- n>inplace_vector</c-></code> is a contiguous container. Its capacity is fixed and its elements are stored within the <code class="highlight"><c- n>inplace_vector</c-></code> object itself. <ins>[<i>Note:</i> Although it is an allocator-aware container, <code class="highlight"><c- n>inplace_vector</c-></code> never directly instantiates the <code class="highlight"><c- n>allocate</c-></code> or <code class="highlight"><c- n>deallocate</c-></code> member functions
+of its <code class="highlight"><c- n>allocator_type</c-></code>. <i>— end note</i>]</ins> </p><p>2․ An <code class="highlight"><c- n>inplace_vector</c-></code> meets all of the requirements of a container ([container.reqmts]), of a reversible container ([container.rev.reqmts]), <ins>of an allocator-aware container ([container.alloc.reqmts]),</ins> of a contiguous container, and of a sequence container, including most of the optional sequence container requirements ([sequence.reqmts]).
 The exceptions are the <code class="highlight"><c- n>push_front</c-></code>, <code class="highlight"><c- n>prepend_range</c-></code>, <code class="highlight"><c- n>pop_front</c-></code>, and <code class="highlight"><c- n>emplace_front</c-></code> member functions, which are not provided.
 Descriptions are provided here only for operations on <code class="highlight"><c- n>inplace_vector</c-></code> that are not described in one of these tables or for operations where there is additional semantic information. </p><p>3․ For any <code class="highlight"><c- n>N</c-></code>, <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><ins><c- p>,</c-> <c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></ins><c- o>>::</c-><c- n>iterator</c-></code> and <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><ins><c- p>,</c-> <c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></ins><c- o>>::</c-><c- n>const_iterator</c-></code> meet the constexpr iterator requirements. </p><p>4․ For any <code class="highlight"><c- n>N</c-></code> > 0 <ins>and any <code class="highlight"><c- n>Allocator</c-></code></ins>, if <code class="highlight"><c- n>is_trivial_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">false</code>,
 then no <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><ins><c- p>,</c-> <c- n>Allocator</c-></ins><c- o>></c-></code> member functions are usable in constant expressions. </p><p>5․ Any member function of <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><ins><c- p>,</c-> <c- n>Allocator</c-></ins><c- o>></c-></code> that would cause the size to exceed <code class="highlight"><c- n>N</c-></code> throws an exception of type <code class="highlight"><c- n>bad_alloc</c-></code>. </p><p>6․ Let <code class="highlight"><c- n>IV</c-></code> denote a specialization <del>of</del> <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><ins><c- p>,</c-> <c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></ins><c- o>></c-></code>. If <code class="highlight"><c- n>N</c-></code> is zero, then <code class="highlight"><c- n>IV</c-></code> is both trivial and empty. Otherwise: </p><ul> <li>(6.1) If <code class="highlight"><c- n>is_trivially_copy_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>, then <code class="highlight"><c- n>IV</c-></code> has a trivial copy constructor.</li> <li>(6.2) If <code class="highlight"><c- n>is_trivially_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>, then <code class="highlight"><c- n>IV</c-></code> has a trivial move constructor.</li> <li>(6.3) If <code class="highlight"><c- n>is_trivially_destructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>, then: <ul> <li>(6.3.1) <code class="highlight"><c- n>IV</c-></code> has a trivial destructor.</li> <li>(6.3.2) If <code class="highlight"><c- n>is_trivially_copy_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_trivially_copy_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>, then <code class="highlight"><c- n>IV</c-></code> has a trivial copy assignment operator.</li> <li>(6.3.3) If <code class="highlight"><c- n>is_trivially_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_trivially_move_assignable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> is <code class="highlight">true</code>, then <code class="highlight"><c- n>IV</c-></code> has a trivial move assignment operator.</li> </ul></li> </ul> <p></p><pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c->
@@ -2648,11 +2639,13 @@ then no <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T<
     <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>il</c-><c- p>);</c->                       <c- c1>// freestanding-deleted</c->
     <ins><c- k>constexpr</c-> <c- k>explicit</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
     <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>                <ins><c- c1>// freestanding-deleted</c-></ins>
-    <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>value</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>               <ins><c- c1>// freestanding-deleted</c-></ins>
+    <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>value</c-><c- p>,</c-></ins>                   <ins><c- c1>// freestanding-deleted</c-></ins>
+                             <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>
     <ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c-></ins>
-      <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins> <ins><c- c1>// freestanding-deleted</c-></ins>
+      <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-></ins>     <ins><c- c1>// freestanding-deleted</c-></ins>
+                               <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>
     <ins><c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>R</c-><c- o>></c-></ins>
-      <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>                    <ins><c- c1>// freestanding-deleted</c-></ins>
+      <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>     <ins><c- c1>// freestanding-deleted</c-></ins>
     <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- k>const</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>,</c-> <c- k>const</c-> <c- n>type_identity_t</c-><c- o>&lt;</c-><c- n>Allocator</c-><c- o>>&amp;</c-><c- p>);</c-></ins>
     <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>,</c-> <c- k>const</c-> <c- n>type_identity_t</c-><c- o>&lt;</c-><c- n>Allocator</c-><c- o>>&amp;</c-><c- p>);</c-></ins>
     <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>il</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>     <ins><c- c1>// freestanding-deleted</c-></ins>
@@ -2992,6 +2985,8 @@ Otherwise, the allocators shall not be swapped.</ins> </p><p><b>24.3.14.6 Erasur
    <dd>Ben Craig. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1642r11.html"><cite>Freestanding Library: Easy [utilities], [ranges], and [iterators]</cite></a>. July 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1642r11.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p1642r11.html</a>
    <dt id="biblio-p2198">[P2198]
    <dd>Ben Craig. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html"><cite>Freestanding Feature-Test Macros and Implementation-Defined Extensions</cite></a>. December 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html</a>
+   <dt id="biblio-p3295">[P3295]
+   <dd>Ben Craig. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r0.html"><cite>Freestanding constexpr containers and constexpr exception types</cite></a>. May 2024. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r0.html</a>
    <dt id="biblio-quuxplusonesg14">[QuuxplusoneSG14]
    <dd>Arthur O'Dwyer. <a href="https://github.com/Quuxplusone/SG14?tab=readme-ov-file#allocator-aware-in-place-vector-future--c20"><cite>Quuxplusone/SG14: Allocator-aware in-place vector (future > C++20)</cite></a>. August 2024. URL: <a href="https://github.com/Quuxplusone/SG14?tab=readme-ov-file#allocator-aware-in-place-vector-future--c20">https://github.com/Quuxplusone/SG14?tab=readme-ov-file#allocator-aware-in-place-vector-future--c20</a>
   </dl>

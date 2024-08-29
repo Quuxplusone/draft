@@ -2,7 +2,7 @@
 Title: Allocator-aware <code>inplace_vector</code>
 Shortname: Dxxxx
 Revision: 0
-!Draft Revision: 4
+!Draft Revision: 5
 Audience: LEWG
 Status: D
 Group: WG21
@@ -11,7 +11,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   We make `inplace_vector` an allocator-aware container, and make `allocator` partially freestanding.
-Date: 2024-08-28
+Date: 2024-08-29
 </pre>
 
 <style>
@@ -180,6 +180,45 @@ We could solve this conundrum in any of the following ways:
 
 We've chosen the third option, as it has the fewest obvious downsides.
 We do not propose to change the allocator requirements on hosted implementations.
+
+For another take on freestanding `allocator`, see Ben Craig's [[P3295]],
+which proposes that `allocate` and `deallocate` could be marked
+with a new "freestanding-consteval" category. That proposal would merge-conflict
+with this one, but does not semantically conflict.
+Its semantics are a pure extension of this one, as far as either of us can tell.
+
+
+## Notes on feature-test macros ## {#wording-ftm}
+
+For the non-freestanding case, it's easy: vendors just bump `__cpp_lib_inplace_vector` and are done.
+This note section exists only because the freestanding situation is messier than that,
+because we are making `allocator` partially freestanding.
+
+This situation falls under [[P2198]]'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding."
+Ben Craig, in email, suggests this four-macro design.
+
+<table>
+<tr><th>Macro</th><th>Meaning</th></tr>
+<tr><td>`__cpp_lib_inplace_vector` (exists)</td><td>If `202406L`, P0843 is fully implemented; if `YYYYMML`, allocator-aware `inplace_vector` is fully implemented</td></tr>
+<tr><td>`__cpp_lib_freestanding_inplace_vector` (new)</td><td>Only the freestanding subset of `inplace_vector` is available (e.g. the iterator-pair ctor is `=delete`d)</td></tr>
+<tr><td>`__cpp_lib_allocator` (new)</td><td>`std::allocator` is fully implemented (including `allocate` and `deallocate`)</td></tr>
+<tr><td>`__cpp_lib_freestanding_allocator` (new)</td><td>Only the freestanding subset of `std::allocator` is available</td></tr>
+</table>
+
+The first pair of macros are mutually exclusive: `__cpp_lib_inplace_vector` indicates *full* support (even on freestanding, our vendor might
+be generous enough to provide the full API), while `__cpp_lib_freestanding_inplace_vector` indicates the fallback subset which freestanding
+C++26 vendors (but not hosted vendors) might legally provide instead.
+
+Note: The freestanding-deleted members, such as the
+iterator-pair constructor, are freestanding-deleted not because they *allocate* (they don't) but because they *throw.*
+
+The second pair of macros are mutually exclusive: `__cpp_lib_allocator` indicates *full* support (i.e., a generous freestanding vendor
+or any hosted vendor up-to-date enough to know about this new macro), while `__cpp_lib_freestanding_allocator` indicates the fallback subset
+which freestanding C++26 vendors might legally provide instead.
+
+The existing feature-test macros related to allocator support on freestanding are C++23's `__cpp_lib_allocate_at_least` (the last major
+change to `allocator`/`allocator_traits`), C++26's `__cpp_lib_freestanding_memory`, and C++26's `__cpp_lib_freestanding_operator_new`
+(effectively indicates whether heap allocation is available).
 
 
 # Implementation experience # {#experience}
@@ -366,31 +405,20 @@ leaving it up to the vendor to strengthen the noexcept guarantee if they choose 
 
 # Proposed wording # {#wording}
 
-## Feature-test macros ## {#wording-ftm}
+## [version.syn] ## {#wording-version.syn}
 
-This situation seems to fall under [[P2198]]'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding";
-but that example doesn't help much.
+Modify <"a href="https://eel.is/c++draft/version.syn">[version.syn]</a> as follows,
+inserting these macros into the list in the proper alphabetical positions:
 
-We propose to bump the value of `__cpp_lib_inplace_vector` from `202406L` to `YYYYMML`.
-We add a new macro `__cpp_lib_freestanding_inplace_vector` to track freestanding support.
-Finally, we add a new macro `__cpp_lib_freestanding_allocator` to track the freestanding-only changes to `allocator` and `allocator_traits`.
-
-Alternatively, instead of adding `__cpp_lib_freestanding_allocator`, LEWG/LWG might consider
-just bumping the value of `__cpp_lib_freestanding_memory` from `202306L` to `YYYYMML`.
-
-<table>
-<tr><td></td><th>`__cpp_lib_` `inplace_vector`</th><th>`__cpp_lib_` `freestanding_` `inplace_vector`</th><th>`__cpp_lib_` `freestanding_` `allocator`</th><th></th></tr>
-<tr><th>No support for `inplace_vector`</th><td>—</td><td>—</td><td>—</td></tr>
-<tr><th>Freestanding `allocator` but no `inplace_vector`</th><td>—</td><td>—</td><td>`YYYYMML`</td></tr>
-<tr><th>P0843 `inplace_vector`, hosted only</th><td>`202406L`</td><td>—</td><td>—</td></tr>
-<tr><th>P0843 `inplace_vector` (status quo)</th><td>`202406L`</td><td>`202406L`</td><td>—</td></tr>
-<tr><th>P0843 `inplace_vector`, plus freestanding `allocator`</th><td>`202406L`</td><td>`202406L`</td><td>`YYYYMML`</td></tr>
-<tr><th>AA `inplace_vector`, hosted only</th><td>`YYYYMML`</td><td>—</td><td>—</td></tr>
-<tr><th>AA `inplace_vector` but no freestanding `allocator`</th><td>`YYYYMML`</td><td>`YYYYMML`</td><td>—</td></tr>
-<tr><th>AA `inplace_vector` and freestanding `allocator`</th><td>`YYYYMML`</td><td>`YYYYMML`</td><td>`YYYYMML`</td></tr>
-<tr><th>P0843 `inplace_vector` on freestanding and AA `inplace_vector` on hosted</th><td colspan="3">should never happen</td></tr>
-<tr><th>AA `inplace_vector` on freestanding and P0843 `inplace_vector` on hosted</th><td colspan="3">should never happen</td></tr>
-</table>
+<small><blockquote>
+<pre>
+<ins>#define __cpp_lib_allocator                    YYYYMML // also in &lt;memory></ins>
+<ins>#define __cpp_lib_freestanding_allocator       YYYYMML // freestanding, also in &lt;memory></ins>
+<del>#define __cpp_lib_inplace_vector               202406L // also in &lt;inplace_vector></del>
+<ins>#define __cpp_lib_inplace_vector               YYYYMML // also in &lt;inplace_vector></ins>
+<ins>#define __cpp_lib_freestanding_inplace_vector  YYYYMML // freestanding, also in &lt;inplace_vector></ins>
+</pre>
+</blockquote></small>
 
 ## [memory.syn] ## {#wording-memory.syn}
 
@@ -566,6 +594,8 @@ Modify <a href="https://eel.is/c++draft/inplace.vector">[inplace.vector]</a> as 
 <p><b>24.3.14 Class template `inplace_vector` [inplace.vector]</b>
 <p><b>24.3.14.1 Overview [inplace.vector.overview]</b>
 <p>1․ An `inplace_vector` is a contiguous container. Its capacity is fixed and its elements are stored within the `inplace_vector` object itself.
+<ins>[<i>Note:</i> Although it is an allocator-aware container, `inplace_vector` never directly instantiates the `allocate` or `deallocate` member functions
+of its `allocator_type`. <i>— end note</i>]</ins>
 <p>2․ An `inplace_vector` meets all of the requirements of a container ([container.reqmts]), of a reversible container ([container.rev.reqmts]),
 <ins>of an allocator-aware container ([container.alloc.reqmts]),</ins>
 of a contiguous container, and of a sequence container, including most of the optional sequence container requirements ([sequence.reqmts]).
@@ -623,11 +653,13 @@ namespace std {
     constexpr inplace_vector(initializer_list&lt;T> il);                       // freestanding-deleted
     <ins>constexpr explicit inplace_vector(const Allocator&) noexcept;</ins>
     <ins>constexpr inplace_vector(size_type n, const Allocator&);</ins>                <ins>// freestanding-deleted</ins>
-    <ins>constexpr inplace_vector(size_type n, const T& value, const Allocator&);</ins>               <ins>// freestanding-deleted</ins>
+    <ins>constexpr inplace_vector(size_type n, const T& value,</ins>                   <ins>// freestanding-deleted</ins>
+                             <ins>const Allocator&);</ins>
     <ins>template&lt;class InputIterator></ins>
-      <ins>constexpr inplace_vector(InputIterator first, InputIterator last, const Allocator&);</ins> <ins>// freestanding-deleted</ins>
+      <ins>constexpr inplace_vector(InputIterator first, InputIterator last,</ins>     <ins>// freestanding-deleted</ins>
+                               <ins>const Allocator&);</ins>
     <ins>template&lt;<i>container-compatible-range</i>&lt;T> R></ins>
-      <ins>constexpr inplace_vector(from_range_t, R&& rg, const Allocator&);</ins>                    <ins>// freestanding-deleted</ins>
+      <ins>constexpr inplace_vector(from_range_t, R&& rg, const Allocator&);</ins>     <ins>// freestanding-deleted</ins>
     <ins>constexpr inplace_vector(const inplace_vector& rhs, const type_identity_t&lt;Allocator>&);</ins>
     <ins>constexpr inplace_vector(inplace_vector&& rhs, const type_identity_t&lt;Allocator>&);</ins>
     <ins>constexpr inplace_vector(initializer_list&lt;T> il, const Allocator&);</ins>     <ins>// freestanding-deleted</ins>
@@ -1013,6 +1045,14 @@ template&lt;class T, size_t N, <ins>class Allocator,</ins> class Predicate>
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html",
     "date": "December 2022"
+  },
+  "P3295": {
+    "title": "Freestanding constexpr containers and constexpr exception types",
+    "authors": [
+      "Ben Craig"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r0.html",
+    "date": "May 2024"
   },
   "QuuxplusoneSG14": {
     "title": "Quuxplusone/SG14: Allocator-aware in-place vector (future > C++20)",
