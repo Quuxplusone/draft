@@ -2,7 +2,7 @@
 Title: Allocator-aware <code>inplace_vector</code>
 Shortname: Dxxxx
 Revision: 0
-!Draft Revision: 5
+!Draft Revision: 7
 Audience: LEWG
 Status: D
 Group: WG21
@@ -11,7 +11,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   We make `inplace_vector` an allocator-aware container, and make `allocator` partially freestanding.
-Date: 2024-08-29
+Date: 2024-08-30
 </pre>
 
 <style>
@@ -158,7 +158,7 @@ But now it's a synonym for `inplace_vector<T, N, allocator<T>>`.
 So, `allocator<T>` needs to become freestanding.
 Freestanding implementations lack a heap, so `allocator<T>::allocate` becomes
 a <i>freestanding-deleted</i> member function (<a href="https://eel.is/c++draft/library#freestanding.item-3">[freestanding.item]/3</a>),
-which means that it must be `=delete`'d if not provided by a freestanding implementation.
+which means that it may be `=delete`'d if not provided by a freestanding implementation.
 This is fine because `inplace_vector` doesn't use `allocate` or `deallocate`.
 
 `allocator_traits` is already freestanding in C++23, thanks to Ben Craig's [[P1642]].
@@ -191,7 +191,7 @@ Its semantics are a pure extension of this one, as far as either of us can tell.
 ## Notes on feature-test macros ## {#wording-ftm}
 
 For the non-freestanding case, it's easy: vendors just bump `__cpp_lib_inplace_vector` and are done.
-This note section exists only because the freestanding situation is messier than that,
+This subsection exists only because the freestanding situation is messier than that,
 because we are making `allocator` partially freestanding.
 
 This situation falls under [[P2198]]'s subsection labeled "Detect C++20 (or older) feature that is now partially required in freestanding."
@@ -199,20 +199,20 @@ Ben Craig, in email, suggests this four-macro design.
 
 <table>
 <tr><th>Macro</th><th>Meaning</th></tr>
-<tr><td>`__cpp_lib_inplace_vector` (exists)</td><td>If `202406L`, P0843 is fully implemented; if `YYYYMML`, allocator-aware `inplace_vector` is fully implemented</td></tr>
-<tr><td>`__cpp_lib_freestanding_inplace_vector` (new)</td><td>Only the freestanding subset of `inplace_vector` is available (e.g. the iterator-pair ctor is `=delete`d)</td></tr>
-<tr><td>`__cpp_lib_allocator` (new)</td><td>`std::allocator` is fully implemented (including `allocate` and `deallocate`)</td></tr>
-<tr><td>`__cpp_lib_freestanding_allocator` (new)</td><td>Only the freestanding subset of `std::allocator` is available</td></tr>
+<tr><td>`__cpp_lib_inplace_vector`&nbsp;(exists)</td><td>If `202406L`, P0843 is fully implemented; if `YYYYMML`, allocator-aware `inplace_vector` is fully implemented</td></tr>
+<tr><td>`__cpp_lib_freestanding_inplace_vector`&nbsp;(new)</td><td>At least the freestanding subset of `inplace_vector` is available (but e.g. the <i>freestanding-deleted</i> iterator-pair constructor might be `=delete`d)</td></tr>
+<tr><td>`__cpp_lib_allocator`&nbsp;(new)</td><td>`std::allocator` is fully implemented (including `allocate` and `deallocate`)</td></tr>
+<tr><td>`__cpp_lib_freestanding_allocator`&nbsp;(new)</td><td>At least the freestanding subset of `std::allocator` is available (but e.g. `allocate` might be `=delete`d)</td></tr>
 </table>
 
-The first pair of macros are mutually exclusive: `__cpp_lib_inplace_vector` indicates *full* support (even on freestanding, our vendor might
+`__cpp_lib_inplace_vector` indicates *full* support (even on freestanding, our vendor might
 be generous enough to provide the full API), while `__cpp_lib_freestanding_inplace_vector` indicates the fallback subset which freestanding
 C++26 vendors (but not hosted vendors) might legally provide instead.
 
 Note: The freestanding-deleted members, such as the
 iterator-pair constructor, are freestanding-deleted not because they *allocate* (they don't) but because they *throw.*
 
-The second pair of macros are mutually exclusive: `__cpp_lib_allocator` indicates *full* support (i.e., a generous freestanding vendor
+`__cpp_lib_allocator` indicates *full* support (i.e., a generous freestanding vendor
 or any hosted vendor up-to-date enough to know about this new macro), while `__cpp_lib_freestanding_allocator` indicates the fallback subset
 which freestanding C++26 vendors might legally provide instead.
 
@@ -227,10 +227,10 @@ Arthur has implemented [[#wording]] in [[QuuxplusoneSG14]]. This includes extens
 unit tests verifying that:
 
 - The proposed `inplace_vector<T, N, std::allocator<T>>` is an exact drop-in replacement
-    for the original `inplace_vector<T, N>`, with all the same properties w.r.t.
+    for the original `inplace_vector<T, N>`, with the same
     sizeof, alignof, triviality, and noexcept.
 
-- The proposed `inplace_vector<T, N, Alloc>` works correctly with `std::pmr::polymorphic_allocator<T>`.
+- The proposed `inplace_vector<T, N, Alloc>` works correctly with `std::pmr`.
 
 - The proposed `inplace_vector<T, N, Alloc>` works correctly with Boost.Interprocess.
 
@@ -325,7 +325,7 @@ We follow the Lakos rule and make each special member function `noexcept(false)`
 it may have UB.
 
 Theoretically, we could special-case the preconditions to make it *not* UB to swap two vectors
-with unequal propagating allocators *if* one or both vectors are empty — because then
+with unequal propagating allocators *if* either vector is empty — because then
 there's no insurmountable physical difficulty with `CountingAlloc`.
 However, that idea would complicate the spec, make more work for vendors, and make the UB condition
 less legible to users. So we don't do that.
@@ -407,7 +407,7 @@ leaving it up to the vendor to strengthen the noexcept guarantee if they choose 
 
 ## [version.syn] ## {#wording-version.syn}
 
-Modify <"a href="https://eel.is/c++draft/version.syn">[version.syn]</a> as follows,
+Modify <a href="https://eel.is/c++draft/version.syn">[version.syn]</a> as follows,
 inserting these macros into the list in the proper alphabetical positions:
 
 <small><blockquote>
@@ -625,7 +625,7 @@ namespace std {
   public:
     <i>// types:</i>
     using value_type             = T;
-    <ins>using value_type             = Allocator;</ins>
+    <ins>using allocator_type         = Allocator;</ins>
     using pointer                = <del>T*</del> <ins>typename allocator_traits&lt;Allocator>::pointer</ins>;
     using const_pointer          = <del>const T*</del> <ins>typename allocator_traits&lt;Allocator>::const_pointer</ins>;
     using reference              = value_type&;
@@ -840,7 +840,7 @@ or `rhs.get_allocator() == this->get_allocator()`.</ins>
 </pre></div>
 
 <p class="note"><b>DRAFTING NOTE:</b>
-The `type_identity_t` here matches all the other containers.
+`type_identity_t` below is consistent with the other STL containers.
 CTAD needs it in order to handle this snippet: `std::pmr::inplace_vector<int,10> v; auto w = inplace_vector(v, &mr);`
 
 <p><pre>
