@@ -2094,7 +2094,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">DxxxxR0<br>Allocator-aware <code class="highlight"><c- n>inplace_vector</c-></code></h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-08-30">2024-08-30</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-09-03">2024-09-03</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2104,7 +2104,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>7
+     <dd>8
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2130,17 +2130,18 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#pocma"><span class="secno">3.1</span> <span class="content">Notes on allocator propagation</span></a>
       <li><a href="#noexceptness"><span class="secno">3.2</span> <span class="content">Notes on noexceptness</span></a>
      </ol>
+    <li><a href="#acknowledgments"><span class="secno">4</span> <span class="content">Acknowledgments</span></a>
     <li>
-     <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording</span></a>
+     <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording</span></a>
      <ol class="toc">
-      <li><a href="#wording-version.syn"><span class="secno">4.1</span> <span class="content">[version.syn]</span></a>
-      <li><a href="#wording-memory.syn"><span class="secno">4.2</span> <span class="content">[memory.syn]</span></a>
-      <li><a href="#wording-default.allocator"><span class="secno">4.3</span> <span class="content">[default.allocator]</span></a>
-      <li><a href="#wording-allocator.requirements.general"><span class="secno">4.4</span> <span class="content">[allocator.requirements.general]</span></a>
-      <li><a href="#wording-allocator.traits.members"><span class="secno">4.5</span> <span class="content">[allocator.traits.members]</span></a>
-      <li><a href="#wording-container.alloc.reqmts"><span class="secno">4.6</span> <span class="content">[container.alloc.reqmts]</span></a>
-      <li><a href="#wording-inplace.vector.syn"><span class="secno">4.7</span> <span class="content">[inplace.vector.syn]</span></a>
-      <li><a href="#wording-inplace.vector"><span class="secno">4.8</span> <span class="content">[inplace.vector]</span></a>
+      <li><a href="#wording-version.syn"><span class="secno">5.1</span> <span class="content">[version.syn]</span></a>
+      <li><a href="#wording-memory.syn"><span class="secno">5.2</span> <span class="content">[memory.syn]</span></a>
+      <li><a href="#wording-default.allocator"><span class="secno">5.3</span> <span class="content">[default.allocator]</span></a>
+      <li><a href="#wording-allocator.requirements.general"><span class="secno">5.4</span> <span class="content">[allocator.requirements.general]</span></a>
+      <li><a href="#wording-allocator.traits.members"><span class="secno">5.5</span> <span class="content">[allocator.traits.members]</span></a>
+      <li><a href="#wording-container.alloc.reqmts"><span class="secno">5.6</span> <span class="content">[container.alloc.reqmts]</span></a>
+      <li><a href="#wording-inplace.vector.syn"><span class="secno">5.7</span> <span class="content">[inplace.vector.syn]</span></a>
+      <li><a href="#wording-inplace.vector"><span class="secno">5.8</span> <span class="content">[inplace.vector]</span></a>
      </ol>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
@@ -2163,7 +2164,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <p><a data-link-type="biblio" href="#biblio-p0843" title="inplace_vector">[P0843]</a> introduced <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><c- o>></c-></code> to the C++26 working draft.
 We propose that <code class="highlight"><c- n>inplace_vector</c-></code> should support an allocator parameter, thus allowing it
 to use that allocator’s <code class="highlight"><c- n>construct</c-></code> and <code class="highlight"><c- n>destroy</c-></code> members, even though it never needs to <code class="highlight"><c- n>allocate</c-></code>.</p>
-   <p>(1) This permits <code class="highlight"><c- n>inplace_vector</c-></code> to interoperate with allocator-extended client code. For example:</p>
+   <p>(1) This permits <code class="highlight"><c- n>inplace_vector</c-></code> to interoperate with allocator-extended client code, thus
+making it a better drop-in replacement for <code class="highlight"><c- n>vector</c-></code>. For example:</p>
    <table>
     <tbody>
      <tr>
@@ -2178,11 +2180,13 @@ to use that allocator’s <code class="highlight"><c- n>construct</c-></code> an
      <tr>
       <td>
 <pre class="highlight"><c- k>auto</c-> <c- n>v1</c-> <c- o>=</c-> <c- n>f</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>();</c->
-<del><c- k>auto</c-> <c- n>v2</c-> <c- o>=</c-> <c- n>f</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- mi>10</c-><c- o>>></c-><c- p>();</c-></del>
+ 
+<c- k>auto</c-> <c- n>v3</c-> <c- o>=</c-> <c- n>f</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
 </pre>
       <td>
 <pre class="highlight"><c- k>auto</c-> <c- n>v1</c-> <c- o>=</c-> <c- n>f</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>();</c->
-<ins><c- k>auto</c-> <c- n>v2</c-> <c- o>=</c-> <c- n>f</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- mi>10</c-><c- o>>></c-><c- p>();</c-></ins>
+<ins><c- k>auto</c-> <c- n>v2</c-> <c- o>=</c-> <c- n>f</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- b>int</c-><c- p>,</c-> <c- mi>3</c-><c- o>>></c-><c- p>();</c-></ins>
+<c- k>auto</c-> <c- n>v3</c-> <c- o>=</c-> <c- n>f</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
 </pre>
    </table>
    <p>(2) This permits using <code class="highlight"><c- n>inplace_vector</c-></code> with a PMR allocator. The vector’s elements are still
@@ -2200,7 +2204,7 @@ snippet below uses the global heap.</p>
 </pre>
      <tr>
       <td>
-<pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>10</c-><c- o>></c-> <c- n>pv</c-><c- p>;</c->
+<pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>5</c-><c- o>></c-> <c- n>pv</c-><c- p>;</c->
 <c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- n>contents</c-><c- p>[]</c-> <c- o>=</c-> <c- p>{</c->
   <c- s>"A string so long that it requires heap allocation"</c-><c- p>,</c->
   <c- s>"A short string"</c-><c- p>,</c->
@@ -2211,7 +2215,7 @@ snippet below uses the global heap.</p>
 <c- n>pv</c-><c- p>.</c-><c- n>emplace_back</c-><c- p>(</c-><c- s>"A string so long that it requires heap allocation"</c-><c- p>,</c-> <del><c- o>&amp;</c-><c- n>mr</c-></del><c- p>);</c->
 </pre>
       <td>
-<pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>10</c-><c- o>></c-> <c- n>pv</c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
+<pre class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>5</c-><c- o>></c-> <c- n>pv</c-><c- p>(</c-><c- o>&amp;</c-><c- n>mr</c-><c- p>);</c->
 <c- k>const</c-> <c- b>char</c-> <c- o>*</c-><c- n>contents</c-><c- p>[]</c-> <c- o>=</c-> <c- p>{</c->
   <c- s>"A string so long that it requires heap allocation"</c-><c- p>,</c->
   <c- s>"A short string"</c-><c- p>,</c->
@@ -2224,17 +2228,63 @@ snippet below uses the global heap.</p>
 with the same benefits as the PMR example above: less code to write, and
 fewer chances to write bugs by accident.
 See <a href="https://quuxplusone.github.io/blog/2024/08/23/boost-interprocess-tutorial/">"Boost.Interprocess, and <code class="highlight"><c- n>sg14</c-><c- o>::</c-><c- n>inplace_vector</c-></code>"</a> (2024-08-23).</p>
+   <table>
+    <tbody>
+     <tr>
+      <td colspan="2">
+<pre class="highlight"><c- k>namespace</c-> <c- nn>bip</c-> <c- o>=</c-> <c- nn>boost</c-><c- o>::</c-><c- nn>interprocess</c-><c- p>;</c->
+<c- k>namespace</c-> <c- nn>shm</c-> <c- p>{</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <c- k>using</c-> <c- n>allocator</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>scoped_allocator_adaptor</c-><c- o>&lt;</c-><c- n>bip</c-><c- o>::</c-><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>bip</c-><c- o>::</c-><c- n>managed_shared_memory</c-><c- o>::</c-><c- n>segment_manager</c-><c- o>>></c-><c- p>;</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <c- k>using</c-> <c- n>vector</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>shm</c-><c- o>::</c-><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c-><c- p>;</c->
+  <c- k>using</c-> <c- n>string</c-> <c- o>=</c-> <c- n>boost</c-><c- o>::</c-><c- n>container</c-><c- o>::</c-><c- n>basic_string</c-><c- o>&lt;</c-><c- b>char</c-><c- p>,</c-> <c- n>std</c-><c- o>::</c-><c- n>char_traits</c-><c- o>&lt;</c-><c- b>char</c-><c- o>></c-><c- p>,</c-> <c- n>shm</c-><c- o>::</c-><c- n>allocator</c-><c- o>&lt;</c-><c- b>char</c-><c- o>>></c-><c- p>;</c->
+<c- p>}</c->
+<c- k>auto</c-> <c- n>segment</c-> <c- o>=</c-> <c- n>bip</c-><c- o>::</c-><c- n>managed_shared_memory</c-><c- p>(</c-><c- n>bip</c-><c- o>::</c-><c- n>create_only</c-><c- p>,</c-> <c- n>SHM_SEGMENT_NAME</c-><c- p>,</c-> <c- mi>10</c->’<c- mo>000</c-><c- p>);</c->
+<c- k>auto</c-> <c- n>alloc</c-> <c- o>=</c-> <c- n>shm</c-><c- o>::</c-><c- n>allocator</c-><c- o>&lt;</c-><c- b>int</c-><c- o>></c-><c- p>(</c-><c- n>segment</c-><c- p>.</c-><c- n>get_segment_manager</c-><c- p>());</c->
+</pre>
+     <tr>
+      <td>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>shm</c-> <c- p>{</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c->
+  <c- k>using</c-> <c- n>vector</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>shm</c-><c- o>::</c-><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c-><c- p>;</c->
+<c- p>}</c->
+<c- k>using</c-> <c- n>VecOfStrings</c-> <c- o>=</c-> <c- n>shm</c-><c- o>::</c-><c- n>vector</c-><c- o>&lt;</c-><c- n>shm</c-><c- o>::</c-><c- n>string</c-><c- o>></c-><c- p>;</c->
+<c- k>auto</c-> <c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- n>segment</c-><c- p>.</c-><c- n>construct</c-><c- o>&lt;</c-><c- n>VecOfStrings</c-><c- o>></c-><c- p>(</c-><c- s>"S"</c-><c- p>)(</c-><c- n>argv</c-><c- o>+</c-><c- mi>2</c-><c- p>,</c-> <c- n>argv</c-><c- o>+</c-><c- n>argc</c-><c- p>,</c-> <c- n>alloc</c-><c- p>);</c->
+</pre>
+      <td>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>shm</c-> <c- p>{</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>N</c-><c- o>></c->
+  <c- k>using</c-> <c- n>inplace_vector</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><c- p>,</c-> <c- n>shm</c-><c- o>::</c-><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c-><c- p>;</c->
+<c- p>}</c->
+<c- k>using</c-> <c- n>IPVOfStrings</c-> <c- o>=</c-> <c- n>shm</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>shm</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>5</c-><c- o>></c-><c- p>;</c->
+<c- k>auto</c-> <c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- n>segment</c-><c- p>.</c-><c- n>construct</c-><c- o>&lt;</c-><c- n>IPVOfStrings</c-><c- o>></c-><c- p>(</c-><c- s>"S"</c-><c- p>)(</c-><c- n>argv</c-><c- o>+</c-><c- mi>2</c-><c- p>,</c-> <c- n>argv</c-><c- o>+</c-><c- n>argc</c-><c- p>,</c-> <c- n>alloc</c-><c- p>);</c->
+</pre>
+     <tr>
+      <td>
+<pre class="highlight"><c- k>using</c-> <c- n>IPVOfStrings</c-> <c- o>=</c-> <del><c- n>std</c-></del><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>shm</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>5</c-><c- o>></c-><c- p>;</c->
+<del><c- k>auto</c-> <c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- n>segment</c-><c- p>.</c-><c- n>construct</c-><c- o>&lt;</c-><c- n>IPVOfStrings</c-><c- o>></c-><c- p>(</c-><c- s>"S"</c-><c- p>)();</c-></del>
+<del><c- k>for</c-> <c- p>(</c-><c- b>int</c-> <c- n>i</c-> <c- o>=</c-> <c- mi>2</c-><c- p>;</c-> <c- n>i</c-> <c- o>&lt;</c-> <c- n>argc</c-><c- p>;</c-> <c- o>++</c-><c- n>i</c-><c- p>)</c-> <c- p>{</c-></del>
+  <del><c- n>p</c-><c- o>-></c-><c- n>emplace_back</c-><c- p>(</c-><c- n>argv</c-><c- p>[</c-><c- n>i</c-><c- p>],</c-> <c- n>alloc</c-><c- p>);</c-></del>
+<del><c- p>}</c-></del>
+</pre>
+      <td>
+<pre class="highlight"><c- k>using</c-> <c- n>IPVOfStrings</c-> <c- o>=</c-> <ins><c- n>shm</c-></ins><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>shm</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>5</c-><c- o>></c-><c- p>;</c->
+<ins><c- k>auto</c-> <c- o>*</c-><c- n>p</c-> <c- o>=</c-> <c- n>segment</c-><c- p>.</c-><c- n>construct</c-><c- o>&lt;</c-><c- n>IPVOfStrings</c-><c- o>></c-><c- p>(</c-><c- s>"S"</c-><c- p>)(</c-><c- n>argv</c-><c- o>+</c-><c- mi>2</c-><c- p>,</c-> <c- n>argv</c-><c- o>+</c-><c- n>argc</c-><c- p>,</c-> <c- n>alloc</c-><c- p>);</c-></ins>
+ 
+ 
+ 
+</pre>
+   </table>
    <p>(4) This gives the programmer control over the <code class="highlight"><c- n>size_type</c-></code> and <code class="highlight"><c- n>difference_type</c-></code> members
 of <code class="highlight"><c- n>inplace_vector</c-></code>, permitting a predictably smaller (or larger) memory footprint.
 Now, STL vendors <em>could</em> implement memory-footprint optimizations to store the <code class="highlight"><c- n>size</c-></code> member
 in fewer bits when <code class="highlight"><c- n>N</c-></code> was small; but we have seen from our experience with <code class="highlight"><c- n>variant</c-></code> that vendors do not do such optimizations in practice, and then get locked out of them
 forever by ABI. Giving control to the programmer is more general <em>and</em> reduces the
-STL vendor’s own workload. (<a href="https://godbolt.org/z/onofT6oMa">Godbolt.</a>)</p>
+STL vendor’s own workload. (<a href="https://godbolt.org/z/78rf9dvnz">Godbolt.</a>)</p>
    <table>
     <tbody>
      <tr>
       <td>
-<pre class="highlight">       <br>       <br>       <br>       <br>       <br>       <br>       <br>       <br>
+<pre class="highlight">       <br>       <br>       <br>       <br>       <br>       <br>       <br>       <br>       <br>       <br>
 <c- k>static_assert</c-><c- p>(</c-><c- k>sizeof</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- b>char</c-><c- p>,</c-> <c- mi>3</c-><c- o>></c-><c- p>)</c-> <c- o>==</c-> <c- mi>16</c-><c- p>);</c->
 </pre>
       <td>
@@ -2253,6 +2303,14 @@ STL vendor’s own workload. (<a href="https://godbolt.org/z/onofT6oMa">Godbolt.
 <ins><c- k>static_assert</c-><c- p>(</c-><c- k>sizeof</c-><c- p>(</c-><c- n>Tiny</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- b>char</c-><c- p>,</c-> <c- mi>3</c-><c- o>></c-><c- p>)</c-> <c- o>==</c-> <c- mi>4</c-><c- p>);</c-></ins>
 </pre>
    </table>
+   <p class="note" role="note"><span class="marker">Note:</span> Mital Ashok’s draft implementation of <code class="highlight"><c- n>inplace_vector</c-></code> for libc++ (<a data-link-type="biblio" href="#biblio-mital" title="[libc++] Implement std::inplace_vector<T, N>">[Mital]</a>) does store the <code class="highlight"><c- n>size</c-></code> in a reduced footprint,
+based on the absolute value of <code class="highlight"><c- n>N</c-></code>. That is, we have "reduced the STL vendor’s workload" in an area where libc++
+has already done that work! libc++ also uses a reduced footprint for <code class="highlight"><c- n>variant</c-></code>’s index in its "unstable ABI" mode.
+This proposal doesn’t forbid an implementation like Mital’s; libc++ is free to continue using a reduced footprint even after this proposal.
+But certainly argument (4) in favor is weak: the space-saving is superfluous (in libc++'s case) and non-portable
+(since different STL vendors may continue to choose different types for the <code class="highlight"><c- n>size</c-></code> data member regardless of <code class="highlight"><c- n>Allocator</c-><c- o>::</c-><c- n>size_type</c-></code>). From the user-programmer’s point of view, it matters only that there is <em>some</em> way to
+store the <code class="highlight"><c- n>size</c-></code> member in fewer than eight bytes: either every STL vendor commits to store <code class="highlight"><c- n>size</c-></code> in the minimum possible number of bytes,
+or this proposal is adopted and every STL vendor commits to store <code class="highlight"><c- n>size</c-></code> in a type no larger than <code class="highlight"><c- n>Allocator</c-><c- o>::</c-><c- n>size_type</c-></code>.</p>
    <h3 class="heading settled" data-level="2.1" id="freestanding"><span class="secno">2.1. </span><span class="content">Notes on freestanding</span><a class="self-link" href="#freestanding"></a></h3>
    <p><code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><c- o>></c-></code> is freestanding. We don’t propose to change that.
 But now it’s a synonym for <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><c- p>,</c-> <c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>></c-></code>.
@@ -2320,7 +2378,7 @@ which freestanding C++26 vendors might legally provide instead.</p>
    <p>The existing feature-test macros related to allocator support on freestanding are C++23’s <code class="highlight"><c- n>__cpp_lib_allocate_at_least</c-></code> (the last major
 change to <code class="highlight"><c- n>allocator</c-></code>/<code class="highlight"><c- n>allocator_traits</c-></code>), C++26’s <code class="highlight"><c- n>__cpp_lib_freestanding_memory</c-></code>, and C++26’s <code class="highlight"><c- n>__cpp_lib_freestanding_operator_new</c-></code> (effectively indicates whether heap allocation is available).</p>
    <h2 class="heading settled" data-level="3" id="experience"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
-   <p>Arthur has implemented <a href="#wording">§ 4 Proposed wording</a> in <a data-link-type="biblio" href="#biblio-quuxplusonesg14" title="Quuxplusone/SG14: Allocator-aware in-place vector (future > C++20)">[QuuxplusoneSG14]</a>. This includes extensive
+   <p>Arthur has implemented <a href="#wording">§ 5 Proposed wording</a> in <a data-link-type="biblio" href="#biblio-quuxplusonesg14" title="Quuxplusone/SG14: Allocator-aware in-place vector (future > C++20)">[QuuxplusoneSG14]</a>. This includes extensive
 unit tests verifying that:</p>
    <ul>
     <li data-md>
@@ -2472,8 +2530,11 @@ operations to throw (on pain of UB).</p>
    <p>We expect that at least some STL vendors will make these operations <code class="highlight"><c- k>noexcept</c-></code> when <code class="highlight"><c- n>N</c-> <c- o>==</c-> <c- mi>0</c-></code>, as a special case;
 but again that idea would complicate the spec, for no obvious benefit to users. So we don’t mandate that special case,
 leaving it up to the vendor to strengthen the noexcept guarantee if they choose to.</p>
-   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
-   <h3 class="heading settled" data-level="4.1" id="wording-version.syn"><span class="secno">4.1. </span><span class="content">[version.syn]</span><a class="self-link" href="#wording-version.syn"></a></h3>
+   <h2 class="heading settled" data-level="4" id="acknowledgments"><span class="secno">4. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
+   <p>Thanks to Ben Craig for his design of the feature-test macros and for discussion of the approach
+to "freestanding <code class="highlight"><c- n>allocator</c-></code>." Thanks to Gonzalo Brito and Mital Ashok for their review of the design and wording.</p>
+   <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
+   <h3 class="heading settled" data-level="5.1" id="wording-version.syn"><span class="secno">5.1. </span><span class="content">[version.syn]</span><a class="self-link" href="#wording-version.syn"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/version.syn">[version.syn]</a> as follows,
 inserting these macros into the list in the proper alphabetical positions:</p>
    <p><small></small></p>
@@ -2486,7 +2547,7 @@ inserting these macros into the list in the proper alphabetical positions:</p>
 <ins><c- cp>#define __cpp_lib_freestanding_inplace_vector  YYYYMML </c-><c- c1>// freestanding, also in &lt;inplace_vector></c-></ins>
 </pre></small>
    </blockquote>
-   <h3 class="heading settled" data-level="4.2" id="wording-memory.syn"><span class="secno">4.2. </span><span class="content">[memory.syn]</span><a class="self-link" href="#wording-memory.syn"></a></h3>
+   <h3 class="heading settled" data-level="5.2" id="wording-memory.syn"><span class="secno">5.2. </span><span class="content">[memory.syn]</span><a class="self-link" href="#wording-memory.syn"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2497,7 +2558,7 @@ inserting these macros into the list in the proper alphabetical positions:</p>
   <c- k>constexpr</c-> <c- b>bool</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>&amp;</c-><c- p>,</c-> <c- k>const</c-> <c- n>allocator</c-><c- o>&lt;</c-><c- n>U</c-><c- o>>&amp;</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-> <ins><c- c1>// freestanding</c-></ins>
 </pre></small>
    </blockquote>
-   <h3 class="heading settled" data-level="4.3" id="wording-default.allocator"><span class="secno">4.3. </span><span class="content">[default.allocator]</span><a class="self-link" href="#wording-default.allocator"></a></h3>
+   <h3 class="heading settled" data-level="5.3" id="wording-default.allocator"><span class="secno">5.3. </span><span class="content">[default.allocator]</span><a class="self-link" href="#wording-default.allocator"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/default.allocator">[default.allocator]/1</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2523,7 +2584,7 @@ inserting these macros into the list in the proper alphabetical positions:</p>
 <c- p>}</c->
 </pre></small>
    </blockquote>
-   <h3 class="heading settled" data-level="4.4" id="wording-allocator.requirements.general"><span class="secno">4.4. </span><span class="content">[allocator.requirements.general]</span><a class="self-link" href="#wording-allocator.requirements.general"></a></h3>
+   <h3 class="heading settled" data-level="5.4" id="wording-allocator.requirements.general"><span class="secno">5.4. </span><span class="content">[allocator.requirements.general]</span><a class="self-link" href="#wording-allocator.requirements.general"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/allocator.requirements.general">[allocator.requirements.general]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2549,7 +2610,7 @@ to the invocation of <code class="highlight"><c- n>allocate</c-></code> which re
 [<i>Note:</i> This default is never used by <code class="highlight"><c- n>allocator_traits</c-></code>, but it ensures that <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> always meets the allocator requirements
 even though <code class="highlight"><c- n>deallocate</c-></code> is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins> </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="4.5" id="wording-allocator.traits.members"><span class="secno">4.5. </span><span class="content">[allocator.traits.members]</span><a class="self-link" href="#wording-allocator.traits.members"></a></h3>
+   <h3 class="heading settled" data-level="5.5" id="wording-allocator.traits.members"><span class="secno">5.5. </span><span class="content">[allocator.traits.members]</span><a class="self-link" href="#wording-allocator.traits.members"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/allocator.traits#members">[allocator.traits.members]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2560,7 +2621,7 @@ even though <code class="highlight"><c- n>deallocate</c-></code> is a freestandi
 </pre> <p class="p">3․ <em>Returns:</em> <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code> if that expression is well-formed; otherwise, <code class="highlight"><c- p>{</c-><c- n>a</c-><c- p>.</c-><c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>),</c-> <c- n>n</c-><c- p>}</c-></code>. </p><p></p><pre class="highlight"><c- k>static</c-> <c- k>constexpr</c-> <c- b>void</c-> <c- nf>deallocate</c-><c- p>(</c-><c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>pointer</c-> <c- n>p</c-><c- p>,</c-> <c- n>size_type</c-> <c- n>n</c-><c- p>);</c->
 </pre> <p class="p"><ins>x․ <em>Mandates:</em> <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>deallocate</c-><c- p>(</c-><c- n>p</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c-></code> is well-formed.</ins> </p><p class="p">4․ <em>Effects:</em> Calls <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>deallocate</c-><c- p>(</c-><c- n>p</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c-></code>. </p><p class="p">5․ <em>Throws:</em> Nothing. </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="4.6" id="wording-container.alloc.reqmts"><span class="secno">4.6. </span><span class="content">[container.alloc.reqmts]</span><a class="self-link" href="#wording-container.alloc.reqmts"></a></h3>
+   <h3 class="heading settled" data-level="5.6" id="wording-container.alloc.reqmts"><span class="secno">5.6. </span><span class="content">[container.alloc.reqmts]</span><a class="self-link" href="#wording-container.alloc.reqmts"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/container.requirements#container.alloc.reqmts">[container.alloc.reqmts]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2568,7 +2629,7 @@ even though <code class="highlight"><c- n>deallocate</c-></code> is a freestandi
     <small> <p>1․ Except for <code class="highlight"><c- n>array</c-></code> <del>and <code class="highlight"><c- n>inplace_vector</c-></code></del>, all of the containers defined in [containers], [stacktrace.basic],
 [basic.string], and [re.results] meet the additional requirements of an <i>allocator-aware container</i>, as described below. </p><p>[...] </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="4.7" id="wording-inplace.vector.syn"><span class="secno">4.7. </span><span class="content">[inplace.vector.syn]</span><a class="self-link" href="#wording-inplace.vector.syn"></a></h3>
+   <h3 class="heading settled" data-level="5.7" id="wording-inplace.vector.syn"><span class="secno">5.7. </span><span class="content">[inplace.vector.syn]</span><a class="self-link" href="#wording-inplace.vector.syn"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/inplace.vector.syn">[inplace.vector.syn]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2596,7 +2657,7 @@ even though <code class="highlight"><c- n>deallocate</c-></code> is a freestandi
 <c- p>}</c->
 </pre> </small>
    </blockquote>
-   <h3 class="heading settled" data-level="4.8" id="wording-inplace.vector"><span class="secno">4.8. </span><span class="content">[inplace.vector]</span><a class="self-link" href="#wording-inplace.vector"></a></h3>
+   <h3 class="heading settled" data-level="5.8" id="wording-inplace.vector"><span class="secno">5.8. </span><span class="content">[inplace.vector]</span><a class="self-link" href="#wording-inplace.vector"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/inplace.vector">[inplace.vector]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2979,6 +3040,8 @@ Otherwise, the allocators shall not be swapped.</ins> </p><p><b>24.3.14.6 Erasur
   <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
   <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
+   <dt id="biblio-mital">[Mital]
+   <dd>Mital Ashok. <a href="https://github.com/llvm/llvm-project/pull/105981"><cite>[libc++] Implement std::inplace_vector&lt;T, N></cite></a>. August 2024. URL: <a href="https://github.com/llvm/llvm-project/pull/105981">https://github.com/llvm/llvm-project/pull/105981</a>
    <dt id="biblio-p0843">[P0843]
    <dd>Gonzalo Brito Gadeschi; et al. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0843r14.html"><cite>inplace_vector</cite></a>. June 2024. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0843r14.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0843r14.html</a>
    <dt id="biblio-p1642">[P1642]

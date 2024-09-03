@@ -2,7 +2,7 @@
 Title: Allocator-aware <code>inplace_vector</code>
 Shortname: Dxxxx
 Revision: 0
-!Draft Revision: 7
+!Draft Revision: 9
 Audience: LEWG
 Status: D
 Group: WG21
@@ -11,7 +11,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   We make `inplace_vector` an allocator-aware container, and make `allocator` partially freestanding.
-Date: 2024-08-30
+Date: 2024-09-05
 </pre>
 
 <style>
@@ -35,7 +35,8 @@ p.p     {margin: 0em 2em 0.5em 2em;}
 We propose that `inplace_vector` should support an allocator parameter, thus allowing it
 to use that allocator's `construct` and `destroy` members, even though it never needs to `allocate`.
 
-(1) This permits `inplace_vector` to interoperate with allocator-extended client code. For example:
+(1) This permits `inplace_vector` to interoperate with allocator-extended client code, thus
+making it a better drop-in replacement for `vector`. For example:
 
 <table>
 <tr>
@@ -54,13 +55,15 @@ Ctr f(Args... args) {
 <td>
 <pre>
 auto v1 = f&lt;std::vector&lt;int>>();
-<del>auto v2 = f&lt;std::inplace_vector&lt;int, 10>>();</del>
+&nbsp;
+auto v3 = f&lt;std::pmr::vector&lt;int>>(&amp;mr);
 </pre>
 </td>
 <td>
 <pre>
 auto v1 = f&lt;std::vector&lt;int>>();
-<ins>auto v2 = f&lt;std::inplace_vector&lt;int, 10>>();</ins>
+<ins>auto v2 = f&lt;std::inplace_vector&lt;int, 3>>();</ins>
+auto v3 = f&lt;std::pmr::vector&lt;int>>(&amp;mr);
 </pre>
 </td>
 </tr>
@@ -85,7 +88,7 @@ std::pmr::monotonic_buffer_resource mr(buf, 10'000);
 <tr>
 <td>
 <pre>
-std::inplace_vector&lt;std::pmr::string, 10> pv;
+std::inplace_vector&lt;std::pmr::string, 5> pv;
 const char *contents[] = {
   "A string so long that it requires heap allocation",
   "A short string",
@@ -98,7 +101,7 @@ pv.emplace_back("A string so long that it requires heap allocation", <del>&amp;m
 </td>
 <td>
 <pre>
-std::pmr::inplace_vector&lt;std::pmr::string, 10> pv(&amp;mr);
+std::pmr::inplace_vector&lt;std::pmr::string, 5> pv(&amp;mr);
 const char *contents[] = {
   "A string so long that it requires heap allocation",
   "A short string",
@@ -115,19 +118,71 @@ with the same benefits as the PMR example above: less code to write, and
 fewer chances to write bugs by accident.
 See <a href="https://quuxplusone.github.io/blog/2024/08/23/boost-interprocess-tutorial/">"Boost.Interprocess, and `sg14::inplace_vector`"</a> (2024-08-23).
 
+<table>
+<tr>
+<td colspan="2">
+<pre>
+namespace bip = boost::interprocess;
+namespace shm {
+  template&lt;class T> using allocator = std::scoped_allocator_adaptor&lt;bip::allocator&lt;T, bip::managed_shared_memory::segment_manager>>;
+  template&lt;class T> using vector = std::vector&lt;T, shm::allocator&lt;T>>;
+  using string = boost::container::basic_string&lt;char, std::char_traits&lt;char>, shm::allocator&lt;char>>;
+}
+auto segment = bip::managed_shared_memory(bip::create_only, SHM_SEGMENT_NAME, 10'000);
+auto alloc = shm::allocator&lt;int>(segment.get_segment_manager());
+</pre>
+</td></tr>
+<tr><td>
+<pre>
+namespace shm {
+  template&lt;class T>
+  using vector = std::vector&lt;T, shm::allocator&lt;T>>;
+}
+using VecOfStrings = shm::vector&lt;shm::string>;
+auto *p = segment.construct&lt;VecOfStrings>("S")(argv+2, argv+argc, alloc);
+</pre>
+</td><td>
+<pre>
+namespace shm {
+  template&lt;class T, size_t N>
+  using inplace_vector = std::inplace_vector&lt;T, N, shm::allocator&lt;T>>;
+}
+using IPVOfStrings = shm::inplace_vector&lt;shm::string, 5>;
+auto *p = segment.construct&lt;IPVOfStrings>("S")(argv+2, argv+argc, alloc);
+</pre>
+</td></tr>
+<tr><td>
+<pre>
+using IPVOfStrings = <del>std</del>::inplace_vector&lt;shm::string, 5>;
+<del>auto *p = segment.construct&lt;IPVOfStrings>("S")();</del>
+<del>for (int i = 2; i &lt; argc; ++i) {</del>
+  <del>p->emplace_back(argv[i], alloc);</del>
+<del>}</del>
+</pre>
+</td><td>
+<pre>
+using IPVOfStrings = <ins>shm</ins>::inplace_vector&lt;shm::string, 5>;
+<ins>auto *p = segment.construct&lt;IPVOfStrings>("S")(argv+2, argv+argc, alloc);</ins>
+&nbsp;
+&nbsp;
+&nbsp;
+</pre>
+</td></tr>
+</table>
+
 (4) This gives the programmer control over the `size_type` and `difference_type` members
 of `inplace_vector`, permitting a predictably smaller (or larger) memory footprint.
 Now, STL vendors *could* implement memory-footprint optimizations to store the `size` member
 in fewer bits when `N` was small; but we have seen from our experience with `variant`
 that vendors do not do such optimizations in practice, and then get locked out of them
 forever by ABI. Giving control to the programmer is more general *and* reduces the
-STL vendor's own workload. (<a href="https://godbolt.org/z/onofT6oMa">Godbolt.</a>)
+STL vendor's own workload. (<a href="https://godbolt.org/z/78rf9dvnz">Godbolt.</a>)
 
 <table>
 <tr>
 <td>
 <pre>
-<br><br><br><br><br><br><br><br>
+<br><br><br><br><br><br><br><br><br><br>
 static_assert(sizeof(std::inplace_vector&lt;char, 3>) == 16);
 </pre>
 </td>
@@ -150,6 +205,16 @@ static_assert(sizeof(std::inplace_vector&lt;char, 3>) == 16);
 </td>
 </tr>
 </table>
+
+Note: Mital Ashok's draft implementation of `inplace_vector` for libc++ ([[Mital]]) does store the `size` in a reduced footprint,
+based on the absolute value of `N`. That is, we have "reduced the STL vendor's workload" in an area where libc++
+has already done that work! libc++ also uses a reduced footprint for `variant`'s index in its "unstable ABI" mode.
+This proposal doesn't forbid an implementation like Mital's; libc++ is free to continue using a reduced footprint even after this proposal.
+But certainly argument (4) in favor is weak: the space-saving is superfluous (in libc++'s case) and non-portable
+(since different STL vendors may continue to choose different types for the `size` data member regardless of
+`Allocator::size_type`). From the user-programmer's point of view, it matters only that there is *some* way to
+store the `size` member in fewer than eight bytes: either every STL vendor commits to store `size` in the minimum possible number of bytes,
+or this proposal is adopted and every STL vendor commits to store `size` in a type no larger than `Allocator::size_type`.
 
 ## Notes on freestanding ## {#freestanding}
 
@@ -402,6 +467,10 @@ We expect that at least some STL vendors will make these operations `noexcept` w
 but again that idea would complicate the spec, for no obvious benefit to users. So we don't mandate that special case,
 leaving it up to the vendor to strengthen the noexcept guarantee if they choose to.
 
+# Acknowledgments # {#acknowledgments}
+
+Thanks to Ben Craig for his design of the feature-test macros and for discussion of the approach
+to "freestanding `allocator`." Thanks to Gonzalo Brito and Mital Ashok for their review of the design and wording.
 
 # Proposed wording # {#wording}
 
@@ -981,7 +1050,7 @@ The exception specification is modeled on <a href="https://eel.is/c++draft/optio
 <p><pre>
 <ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
 </pre>
-<p class="p"><ins>x․ *Effects:* Exchanges the contents of `a` and `b`.</ins>
+<p class="p"><ins>x․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
 <p class="p"><ins>x․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
 <div style="margin: 0.5em 2em;"><pre>
 <ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
@@ -989,7 +1058,7 @@ The exception specification is modeled on <a href="https://eel.is/c++draft/optio
 <p class="p"><ins>x․
 If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `true`, then
 `allocator_type` shall meet the <i>`Cpp17Swappable`</i> requirements,
-and the behavior is undefined unless `a.get_allocator() == b.get_allocator()`.
+and the behavior is undefined unless `get_allocator() == x.get_allocator()`.
 Otherwise, the allocators shall not be swapped.</ins>
 
 <p><b>24.3.14.6 Erasure [inplace.vector.erasure]</b>
@@ -1022,6 +1091,14 @@ template&lt;class T, size_t N, <ins>class Allocator,</ins> class Predicate>
 
 <pre class=biblio>
 {
+  "Mital": {
+    "title": "[libc++] Implement std::inplace_vector<T, N>",
+    "authors": [
+      "Mital Ashok"
+    ],
+    "href": "https://github.com/llvm/llvm-project/pull/105981",
+    "date": "August 2024"
+  },
   "P0843": {
     "title": "inplace_vector",
     "authors": [
