@@ -2094,7 +2094,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">DxxxxR0<br>Allocator-aware <code class="highlight"><c- n>inplace_vector</c-></code></h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-09-03">2024-09-03</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-09-05">2024-09-05</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2104,7 +2104,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>8
+     <dd>10
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2127,7 +2127,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     <li>
      <a href="#experience"><span class="secno">3</span> <span class="content">Implementation experience</span></a>
      <ol class="toc">
-      <li><a href="#pocma"><span class="secno">3.1</span> <span class="content">Notes on allocator propagation</span></a>
+      <li>
+       <a href="#pocma"><span class="secno">3.1</span> <span class="content">Notes on allocator propagation</span></a>
+       <ol class="toc">
+        <li><a href="#pocs-ub"><span class="secno">3.1.1</span> <span class="content">Notes on undefined behavior</span></a>
+       </ol>
       <li><a href="#noexceptness"><span class="secno">3.2</span> <span class="content">Notes on noexceptness</span></a>
      </ol>
     <li><a href="#acknowledgments"><span class="secno">4</span> <span class="content">Acknowledgments</span></a>
@@ -2473,6 +2477,49 @@ with unequal propagating allocators <em>if</em> either vector is empty — becau
 there’s no insurmountable physical difficulty with <code class="highlight"><c- n>CountingAlloc</c-></code>.
 However, that idea would complicate the spec, make more work for vendors, and make the UB condition
 less legible to users. So we don’t do that.</p>
+   <h4 class="heading settled" data-level="3.1.1" id="pocs-ub"><span class="secno">3.1.1. </span><span class="content">Notes on undefined behavior</span><a class="self-link" href="#pocs-ub"></a></h4>
+   <p>For <code class="highlight"><c- n>swap</c-></code> in particular, Arthur and Pablo disagree on the appropriate precondition. Arthur’s proposed wording is as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c-></ins>
+</pre> <p class="p"><ins>x․ <em>Effects:</em> Exchanges the contents of <code class="highlight"><c- o>*</c-><c- k>this</c-></code> and <code class="highlight"><c- n>x</c-></code>.</ins> </p><p class="p"><ins>x․ <em>Remarks:</em> When <code class="highlight"><c- n>allocator_type</c-></code> is <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></code>, the exception specification is equivalent to:</ins> </p><div style="margin: 0.5em 2em;"><pre class="highlight"><ins><c- n>is_nothrow_swappable_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></ins>
+</pre></div> <p class="p"><ins>x․
+If <code class="highlight"><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>propagate_on_container_swap</c-><c- o>::</c-><c- n>value</c-></code> is <code class="highlight">true</code>, then <code class="highlight"><c- n>allocator_type</c-></code> shall meet the <i><code class="highlight"><c- n>Cpp17Swappable</c-></code></i> requirements,
+and the behavior is undefined unless <code class="highlight"><c- n>get_allocator</c-><c- p>()</c-> <c- o>==</c-> <c- n>x</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-></code>.
+Otherwise, the allocators shall not be swapped.</ins> </p></small>
+   </blockquote>
+   <p>Pablo’s proposed wording is as follows:</p>
+   <p><small></small></p>
+   <blockquote>
+    <p></p>
+    <small> <p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c-></ins>
+</pre> <p class="p"><ins>x․ <em>Preconditions:</em> Let <code class="highlight"><c- n>a1</c-></code> and <code class="highlight"><c- n>a2</c-></code> be <code class="highlight"><c- n>get_allocator</c-><c- p>()</c-></code> and <code class="highlight"><c- n>x</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-></code>, respectively; <code class="highlight"><c- n>p1</c-></code> and <code class="highlight"><c- n>p2</c-></code> be pointers of type <code class="highlight"><c- n>T</c-><c- o>*</c-></code> to blocks of uninitialized storage;
+and <code class="highlight"><c- n>args1</c-></code> and <code class="highlight"><c- n>args2</c-></code> be valid constructor arguments for <code class="highlight"><c- n>T</c-></code>. The following shall be well-formed and well-defined:</ins> </p><div style="margin: 0.5em 2em;"><pre class="highlight"><ins><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>construct</c-><c- p>(</c-><c- n>a1</c-><c- p>,</c-> <c- n>p1</c-><c- p>,</c-> <c- n>args1</c-><c- p>);</c-></ins>
+<ins><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>construct</c-><c- p>(</c-><c- n>a2</c-><c- p>,</c-> <c- n>p2</c-><c- p>,</c-> <c- n>args2</c-><c- p>);</c-></ins>
+<ins><c- k>using</c-> <c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>;</c-></ins>
+<ins><c- n>swap</c-><c- p>(</c-><c- o>*</c-><c- n>p1</c-><c- p>,</c-> <c- o>*</c-><c- n>p2</c-><c- p>);</c-></ins>
+<ins><c- k>if</c-> <c- k>constexpr</c-> <c- p>(</c-><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>propagate_on_container_swap</c-><c- o>::</c-><c- n>value</c-><c- p>)</c-></ins>
+  <ins><c- n>swap</c-><c- p>(</c-><c- n>a1</c-><c- p>,</c-> <c- n>a2</c-><c- p>);</c-></ins>
+<ins><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>destroy</c-><c- p>(</c-><c- n>a1</c-><c- p>,</c-> <c- n>p1</c-><c- p>);</c-></ins>
+<ins><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>destroy</c-><c- p>(</c-><c- n>a2</c-><c- p>,</c-> <c- n>p2</c-><c- p>);</c-></ins>
+</pre></div> <p class="p"><ins>[<i>Note:</i> In other words, when <code class="highlight"><c- n>propagate_on_container_swap</c-><c- o>::</c-><c- n>value</c-></code> is <code class="highlight">false</code>, it must be valid to swap the individual elements even when the allocators do not compare equal.
+Conversely, when <code class="highlight"><c- n>propagate_on_container_swap</c-><c- o>::</c-><c- n>value</c-></code> is <code class="highlight">true</code>, it must be valid to destroy the swapped elements using the swapped allocators, even though the call to <code class="highlight"><c- n>destroy</c-></code> uses a different allocator than the corresponding call to <code class="highlight"><c- n>construct</c-></code>. <i>—end note</i>]</ins> </p><p class="p"><ins>x․ <em>Effects:</em> Exchanges the contents of <code class="highlight"><c- o>*</c-><c- k>this</c-></code> and <code class="highlight"><c- n>x</c-></code>.</ins> </p><p class="p"><ins>x․ <em>Remarks:</em> When <code class="highlight"><c- n>allocator_type</c-></code> is <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></code>, the exception specification is equivalent to:</ins> </p><div style="margin: 0.5em 2em;"><pre class="highlight"><ins><c- n>is_nothrow_swappable_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></ins>
+</pre></div> </small>
+   </blockquote>
+   <p>We encourage discussion as to which direction LEWG prefers.</p>
+   <p>Arthur’s precondition is modeled on <a href="https://eel.is/c++draft/container.requirements#container.reqmts-65">[container.reqmts]/65</a>.
+It has the benefit of being checkable at runtime (via something like SG14’s <code class="highlight"><c- n>SG14_INPLACE_VECTOR_ASSERT_PRECONDITION</c-></code> macro or libc++'s <code class="highlight"><c- n>_LIBCPP_ASSERT_COMPATIBLE_ALLOCATOR</c-></code> macro),
+because it depends solely on the values of computable expressions like <code class="highlight"><c- n>get_allocator</c-><c- p>()</c-> <c- o>==</c-> <c- n>x</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-></code>.</p>
+   <p>Pablo’s precondition is not checkable at runtime, but has the benefit of being looser: it permits the user to swap <code class="highlight"><c- n>inplace_vector</c-></code>s with allocators that are "unequal, yet functionally interchangeable." An implementation would
+not be allowed to assert-fail in <code class="highlight"><c- n>swap</c-></code> just because the allocators were unequal.</p>
+   <p>It is not possible to violate either precondition with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>allocator</c-></code> (which is always equal) nor with <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>polymorphic_allocator</c-></code> (which doesn’t propagate). However, notice that this snippet...</p>
+<pre class="language-cpp highlight"><c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>4</c-><c- o>></c-> <c- n>v1</c-><c- p>({</c-><c- s>"a"</c-><c- p>},</c-> <c- o>&amp;</c-><c- n>mr1</c-><c- p>);</c->
+<c- n>std</c-><c- o>::</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>pmr</c-><c- o>::</c-><c- n>string</c-><c- p>,</c-> <c- mi>4</c-><c- o>></c-> <c- n>v2</c-><c- p>({</c-><c- s>"a"</c-><c- p>},</c-> <c- o>&amp;</c-><c- n>mr2</c-><c- p>);</c->
+<c- n>v1</c-><c- p>.</c-><c- n>swap</c-><c- p>(</c-><c- n>v2</c-><c- p>);</c->
+</pre>
+   <p>...has undefined behavior anyway, because it swaps the <code class="highlight"><c- n>pmr</c-><c- o>::</c-><c- n>string</c-></code> objects <code class="highlight"><c- n>v1</c-><c- p>[</c-><c- mi>0</c-><c- p>]</c-></code> and <code class="highlight"><c- n>v2</c-><c- p>[</c-><c- mi>0</c-><c- p>]</c-></code>. <em>That</em> swap has UB due to the <em>strings'</em> allocators' being unequal, regardless of anything that happens
+at the <code class="highlight"><c- n>inplace_vector</c-></code> level.</p>
    <h3 class="heading settled" data-level="3.2" id="noexceptness"><span class="secno">3.2. </span><span class="content">Notes on noexceptness</span><a class="self-link" href="#noexceptness"></a></h3>
    <p>We expect that in practice, STL vendors will take approximately the same approach to noexceptness
 which <code class="highlight"><c- n>sg14</c-><c- o>::</c-><c- n>inplace_vector</c-></code> has taken. This approach is:</p>
@@ -2884,13 +2931,9 @@ elements in the range <code class="highlight"><c- n>begin</c-><c- p>()</c-></cod
 <c- k>constexpr</c-> <c- n>iterator</c-> <c- nf>erase</c-><c- p>(</c-><c- n>const_iterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>const_iterator</c-> <c- n>last</c-><c- p>);</c->
 <c- k>constexpr</c-> <c- b>void</c-> <c- nf>pop_back</c-><c- p>();</c->
 </pre> <p class="p">27․ <em>Effects:</em> Invalidates iterators and references at or after the point of the erase. </p><p class="p">28․ <em>Throws:</em> Nothing unless an exception is thrown by the assignment operator or move assignment operator of <code class="highlight"><c- n>T</c-></code>. </p><p class="p">29․ <em>Complexity:</em> The destructor of <code class="highlight"><c- n>T</c-></code> is called the number of times equal to the number of the elements erased,
-but the assignment operator of <code class="highlight"><c- n>T</c-></code> is called the number of times equal to the number of elements after the erased elements. </p><p class="note" role="note"><b>DRAFTING NOTE:</b> The <em>Precondition</em> element below is modeled on <a href="https://eel.is/c++draft/container.requirements#container.reqmts-65">[container.reqmts]/65</a>.
-The exception specification is modeled on <a href="https://eel.is/c++draft/optional.swap#5">[optional.swap]/5</a>. </p><p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c-></ins>
-</pre> <p class="p"><ins>x․ <em>Effects:</em> Exchanges the contents of <code class="highlight"><c- n>a</c-></code> and <code class="highlight"><c- n>b</c-></code>.</ins> </p><p class="p"><ins>x․ <em>Remarks:</em> When <code class="highlight"><c- n>allocator_type</c-></code> is <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></code>, the exception specification is equivalent to:</ins> </p><div style="margin: 0.5em 2em;"><pre class="highlight"><ins><c- n>is_nothrow_swappable_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></ins>
-</pre></div> <p class="p"><ins>x․
-If <code class="highlight"><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>propagate_on_container_swap</c-><c- o>::</c-><c- n>value</c-></code> is <code class="highlight">true</code>, then <code class="highlight"><c- n>allocator_type</c-></code> shall meet the <i><code class="highlight"><c- n>Cpp17Swappable</c-></code></i> requirements,
-and the behavior is undefined unless <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-> <c- o>==</c-> <c- n>b</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-></code>.
-Otherwise, the allocators shall not be swapped.</ins> </p><p><b>24.3.14.6 Erasure [inplace.vector.erasure]</b> </p><p></p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>N</c-><c- p>,</c-> <ins><c- k>class</c-> <c- nc>Allocator</c-><c- p>,</c-></ins> <c- k>class</c-> <c- nc>U</c-> <c- o>=</c-> <c- n>T</c-><c- o>></c->
+but the assignment operator of <code class="highlight"><c- n>T</c-></code> is called the number of times equal to the number of elements after the erased elements. </p><p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c-></ins>
+</pre> <p class="p"><ins>x․ <em>Effects:</em> Exchanges the contents of <code class="highlight"><c- o>*</c-><c- k>this</c-></code> and <code class="highlight"><c- n>x</c-></code>.</ins> </p><p class="p"><ins>x․ <em>Remarks:</em> When <code class="highlight"><c- n>allocator_type</c-></code> is <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></code>, the exception specification is equivalent to:</ins> </p><div style="margin: 0.5em 2em;"><pre class="highlight"><ins><c- n>is_nothrow_swappable_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></ins>
+</pre></div> <p class="p"><ins><b>x․ TO BE DETERMINED; see <a href="#pocs-ub">§ 3.1.1 Notes on undefined behavior</a>.</b></ins> </p><p class="note" role="note"><b>DRAFTING NOTE:</b> The exception specification above is modeled on <a href="https://eel.is/c++draft/optional.swap#5">[optional.swap]/5</a>. </p><p><b>24.3.14.6 Erasure [inplace.vector.erasure]</b> </p><p></p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>N</c-><c- p>,</c-> <ins><c- k>class</c-> <c- nc>Allocator</c-><c- p>,</c-></ins> <c- k>class</c-> <c- nc>U</c-> <c- o>=</c-> <c- n>T</c-><c- o>></c->
   <c- k>constexpr</c-> <del><c- b>size_t</c-></del> <ins><c- k>typename</c-> <c- nc>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>>::</c-><c- n>size_type</c-></ins>
     <c- n>erase</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><ins><c- p>,</c-> <c- n>Allocator</c-></ins><c- o>>&amp;</c-> <c- n>c</c-><c- p>,</c-> <c- k>const</c-> <c- n>U</c-><c- o>&amp;</c-> <c- n>value</c-><c- p>);</c->
 </pre> <p class="p">1․ <em>Effects:</em> Equivalent to: </p><div style="margin: 0.5em 2em;"><pre class="highlight">    <c- k>auto</c-> <c- n>it</c-> <c- o>=</c-> <c- n>remove</c-><c- p>(</c-><c- n>c</c-><c- p>.</c-><c- n>begin</c-><c- p>(),</c-> <c- n>c</c-><c- p>.</c-><c- n>end</c-><c- p>(),</c-> <c- n>value</c-><c- p>);</c->

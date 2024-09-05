@@ -2,7 +2,7 @@
 Title: Allocator-aware <code>inplace_vector</code>
 Shortname: Dxxxx
 Revision: 0
-!Draft Revision: 9
+!Draft Revision: 10
 Audience: LEWG
 Status: D
 Group: WG21
@@ -395,6 +395,76 @@ there's no insurmountable physical difficulty with `CountingAlloc`.
 However, that idea would complicate the spec, make more work for vendors, and make the UB condition
 less legible to users. So we don't do that.
 
+### Notes on undefined behavior ### {#pocs-ub}
+
+For `swap` in particular, Arthur and Pablo disagree on the appropriate precondition. Arthur's proposed wording is as follows:
+
+<small><blockquote>
+<p><pre><ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
+</pre>
+<p class="p"><ins>x․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
+<p class="p"><ins>x․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
+<div style="margin: 0.5em 2em;"><pre>
+<ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
+</pre></div>
+<p class="p"><ins>x․
+If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `true`, then
+`allocator_type` shall meet the <i>`Cpp17Swappable`</i> requirements,
+and the behavior is undefined unless `get_allocator() == x.get_allocator()`.
+Otherwise, the allocators shall not be swapped.</ins>
+</blockquote></small>
+
+Pablo's proposed wording is as follows:
+
+<small><blockquote>
+<p><pre><ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
+</pre>
+<p class="p"><ins>x․ *Preconditions:* Let `a1` and `a2` be `get_allocator()` and `x.get_allocator()`, respectively; `p1` and `p2` be pointers of type `T*` to blocks of uninitialized storage;
+and `args1` and `args2` be valid constructor arguments for `T`. The following shall be well-formed and well-defined:</ins>
+<div style="margin: 0.5em 2em;"><pre>
+<ins>allocator_traits&lt;allocator_type>::construct(a1, p1, args1);</ins>
+<ins>allocator_traits&lt;allocator_type>::construct(a2, p2, args2);</ins>
+<ins>using std::swap;</ins>
+<ins>swap(*p1, *p2);</ins>
+<ins>if constexpr (allocator_traits&lt;allocator_type>::propagate_on_container_swap::value)</ins>
+  <ins>swap(a1, a2);</ins>
+<ins>allocator_traits&lt;allocator_type>::destroy(a1, p1);</ins>
+<ins>allocator_traits&lt;allocator_type>::destroy(a2, p2);</ins>
+</pre></div>
+<p class="p"><ins>[<i>Note:</i> In other words, when `propagate_on_container_swap::value` is `false`, it must be valid to swap the individual elements even when the allocators do not compare equal.
+Conversely, when `propagate_on_container_swap::value` is `true`, it must be valid to destroy the swapped elements using the swapped allocators, even though the call to `destroy`
+uses a different allocator than the corresponding call to `construct`. <i>—end note</i>]</ins>
+<p class="p"><ins>x․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
+<p class="p"><ins>x․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
+<div style="margin: 0.5em 2em;"><pre>
+<ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
+</pre></div>
+</blockquote></small>
+
+We encourage discussion as to which direction LEWG prefers.
+
+Arthur's precondition is modeled on <a href="https://eel.is/c++draft/container.requirements#container.reqmts-65">[container.reqmts]/65</a>.
+It has the benefit of being checkable at runtime (via something like SG14's
+`SG14_INPLACE_VECTOR_ASSERT_PRECONDITION` macro or libc++'s `_LIBCPP_ASSERT_COMPATIBLE_ALLOCATOR` macro),
+because it depends solely on the values of computable expressions like `get_allocator() == x.get_allocator()`.
+
+Pablo's precondition is not checkable at runtime, but has the benefit of being looser: it permits the user to swap
+`inplace_vector`s with allocators that are "unequal, yet functionally interchangeable." An implementation would
+not be allowed to assert-fail in `swap` just because the allocators were unequal.
+
+It is not possible to violate either precondition with `std::allocator` (which is always equal) nor with
+`std::pmr::polymorphic_allocator` (which doesn't propagate). However, notice that this snippet...
+
+```cpp
+    std::inplace_vector<std::pmr::string, 4> v1({"a"}, &mr1);
+    std::inplace_vector<std::pmr::string, 4> v2({"a"}, &mr2);
+    v1.swap(v2);
+```
+
+...has undefined behavior anyway, because it swaps the `pmr::string` objects `v1[0]` and `v2[0]`.
+*That* swap has UB due to the *strings'* allocators' being unequal, regardless of anything that happens
+at the `inplace_vector` level.
+
 
 ## Notes on noexceptness ## {#noexceptness}
 
@@ -466,6 +536,7 @@ operations to throw (on pain of UB).
 We expect that at least some STL vendors will make these operations `noexcept` when `N == 0`, as a special case;
 but again that idea would complicate the spec, for no obvious benefit to users. So we don't mandate that special case,
 leaving it up to the vendor to strengthen the noexcept guarantee if they choose to.
+
 
 # Acknowledgments # {#acknowledgments}
 
@@ -1043,10 +1114,6 @@ constexpr void pop_back();
 <p class="p">29․ *Complexity:* The destructor of `T` is called the number of times equal to the number of the elements erased,
 but the assignment operator of `T` is called the number of times equal to the number of elements after the erased elements.
 
-<p class="note"><b>DRAFTING NOTE:</b>
-The *Precondition* element below is modeled on <a href="https://eel.is/c++draft/container.requirements#container.reqmts-65">[container.reqmts]/65</a>.
-The exception specification is modeled on <a href="https://eel.is/c++draft/optional.swap#5">[optional.swap]/5</a>.
-
 <p><pre>
 <ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
 </pre>
@@ -1055,11 +1122,10 @@ The exception specification is modeled on <a href="https://eel.is/c++draft/optio
 <div style="margin: 0.5em 2em;"><pre>
 <ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
 </pre></div>
-<p class="p"><ins>x․
-If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `true`, then
-`allocator_type` shall meet the <i>`Cpp17Swappable`</i> requirements,
-and the behavior is undefined unless `get_allocator() == x.get_allocator()`.
-Otherwise, the allocators shall not be swapped.</ins>
+<p class="p"><ins><b>x․ TO BE DETERMINED; see [[#pocs-ub]].</b></ins>
+
+<p class="note"><b>DRAFTING NOTE:</b>
+The exception specification above is modeled on <a href="https://eel.is/c++draft/optional.swap#5">[optional.swap]/5</a>.
 
 <p><b>24.3.14.6 Erasure [inplace.vector.erasure]</b>
 <p><pre>
