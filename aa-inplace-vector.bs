@@ -2,7 +2,7 @@
 Title: Allocator-aware <code>inplace_vector</code>
 Shortname: Dxxxx
 Revision: 0
-!Draft Revision: 10
+!Draft Revision: 11
 Audience: LEWG
 Status: D
 Group: WG21
@@ -11,7 +11,7 @@ Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   We make `inplace_vector` an allocator-aware container, and make `allocator` partially freestanding.
-Date: 2024-09-05
+Date: 2024-09-07
 </pre>
 
 <style>
@@ -397,21 +397,25 @@ less legible to users. So we don't do that.
 
 ### Notes on undefined behavior ### {#pocs-ub}
 
-For `swap` in particular, Arthur and Pablo disagree on the appropriate precondition. Arthur's proposed wording is as follows:
+For `swap` in particular, Arthur and Pablo disagree on the appropriate precondition w.r.t. allocator equality.
+Arthur's proposed wording is as follows.
+The first part of the <i>Precondition</i> element is modeled on <a href="https://eel.is/c++draft/alg.swap#2">[alg.swap]/2</a>
+(as used by <a href="https://eel.is/c++draft/array#members-4">`array::swap`</a>), and the second part (the part
+dealing with allocators) is modeled
+on <a href="https://eel.is/c++draft/container.requirements#container.reqmts-65">[container.reqmts]/65</a>.
 
 <small><blockquote>
 <p><pre><ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
 </pre>
+<p class="p"><ins>x․ *Preconditions:* Let *M* be `min(size(), x.size())`.
+For each non-negative integer *n* &lt; *M*, `(*this)[n]` is swappable with ([swappable.requirements]) `x[n]`.
+If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `true`, then
+`allocator_type` meets the <i>`Cpp17Swappable`</i> requirements and `get_allocator() == x.get_allocator()`.</ins>
 <p class="p"><ins>x․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
 <p class="p"><ins>x․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
 <div style="margin: 0.5em 2em;"><pre>
 <ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
 </pre></div>
-<p class="p"><ins>x․
-If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `true`, then
-`allocator_type` shall meet the <i>`Cpp17Swappable`</i> requirements,
-and the behavior is undefined unless `get_allocator() == x.get_allocator()`.
-Otherwise, the allocators shall not be swapped.</ins>
 </blockquote></small>
 
 Pablo's proposed wording is as follows:
@@ -443,10 +447,10 @@ uses a different allocator than the corresponding call to `construct`. <i>—end
 
 We encourage discussion as to which direction LEWG prefers.
 
-Arthur's precondition is modeled on <a href="https://eel.is/c++draft/container.requirements#container.reqmts-65">[container.reqmts]/65</a>.
-It has the benefit of being checkable at runtime (via something like SG14's
-`SG14_INPLACE_VECTOR_ASSERT_PRECONDITION` macro or libc++'s `_LIBCPP_ASSERT_COMPATIBLE_ALLOCATOR` macro),
-because it depends solely on the values of computable expressions like `get_allocator() == x.get_allocator()`.
+Arthur's precondition has the benefit of being checkable at runtime,
+because it involves the values of computable expressions like `get_allocator() == x.get_allocator()`.
+An implementation would be allowed to assert-fail if the precondition was violated, using something like
+SG14's `SG14_INPLACE_VECTOR_ASSERT_PRECONDITION` macro or libc++'s `_LIBCPP_ASSERT_COMPATIBLE_ALLOCATOR` macro.
 
 Pablo's precondition is not checkable at runtime, but has the benefit of being looser: it permits the user to swap
 `inplace_vector`s with allocators that are "unequal, yet functionally interchangeable." An implementation would
@@ -461,9 +465,10 @@ It is not possible to violate either precondition with `std::allocator` (which i
     v1.swap(v2);
 ```
 
-...has undefined behavior anyway, because it swaps the `pmr::string` objects `v1[0]` and `v2[0]`.
-*That* swap has UB due to the *strings'* allocators' being unequal, regardless of anything that happens
-at the `inplace_vector` level.
+...has undefined behavior anyway, because it swaps the differently-allocated `pmr::string` objects `v1[0]` and `v2[0]`.
+*That* swap has UB due to the elements' not being swappable
+(<a href="https://eel.is/c++draft/swappable.requirements#2">[swappable.requirements]/2</a>),
+regardless of anything that happens at the `inplace_vector` level.
 
 
 ## Notes on noexceptness ## {#noexceptness}
