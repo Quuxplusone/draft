@@ -1,17 +1,18 @@
 <pre class='metadata'>
 Title: Allocator-aware <code>inplace_vector</code>
 Shortname: Dxxxx
-Revision: 0
-!Draft Revision: 11
+Revision: 2
+!Draft Revision: 12
 Audience: LEWG
 Status: D
 Group: WG21
 URL:
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Editor: Pablo Halpern, phalpern@halpernwightsoftware.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   We make `inplace_vector` an allocator-aware container, and make `allocator` partially freestanding.
-Date: 2024-09-07
+Date: 2024-09-12
 </pre>
 
 <style>
@@ -24,9 +25,15 @@ p.p     {margin: 0em 2em 0.5em 2em;}
 
 # Changelog # {#changelog}
 
-- R0:
+- R2:
 
-    - Initial revision.
+    - Wording drafted by Arthur O'Dwyer.
+    - Added discussion of freestanding, `noexcept`, and preconditions.
+
+- R1:
+
+    - Proposal Summary section added.
+    - Compile-Time Data section significantly expanded and renamed.
 
 
 # Motivation and proposal # {#proposal}
@@ -395,7 +402,7 @@ there's no insurmountable physical difficulty with `CountingAlloc`.
 However, that idea would complicate the spec, make more work for vendors, and make the UB condition
 less legible to users. So we don't do that.
 
-### Notes on undefined behavior ### {#pocs-ub}
+### Notes on preconditions ### {#pocs-ub}
 
 For `swap` in particular, Arthur and Pablo disagree on the appropriate precondition w.r.t. allocator equality.
 Arthur's proposed wording is as follows.
@@ -469,6 +476,9 @@ It is not possible to violate either precondition with `std::allocator` (which i
 *That* swap has UB due to the elements' not being swappable
 (<a href="https://eel.is/c++draft/swappable.requirements#2">[swappable.requirements]/2</a>),
 regardless of anything that happens at the `inplace_vector` level.
+
+[[LWG4151]] is related: `inplace_vector::swap` is already missing a precondition today.
+Both of the above-proposed preconditions are supersets of LWG4151's proposed resolution.
 
 
 ## Notes on noexceptness ## {#noexceptness}
@@ -1162,6 +1172,14 @@ template&lt;class T, size_t N, <ins>class Allocator,</ins> class Predicate>
 
 <pre class=biblio>
 {
+  "LWG4151": {
+    "title": "Precondition of inplace_vector::swap",
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue4151",
+    "date": "September 2024"
+  },
   "Mital": {
     "title": "[libc++] Implement std::inplace_vector<T, N>",
     "authors": [
