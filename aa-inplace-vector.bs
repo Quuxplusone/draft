@@ -1,18 +1,20 @@
 <pre class='metadata'>
-Title: Allocator-aware <code>inplace_vector</code>
-Shortname: Dxxxx
-Revision: 2
+Title: Candidate wording for P3160R1 allocator-aware <code>inplace_vector</code>
+Shortname: D3418
+Revision: 0
 !Draft Revision: 13
 Audience: LEWG
 Status: D
 Group: WG21
 URL:
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
-Editor: Pablo Halpern, phalpern@halpernwightsoftware.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  We make `inplace_vector` an allocator-aware container, and make `allocator` partially freestanding.
-Date: 2024-09-15
+  P3160R1 proposes to make `inplace_vector` an allocator-aware container.
+  This paper (P3418) provides wording, in case P3160R2 fails to materialize
+  before the mailing deadline. One effect of this wording is to make
+  `allocator` partially freestanding.
+Date: 2024-10-08
 </pre>
 
 <style>
@@ -25,21 +27,16 @@ p.p     {margin: 0em 2em 0.5em 2em;}
 
 # Changelog # {#changelog}
 
-- R2:
+- R0:
 
     - Wording drafted by Arthur O'Dwyer.
     - Added discussion of freestanding, `noexcept`, and preconditions.
-
-- R1:
-
-    - Proposal Summary section added.
-    - Compile-Time Data section significantly expanded and renamed.
 
 
 # Motivation and proposal # {#proposal}
 
 [[P0843]] introduced `inplace_vector<T, N>` to the C++26 working draft.
-We propose that `inplace_vector` should support an allocator parameter, thus allowing it
+[[P3160R1]] proposes that `inplace_vector` should support an allocator parameter, thus allowing it
 to use that allocator's `construct` and `destroy` members, even though it never needs to `allocate`.
 
 (1) This permits `inplace_vector` to interoperate with allocator-extended client code, thus
@@ -80,7 +77,7 @@ auto v3 = f&lt;std::pmr::vector&lt;int>>(&amp;mr);
 allocated directly in-place inside the memory footprint of the `inplace_vector` object, but
 the elements *in turn* are constructed with allocator-extended construction.
 Without allocator-awareness, the code is cumbersome and error-prone. Notice that neither
-snippet below uses the global heap.
+snippet below ever allocates from the global heap.
 
 <table>
 <tr>
@@ -236,7 +233,7 @@ This is fine because `inplace_vector` doesn't use `allocate` or `deallocate`.
 `allocator_traits` is already freestanding in C++23, thanks to Ben Craig's [[P1642]].
 But it is UB to instantiate `allocator_traits<A>` unless `A` meets
 the allocator requirements (<a href="https://eel.is/c++draft/library#allocator.requirements.general-3.sentence-2">[allocator.requirements]/3</a>),
-and the allocator requirements require that `A::allocate` must not be deleted!
+and the allocator requirements require that `A::allocate` must be present!
 
 We could solve this conundrum in any of the following ways:
 
@@ -277,42 +274,18 @@ Ben Craig, in email, suggests this four-macro design.
 <tr><td>`__cpp_lib_freestanding_allocator`&nbsp;(new)</td><td>At least the freestanding subset of `std::allocator` is available (but e.g. `allocate` might be `=delete`d)</td></tr>
 </table>
 
-`__cpp_lib_inplace_vector` indicates *full* support (even on freestanding, our vendor might
-be generous enough to provide the full API), while `__cpp_lib_freestanding_inplace_vector` indicates the fallback subset which freestanding
-C++26 vendors (but not hosted vendors) might legally provide instead.
-
 Note: The freestanding-deleted members, such as the
 iterator-pair constructor, are freestanding-deleted not because they *allocate* (they don't) but because they *throw.*
-
-`__cpp_lib_allocator` indicates *full* support (i.e., a generous freestanding vendor
-or any hosted vendor up-to-date enough to know about this new macro), while `__cpp_lib_freestanding_allocator` indicates the fallback subset
-which freestanding C++26 vendors might legally provide instead.
 
 The existing feature-test macros related to allocator support on freestanding are C++23's `__cpp_lib_allocate_at_least` (the last major
 change to `allocator`/`allocator_traits`), C++26's `__cpp_lib_freestanding_memory`, and C++26's `__cpp_lib_freestanding_operator_new`
 (effectively indicates whether heap allocation is available).
 
-
-# Implementation experience # {#experience}
-
-Arthur has implemented [[#wording]] in [[QuuxplusoneSG14]]. This includes extensive
-unit tests verifying that:
-
-- The proposed `inplace_vector<T, N, std::allocator<T>>` is an exact drop-in replacement
-    for the original `inplace_vector<T, N>`, with the same
-    sizeof, alignof, triviality, and noexcept.
-
-- The proposed `inplace_vector<T, N, Alloc>` works correctly with `std::pmr`.
-
-- The proposed `inplace_vector<T, N, Alloc>` works correctly with Boost.Interprocess.
-
-- The proposed `inplace_vector<T, N, Alloc>` works correctly with the `Tiny::Alloc<T>` depicted above.
-
 ## Notes on allocator propagation ## {#pocma}
 
-The STL uses allocators for allocation/deallocation and for construction/destruction. So the happy path
-for STL containers is when the allocator sticks alongside the value of the data pointer (which must be deallocated)
-and alongside the lifetimes of the element objects (which must be destroyed).
+The STL uses allocators both for allocation/deallocation and for construction/destruction. So the happy path
+for STL containers is when the allocator sticks alongside both the value of the data pointer (which must be deallocated)
+and the lifetimes of the element objects (which must be destroyed).
 
 Containers that store their elements on the heap want POCCA/POCMA/POCS to be `true`: they'll
 simply swap the allocator alongside the data pointer.
@@ -320,44 +293,14 @@ When POCCA/POCMA/POCS is `false`, those containers are unhappy: their constant-t
 become linear-time and throwing, and their `swap` (which refuses to become throwing) requires that the two
 allocators be equal, on pain of UB.
 
-`inplace_vector` stores its element objects inside itself, alongside the allocator.
-This means that `inplace_vector` wants POCCA/POCMA/POCS to be `false`!
-Its move operations *by default* are linear-time. For example, move-assigning into `v1`
-from `v2` requires move-assigning each element of `v1` and move-constructing new elements beyond those.
+`inplace_vector` wants POCCA/POCMA/POCS to be `false`!
 Each element of `v1` is itself an object that was constructed via `allocator_traits<A>::construct(a1, ...)`
-and must therefore be destroyed by `allocator_traits<A>::destroy(a1, ...)`. Therefore, as long as `v1` has
+and must eventually be destroyed by `allocator_traits<A>::destroy(a1, ...)`. Therefore, as long as `v1` has
 any elements, `v1` must never forget about `a1`. When POCCA/POCMA/POCS is `false`, this is easy and natural.
 When POCCA/POCMA/POCS is `true`, `inplace_vector` is unhappy: its copy-assignment, move-assignment, and `swap`
 require for correctness that the two allocators be equal, on pain of UB.
 
-```cpp
-    template<class T>
-    struct CountingAlloc {
-        using value_type = T;
-        std::set<void*> *objs_;
-        CountingAlloc(std::set<void*> *objs) : objs_(objs) {}
-        bool operator==(const CountingAlloc&) const = default;
-        void construct(auto *p, auto&&... args) const {
-            assert(objs_->find(p) == objs_->end());
-            std::construct_at(p, decltype(args)(args)...);
-            objs_->insert(p);
-        }
-        void destroy(auto *p) const {
-            assert(objs_->find(p) != objs_->end());
-            std::destroy_at(p);
-            objs_->erase(p);
-        }
-        using propagate_on_container_copy_assignment = std::true_type;
-    };
-
-    std::set<void*> mr1, mr2;
-    std::inplace_vector<int, 5, CountingAlloc<int>> v1({1}, &mr1);
-    std::inplace_vector<int, 5, CountingAlloc<int>> v2({2,3}, &mr2);
-    v1 = v2;
-      // The above line has UB because POCCA=true and &mr1 != &mr2
-    v1.clear(); v2.clear();
-    assert(mr1.empty() && mr2.empty());
-```
+For an example involving `CountingAlloc<T>`, see <a href="https://godbolt.org/z/v9xvEPdaG">this Godbolt</a>.
 
 <table>
 <tr><th>Operation</th><th>Heap-storage `vector`</th><th>`inplace_vector`</th></tr>
@@ -396,7 +339,7 @@ require for correctness that the two allocators be equal, on pain of UB.
 We follow the Lakos rule and make each special member function `noexcept(false)` whenever
 it may have UB.
 
-Theoretically, we could special-case the preconditions to make it *not* UB to swap two vectors
+Theoretically, we could special-case the preconditions to make it *not* UB to swap/assign two vectors
 with unequal propagating allocators *if* either vector is empty — because then
 there's no insurmountable physical difficulty with `CountingAlloc`.
 However, that idea would complicate the spec, make more work for vendors, and make the UB condition
@@ -418,16 +361,10 @@ on <a href="https://eel.is/c++draft/container.requirements#container.reqmts-65">
 For each non-negative integer *n* &lt; *M*, `(*this)[n]` is swappable with ([swappable.requirements]) `x[n]`.
 If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `true`, then
 `allocator_type` meets the <i>`Cpp17Swappable`</i> requirements and `get_allocator() == x.get_allocator()`.</ins>
-<p class="p"><ins>x․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
-<p class="p"><ins>x․ *Complexity:* Linear.</ins>
-<p class="p"><ins>x․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
-<div style="margin: 0.5em 2em;"><pre>
-<ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
-</pre></div>
-<ins>Otherwise, the exception specification is equivalent to `false`.</ins>
+<p class="p"><ins>x․ *Effects:*</ins> [...]
 </blockquote></small>
 
-Pablo's proposed wording is as follows:
+An alternative proposed by Pablo is as follows:
 
 <small><blockquote>
 <p><pre><ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
@@ -449,13 +386,7 @@ The following shall be well-formed and well-defined:</ins>
 <p class="p"><ins>[<i>Note:</i> In other words, when `propagate_on_container_swap::value` is `false`, it must be valid to swap the individual elements even when the allocators do not compare equal.
 Conversely, when `propagate_on_container_swap::value` is `true`, it must be valid to destroy the swapped elements using the swapped allocators, even though the call to `destroy`
 uses a different allocator than the corresponding call to `construct`. <i>—end note</i>]</ins>
-<p class="p"><ins>x․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
-<p class="p"><ins>x․ *Complexity:* Linear.</ins>
-<p class="p"><ins>x․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
-<div style="margin: 0.5em 2em;"><pre>
-<ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
-</pre></div>
-<ins>Otherwise, the exception specification is equivalent to `false`.</ins>
+<p class="p"><ins>x․ *Effects:*</ins> [...]
 </blockquote></small>
 
 We encourage discussion as to which direction LEWG prefers.
@@ -466,22 +397,11 @@ An implementation would be allowed to assert-fail if the precondition was violat
 SG14's `SG14_INPLACE_VECTOR_ASSERT_PRECONDITION` macro or libc++'s `_LIBCPP_ASSERT_COMPATIBLE_ALLOCATOR` macro.
 
 Pablo's precondition is not checkable at runtime, but has the benefit of being looser: it permits the user to swap
-`inplace_vector`s with allocators that are "unequal, yet functionally interchangeable." An implementation would
-not be allowed to assert-fail in `swap` just because the allocators were unequal.
+`inplace_vector`s with allocators that are "unequal, yet functionally interchangeable." The `inplace_vector`
+implementation would be forbidden to assert-fail inside `operator=` or `swap`.
 
 It is not possible to violate either precondition with `std::allocator` (which is always equal) nor with
-`std::pmr::polymorphic_allocator` (which doesn't propagate). However, notice that this snippet...
-
-```cpp
-    std::inplace_vector<std::pmr::string, 4> v1({"a"}, &mr1);
-    std::inplace_vector<std::pmr::string, 4> v2({"a"}, &mr2);
-    v1.swap(v2);
-```
-
-...has undefined behavior anyway, because it swaps the differently-allocated `pmr::string` objects `v1[0]` and `v2[0]`.
-*That* swap has UB due to the elements' not being swappable
-(<a href="https://eel.is/c++draft/swappable.requirements#2">[swappable.requirements]/2</a>),
-regardless of anything that happens at the `inplace_vector` level.
+`std::pmr::polymorphic_allocator` (which doesn't propagate).
 
 [[LWG4151]] is related: `inplace_vector::swap` is already missing a precondition today.
 Both of the above-proposed preconditions are supersets of LWG4151's proposed resolution.
@@ -534,33 +454,37 @@ defaulted to simply call `std::destroy_at(p)`. STL vendors might reasonably choo
 helpers for `std::allocator` and `std::pmr::polymorphic_allocator`.
 
 However, for wording purposes, we can't use these helpers because they aren't standardized: we don't have any
-easy way to invoke them in the wording. So our proposed wording assumes that each helper trait is always-`false`,
-with the understanding that STL vendors are always allowed to strengthen noexcept guarantees — and we hope that they will do so!
+easy way to invoke them in the wording. So our proposed wording is written as if each helper trait always yields `false`,
+but in a way that (we intend) permits the STL vendor to strengthen the noexcept guarantee — and we hope that they will do so!
 
-At the same time, we want to provide a *stronger* noexcept guarantee on copy-construction and copy-assignment
-than the current draft standard does. In the current draft standard, these assertions are permitted to fail:
-
-```cpp
-    struct S { S(const S&) noexcept; S& operator=(const S&) noexcept; ~S(); };
-    static_assert(std::is_nothrow_copy_constructible_v<std::inplace_vector<S>>);
-    static_assert(std::is_nothrow_copy_assignable_v<std::inplace_vector<S>>);
-```
-
-(A real-world example of such an `S` is `std::shared_ptr<int>`.) We don't like this.
-Therefore, our updated exception-specifications require that `inplace_vector<T>` be nothrow copy-constructible
-and nothrow copy-assignable whenever `T` is, at least when using the default allocator.
+Note: <a href="https://eel.is/c++draft/res.on.exception.handling#5">[res.on.exception.handling]/5</a> permits STL vendors
+only to add `noexcept` to function signatures that completely lack it; it doesn't permit vendors to strengthen `noexcept(A)`
+into `noexcept(A || B)`. This is unfortunate.
 
 Our exception-specifications don't mention the copy/move/equality operations on `Alloc` itself,
 because <a href="https://eel.is/c++draft/allocator.requirements">[allocator.requirements]</a> forbids these
 operations to throw (on pain of UB).
 
-We expect that at least some STL vendors will make these operations `noexcept` when `N == 0`, as a special case;
-but again that idea would complicate the spec, for no obvious benefit to users. So we don't mandate that special case,
-leaving it up to the vendor to strengthen the noexcept guarantee if they choose to.
+
+# Implementation experience # {#experience}
+
+Arthur has implemented [[#wording]] in [[QuuxplusoneSG14]] (see <a href="https://godbolt.org/z/c9W44Kr1v">Godbolt</a>).
+This includes extensive unit tests verifying that:
+
+- The proposed `inplace_vector<T, N, std::allocator<T>>` is an exact drop-in replacement
+    for the original `inplace_vector<T, N>`, with the same
+    sizeof, alignof, triviality, and noexcept.
+
+- The proposed `inplace_vector<T, N, Alloc>` works correctly with `std::pmr`.
+
+- The proposed `inplace_vector<T, N, Alloc>` works correctly with Boost.Interprocess.
+
+- The proposed `inplace_vector<T, N, Alloc>` works correctly with the `Tiny::Alloc<T>` depicted above.
 
 
 # Acknowledgments # {#acknowledgments}
 
+Thanks to Pablo Halpern for [[P3160R1]].
 Thanks to Ben Craig for his design of the feature-test macros and for discussion of the approach
 to "freestanding `allocator`." Thanks to Gonzalo Brito and Mital Ashok for their review of the design and wording.
 Thanks to Casey Carter for his review of the wording.
@@ -871,8 +795,7 @@ namespace std {
       constexpr inplace_vector(InputIterator first, InputIterator last);    // freestanding-deleted
     template&lt;<i>container-compatible-range</i>&lt;T> R>
       constexpr inplace_vector(from_range_t, R&& rg);                       // freestanding-deleted
-    constexpr inplace_vector(const inplace_vector&)
-      <ins>noexcept(<i>see below</i>)</ins>;
+    constexpr inplace_vector(const inplace_vector&);
     constexpr inplace_vector(inplace_vector&&)
       <del>noexcept(N == 0 || is_nothrow_move_constructible_v&lt;T>)</del>
       <ins>noexcept(<i>see below</i>)</ins>;
@@ -890,8 +813,7 @@ namespace std {
     <ins>constexpr inplace_vector(inplace_vector&& rhs, const type_identity_t&lt;Allocator>&);</ins>
     <ins>constexpr inplace_vector(initializer_list&lt;T> il, const Allocator&);</ins>     <ins>// freestanding-deleted</ins>
     constexpr ~inplace_vector();
-    constexpr inplace_vector& operator=(const inplace_vector& <del>other</del> <ins>rhs</ins>)
-      <ins>noexcept(<i>see below</i>)</ins>;
+    constexpr inplace_vector& operator=(const inplace_vector& <del>other</del> <ins>rhs</ins>);
     constexpr inplace_vector& operator=(inplace_vector&& <del>other</del> <ins>rhs</ins>)
       <del>noexcept(N == 0 || (is_nothrow_move_assignable_v&lt;T> &&</del>
                           <del>is_nothrow_move_constructible_v&lt;T>))</del>
@@ -1026,51 +948,36 @@ template&lt;<i>container-compatible-range</i>&lt;T> R>
 <p class="p">10․ *Complexity:* Linear in `ranges::distance(rg)`.
 
 <p><pre>
-<ins>constexpr inplace_vector(const inplace_vector&)</ins>
-  <ins>noexcept(<i>see below</i>);</ins>
-</pre>
-<p class="p"><ins>11․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
-<div style="margin: 0.5em 2em;"><pre>
-<ins>is_nothrow_copy_constructible_v&lt;value_type></ins>
-</pre></div>
-<ins>Otherwise, the exception specification is equivalent to `false`.</ins>
-
-<p><pre>
 <ins>constexpr inplace_vector(inplace_vector&&)</ins>
   <ins>noexcept(<i>see below</i>);</ins>
 </pre>
-<p class="p"><ins>12․ *Preconditions:* `T` is *Cpp17MoveInsertable* into `inplace_vector`.</ins>
-<p class="p"><ins>13․ *Complexity:* Linear.</ins>
-<p class="p"><ins>14․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
+<p class="p"><ins>11․ *Preconditions:* `T` is *Cpp17MoveInsertable* into `inplace_vector`.</ins>
+<p class="p"><ins>12․ *Complexity:* Linear.</ins>
+<p class="p"><ins>13․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
 <div style="margin: 0.5em 2em;"><pre>
 <ins>is_nothrow_move_constructible_v&lt;value_type></ins>
 </pre></div>
-<ins>Otherwise, the exception specification is equivalent to `false`.</ins>
+<ins>Otherwise, the exception specification is unspecified.</ins>
 
 <p><pre>
 <ins>constexpr inplace_vector& operator=(const inplace_vector& rhs)</ins>
   <ins>noexcept(<i>see below</i>);</ins>
 </pre>
-<p class="p"><ins>15․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_copy_assignment::value` is `false`
+<p class="p"><ins>14․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_copy_assignment::value` is `false`
 or `rhs.get_allocator() == this->get_allocator()`. `T` is *Cpp17CopyInsertable* into `inplace_vector` and *Cpp17CopyAssignable*.</ins>
-<p class="p"><ins>16․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
-<div style="margin: 0.5em 2em;"><pre>
-<ins>is_nothrow_copy_assignable_v&lt;value_type> && is_nothrow_copy_constructible_v&lt;value_type></ins>
-</pre></div>
-<ins>Otherwise, the exception specification is equivalent to `false`.</ins>
 
 <p><pre>
 <ins>constexpr inplace_vector& operator=(inplace_vector&& rhs)</ins>
   <ins>noexcept(<i>see below</i>);</ins>
 </pre>
-<p class="p"><ins>17․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_move_assignment::value` is `false`
+<p class="p"><ins>15․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_move_assignment::value` is `false`
 or `rhs.get_allocator() == this->get_allocator()`. `T` is *Cpp17MoveInsertable* into `inplace_vector` and *Cpp17MoveAssignable*.</ins>
-<p class="p"><ins>18․ *Complexity:* Linear.</ins>
-<p class="p"><ins>19․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
+<p class="p"><ins>16․ *Complexity:* Linear.</ins>
+<p class="p"><ins>17․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
 <div style="margin: 0.5em 2em;"><pre>
 <ins>is_nothrow_move_assignable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
 </pre></div>
-<ins>Otherwise, the exception specification is equivalent to `false`.</ins>
+<ins>Otherwise, the exception specification is unspecified.</ins>
 
 <p class="note"><b>DRAFTING NOTE:</b>
 `type_identity_t` below is consistent with the other STL containers.
@@ -1210,14 +1117,17 @@ but the assignment operator of `T` is called the number of times equal to the nu
 <p><pre>
 <ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
 </pre>
-<p class="p"><ins><b>x․ *Preconditions:* TO BE DETERMINED; see [[#pocs-ub]].</b></ins>
-<p class="p"><ins>x․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
-<p class="p"><ins>x․ *Complexity:* Linear.</ins>
-<p class="p"><ins>x․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
+<p class="p"><ins>30․ *Preconditions:* Let *M* be `min(size(), x.size())`.
+For each non-negative integer *n* &lt; *M*, `(*this)[n]` is swappable with ([swappable.requirements]) `x[n]`.
+If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `true`, then
+`allocator_type` meets the <i>`Cpp17Swappable`</i> requirements and `get_allocator() == x.get_allocator()`.</ins>
+<p class="p"><ins>31․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
+<p class="p"><ins>32․ *Complexity:* Linear.</ins>
+<p class="p"><ins>33․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
 <div style="margin: 0.5em 2em;"><pre>
 <ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
 </pre></div>
-<ins>Otherwise, the exception specification is equivalent to `false`.</ins>
+<ins>Otherwise, the exception specification is unspecified.</ins>
 
 <p class="note"><b>DRAFTING NOTE:</b>
 The exception specification above is modeled on <a href="https://eel.is/c++draft/optional.swap#5">[optional.swap]/5</a>.
@@ -1291,6 +1201,14 @@ template&lt;class T, size_t N, <ins>class Allocator,</ins> class Predicate>
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html",
     "date": "December 2022"
+  },
+  "P3160R1": {
+    "title": "Allocator-aware inplace_vector",
+    "authors": [
+      "Pablo Halpern"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r1.html",
+    "date": "March 2024"
   },
   "P3295": {
     "title": "Freestanding constexpr containers and constexpr exception types",
