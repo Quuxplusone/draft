@@ -1,6 +1,5 @@
 
 all: \
-    aa-inplace-vector.html \
     d2447-std-span-over-initializer-list.html \
     d1808-contra-p0339.html \
     d1837-remove-class-type-nttps.html \
@@ -22,7 +21,8 @@ all: \
     d3016-valarray.html \
     d3031-lambda.html \
     d3055-relocation.html \
-    d3279-trivial.html
+    d3279-trivial.html \
+    d3418-inplace-vector.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
