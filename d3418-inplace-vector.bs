@@ -1,8 +1,8 @@
 <pre class='metadata'>
-Title: Candidate wording for P3160R1 allocator-aware <code>inplace_vector</code>
+Title: Wording for P3160R2 <code>inplace_vector</code>'s "construct/destroy" alternative
 Shortname: D3418
 Revision: 0
-!Draft Revision: 13
+!Draft Revision: 14
 Audience: LEWG
 Status: D
 Group: WG21
@@ -10,11 +10,12 @@ URL:
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  P3160R1 proposes to make `inplace_vector` an allocator-aware container.
-  This paper (P3418) provides wording, in case P3160R2 fails to materialize
-  before the mailing deadline. One effect of this wording is to make
-  `allocator` partially freestanding.
-Date: 2024-10-08
+  P3160R2 proposes to make `inplace_vector` an allocator-aware container.
+  It offers two design alternatives, nicknamed "uses-allocator" and "construct/destroy,"
+  and presents wording for the "uses-allocator" alternative.
+  This paper (P3418) provides wording for the "construct/destroy" alternative.
+  This paper also provides additional motivation for allocator-awareness.
+Date: 2024-10-10
 </pre>
 
 <style>
@@ -247,14 +248,11 @@ We could solve this conundrum in any of the following ways:
 - Change the allocator requirements to permit `allocate` and `deallocate` to be missing
     on freestanding implementations (only).
 
-We've chosen the third option, as it has the fewest obvious downsides.
-We do not propose to change the allocator requirements on hosted implementations.
-
-For another take on freestanding `allocator`, see Ben Craig's [[P3295]],
-which proposes that `allocate` and `deallocate` could be marked
-with a new "freestanding-consteval" category. That proposal would merge-conflict
-with this one, but does not semantically conflict.
-Its semantics are a pure extension of this one, as far as either of us can tell.
+Arthur drafted wording for the third option, but Pablo suggests taking a variation on
+that approach that basically anticipates Ben Craig's [[P3295]] — marking `allocate` and `deallocate`
+with a new "freestanding-consteval" category — except that instead of copying large
+portions of [[P3295]] into this paper, we simply achieve the same effect with a <i>Note</i>.
+If [[P3295]] is adopted, we can easily update our <i>Note</i> to use the <i>freestanding-consteval</i> markup instead.
 
 
 ## Notes on feature-test macros ## {#wording-ftm}
@@ -484,10 +482,10 @@ This includes extensive unit tests verifying that:
 
 # Acknowledgments # {#acknowledgments}
 
-Thanks to Pablo Halpern for [[P3160R1]].
+Thanks to Pablo Halpern for [[P3160R1]] and [[P3160R2]].
 Thanks to Ben Craig for his design of the feature-test macros and for discussion of the approach
-to "freestanding `allocator`." Thanks to Gonzalo Brito and Mital Ashok for their review of the design and wording.
-Thanks to Casey Carter for his review of the wording.
+to "freestanding `allocator`." Thanks to Gonzalo Brito and Mital Ashok for their review of this design and wording.
+Thanks to Casey Carter for his review of this wording.
 
 
 # Proposed wording # {#wording}
@@ -522,7 +520,7 @@ template&lt;class T, class U>
 
 ## [default.allocator] ## {#wording-default.allocator}
 
-Modify <a href="https://eel.is/c++draft/default.allocator">[default.allocator]/1</a> as follows:
+Modify <a href="https://eel.is/c++draft/default.allocator">[default.allocator]</a> as follows:
 
 <small><blockquote>
 <pre>
@@ -540,96 +538,17 @@ namespace std {
     constexpr ~allocator();
     constexpr allocator& operator=(const allocator&) = default;
 
-    constexpr T* allocate(size_t n);                              <ins>// freestanding-deleted</ins>
-    constexpr allocation_result&lt;T*> allocate_at_least(size_t n);  <ins>// freestanding-deleted</ins>
-    constexpr void deallocate(T* p, size_t n);                    <ins>// freestanding-deleted</ins>
+    constexpr T* allocate(size_t n);                              <ins>// Note 1</ins>
+    constexpr allocation_result&lt;T*> allocate_at_least(size_t n);  <ins>// Note 1</ins>
+    constexpr void deallocate(T* p, size_t n);                    <ins>// Note 1</ins>
   };
 }
 </pre>
-</blockquote></small>
 
-## [allocator.requirements.general] ## {#wording-allocator.requirements.general}
+<p><ins>x․ [<i>Note</i>: For a freestanding implementation, it is implementation-defined
+whether `allocate`, `allocate_at_least`, and `deallocate` are `consteval` rather than `constexpr`. —<i>end note</i>]</ins>
 
-Modify <a href="https://eel.is/c++draft/allocator.requirements.general">[allocator.requirements.general]</a> as follows:
-
-<small><blockquote>
-<p>1․ The library describes a standard set of requirements for allocators, which are class-type objects
-that encapsulate the information about an allocation model. This information includes the knowledge of
-pointer types, the type of their difference, the type of the size of objects in this allocation model,
-as well as the memory allocation and deallocation primitives for it. All of the string types ([strings]),
-containers ([containers]) (except `array` <del>and `inplace_vector`</del>), string buffers and string streams ([input.output]),
-and `match_results` are parameterized in terms of allocators.
-
-<p>[...]
-
-<p>3․ The class template `allocator_traits` ([allocator.traits]) supplies a uniform interface to all allocator types.
-This subclause describes the requirements on allocator types and thus on types used to instantiate `allocator_traits`.
-A requirement is optional if a default for a given type or expression is specified.
-Within the standard library `allocator_traits` template, an optional requirement that is not supplied by an allocator
-is replaced by the specified default type or expression.
-
-<p>[...]
-
-<p><pre>
-a.allocate(n)
-</pre>
-<p class="p">35․ *Result:* `XX::pointer`
-<p class="p">36․ *Effects:* Memory is allocated for an array of `n` `T` and such an object is created but array elements are not constructed.
-<p class="p">[<i>Example 1:</i> When reusing storage denoted by some pointer value `p`, `launder(reinterpret_cast<T*>(new (p) byte[n * sizeof(T)]))`
-can be used to implicitly create a suitable array object and obtain a pointer to it. <i>— end example</i>]
-<p class="p">37․ *Throws:* `allocate` may throw an appropriate exception.
-<p class="p">38․ [<i>Note 3:</i> It is intended that `a.allocate` be an efficient means of allocating a single object of type `T`,
-even when `sizeof(T)` is small. That is, there is no need for a container to maintain its own free list. <i>— end note</i>]
-<p class="p">39․ *Remarks:* If `n == 0`, the return value is unspecified.
-<p class="p"><ins>x․ Default: On freestanding implementations, `XX::pointer()`.
-[<i>Note:</i> This default is never used by `allocator_traits`, but it ensures that `allocator<T>` always meets the allocator requirements
-even though `allocate` is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins>
-
-<p>[...]
-
-<p><pre>
-a.deallocate(p, n)
-</pre>
-<p class="p">47․ *Result:* (not used)
-<p class="p">48․ *Preconditions:*
-<ul>
-<li>(48.1) If `p` is memory that was obtained by a call to `a.allocate_at_least`, let `ret` be the value returned
-and `req` be the value passed as the first argument of that call. `p` is equal to `ret.ptr` and `n` is a value
-such that `req` ≤ `n` ≤ `ret.count`.</li>
-<li>(48.2) Otherwise, `p` is a pointer value obtained from `allocate`. `n` equals the value passed as the first argument
-to the invocation of `allocate` which returned `p`.
-</ul>
-`p` has not been invalidated by an intervening call to `deallocate`.
-<p class="p">49․ *Throws:* Nothing.
-<p class="p"><ins>x․ *Remarks:* Default: On freestanding implementations, `void()`.
-[<i>Note:</i> This default is never used by `allocator_traits`, but it ensures that `allocator<T>` always meets the allocator requirements
-even though `deallocate` is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins>
-</blockquote></small>
-
-## [allocator.traits.members] ## {#wording-allocator.traits.members}
-
-Modify <a href="https://eel.is/c++draft/allocator.traits#members">[allocator.traits.members]</a> as follows:
-
-<small><blockquote>
-<p><pre>
-static constexpr pointer allocate(Alloc& a, size_type n);
-</pre>
-<p class="p"><ins>x․ *Mandates:* `a.allocate(n)` is well-formed.</ins>
-<p class="p">1․ *Returns:* `a.allocate(n)`.
-<p><pre>
-static constexpr pointer allocate(Alloc& a, size_type n, const_void_pointer hint);
-</pre>
-<p class="p">2․ *Returns:* `a.allocate(n, hint)` if that expression is well-formed; otherwise, `a.allocate(n)`.
-<p><pre>
-static constexpr allocation_result&lt;pointer, size_type> allocate_at_least(Alloc& a, size_type n);
-</pre>
-<p class="p">3․ *Returns:* `a.allocate_at_least(n)` if that expression is well-formed; otherwise, `{a.allocate(n), n}`.
-<p><pre>
-static constexpr void deallocate(Alloc& a, pointer p, size_type n);
-</pre>
-<p class="p"><ins>x․ *Mandates:* `a.deallocate(p, n)` is well-formed.</ins>
-<p class="p">4․ *Effects:* Calls `a.deallocate(p, n)`.
-<p class="p">5․ *Throws:* Nothing.
+<p>2․ `allocator_traits<allocator<T>>::is_always_equal::value` is `true` for any `T`.
 </blockquote></small>
 
 ## [container.alloc.reqmts] ## {#wording-container.alloc.reqmts}
@@ -788,30 +707,26 @@ namespace std {
     using const_reverse_iterator = std::reverse_iterator&lt;const_iterator>;
 &nbsp;
     <i>// [inplace.vector.cons], construct/copy/destroy</i>
-    constexpr inplace_vector() noexcept<ins>(noexcept(Allocator()))</ins>;
-    constexpr explicit inplace_vector(size_type n);                         // freestanding-deleted
-    constexpr inplace_vector(size_type n, const T& value);                  // freestanding-deleted
+    constexpr inplace_vector() noexcept<ins>(noexcept(Allocator())) : inplace_vector(Allocator()) { }</ins><del>;</del>
+    <ins>constexpr explicit inplace_vector(const Allocator&) noexcept;</ins>
+    constexpr explicit inplace_vector(size_type n<ins>,</ins>
+                                      <ins>const Allocator& = Allocator()</ins>);      // freestanding-deleted
+    constexpr inplace_vector(size_type n, const T& value<ins>,</ins>
+                             <ins>const Allocator& = Allocator()</ins>);               // freestanding-deleted
     template&lt;class InputIterator>
-      constexpr inplace_vector(InputIterator first, InputIterator last);    // freestanding-deleted
+      constexpr inplace_vector(InputIterator first, InputIterator last<ins>,</ins>
+                               <ins>const Allocator& = Allocator()</ins>);             // freestanding-deleted
     template&lt;<i>container-compatible-range</i>&lt;T> R>
-      constexpr inplace_vector(from_range_t, R&& rg);                       // freestanding-deleted
+      constexpr inplace_vector(from_range_t, R&& rg<ins>,</ins>
+                               <ins>const Allocator& = Allocator()</ins>);             // freestanding-deleted
     constexpr inplace_vector(const inplace_vector&);
     constexpr inplace_vector(inplace_vector&&)
       <del>noexcept(N == 0 || is_nothrow_move_constructible_v&lt;T>)</del>
       <ins>noexcept(<i>see below</i>)</ins>;
-    constexpr inplace_vector(initializer_list&lt;T> il);                       // freestanding-deleted
-    <ins>constexpr explicit inplace_vector(const Allocator&) noexcept;</ins>
-    <ins>constexpr inplace_vector(size_type n, const Allocator&);</ins>                <ins>// freestanding-deleted</ins>
-    <ins>constexpr inplace_vector(size_type n, const T& value,</ins>                   <ins>// freestanding-deleted</ins>
-                             <ins>const Allocator&);</ins>
-    <ins>template&lt;class InputIterator></ins>
-      <ins>constexpr inplace_vector(InputIterator first, InputIterator last,</ins>     <ins>// freestanding-deleted</ins>
-                               <ins>const Allocator&);</ins>
-    <ins>template&lt;<i>container-compatible-range</i>&lt;T> R></ins>
-      <ins>constexpr inplace_vector(from_range_t, R&& rg, const Allocator&);</ins>     <ins>// freestanding-deleted</ins>
     <ins>constexpr inplace_vector(const inplace_vector& rhs, const type_identity_t&lt;Allocator>&);</ins>
     <ins>constexpr inplace_vector(inplace_vector&& rhs, const type_identity_t&lt;Allocator>&);</ins>
-    <ins>constexpr inplace_vector(initializer_list&lt;T> il, const Allocator&);</ins>     <ins>// freestanding-deleted</ins>
+    constexpr inplace_vector(initializer_list&lt;T> <del>il</del><ins>,</ins>
+                             <ins>const Allocator& = Allocator()</ins>);               // freestanding-deleted
     constexpr ~inplace_vector();
     constexpr inplace_vector& operator=(const inplace_vector& <del>other</del> <ins>rhs</ins>);
     constexpr inplace_vector& operator=(inplace_vector&& <del>other</del> <ins>rhs</ins>)
@@ -915,36 +830,50 @@ namespace std {
     constexpr friend void swap(inplace_vector& x, inplace_vector& y)
       <del>noexcept(N == 0 || (is_nothrow_swappable_v&lt;T> &&</del>
                           <del>is_nothrow_move_constructible_v&lt;T>))</del>
-      <ins>noexcept(x.swap(y))</ins>
+      <ins>noexcept(noexcept(x.swap(y)))</ins>
       { x.swap(y); }
   };
 };
 </pre>
 
 <p><b>24.3.14.2. Constructors [inplace.vector.cons]</b>
+
+<p class="note"><b>DRAFTING NOTE:</b>
+The use of `explicit` on `inplace_vector(n, alloc)` is consistent with the other STL containers
+(e.g. <a href="https://eel.is/c++draft/vector#cons">`vector`</a>
+and <a href="https://eel.is/c++draft/list#cons">`list`</a>).
+
 <p><pre>
-constexpr explicit inplace_vector(size_type n);
+<ins>constexpr explicit vector(const Allocator&);</ins>
+</pre>
+<p class="p"><ins>x․ *Effects:* Constructs an empty `inplace_vector`, using the specified allocator.</ins>
+<p class="p"><ins>x․ *Complexity:* Constant.</ins>
+
+<p><pre>
+constexpr explicit inplace_vector(size_type n<ins>, const Allocator& = Allocator()</ins>);
 </pre>
 <p class="p">1․ *Preconditions:* `T` is <i>`Cpp17DefaultInsertable`</i> into `inplace_vector`.
-<p class="p">2․ *Effects:* Constructs an `inplace_vector` with `n` default-inserted elements.
+<p class="p">2․ *Effects:* Constructs an `inplace_vector` with `n` default-inserted elements<ins>, using the specified allocator</ins>.
 <p class="p">3․ *Complexity:* Linear in `n`.
 <p><pre>
-constexpr inplace_vector(size_type n, const T& value);
+constexpr inplace_vector(size_type n, const T& value<ins>,</ins>
+                         <ins>const Allocator& = Allocator()</ins>);
 </pre>
 <p class="p">4․ *Preconditions:* `T` is <i>`Cpp17CopyInsertable`</i> into `inplace_vector`.
-<p class="p">5․ *Effects:* Constructs an `inplace_vector` with `n` copies of `value`.
+<p class="p">5․ *Effects:* Constructs an `inplace_vector` with `n` copies of `value`<ins>, using the specified allocator</ins>.
 <p class="p">6․ *Complexity:* Linear in `n`.
 <p><pre>
 template&lt;class InputIterator>
-  constexpr inplace_vector(InputIterator first, InputIterator last);
+  constexpr inplace_vector(InputIterator first, InputIterator last<ins>,</ins>
+                           <ins>const Allocator& = Allocator()</ins>);
 </pre>
-<p class="p">7․ *Effects:* Constructs an `inplace_vector` equal to the range `[first, last)`.
+<p class="p">7․ *Effects:* Constructs an `inplace_vector` equal to the range `[first, last)`<ins>, using the specified allocator</ins>.
 <p class="p">8․ *Complexity:* Linear in `distance(first, last)`.
 <p><pre>
 template&lt;<i>container-compatible-range</i>&lt;T> R>
-  constexpr inplace_vector(from_range_t, R&& rg);
+  constexpr inplace_vector(from_range_t, R&& rg<ins>, const Allocator& = Allocator()</ins>);
 </pre>
-<p class="p">9․ *Effects:* Constructs an `inplace_vector` object with the elements of the range `rg`.
+<p class="p">9․ *Effects:* Constructs an `inplace_vector` object with the elements of the range `rg`<ins>, using the specified allocator</ins>.
 <p class="p">10․ *Complexity:* Linear in `ranges::distance(rg)`.
 
 <p><pre>
@@ -960,8 +889,7 @@ template&lt;<i>container-compatible-range</i>&lt;T> R>
 <ins>Otherwise, the exception specification is unspecified.</ins>
 
 <p><pre>
-<ins>constexpr inplace_vector& operator=(const inplace_vector& rhs)</ins>
-  <ins>noexcept(<i>see below</i>);</ins>
+<ins>constexpr inplace_vector& operator=(const inplace_vector& rhs);</ins>
 </pre>
 <p class="p"><ins>14․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_copy_assignment::value` is `false`
 or `rhs.get_allocator() == this->get_allocator()`. `T` is *Cpp17CopyInsertable* into `inplace_vector` and *Cpp17CopyAssignable*.</ins>
@@ -1209,6 +1137,14 @@ template&lt;class T, size_t N, <ins>class Allocator,</ins> class Predicate>
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r1.html",
     "date": "March 2024"
+  },
+  "P3160R2": {
+    "title": "Allocator-aware inplace_vector",
+    "authors": [
+      "Pablo Halpern"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r2.html",
+    "date": "October 2024"
   },
   "P3295": {
     "title": "Freestanding constexpr containers and constexpr exception types",

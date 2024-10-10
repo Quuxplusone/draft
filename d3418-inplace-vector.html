@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D3418R0: Candidate wording for P3160R1 allocator-aware inplace_vector</title>
+  <title>D3418R0: Wording for P3160R2 inplace_vector’s "construct/destroy" alternative</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -2093,8 +2093,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D3418R0<br>Candidate wording for P3160R1 allocator-aware <code class="highlight"><c- n>inplace_vector</c-></code></h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-10-08">2024-10-08</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D3418R0<br>Wording for P3160R2 <code class="highlight"><c- n>inplace_vector</c-></code>’s "construct/destroy" alternative</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2024-10-10">2024-10-10</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2104,7 +2104,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>13
+     <dd>14
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2112,9 +2112,11 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   </div>
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
-   <p>P3160R1 proposes to make <code class="highlight"><c- n>inplace_vector</c-></code> an allocator-aware container.
-This paper (P3418) provides wording, in case P3160R2 fails to materialize
-before the mailing deadline. One effect of this wording is to make <code class="highlight"><c- n>allocator</c-></code> partially freestanding.</p>
+   <p>P3160R2 proposes to make <code class="highlight"><c- n>inplace_vector</c-></code> an allocator-aware container.
+It offers two design alternatives, nicknamed "uses-allocator" and "construct/destroy,"
+and presents wording for the "uses-allocator" alternative.
+This paper (P3418) provides wording for the "construct/destroy" alternative.
+This paper also provides additional motivation for allocator-awareness.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -2140,11 +2142,9 @@ before the mailing deadline. One effect of this wording is to make <code class="
       <li><a href="#wording-version.syn"><span class="secno">5.1</span> <span class="content">[version.syn]</span></a>
       <li><a href="#wording-memory.syn"><span class="secno">5.2</span> <span class="content">[memory.syn]</span></a>
       <li><a href="#wording-default.allocator"><span class="secno">5.3</span> <span class="content">[default.allocator]</span></a>
-      <li><a href="#wording-allocator.requirements.general"><span class="secno">5.4</span> <span class="content">[allocator.requirements.general]</span></a>
-      <li><a href="#wording-allocator.traits.members"><span class="secno">5.5</span> <span class="content">[allocator.traits.members]</span></a>
-      <li><a href="#wording-container.alloc.reqmts"><span class="secno">5.6</span> <span class="content">[container.alloc.reqmts]</span></a>
-      <li><a href="#wording-inplace.vector.syn"><span class="secno">5.7</span> <span class="content">[inplace.vector.syn]</span></a>
-      <li><a href="#wording-inplace.vector"><span class="secno">5.8</span> <span class="content">[inplace.vector]</span></a>
+      <li><a href="#wording-container.alloc.reqmts"><span class="secno">5.4</span> <span class="content">[container.alloc.reqmts]</span></a>
+      <li><a href="#wording-inplace.vector.syn"><span class="secno">5.5</span> <span class="content">[inplace.vector.syn]</span></a>
+      <li><a href="#wording-inplace.vector"><span class="secno">5.6</span> <span class="content">[inplace.vector]</span></a>
      </ol>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
@@ -2340,13 +2340,10 @@ freestanding implementations. (But this makes it untrustworthy. This is a bad id
      <p>Change the allocator requirements to permit <code class="highlight"><c- n>allocate</c-></code> and <code class="highlight"><c- n>deallocate</c-></code> to be missing
 on freestanding implementations (only).</p>
    </ul>
-   <p>We’ve chosen the third option, as it has the fewest obvious downsides.
-We do not propose to change the allocator requirements on hosted implementations.</p>
-   <p>For another take on freestanding <code class="highlight"><c- n>allocator</c-></code>, see Ben Craig’s <a data-link-type="biblio" href="#biblio-p3295" title="Freestanding constexpr containers and constexpr exception types">[P3295]</a>,
-which proposes that <code class="highlight"><c- n>allocate</c-></code> and <code class="highlight"><c- n>deallocate</c-></code> could be marked
-with a new "freestanding-consteval" category. That proposal would merge-conflict
-with this one, but does not semantically conflict.
-Its semantics are a pure extension of this one, as far as either of us can tell.</p>
+   <p>Arthur drafted wording for the third option, but Pablo suggests taking a variation on
+that approach that basically anticipates Ben Craig’s <a data-link-type="biblio" href="#biblio-p3295" title="Freestanding constexpr containers and constexpr exception types">[P3295]</a> — marking <code class="highlight"><c- n>allocate</c-></code> and <code class="highlight"><c- n>deallocate</c-></code> with a new "freestanding-consteval" category — except that instead of copying large
+portions of <a data-link-type="biblio" href="#biblio-p3295" title="Freestanding constexpr containers and constexpr exception types">[P3295]</a> into this paper, we simply achieve the same effect with a <i>Note</i>.
+If <a data-link-type="biblio" href="#biblio-p3295" title="Freestanding constexpr containers and constexpr exception types">[P3295]</a> is adopted, we can easily update our <i>Note</i> to use the <i>freestanding-consteval</i> markup instead.</p>
    <h3 class="heading settled" data-level="2.2" id="wording-ftm"><span class="secno">2.2. </span><span class="content">Notes on feature-test macros</span><a class="self-link" href="#wording-ftm"></a></h3>
    <p>For the non-freestanding case, it’s easy: vendors just bump <code class="highlight"><c- n>__cpp_lib_inplace_vector</c-></code> and are done.
 This subsection exists only because the freestanding situation is messier than that,
@@ -2533,10 +2530,10 @@ sizeof, alignof, triviality, and noexcept.</p>
      <p>The proposed <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>N</c-><c- p>,</c-> <c- n>Alloc</c-><c- o>></c-></code> works correctly with the <code class="highlight"><c- n>Tiny</c-><c- o>::</c-><c- n>Alloc</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> depicted above.</p>
    </ul>
    <h2 class="heading settled" data-level="4" id="acknowledgments"><span class="secno">4. </span><span class="content">Acknowledgments</span><a class="self-link" href="#acknowledgments"></a></h2>
-   <p>Thanks to Pablo Halpern for <a data-link-type="biblio" href="#biblio-p3160r1" title="Allocator-aware inplace_vector">[P3160R1]</a>.
+   <p>Thanks to Pablo Halpern for <a data-link-type="biblio" href="#biblio-p3160r1" title="Allocator-aware inplace_vector">[P3160R1]</a> and <a data-link-type="biblio" href="#biblio-p3160r2" title="Allocator-aware inplace_vector">[P3160R2]</a>.
 Thanks to Ben Craig for his design of the feature-test macros and for discussion of the approach
-to "freestanding <code class="highlight"><c- n>allocator</c-></code>." Thanks to Gonzalo Brito and Mital Ashok for their review of the design and wording.
-Thanks to Casey Carter for his review of the wording.</p>
+to "freestanding <code class="highlight"><c- n>allocator</c-></code>." Thanks to Gonzalo Brito and Mital Ashok for their review of this design and wording.
+Thanks to Casey Carter for his review of this wording.</p>
    <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <h3 class="heading settled" data-level="5.1" id="wording-version.syn"><span class="secno">5.1. </span><span class="content">[version.syn]</span><a class="self-link" href="#wording-version.syn"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/version.syn">[version.syn]</a> as follows,
@@ -2563,7 +2560,7 @@ inserting these macros into the list in the proper alphabetical positions:</p>
 </pre></small>
    </blockquote>
    <h3 class="heading settled" data-level="5.3" id="wording-default.allocator"><span class="secno">5.3. </span><span class="content">[default.allocator]</span><a class="self-link" href="#wording-default.allocator"></a></h3>
-   <p>Modify <a href="https://eel.is/c++draft/default.allocator">[default.allocator]/1</a> as follows:</p>
+   <p>Modify <a href="https://eel.is/c++draft/default.allocator">[default.allocator]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
@@ -2581,51 +2578,15 @@ inserting these macros into the list in the proper alphabetical positions:</p>
     <c- k>constexpr</c-> <c- o>~</c-><c- n>allocator</c-><c- p>();</c->
     <c- k>constexpr</c-> <c- n>allocator</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>allocator</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 
-    <c- k>constexpr</c-> <c- n>T</c-><c- o>*</c-> <c- nf>allocate</c-><c- p>(</c-><c- b>size_t</c-> <c- n>n</c-><c- p>);</c->                              <ins><c- c1>// freestanding-deleted</c-></ins>
-    <c- k>constexpr</c-> <c- n>allocation_result</c-><c- o>&lt;</c-><c- n>T</c-><c- o>*></c-> <c- n>allocate_at_least</c-><c- p>(</c-><c- b>size_t</c-> <c- n>n</c-><c- p>);</c->  <ins><c- c1>// freestanding-deleted</c-></ins>
-    <c- k>constexpr</c-> <c- b>void</c-> <c- nf>deallocate</c-><c- p>(</c-><c- n>T</c-><c- o>*</c-> <c- n>p</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>n</c-><c- p>);</c->                    <ins><c- c1>// freestanding-deleted</c-></ins>
+    <c- k>constexpr</c-> <c- n>T</c-><c- o>*</c-> <c- nf>allocate</c-><c- p>(</c-><c- b>size_t</c-> <c- n>n</c-><c- p>);</c->                              <ins><c- c1>// Note 1</c-></ins>
+    <c- k>constexpr</c-> <c- n>allocation_result</c-><c- o>&lt;</c-><c- n>T</c-><c- o>*></c-> <c- n>allocate_at_least</c-><c- p>(</c-><c- b>size_t</c-> <c- n>n</c-><c- p>);</c->  <ins><c- c1>// Note 1</c-></ins>
+    <c- k>constexpr</c-> <c- b>void</c-> <c- nf>deallocate</c-><c- p>(</c-><c- n>T</c-><c- o>*</c-> <c- n>p</c-><c- p>,</c-> <c- b>size_t</c-> <c- n>n</c-><c- p>);</c->                    <ins><c- c1>// Note 1</c-></ins>
   <c- p>};</c->
 <c- p>}</c->
-</pre></small>
+</pre> <p><ins>x․ [<i>Note</i>: For a freestanding implementation, it is implementation-defined
+whether <code class="highlight"><c- n>allocate</c-></code>, <code class="highlight"><c- n>allocate_at_least</c-></code>, and <code class="highlight"><c- n>deallocate</c-></code> are <code class="highlight"><c- k>consteval</c-></code> rather than <code class="highlight"><c- k>constexpr</c-></code>. —<i>end note</i>]</ins> </p><p>2․ <code class="highlight"><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>>>::</c-><c- n>is_always_equal</c-><c- o>::</c-><c- n>value</c-></code> is <code class="highlight">true</code> for any <code class="highlight"><c- n>T</c-></code>. </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.4" id="wording-allocator.requirements.general"><span class="secno">5.4. </span><span class="content">[allocator.requirements.general]</span><a class="self-link" href="#wording-allocator.requirements.general"></a></h3>
-   <p>Modify <a href="https://eel.is/c++draft/allocator.requirements.general">[allocator.requirements.general]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p></p>
-    <small> <p>1․ The library describes a standard set of requirements for allocators, which are class-type objects
-that encapsulate the information about an allocation model. This information includes the knowledge of
-pointer types, the type of their difference, the type of the size of objects in this allocation model,
-as well as the memory allocation and deallocation primitives for it. All of the string types ([strings]),
-containers ([containers]) (except <code class="highlight"><c- n>array</c-></code> <del>and <code class="highlight"><c- n>inplace_vector</c-></code></del>), string buffers and string streams ([input.output]),
-and <code class="highlight"><c- n>match_results</c-></code> are parameterized in terms of allocators. </p><p>[...] </p><p>3․ The class template <code class="highlight"><c- n>allocator_traits</c-></code> ([allocator.traits]) supplies a uniform interface to all allocator types.
-This subclause describes the requirements on allocator types and thus on types used to instantiate <code class="highlight"><c- n>allocator_traits</c-></code>.
-A requirement is optional if a default for a given type or expression is specified.
-Within the standard library <code class="highlight"><c- n>allocator_traits</c-></code> template, an optional requirement that is not supplied by an allocator
-is replaced by the specified default type or expression. </p><p>[...] </p><p></p><pre class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>)</c->
-</pre> <p class="p">35․ <em>Result:</em> <code class="highlight"><c- n>XX</c-><c- o>::</c-><c- n>pointer</c-></code> </p><p class="p">36․ <em>Effects:</em> Memory is allocated for an array of <code class="highlight"><c- n>n</c-></code> <code class="highlight"><c- n>T</c-></code> and such an object is created but array elements are not constructed. </p><p class="p">[<i>Example 1:</i> When reusing storage denoted by some pointer value <code class="highlight"><c- n>p</c-></code>, <code class="highlight"><c- n>launder</c-><c- p>(</c-><c- k>reinterpret_cast</c-><c- o>&lt;</c-><c- n>T</c-><c- o>*></c-><c- p>(</c-><c- k>new</c-> <c- p>(</c-><c- n>p</c-><c- p>)</c-> <c- n>byte</c-><c- p>[</c-><c- n>n</c-> <c- o>*</c-> <c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)]))</c-></code> can be used to implicitly create a suitable array object and obtain a pointer to it. <i>— end example</i>] </p><p class="p">37․ <em>Throws:</em> <code class="highlight"><c- n>allocate</c-></code> may throw an appropriate exception. </p><p class="p">38․ [<i>Note 3:</i> It is intended that <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate</c-></code> be an efficient means of allocating a single object of type <code class="highlight"><c- n>T</c-></code>,
-even when <code class="highlight"><c- k>sizeof</c-><c- p>(</c-><c- n>T</c-><c- p>)</c-></code> is small. That is, there is no need for a container to maintain its own free list. <i>— end note</i>] </p><p class="p">39․ <em>Remarks:</em> If <code class="highlight"><c- n>n</c-> <c- o>==</c-> <c- mi>0</c-></code>, the return value is unspecified. </p><p class="p"><ins>x․ Default: On freestanding implementations, <code class="highlight"><c- n>XX</c-><c- o>::</c-><c- n>pointer</c-><c- p>()</c-></code>.
-[<i>Note:</i> This default is never used by <code class="highlight"><c- n>allocator_traits</c-></code>, but it ensures that <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> always meets the allocator requirements
-even though <code class="highlight"><c- n>allocate</c-></code> is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins> </p><p>[...] </p><p></p><pre class="highlight"><c- n>a</c-><c- p>.</c-><c- n>deallocate</c-><c- p>(</c-><c- n>p</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c->
-</pre> <p class="p">47․ <em>Result:</em> (not used) </p><p class="p">48․ <em>Preconditions:</em> </p><ul> <li>(48.1) If <code class="highlight"><c- n>p</c-></code> is memory that was obtained by a call to <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-></code>, let <code class="highlight"><c- n>ret</c-></code> be the value returned
-and <code class="highlight"><c- n>req</c-></code> be the value passed as the first argument of that call. <code class="highlight"><c- n>p</c-></code> is equal to <code class="highlight"><c- n>ret</c-><c- p>.</c-><c- n>ptr</c-></code> and <code class="highlight"><c- n>n</c-></code> is a value
-such that <code class="highlight"><c- n>req</c-></code> ≤ <code class="highlight"><c- n>n</c-></code> ≤ <code class="highlight"><c- n>ret</c-><c- p>.</c-><c- n>count</c-></code>.</li> <li>(48.2) Otherwise, <code class="highlight"><c- n>p</c-></code> is a pointer value obtained from <code class="highlight"><c- n>allocate</c-></code>. <code class="highlight"><c- n>n</c-></code> equals the value passed as the first argument
-to the invocation of <code class="highlight"><c- n>allocate</c-></code> which returned <code class="highlight"><c- n>p</c-></code>. </li></ul> <code class="highlight"><c- n>p</c-></code> has not been invalidated by an intervening call to <code class="highlight"><c- n>deallocate</c-></code>. <p class="p">49․ <em>Throws:</em> Nothing. </p><p class="p"><ins>x․ <em>Remarks:</em> Default: On freestanding implementations, <code class="highlight"><c- b>void</c-><c- p>()</c-></code>.
-[<i>Note:</i> This default is never used by <code class="highlight"><c- n>allocator_traits</c-></code>, but it ensures that <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-></code> always meets the allocator requirements
-even though <code class="highlight"><c- n>deallocate</c-></code> is a freestanding deleted function ([freestanding.item]). <i>— end note</i>]</ins> </p></small>
-   </blockquote>
-   <h3 class="heading settled" data-level="5.5" id="wording-allocator.traits.members"><span class="secno">5.5. </span><span class="content">[allocator.traits.members]</span><a class="self-link" href="#wording-allocator.traits.members"></a></h3>
-   <p>Modify <a href="https://eel.is/c++draft/allocator.traits#members">[allocator.traits.members]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p></p>
-    <small> <p></p><pre class="highlight"><c- k>static</c-> <c- k>constexpr</c-> <c- n>pointer</c-> <c- nf>allocate</c-><c- p>(</c-><c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>size_type</c-> <c- n>n</c-><c- p>);</c->
-</pre> <p class="p"><ins>x․ <em>Mandates:</em> <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code> is well-formed.</ins> </p><p class="p">1․ <em>Returns:</em> <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code>. </p><p></p><pre class="highlight"><c- k>static</c-> <c- k>constexpr</c-> <c- n>pointer</c-> <c- nf>allocate</c-><c- p>(</c-><c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- n>const_void_pointer</c-> <c- n>hint</c-><c- p>);</c->
-</pre> <p class="p">2․ <em>Returns:</em> <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>,</c-> <c- n>hint</c-><c- p>)</c-></code> if that expression is well-formed; otherwise, <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code>. </p><p></p><pre class="highlight"><c- k>static</c-> <c- k>constexpr</c-> <c- n>allocation_result</c-><c- o>&lt;</c-><c- n>pointer</c-><c- p>,</c-> <c- n>size_type</c-><c- o>></c-> <c- n>allocate_at_least</c-><c- p>(</c-><c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>size_type</c-> <c- n>n</c-><c- p>);</c->
-</pre> <p class="p">3․ <em>Returns:</em> <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>allocate_at_least</c-><c- p>(</c-><c- n>n</c-><c- p>)</c-></code> if that expression is well-formed; otherwise, <code class="highlight"><c- p>{</c-><c- n>a</c-><c- p>.</c-><c- n>allocate</c-><c- p>(</c-><c- n>n</c-><c- p>),</c-> <c- n>n</c-><c- p>}</c-></code>. </p><p></p><pre class="highlight"><c- k>static</c-> <c- k>constexpr</c-> <c- b>void</c-> <c- nf>deallocate</c-><c- p>(</c-><c- n>Alloc</c-><c- o>&amp;</c-> <c- n>a</c-><c- p>,</c-> <c- n>pointer</c-> <c- n>p</c-><c- p>,</c-> <c- n>size_type</c-> <c- n>n</c-><c- p>);</c->
-</pre> <p class="p"><ins>x․ <em>Mandates:</em> <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>deallocate</c-><c- p>(</c-><c- n>p</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c-></code> is well-formed.</ins> </p><p class="p">4․ <em>Effects:</em> Calls <code class="highlight"><c- n>a</c-><c- p>.</c-><c- n>deallocate</c-><c- p>(</c-><c- n>p</c-><c- p>,</c-> <c- n>n</c-><c- p>)</c-></code>. </p><p class="p">5․ <em>Throws:</em> Nothing. </p></small>
-   </blockquote>
-   <h3 class="heading settled" data-level="5.6" id="wording-container.alloc.reqmts"><span class="secno">5.6. </span><span class="content">[container.alloc.reqmts]</span><a class="self-link" href="#wording-container.alloc.reqmts"></a></h3>
+   <h3 class="heading settled" data-level="5.4" id="wording-container.alloc.reqmts"><span class="secno">5.4. </span><span class="content">[container.alloc.reqmts]</span><a class="self-link" href="#wording-container.alloc.reqmts"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/container.requirements#container.alloc.reqmts">[container.alloc.reqmts]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2646,7 +2607,7 @@ the value of <code class="highlight"><c- n>u</c-><c- p>.</c-><c- n>get_allocator
 </pre> <p class="p">25․ <em>Result:</em> X&amp;. </p><p class="p">26․ <em>Preconditions:</em> If <code class="highlight"><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>propagate_on_container_move_assignment</c-><c- o>::</c-><c- n>value</c-></code> is <code class="highlight">false</code>, <code class="highlight"><c- n>T</c-></code> is <em>Cpp17MoveInsertable</em> into <code class="highlight"><c- n>X</c-></code> and <em>Cpp17MoveAssignable</em>. </p><p class="p">27․ <em>Effects:</em> All existing elements of <code class="highlight"><c- n>a</c-></code> are either move assigned to or destroyed. </p><p class="p">28․ <em>Postconditions:</em> If <code class="highlight"><c- n>a</c-></code> and <code class="highlight"><c- n>rv</c-></code> do not refer to the same object, <code class="highlight"><c- n>a</c-></code> is equal to the value that <code class="highlight"><c- n>rv</c-></code> had before this assignment. </p><p class="p">29․ <em>Complexity:</em> Linear. </p><p></p><pre class="highlight"><c- n>a</c-><c- p>.</c-><c- n>swap</c-><c- p>(</c-><c- n>b</c-><c- p>)</c->
 </pre> <p class="p">30․ <em>Result:</em> <code class="highlight"><c- b>void</c-></code> </p><p class="p">31․ <em>Effects:</em> Exchanges the contents of <code class="highlight"><c- n>a</c-></code> and <code class="highlight"><c- n>b</c-></code>. </p><p class="p">32․ <em>Complexity:</em> Constant. </p></small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.7" id="wording-inplace.vector.syn"><span class="secno">5.7. </span><span class="content">[inplace.vector.syn]</span><a class="self-link" href="#wording-inplace.vector.syn"></a></h3>
+   <h3 class="heading settled" data-level="5.5" id="wording-inplace.vector.syn"><span class="secno">5.5. </span><span class="content">[inplace.vector.syn]</span><a class="self-link" href="#wording-inplace.vector.syn"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/inplace.vector.syn">[inplace.vector.syn]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2674,7 +2635,7 @@ the value of <code class="highlight"><c- n>u</c-><c- p>.</c-><c- n>get_allocator
 <c- p>}</c->
 </pre> </small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.8" id="wording-inplace.vector"><span class="secno">5.8. </span><span class="content">[inplace.vector]</span><a class="self-link" href="#wording-inplace.vector"></a></h3>
+   <h3 class="heading settled" data-level="5.6" id="wording-inplace.vector"><span class="secno">5.6. </span><span class="content">[inplace.vector]</span><a class="self-link" href="#wording-inplace.vector"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/inplace.vector">[inplace.vector]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2702,30 +2663,26 @@ then no <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T<
     <c- k>using</c-> <c- n>const_reverse_iterator</c-> <c- o>=</c-> <c- n>std</c-><c- o>::</c-><c- n>reverse_iterator</c-><c- o>&lt;</c-><c- n>const_iterator</c-><c- o>></c-><c- p>;</c->
  
     <i><c- c1>// [inplace.vector.cons], construct/copy/destroy</c-></i>
-    <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>()</c-> <c- k>noexcept</c-><ins><c- p>(</c-><c- k>noexcept</c-><c- p>(</c-><c- n>Allocator</c-><c- p>()))</c-></ins><c- p>;</c->
-    <c- k>constexpr</c-> <c- k>explicit</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>);</c->                         <c- c1>// freestanding-deleted</c->
-    <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>value</c-><c- p>);</c->                  <c- c1>// freestanding-deleted</c->
+    <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>()</c-> <c- k>noexcept</c-><ins><c- p>(</c-><c- k>noexcept</c-><c- p>(</c-><c- n>Allocator</c-><c- p>()))</c-> <c- o>:</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>Allocator</c-><c- p>())</c-> <c- p>{</c-> <c- p>}</c-></ins><del><c- p>;</c-></del>
+    <ins><c- k>constexpr</c-> <c- k>explicit</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+    <c- k>constexpr</c-> <c- k>explicit</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><ins><c- p>,</c-></ins>
+                                      <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->      <c- c1>// freestanding-deleted</c->
+    <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>value</c-><ins><c- p>,</c-></ins>
+                             <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->               <c- c1>// freestanding-deleted</c->
     <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
-      <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>);</c->    <c- c1>// freestanding-deleted</c->
+      <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><ins><c- p>,</c-></ins>
+                               <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->             <c- c1>// freestanding-deleted</c->
     <c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
-      <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>);</c->                       <c- c1>// freestanding-deleted</c->
+      <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><ins><c- p>,</c-></ins>
+                               <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->             <c- c1>// freestanding-deleted</c->
     <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- k>const</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-><c- p>);</c->
     <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;&amp;</c-><c- p>)</c->
       <del><c- k>noexcept</c-><c- p>(</c-><c- n>N</c-> <c- o>==</c-> <c- mi>0</c-> <c- o>||</c-> <c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>)</c-></del>
       <ins><c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>)</c-></ins><c- p>;</c->
-    <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>il</c-><c- p>);</c->                       <c- c1>// freestanding-deleted</c->
-    <ins><c- k>constexpr</c-> <c- k>explicit</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-    <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>                <ins><c- c1>// freestanding-deleted</c-></ins>
-    <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>value</c-><c- p>,</c-></ins>                   <ins><c- c1>// freestanding-deleted</c-></ins>
-                             <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>
-    <ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c-></ins>
-      <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>,</c-></ins>     <ins><c- c1>// freestanding-deleted</c-></ins>
-                               <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>
-    <ins><c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>R</c-><c- o>></c-></ins>
-      <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>     <ins><c- c1>// freestanding-deleted</c-></ins>
     <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- k>const</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>,</c-> <c- k>const</c-> <c- n>type_identity_t</c-><c- o>&lt;</c-><c- n>Allocator</c-><c- o>>&amp;</c-><c- p>);</c-></ins>
     <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>,</c-> <c- k>const</c-> <c- n>type_identity_t</c-><c- o>&lt;</c-><c- n>Allocator</c-><c- o>>&amp;</c-><c- p>);</c-></ins>
-    <ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>il</c-><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>     <ins><c- c1>// freestanding-deleted</c-></ins>
+    <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>initializer_list</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <del><c- n>il</c-></del><ins><c- p>,</c-></ins>
+                             <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->               <c- c1>// freestanding-deleted</c->
     <c- k>constexpr</c-> <c- o>~</c-><c- n>inplace_vector</c-><c- p>();</c->
     <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <del><c- n>other</c-></del> <ins><c- n>rhs</c-></ins><c- p>);</c->
     <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;&amp;</c-> <del><c- n>other</c-></del> <ins><c- n>rhs</c-></ins><c- p>)</c->
@@ -2829,21 +2786,24 @@ then no <code class="highlight"><c- n>inplace_vector</c-><c- o>&lt;</c-><c- n>T<
     <c- k>constexpr</c-> <c- k>friend</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>,</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>y</c-><c- p>)</c->
       <del><c- k>noexcept</c-><c- p>(</c-><c- n>N</c-> <c- o>==</c-> <c- mi>0</c-> <c- o>||</c-> <c- p>(</c-><c- n>is_nothrow_swappable_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-></del>
                           <del><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-><c- p>))</c-></del>
-      <ins><c- k>noexcept</c-><c- p>(</c-><c- n>x</c-><c- p>.</c-><c- n>swap</c-><c- p>(</c-><c- n>y</c-><c- p>))</c-></ins>
+      <ins><c- k>noexcept</c-><c- p>(</c-><c- k>noexcept</c-><c- p>(</c-><c- n>x</c-><c- p>.</c-><c- n>swap</c-><c- p>(</c-><c- n>y</c-><c- p>)))</c-></ins>
       <c- p>{</c-> <c- n>x</c-><c- p>.</c-><c- n>swap</c-><c- p>(</c-><c- n>y</c-><c- p>);</c-> <c- p>}</c->
   <c- p>};</c->
 <c- p>};</c->
-</pre> <p><b>24.3.14.2. Constructors [inplace.vector.cons]</b> </p><p></p><pre class="highlight"><c- k>constexpr</c-> <c- k>explicit</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>);</c->
-</pre> <p class="p">1․ <em>Preconditions:</em> <code class="highlight"><c- n>T</c-></code> is <i><code class="highlight"><c- n>Cpp17DefaultInsertable</c-></code></i> into <code class="highlight"><c- n>inplace_vector</c-></code>. </p><p class="p">2․ <em>Effects:</em> Constructs an <code class="highlight"><c- n>inplace_vector</c-></code> with <code class="highlight"><c- n>n</c-></code> default-inserted elements. </p><p class="p">3․ <em>Complexity:</em> Linear in <code class="highlight"><c- n>n</c-></code>. </p><p></p><pre class="highlight"><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>value</c-><c- p>);</c->
-</pre> <p class="p">4․ <em>Preconditions:</em> <code class="highlight"><c- n>T</c-></code> is <i><code class="highlight"><c- n>Cpp17CopyInsertable</c-></code></i> into <code class="highlight"><c- n>inplace_vector</c-></code>. </p><p class="p">5․ <em>Effects:</em> Constructs an <code class="highlight"><c- n>inplace_vector</c-></code> with <code class="highlight"><c- n>n</c-></code> copies of <code class="highlight"><c- n>value</c-></code>. </p><p class="p">6․ <em>Complexity:</em> Linear in <code class="highlight"><c- n>n</c-></code>. </p><p></p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
-  <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><c- p>);</c->
-</pre> <p class="p">7․ <em>Effects:</em> Constructs an <code class="highlight"><c- n>inplace_vector</c-></code> equal to the range <code class="highlight"><c- p>[</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code>. </p><p class="p">8․ <em>Complexity:</em> Linear in <code class="highlight"><c- n>distance</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code>. </p><p></p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
-  <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><c- p>);</c->
-</pre> <p class="p">9․ <em>Effects:</em> Constructs an <code class="highlight"><c- n>inplace_vector</c-></code> object with the elements of the range <code class="highlight"><c- n>rg</c-></code>. </p><p class="p">10․ <em>Complexity:</em> Linear in <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>distance</c-><c- p>(</c-><c- n>rg</c-><c- p>)</c-></code>. </p><p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;&amp;</c-><c- p>)</c-></ins>
+</pre> <p><b>24.3.14.2. Constructors [inplace.vector.cons]</b> </p><p class="note" role="note"><b>DRAFTING NOTE:</b> The use of <code class="highlight"><c- k>explicit</c-></code> on <code class="highlight"><c- n>inplace_vector</c-><c- p>(</c-><c- n>n</c-><c- p>,</c-> <c- n>alloc</c-><c- p>)</c-></code> is consistent with the other STL containers
+(e.g. <a href="https://eel.is/c++draft/vector#cons"><code class="highlight"><c- n>vector</c-></code></a> and <a href="https://eel.is/c++draft/list#cons"><code class="highlight"><c- n>list</c-></code></a>). </p><p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- k>explicit</c-> <c- n>vector</c-><c- p>(</c-><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-><c- p>);</c-></ins>
+</pre> <p class="p"><ins>x․ <em>Effects:</em> Constructs an empty <code class="highlight"><c- n>inplace_vector</c-></code>, using the specified allocator.</ins> </p><p class="p"><ins>x․ <em>Complexity:</em> Constant.</ins> </p><p></p><pre class="highlight"><c- k>constexpr</c-> <c- k>explicit</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><ins><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->
+</pre> <p class="p">1․ <em>Preconditions:</em> <code class="highlight"><c- n>T</c-></code> is <i><code class="highlight"><c- n>Cpp17DefaultInsertable</c-></code></i> into <code class="highlight"><c- n>inplace_vector</c-></code>. </p><p class="p">2․ <em>Effects:</em> Constructs an <code class="highlight"><c- n>inplace_vector</c-></code> with <code class="highlight"><c- n>n</c-></code> default-inserted elements<ins>, using the specified allocator</ins>. </p><p class="p">3․ <em>Complexity:</em> Linear in <code class="highlight"><c- n>n</c-></code>. </p><p></p><pre class="highlight"><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>size_type</c-> <c- n>n</c-><c- p>,</c-> <c- k>const</c-> <c- n>T</c-><c- o>&amp;</c-> <c- n>value</c-><ins><c- p>,</c-></ins>
+                         <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->
+</pre> <p class="p">4․ <em>Preconditions:</em> <code class="highlight"><c- n>T</c-></code> is <i><code class="highlight"><c- n>Cpp17CopyInsertable</c-></code></i> into <code class="highlight"><c- n>inplace_vector</c-></code>. </p><p class="p">5․ <em>Effects:</em> Constructs an <code class="highlight"><c- n>inplace_vector</c-></code> with <code class="highlight"><c- n>n</c-></code> copies of <code class="highlight"><c- n>value</c-></code><ins>, using the specified allocator</ins>. </p><p class="p">6․ <em>Complexity:</em> Linear in <code class="highlight"><c- n>n</c-></code>. </p><p></p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>InputIterator</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>InputIterator</c-> <c- n>first</c-><c- p>,</c-> <c- n>InputIterator</c-> <c- n>last</c-><ins><c- p>,</c-></ins>
+                           <ins><c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->
+</pre> <p class="p">7․ <em>Effects:</em> Constructs an <code class="highlight"><c- n>inplace_vector</c-></code> equal to the range <code class="highlight"><c- p>[</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code><ins>, using the specified allocator</ins>. </p><p class="p">8․ <em>Complexity:</em> Linear in <code class="highlight"><c- n>distance</c-><c- p>(</c-><c- n>first</c-><c- p>,</c-> <c- n>last</c-><c- p>)</c-></code>. </p><p></p><pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><i><c- n>container</c-><c- o>-</c-><c- n>compatible</c-><c- o>-</c-><c- n>range</c-></i><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- n>R</c-><c- o>></c->
+  <c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>from_range_t</c-><c- p>,</c-> <c- n>R</c-><c- o>&amp;&amp;</c-> <c- n>rg</c-><ins><c- p>,</c-> <c- k>const</c-> <c- n>Allocator</c-><c- o>&amp;</c-> <c- o>=</c-> <c- n>Allocator</c-><c- p>()</c-></ins><c- p>);</c->
+</pre> <p class="p">9․ <em>Effects:</em> Constructs an <code class="highlight"><c- n>inplace_vector</c-></code> object with the elements of the range <code class="highlight"><c- n>rg</c-></code><ins>, using the specified allocator</ins>. </p><p class="p">10․ <em>Complexity:</em> Linear in <code class="highlight"><c- n>ranges</c-><c- o>::</c-><c- n>distance</c-><c- p>(</c-><c- n>rg</c-><c- p>)</c-></code>. </p><p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;&amp;</c-><c- p>)</c-></ins>
   <ins><c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c-></ins>
 </pre> <p class="p"><ins>11․ <em>Preconditions:</em> <code class="highlight"><c- n>T</c-></code> is <em>Cpp17MoveInsertable</em> into <code class="highlight"><c- n>inplace_vector</c-></code>.</ins> </p><p class="p"><ins>12․ <em>Complexity:</em> Linear.</ins> </p><p class="p"><ins>13․ <em>Remarks:</em> When <code class="highlight"><c- n>allocator_type</c-></code> is <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></code>, the exception specification is equivalent to:</ins> </p><div style="margin: 0.5em 2em;"><pre class="highlight"><ins><c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></ins>
-</pre></div> <ins>Otherwise, the exception specification is unspecified.</ins> <p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-></ins>
-  <ins><c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c-></ins>
+</pre></div> <ins>Otherwise, the exception specification is unspecified.</ins> <p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>);</c-></ins>
 </pre> <p class="p"><ins>14․ <em>Preconditions:</em> <code class="highlight"><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>propagate_on_container_copy_assignment</c-><c- o>::</c-><c- n>value</c-></code> is <code class="highlight">false</code> or <code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-> <c- o>==</c-> <c- k>this</c-><c- o>-></c-><c- n>get_allocator</c-><c- p>()</c-></code>. <code class="highlight"><c- n>T</c-></code> is <em>Cpp17CopyInsertable</em> into <code class="highlight"><c- n>inplace_vector</c-></code> and <em>Cpp17CopyAssignable</em>.</ins> </p><p></p><pre class="highlight"><ins><c- k>constexpr</c-> <c- n>inplace_vector</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>inplace_vector</c-><c- o>&amp;&amp;</c-> <c- n>rhs</c-><c- p>)</c-></ins>
   <ins><c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>);</c-></ins>
 </pre> <p class="p"><ins>15․ <em>Preconditions:</em> <code class="highlight"><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>allocator_type</c-><c- o>>::</c-><c- n>propagate_on_container_move_assignment</c-><c- o>::</c-><c- n>value</c-></code> is <code class="highlight">false</code> or <code class="highlight"><c- n>rhs</c-><c- p>.</c-><c- n>get_allocator</c-><c- p>()</c-> <c- o>==</c-> <c- k>this</c-><c- o>-></c-><c- n>get_allocator</c-><c- p>()</c-></code>. <code class="highlight"><c- n>T</c-></code> is <em>Cpp17MoveInsertable</em> into <code class="highlight"><c- n>inplace_vector</c-></code> and <em>Cpp17MoveAssignable</em>.</ins> </p><p class="p"><ins>16․ <em>Complexity:</em> Linear.</ins> </p><p class="p"><ins>17․ <em>Remarks:</em> When <code class="highlight"><c- n>allocator_type</c-></code> is <code class="highlight"><c- n>allocator</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></code>, the exception specification is equivalent to:</ins> </p><div style="margin: 0.5em 2em;"><pre class="highlight"><ins><c- n>is_nothrow_move_assignable_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- n>is_nothrow_move_constructible_v</c-><c- o>&lt;</c-><c- n>value_type</c-><c- o>></c-></ins>
@@ -3061,6 +3021,8 @@ If <code class="highlight"><c- n>allocator_traits</c-><c- o>&lt;</c-><c- n>alloc
    <dd>Ben Craig. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html"><cite>Freestanding Feature-Test Macros and Implementation-Defined Extensions</cite></a>. December 2022. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2198r7.html</a>
    <dt id="biblio-p3160r1">[P3160R1]
    <dd>Pablo Halpern. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r1.html"><cite>Allocator-aware inplace_vector</cite></a>. March 2024. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r1.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r1.html</a>
+   <dt id="biblio-p3160r2">[P3160R2]
+   <dd>Pablo Halpern. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r2.html"><cite>Allocator-aware inplace_vector</cite></a>. October 2024. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r2.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3160r2.html</a>
    <dt id="biblio-p3295">[P3295]
    <dd>Ben Craig. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r0.html"><cite>Freestanding constexpr containers and constexpr exception types</cite></a>. May 2024. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r0.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3295r0.html</a>
    <dt id="biblio-quuxplusonesg14">[QuuxplusoneSG14]
