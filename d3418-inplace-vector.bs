@@ -2,7 +2,7 @@
 Title: Wording for P3160R2 <code>inplace_vector</code>'s "construct/destroy" alternative
 Shortname: D3418
 Revision: 0
-!Draft Revision: 14
+!Draft Revision: 15
 Audience: LEWG
 Status: D
 Group: WG21
@@ -21,6 +21,8 @@ Date: 2024-10-10
 <style>
 hilite  {background-color: #FFFF00; font-weight: bold;}
 ins     {background-color: #CCFFCC; text-decoration: underline;}
+insarthur  {background-color: #FFFFCC; text-decoration: underline;}
+inspablo   {background-color: #DDDDFF; text-decoration: underline;}
 del     {background-color: #FFCACA; text-decoration: line-through;}
 p       {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
 p.p     {margin: 0em 2em 0.5em 2em;}
@@ -345,7 +347,8 @@ less legible to users. So we don't do that.
 
 ### Notes on preconditions ### {#pocs-ub}
 
-For `swap` in particular, Arthur and Pablo disagree on the appropriate precondition w.r.t. allocator equality.
+For `swap` in particular, even if we assume the "construct/destroy" model instead of the "uses-allocator" model,
+Arthur and Pablo disagree as to what would be the appropriate precondition w.r.t. allocator equality.
 Arthur's proposed wording is as follows.
 The first part of the <i>Precondition</i> element is modeled on <a href="https://eel.is/c++draft/alg.swap#2">[alg.swap]/2</a>
 (as used by <a href="https://eel.is/c++draft/array#members-4">`array::swap`</a>), and the second part (the part
@@ -362,7 +365,7 @@ If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `tr
 <p class="p"><ins>x․ *Effects:*</ins> [...]
 </blockquote></small>
 
-An alternative proposed by Pablo is as follows:
+Pablo would prefer something more like this:
 
 <small><blockquote>
 <p><pre><ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
@@ -490,6 +493,11 @@ Thanks to Casey Carter for his review of this wording.
 
 # Proposed wording # {#wording}
 
+In this section, wording in <del>strikethrough</del> is to be deleted; wording in <ins>green</ins> is to be added
+no matter which alternative we go with;
+wording in <insarthur>yellow</insarthur> is to be added only in the "construct/destroy alternative";
+wording in <inspablo>blue</inspablo> is to be added only in the "uses-allocator alternative."
+
 ## [version.syn] ## {#wording-version.syn}
 
 Modify <a href="https://eel.is/c++draft/version.syn">[version.syn]</a> as follows,
@@ -558,7 +566,52 @@ Modify <a href="https://eel.is/c++draft/container.requirements#container.alloc.r
 <small><blockquote>
 <p>1․ Except for `array` <del>and `inplace_vector`</del>, all of the containers defined in [containers], [stacktrace.basic],
 [basic.string], and [re.results] meet the additional requirements of an <i>allocator-aware container</i>, as described below.
+<p>2․ Given an allocator type `A` and given a container type `X` having a `value_type` identical to `T` and
+an `allocator_type` identical to `allocator_traits<A>::rebind_alloc<T>` and given an lvalue `m` of type `A`,
+a pointer `p` of type `T*`, an expression `v` that denotes an lvalue of type `T` or `const T` or an rvalue of type `const T`,
+and an rvalue `rv` of type `T`, the following terms are defined.
+<inspablo>If `X` is a specialization of `inplace_vector`, the terms below are defined
+as if `A` were `scoped_allocator_adaptor<allocator<T>, allocator_type>`.</inspablo>
+If `X` is not allocator-aware or is a specialization of `basic_string`, the terms below are defined
+as if `A` were `allocator<T>` — no allocator object needs to be created
+and user specializations of `allocator<T>` are not instantiated:
+
+<p>(2.1) — `T` is <i>Cpp17DefaultInsertable into `X`</i> means that the following expression is well-formed:
+<p><pre>
+allocator_traits&lt;A>::construct(m, p)
+</pre>
+<p>(2.2) — An element of `X` is *default-inserted* if it is initialized by evaluation of the expression
+<p><pre>
+allocator_traits&lt;A>::construct(m, p)
+</pre>
+where `p` is the address of the uninitialized storage for the element allocated within `X`.
+<p>(2.3) — `T` is <i>Cpp17MoveInsertable into `X`</i> means that the following expression is well-formed:
+<p><pre>
+allocator_traits&lt;A>::construct(m, p, rv)
+</pre>
+and its evaluation causes the following postcondition to hold: The value of `*p` is equivalent to the value of `rv` before the evaluation.
+[*Note:* `rv` remains a valid object. Its state is unspecified. *—end note*]
+<p>(2.4) — `T` is <i>Cpp17CopyInsertable into `X`</i> means that, in addition to `T` being *Cpp17MoveInsertable* into `X`, the following expression is well-formed:
+<p><pre>
+allocator_traits&lt;A>::construct(m, p, v)
+</pre>
+and its evaluation causes the following postcondition to hold: The value of `v` is unchanged and is equivalent to `*p`.
+<p>(2.5) — `T` is <i>Cpp17EmplaceConstructible into `X` from `args`</i>, for zero or more arguments `args`, means that the following expression is well-formed:
+<p><pre>
+allocator_traits&lt;A>::construct(m, p, args)
+</pre>
+<p>(2.6) — `T` is <i>Cpp17Erasable from `X`</i> means that the following expression is well-formed:
+<p><pre>
+allocator_traits&lt;A>::destroy(m, p)
+</pre>
+[<i>Note:</i> A container calls `allocator_traits<A>::construct(m, p, args)` to construct an element at `p` using `args`,
+with `m == get_allocator()`
+<inspablo>(or `m == A(allocator<T>(), get_allocator())` in the case of `inplace_vector`)</inspablo>.
+The default `construct` in `allocator` will call `::new((void*)p) T(args)`, but
+specialized allocators can choose a different definition. <i>—end note</i>]
+
 <p>[...]
+
 <p class="p">A type `X` meets the allocator-aware container requirements if `X` meets the container requirements
 and the following types, statements, and expressions are well-formed and have the specified semantics.
 <p><pre>
@@ -636,6 +689,11 @@ Modify <a href="https://eel.is/c++draft/inplace.vector.syn">[inplace.vector.syn]
 #include &lt;initializer_list>     <i>// see [initializer.list.syn]</i>
 &nbsp;
 namespace std {
+
+  <inspablo><i>// exposition-only type traits</i></inspablo>
+  <inspablo>template&lt;class T, class A, class... X></inspablo>
+    <inspablo>constexpr bool <i>is-nothrow-ua-constructible-v</i> = <i>see below</i>; <i>// exposition only</i></inspablo>
+
   <i>// [inplace.vector], class template inplace_vector</i>
   template&lt;class T, size_t N<ins>, class Allocator</ins>> class inplace_vector; <i>// partially freestanding</i>
 &nbsp;
@@ -663,8 +721,9 @@ Modify <a href="https://eel.is/c++draft/inplace.vector">[inplace.vector]</a> as 
 <p><b>24.3.14 Class template `inplace_vector` [inplace.vector]</b>
 <p><b>24.3.14.1 Overview [inplace.vector.overview]</b>
 <p>1․ An `inplace_vector` is a contiguous container. Its capacity is fixed and its elements are stored within the `inplace_vector` object itself.
-<ins>[<i>Note:</i> Although it is an allocator-aware container, `inplace_vector` never directly instantiates the `allocate` or `deallocate` member functions
-of its `allocator_type`. `inplace_vector` uses its allocator only to construct and destroy elements.<i>— end note</i>]</ins>
+<ins>[<i>Note:</i> Although it is an allocator-aware container, `inplace_vector` uses its allocator
+only to construct and destroy <inspablo>allocator-aware</inspablo> elements;
+it never directly instantiates the `allocate` or `deallocate` member functions of its `allocator_type`.<i>— end note</i>]</ins>
 <p>2․ An `inplace_vector` meets all of the requirements of a container ([container.reqmts]), of a reversible container ([container.rev.reqmts]),
 <ins>of an allocator-aware container ([container.alloc.reqmts]),</ins>
 of a contiguous container, and of a sequence container, including most of the optional sequence container requirements ([sequence.reqmts]).
@@ -675,17 +734,32 @@ meet the constexpr iterator requirements.
 <p>4․ For any `N` > 0 <ins>and any `Allocator`</ins>, if `is_trivial_v<T>` is `false`,
 then no <code>inplace_vector&lt;T, N<ins>, Allocator</ins>></code> member functions are usable in constant expressions.
 <p>5․ Any member function of <code>inplace_vector&lt;T, N<ins>, Allocator</ins>></code> that would cause the size to exceed `N` throws an exception of type `bad_alloc`.
-<p>6․ Let `IV` denote a specialization <del>of</del> <code>inplace_vector&lt;T, N<ins>, allocator&lt;T></ins>></code>. If `N` is zero, then `IV` is both trivial and empty. Otherwise:
+<p>6․ Let `IV` denote a specialization <del>of <code>inplace_vector&lt;T, N></code></del> <insarthur><code>inplace_vector&lt;T, N, allocator&lt;T>></code></insarthur>
+<inspablo>inplace_vector&lt;T, N, A></inspablo>. If `N` is zero, then `IV` is <inspablo>empty.
+If `N` is zero and either `is_trivial_v<A>` is `true` or `A` is a specialization of `allocator`,
+then `IV` is</inspablo> both trivial and empty. Otherwise:
 <ul>
-  <li>(6.1) If `is_trivially_copy_constructible_v<T>` is `true`, then `IV` has a trivial copy constructor.</li>
-  <li>(6.2) If `is_trivially_move_constructible_v<T>` is `true`, then `IV` has a trivial move constructor.</li>
+  <li>(6.1) If <code>is_trivially_copy_constructible_v&lt;T> <inspablo>&& is_trivially_copy_constructible_v&lt;A></inspablo></code> is `true`
+            <inspablo>and `A::select_on_container_copy_construction` does not exist</inspablo>,
+            then `IV` has a trivial copy constructor.</li>
+  <li>(6.2) If <code>is_trivially_move_constructible_v&lt;T> <inspablo>&& is_trivially_move_constructible_v&lt;A></inspablo></code> is `true`,
+            then `IV` has a trivial move constructor.</li>
   <li>(6.3) If `is_trivially_destructible_v<T>` is `true`, then:
   <ul>
-    <li>(6.3.1) `IV` has a trivial destructor.</li>
-    <li>(6.3.2) If `is_trivially_copy_constructible_v<T> && is_trivially_copy_assignable_v<T>` is `true`, then `IV` has a trivial copy assignment operator.</li>
-    <li>(6.3.3) If `is_trivially_move_constructible_v<T> && is_trivially_move_assignable_v<T>` is `true`, then `IV` has a trivial move assignment operator.</li>
+    <li>(6.3.1) <inspablo>If `is_trivially_destructible_v<A>` is `true`, then</inspablo> `IV` has a trivial destructor.</li>
+    <li>(6.3.2) If <code>is_trivially_copy_constructible_v&lt;T> && is_trivially_copy_assignable_v&lt;T>
+                <inspablo>&& is_trivially_copy_assignable_v&lt;A> && (allocator_traits&lt;A>::propagate_on_container_copy_assignment::value ||
+                allocator_traits&lt;A>::is_always_equal::value)</inspablo></code> is `true`, then `IV` has a trivial copy assignment operator.</li>
+    <li>(6.3.3) If <code>is_trivially_move_constructible_v&lt;T> && is_trivially_move_assignable_v&lt;T>
+                <inspablo>&& is_trivially_move_assignable_v&lt;A> && (allocator_traits&lt;A>::propagate_on_container_move_assignment::value ||
+                allocator_traits&lt;A>::is_always_equal::value)</inspablo></code> is `true`, then `IV` has a trivial move assignment operator.</li>
   </ul></li>
 </ul>
+<ul>
+<p><inspablo>7․ The exposition-only trait <code><i>is-nothrow-ua-constructible-v</i>&lt;T, A, X...></code> is true if
+<i>uses-allocator construction</i> with an allocator of type `A` and constructor arguments of types specified by `X...` ([allocator.uses.construction])
+is known to be a non-throwing operation. [*Note:* This trait can be implemented by instantiating `is_nothrow_constructible_v<T, Y...>`,
+where `Y...` is the set of tuple arguments deduced by `uses_allocator_construction_args`. *—end note*]</inspablo>
 
 <p><pre>
 namespace std {
@@ -695,12 +769,12 @@ namespace std {
     <i>// types:</i>
     using value_type             = T;
     <ins>using allocator_type         = Allocator;</ins>
-    using pointer                = <del>T*</del> <ins>typename allocator_traits&lt;Allocator>::pointer</ins>;
-    using const_pointer          = <del>const T*</del> <ins>typename allocator_traits&lt;Allocator>::const_pointer</ins>;
+    using pointer                = <del>T*</del> <insarthur>typename allocator_traits&lt;Allocator>::pointer</insarthur>;
+    using const_pointer          = <del>const T*</del> <insarthur>typename allocator_traits&lt;Allocator>::const_pointer</insarthur>;
     using reference              = value_type&;
     using const_reference        = const value_type&;
-    using size_type              = <del>size_t</del> <ins><i>implementation-defined</i></ins>; <ins><i>// see [container.requirements]</i></ins>
-    using difference_type        = <del>ptrdiff_t</del> <ins><i>implementation-defined</i></ins>; <ins><i>// see [container.requirements]</i></ins>
+    using size_type              = <del>size_t</del> <insarthur><i>implementation-defined</i></insarthur>; <insarthur><i>// see [container.requirements]</i></insarthur>
+    using difference_type        = <del>ptrdiff_t</del> <insarthur><i>implementation-defined</i></insarthur>; <insarthur><i>// see [container.requirements]</i></insarthur>
     using iterator               = <i>implementation-defined</i>; <i>// see [container.requirements]</i>
     using const_iterator         = <i>implementation-defined</i>; <i>// see [container.requirements]</i>
     using reverse_iterator       = std::reverse_iterator&lt;iterator>;
@@ -722,7 +796,8 @@ namespace std {
     constexpr inplace_vector(const inplace_vector&);
     constexpr inplace_vector(inplace_vector&&)
       <del>noexcept(N == 0 || is_nothrow_move_constructible_v&lt;T>)</del>
-      <ins>noexcept(<i>see below</i>)</ins>;
+      <inspablo>noexcept(N == 0 || <i>is-nothrow-ua-constructible-v</i>&lt;T, Allocator, T&&>)</inspablo>
+      <insarthur>noexcept(<i>see below</i>)</insarthur>;
     <ins>constexpr inplace_vector(const inplace_vector& rhs, const type_identity_t&lt;Allocator>&);</ins>
     <ins>constexpr inplace_vector(inplace_vector&& rhs, const type_identity_t&lt;Allocator>&);</ins>
     constexpr inplace_vector(initializer_list&lt;T> <del>il</del><ins>,</ins>
@@ -732,7 +807,9 @@ namespace std {
     constexpr inplace_vector& operator=(inplace_vector&& <del>other</del> <ins>rhs</ins>)
       <del>noexcept(N == 0 || (is_nothrow_move_assignable_v&lt;T> &&</del>
                           <del>is_nothrow_move_constructible_v&lt;T>))</del>
-      <ins>noexcept(<i>see below</i>)</ins>;
+      <inspablo>noexcept(N == 0 || (is_nothrow_move_assignable_v&lt;T> &&</inspablo>
+                          <inspablo><i>is-nothrow-ua-constructible-v</i>&lt;T, Allocator, T&&>))</inspablo>
+      <insarthur>noexcept(<i>see below</i>)</insarthur>;
     constexpr inplace_vector& operator=(initializer_list&lt;T>);               // freestanding-deleted
     template&lt;class InputIterator>
       constexpr void assign(InputIterator first, InputIterator last);       // freestanding-deleted
@@ -820,7 +897,9 @@ namespace std {
     constexpr void swap(inplace_vector& x)
       <del>noexcept(N == 0 || (is_nothrow_swappable_v&lt;T> &&</del>
                           <del>is_nothrow_move_constructible_v&lt;T>))</del>
-      <ins>noexcept(<i>see below</i>)</ins>;
+      <inspablo>noexcept(N == 0 || (is_nothrow_swappable_v&lt;T> &&</inspablo>
+                          <inspablo><i>is-nothrow-ua-constructible-v</i>&lt;T, Allocator, T&&>))</inspablo>
+      <insarthur>noexcept(<i>see below</i>)</insarthur>;
     constexpr void clear() noexcept;
 &nbsp;
     constexpr friend bool operator==(const inplace_vector& x,
@@ -878,34 +957,37 @@ template&lt;<i>container-compatible-range</i>&lt;T> R>
 
 <p><pre>
 <ins>constexpr inplace_vector(inplace_vector&&)</ins>
-  <ins>noexcept(<i>see below</i>);</ins>
+  <inspablo>noexcept(N == 0 || <i>is-nothrow-ua-constructible-v</i>&lt;T, Allocator, T&&>);</inspablo>
+  <insarthur>noexcept(<i>see below</i>);</insarthur>
 </pre>
 <p class="p"><ins>11․ *Preconditions:* `T` is *Cpp17MoveInsertable* into `inplace_vector`.</ins>
 <p class="p"><ins>12․ *Complexity:* Linear.</ins>
-<p class="p"><ins>13․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
+<p class="p"><insarthur>13․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</insarthur>
 <div style="margin: 0.5em 2em;"><pre>
-<ins>is_nothrow_move_constructible_v&lt;value_type></ins>
+<insarthur>is_nothrow_move_constructible_v&lt;value_type></insarthur>
 </pre></div>
-<ins>Otherwise, the exception specification is unspecified.</ins>
+<insarthur>Otherwise, the exception specification is unspecified.</insarthur>
 
 <p><pre>
-<ins>constexpr inplace_vector& operator=(const inplace_vector& rhs);</ins>
+<insarthur>constexpr inplace_vector& operator=(const inplace_vector& rhs);</insarthur>
 </pre>
-<p class="p"><ins>14․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_copy_assignment::value` is `false`
-or `rhs.get_allocator() == this->get_allocator()`. `T` is *Cpp17CopyInsertable* into `inplace_vector` and *Cpp17CopyAssignable*.</ins>
+<p class="p"><insarthur>14․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_copy_assignment::value` is `false`
+or `rhs.get_allocator() == this->get_allocator()`. `T` is *Cpp17CopyInsertable* into `inplace_vector` and *Cpp17CopyAssignable*.</insarthur>
 
 <p><pre>
 <ins>constexpr inplace_vector& operator=(inplace_vector&& rhs)</ins>
-  <ins>noexcept(<i>see below</i>);</ins>
+  <inspablo>noexcept(N == 0 || (is_nothrow_move_assignable_v&lt;T> &&</inspablo>
+                      <inspablo><i>is-nothrow-ua-constructible-v</i>&lt;T, Allocator, T&&>));</inspablo>
+  <insarthur>noexcept(<i>see below</i>);</insarthur>
 </pre>
-<p class="p"><ins>15․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_move_assignment::value` is `false`
-or `rhs.get_allocator() == this->get_allocator()`. `T` is *Cpp17MoveInsertable* into `inplace_vector` and *Cpp17MoveAssignable*.</ins>
+<p class="p"><insarthur>15․ *Preconditions:* `allocator_traits<allocator_type>::propagate_on_container_move_assignment::value` is `false`
+or `rhs.get_allocator() == this->get_allocator()`. `T` is *Cpp17MoveInsertable* into `inplace_vector` and *Cpp17MoveAssignable*.</insarthur>
 <p class="p"><ins>16․ *Complexity:* Linear.</ins>
-<p class="p"><ins>17․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
+<p class="p"><insarthur>17․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</insarthur>
 <div style="margin: 0.5em 2em;"><pre>
-<ins>is_nothrow_move_assignable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
+<insarthur>is_nothrow_move_assignable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></insarthur>
 </pre></div>
-<ins>Otherwise, the exception specification is unspecified.</ins>
+<insarthur>Otherwise, the exception specification is unspecified.</insarthur>
 
 <p class="note"><b>DRAFTING NOTE:</b>
 `type_identity_t` below is consistent with the other STL containers.
@@ -1043,19 +1125,31 @@ constexpr void pop_back();
 but the assignment operator of `T` is called the number of times equal to the number of elements after the erased elements.
 
 <p><pre>
-<ins>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</ins>
+<inspablo>constexpr void swap(inplace_vector& x)</inspablo>
+  <inspablo>noexcept(N == 0 || (is_nothrow_swappable_v&lt;T> &&</inspablo>
+                      <inspablo><i>is-nothrow-ua-constructible-v</i>&lt;T, Allocator, T&&>));</inspablo>
 </pre>
-<p class="p"><ins>30․ *Preconditions:* Let *M* be `min(size(), x.size())`.
+<p class="p"><inspablo>30․ *Effects:* If `allocator_traits<A>::propagate_on_container_swap::value && !allocator_traits<A>::always_compare_equal::value` is `true`,
+swap the allocators of `*this` and `x`.
+Then, swap the first `m` elements of `*this` and `x`, where `m` is the smaller of `this->size()` and `x.size()`.
+Then, move-insert the remaining elements from the longer `inplace_vector` to the end of the shorter one,
+then erase those elements from the longer `inplace_vector`.</inspablo>
+<p class="p"><inspablo>32․ *Complexity:* Linear.</inspablo>
+
+<p><pre>
+<insarthur>constexpr void swap(inplace_vector& x) noexcept(<i>see below</i>);</insarthur>
+</pre>
+<p class="p"><insarthur>30․ *Preconditions:* Let *M* be `min(size(), x.size())`.
 For each non-negative integer *n* &lt; *M*, `(*this)[n]` is swappable with ([swappable.requirements]) `x[n]`.
 If `allocator_traits<allocator_type>::propagate_on_container_swap::value` is `true`, then
-`allocator_type` meets the <i>`Cpp17Swappable`</i> requirements and `get_allocator() == x.get_allocator()`.</ins>
-<p class="p"><ins>31․ *Effects:* Exchanges the contents of `*this` and `x`.</ins>
-<p class="p"><ins>32․ *Complexity:* Linear.</ins>
-<p class="p"><ins>33․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</ins>
+`allocator_type` meets the <i>`Cpp17Swappable`</i> requirements and `get_allocator() == x.get_allocator()`.</insarthur>
+<p class="p"><insarthur>31․ *Effects:* Exchanges the contents of `*this` and `x`.</insarthur>
+<p class="p"><insarthur>32․ *Complexity:* Linear.</insarthur>
+<p class="p"><insarthur>33․ *Remarks:* When `allocator_type` is `allocator<value_type>`, the exception specification is equivalent to:</insarthur>
 <div style="margin: 0.5em 2em;"><pre>
-<ins>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></ins>
+<insarthur>is_nothrow_swappable_v&lt;value_type> && is_nothrow_move_constructible_v&lt;value_type></insarthur>
 </pre></div>
-<ins>Otherwise, the exception specification is unspecified.</ins>
+<insarthur>Otherwise, the exception specification is unspecified.</insarthur>
 
 <p class="note"><b>DRAFTING NOTE:</b>
 The exception specification above is modeled on <a href="https://eel.is/c++draft/optional.swap#5">[optional.swap]/5</a>.
