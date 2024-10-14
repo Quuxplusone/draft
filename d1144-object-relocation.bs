@@ -2,24 +2,21 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 12
-!Draft Revision: 70
-Audience: LEWG, EWG
+!Draft Revision: 71
+Audience: EWGI
 Status: D
 Group: WG21
 URL:
 Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  We define a new verb, "relocate," equivalent to a move and a destroy.
-  For many C++ types, this is implementable "trivially," as a single <code>memcpy</code>.
-  We propose a standard trait so library writers can detect such types.
-  We propose a compiler rule that propagates trivial relocatability among Rule-of-Zero types.
-  Finally, we propose a standard syntax for a user-defined type (e.g. <code>boost::container::static_vector</code>) to warrant
-  to the implementation that it is trivially relocatable.
-Date: 2024-07-04
+  P1144 trivial relocation is used by Abseil, AMC, BSL, Folly, HPX, Parlay, Pocketpy, Qt, Subspace, and Thrust.
+  Let's make it part of the C++ standard.
+Date: 2024-10-15
 </pre>
 
 <style>
+p    {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
@@ -27,416 +24,169 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R12 (post-St Louis 2024):
+- R12 (pre-Wrocław 2024):
+
+    - Complete rewrite of the prose sections.
+
+    - Added missing forward-declarations to [concepts.syn], [meta.type.synop], and [memory.syn].
+
+    - Removed `[[nodiscard]]` from `relocate(T*)`,
+        thanks to <a href="https://github.com/cplusplus/papers/issues/1744">P2422</a>.
 
     - Updated [concept.relocatable]: `u2` mustn't be a potentially overlapping subobject.
 
-- R11 (pre-St Louis 2024):
+    - Updated [uninitialized.relocate] and [specialized.relocate]: Instead of "side effects <i>might</i> not happen,"
+        we now say "<i>do</i> not happen": Memmove optimization is now mandatory. (This addresses
+        one of EWG's concerns versus [[P2786]], that P1144 leaves too much up to quality-of-implementation.)
+        This incidentally guarantees that `relocate` of a trivially relocatable type will never throw.
 
-    - Updated [[ParlayLib]] status; it conforms with P1144 since February 2024.
-            Updated [[Abseil]] and [[Folly]] status. Added [[PocketPy]] status.
 
-    - Introduce `NoThrowInputIterator` for the benefit of `uninitialized_relocate_n`.
+# What's going on here? # {#intro}
 
-    - Cross-reference to [[P3279]].
+<b>Isn't EWG already considering a "trivial relocation" proposal, [[P2786]]?</b>
 
-- R10 (pre-Tokyo 2024):
+Yes. P2786 was forwarded (1–8–3–3–1) from EWGI to EWG at Issaquah in February 2023.
 
-    - Added implementation experience with [[Abseil]], [[Amadeus]], [[HPX]], [[ParlayLib]], [[StdxError]], and [[Thrust]].
-            Added <a href="#relevance-of-assignment">§5.2 "Relevance of `operator=`"</a>.
+P1144, which dates back to 2018, had <i>already</i> been voted out of EWGI once,
+at Prague in February 2020 (1–3–4–1–0). It remains unclear why that vote was ignored.
+At Issaquah, it was seen and voted <i>again</i> (0–7–4–3–1).
 
-    - Wording for `ExecutionPolicy` overloads of the specialized algorithms. Explain why
-            there are no `ranges` overloads.
+At Tokyo in February 2024, P2786 was voted from EWG into CWG (7–9–6–0–2).
+But then, at St Louis in June 2024, EWG voted strongly (21–15–3–6–5) that P2786 wasn't ready for CWG after all,
+and brought it back for further discussion. I <a href="https://wiki.edg.com/bin/view/Wg21stlouis2024/NotesEWGTrivialRelocatability">asked</a>
+during that meeting whether the chair of EWG was willing to schedule P1144 for discussion,
+or even to take a poll of EWG on <i>whether</i> to discuss it. He said no.
 
-    - Moved "trivially relocatable class" wording into [class.prop], and increased the similarity
-            between `[[trivially_relocatable]]` and `[[no_unique_address]]`.
+<b>That seems... weird. Is P2786 simply better?</b>
 
-- R9 (pre-Kona 2023):
+In my opinion, no it is not. It's more complicated and offers less to the programmer.
+It has had no uptake in the programming community. In fact, the main reason it was so
+overwhelmingly clawed back in St Louis is because of two papers presented there by
+third-party library maintainers:
 
-    - Added feature-test macros `__cpp_impl_trivially_relocatable` and `__cpp_lib_trivially_relocatable`.
+* [[P3233]] "Issues with P2786" (Giuseppe D'Angelo)
+* [[P3236]] "Please reject P2786 and adopt P1144" (Stéphane Janel, Hans Goudey, Jacques Lucke, Alan de Freitas,
+    Krystian Stasiowski, Daniel Liam Anderson, Giuseppe Ottaviano, Giuseppe D’Angelo, Thiago Maciera,
+    Hartmut Kaiser, Isidoros Tsaousis, Shreyas Atre)
 
-    - Added <a href="#design-non-goals">§3.1 "Design non-goals"</a> and comparison to [[P2785R3]].
+<b>Does P1144 have uptake in the community?</b>
 
-    - Replaced [[#non-trivial-samples|Appendix C "Examples of non-trivially relocatable class types"]]
-            with a shorter summary.
+Yes. In fact, since P1144R0 was modeled directly on Folly and BSL, you might say that
+P1144 is the <i>committee's</i> uptake of a <i>community</i> idea!
 
-    - Removed Appendix E "Open questions" as basically redundant with <a href="#pmr-concerns">§5.3 "Confusing interactions with `std::pmr`"</a>.
-            See ["P1144 PMR koans"](https://quuxplusone.github.io/blog/2023/06/03/p1144-pmr-koans/) (June 2023).
+Since 2018, most of the libraries that inspired P1144
+have entrenched even further with its consistent terminology and semantics.
+P1144R9 introduced a pair of feature-test macros, and some libraries have
+adopted those macros, so that they <i>already today</i> get better performance on Arthur's
+reference implementation and will be "ready on day one" when P1144 is eventually adopted
+by the committee. The flagship examples are:
 
-- R8 (pre-Varna 2023):
-
-    - [[#wording-dcl.attr.trivreloc|dcl.attr.trivreloc]]: Removed "If a type `T` is declared `trivially_relocatable`,
-            and `T` is either not move-constructible or not destructible, the program is ill-formed."
-            This should have been removed in R7 along with "move-constructible, destructible."
-
-    - [[#wording-meta.unary.prop|meta.unary.prop]]: Adjusted the precondition of `is_trivially_relocatable_v` to match `is_trivially_copyable_v`.
-            Removed `is_relocatable_v`, `is_nothrow_relocatable_v` for insufficient motivation (but kept
-            `concept relocatable` because it expresses semantic requirements).
-
-    - Marked `std::relocate` as `[[nodiscard]]`; changed its return type to `remove_cv_t<T>`.
-
-    - Rewrote [[#design-goals|§3 "Design goals."]]
-
-- R7 (post-Issaquah 2023):
-
-    - Added `std::uninitialized_relocate_backward`, the building block of `vector::insert`.
-
-    - Removed "move-constructible, destructible" from the requirements in [[#wording-basic.types.general|basic.types.general]].
-            Now trivially relocatable types, like trivially copyable types, can be non-relocatable.
-
-    - Added [[#applications|table §2.1]] directly comparing this proposal to Folly, BSL, and Qt.
-
-    - Added straw poll results from Issaquah; removed much background and discussion
-            (leaving only notes for the interested reader to consult [[P1144R6]]).
-
-
-# Introduction and motivation # {#intro}
-
-Given an object type `T` and memory addresses `src` and `dst`,
-the phrase "<b><i>relocate</i></b> a `T` from `src` to `dst`" means
-"*move-construct* `dst` from `src`, and then immediately *destroy* the object at `src`."
-
-Any type which is both move-constructible and destructible is <b><i>relocatable</i></b>.
-A type is <b><i>nothrow relocatable</i></b> if its relocation operation is noexcept, and a type
-is <b><i>trivially relocatable</i></b> if its relocation operation is trivial (which,
-just like trivial move-construction and trivial copy-construction, means
-"tantamount to `memcpy`").
-
-In practice, almost all relocatable types are trivially relocatable: `std::unique_ptr<int>`,
-`std::vector<int>`, `std::string` (on libc++ and MSVC), `std::list<int>` (on MSVC).
-Examples of non-trivially relocatable types include `std::list<int>` (on libstdc++ and libc++)
-and `std::string` (on libstdc++). See [[#non-trivial-samples]] and [[InPractice]].
-
-P1144 allows the library programmer
-to <b><i>warrant</i></b> to the compiler that a resource-management type is trivially relocatable.
-Explicit warrants are rarely needed because the compiler can infer trivial relocatability for
-Rule-of-Zero types. See [[#wording-basic.types.general]].
-
-The most important thing about P1144 relocation is that it is backward compatible and does not
-break either API or ABI. P1144 intends simply to legalize the well-understood tricks
-that many industry codebases already do (see [[BSL]], [[Folly]], [[Deque]], [[Abseil]]),
-not to change the behavior of any existing source code (except to speed it up),
-nor to require major work from standard library vendors.
-
-
-## Who optimizes on this? ## {#applications}
-
-The following optimizations are possible according to P1144's notion of
-trivial relocatability. Here's who does these optimizations in practice:
-
-<table>
-<tr>
-<td></td><td> vector<br> realloc </td><td> type<br> erasure </td><td> fixed-cap<br> move </td><td> vector<br> `erase` </td><td> vector<br> `insert` </td><td> `rotate` </td><td> `swap` </td>
-</tr><tr>
-<td> Arthur's libc++ `std::is_trivially_relocatable_v<T>` </td><td>
-     <a href="https://github.com/Quuxplusone/llvm-project/blob/d0c5d3639e/libcxx/include/vector#L936-L942">`vector`</a> </td><td>
-     no </td><td>
-     N/A </td><td>
-     <a href="https://github.com/Quuxplusone/llvm-project/blob/e8b61de07/libcxx/include/vector#L1663-L1669">`vector`</a><br>
-         (<a href="https://godbolt.org/z/18hvvxjE4">Godbolt</a>) </td><td>
-     <a href="https://github.com/Quuxplusone/llvm-project/blob/e8b61de07/libcxx/include/vector#L1722-L1732">`vector`</a><br>
-         (<a href="https://godbolt.org/z/18hvvxjE4">Godbolt</a>) </td><td>
-     yes, uses `swap_ranges`<br>
-         (<a href="https://godbolt.org/z/onxrEce6G">Godbolt</a>) </td><td>
-     <a href="https://github.com/Quuxplusone/llvm-project/blob/e8b61de07/libcxx/include/__algorithm/swap_ranges.h#L59-L75">`swap_ranges`</a><br>
-         (<a href="https://godbolt.org/z/onxrEce6G">Godbolt</a>) </td>
-</tr><tr>
-<td> [[BSL]] `bslmf::IsBitwiseMoveable<T>` </td><td>
-     <a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslstl/bslstl_vector.h#L3374-L3398">`vector`</a> </td><td>
-     <a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslstl/bslstl_function.h#L116-L131">no</a> </td><td>
-     ? </td><td>
-     <a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslalg/bslalg_arrayprimitives.h#L3769-L3800">`vector`</a> </td><td>
-     <a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslalg/bslalg_arrayprimitives.h#L3606-L3643">`vector`</a> </td><td>
-     <a href="https://github.com/bloomberg/bde/blob/e15f05be6/groups/bsl/bslalg/bslalg_arrayprimitives.h#L1707-L1722">`ArrayPrimitives_Imp::rotate`</a>, unused by `bsl::rotate` </td><td>
-     no </td>
-</tr><tr>
-<td> [[Folly]] `folly::IsRelocatable<T>` </td><td>
-     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/FBVector.h#L972">`fbvector`</a> </td><td>
-     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/Function.h#L706-L712">no</a> </td><td>
-     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/small_vector.h#L545-L546">`small_vector`</td><td>
-     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/FBVector.h#L1255-L1261">`fbvector`</a> </td><td>
-     <a href="https://github.com/facebook/folly/blob/080d2a3b82/folly/FBVector.h#L1353-L1355">`fbvector`</a> </td><td>
-     N/A </td><td>
-     N/A </td>
-</tr><tr>
-<td> [[Qt]] `QTypeInfo<T>::isRelocatable` </td><td>
-     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L865-L872">`QList`</a> </td><td>
-     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/kernel/qvariant.h#L73-L94">`QVariant`</a> </td><td>
-     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qvarlengtharray.h#L312-L328">`QVarLengthArray`</a> </td><td>
-     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L842-L863">`QList`</a> </td><td>
-     <a href="https://github.com/qt/qtbase/blob/fbfee2d/src/corelib/tools/qarraydataops.h#L679-L730">`QList`</a> </td><td>
-     <a href="https://github.com/qt/qtbase/blob/7db28fb/src/corelib/tools/qcontainertools_impl.h#L89-L107">`q_rotate`</a> </td><td>
-     N/A </td>
-</tr><tr>
-<td> [[Abseil]] `absl::is_trivially_relocatable<T>` </td><td>
-    no </td><td>
-    N/A </td><td>
-    <a href="https://github.com/abseil/abseil-cpp/blob/7bd9ff910d489658da58251de1317eb3f790a2c6/absl/container/inlined_vector.h#L220-L230">`inlined_vector`</a> </td><td>
-    <a href="https://github.com/abseil/abseil-cpp/blob/7bd9ff910d489658da58251de1317eb3f790a2c6/absl/container/internal/inlined_vector.h#L896-L919">`inlined_vector`</a> </td><td>
-    no </td><td>
-    N/A </td><td>
-    <a href="https://github.com/abseil/abseil-cpp/blob/7bd9ff910d489658da58251de1317eb3f790a2c6/absl/container/internal/inlined_vector.h#L323-L335">`inlined_vector`</a> </td>
-</tr><tr>
-<td> [[Amadeus]] `amc::is_trivially_relocatable<T>` </td><td>
-    <a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/smallvector.hpp#L41-L48">`Vector`</a> </td><td>
-    N/A </td><td>
-    <a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/vectorcommon.hpp#L445-L448">`StaticVector`</a> </td><td>
-    <a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/vectorcommon.hpp#L176-L180">`Vector`</a> </td><td>
-    <a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/vectorcommon.hpp#L292-L315">`Vector`</a> </td><td>
-    N/A </td><td>
-    <a href="https://github.com/AmadeusITGroup/amc/blob/efcb7be/include/amc/vectorcommon.hpp#L201">no</a> </td><td>
-</tr>
-</table>
-
-
-### Contiguous reallocation ### {#benefit-resize}
-
-Trivial relocation helps anywhere we do the moral equivalent of `realloc`,
-such as in `vector<R>::reserve`.
-
-[[Bench]] (presented at C++Now 2018) shows a 3x speedup on `vector<unique_ptr<int>>::resize`.
-[This Reddit thread](https://www.reddit.com/r/cpp/comments/9wj4vt/trivially_relocatable_in_san_diego_call_for/e9p76i4/)
-demonstrates a similar 3x speedup using the online tool Quick-Bench.
-
-
-### Moving in-place/SBO type-erased types like `any` and `function` ### {#benefit-type-erasure}
-
-Trivial relocation can de-duplicate the code generated by type-erasing wrappers
-like `any`, `function`, and `move_only_function`.
-For these types, a *move* of the wrapper object is implemented in terms of a
-*relocation* of the contained object. (E.g.,
-<a href="https://github.com/llvm-mirror/libcxx/blob/8fdc4918/include/any#L389-L394">libc++'s `std::any`</a>.)
-In general, the *relocate* operation must have a different instantiation for each
-different contained type `C`, leading to code bloat. But every trivially relocatable `C`
-of a given size can share the same instantiation.
-
-
-### Moving fixed-capacity containers like `static_vector` and `small_vector` ### {#benefit-fixed-capacity}
-
-The move-constructor of `fixed_capacity_vector<R,N>`
-can be implemented naïvely as an element-by-element *move*
-(leaving the source vector's elements in their moved-from state),
-or efficiently as an element-by-element *relocate*
-(leaving the source vector empty).
-For detailed analysis, see [[FixedCapacityVector]].
-
-`boost::container::static_vector<R,N>` currently implements the
-naïve element-by-element-move strategy, but after LEWG feedback,
-[[P0843R5]] `static_vector` does [permit](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p0843r5.html#Move-semantics)
-the faster relocation strategy.
-
-
-### Contiguous insert and erase ### {#benefit-insert-erase}
-
-Trivial relocation can be used anywhere we shift a contiguous range left or right,
-such as in `vector::erase` (i.e., destroy the erased elements and "close the window"
-by memmoving left) and `vector::insert` (i.e., "make a window" by memmoving right and
-then construct the new elements in place). [[Folly]]'s `fbvector` does
-this optimization; see
-<a href="https://github.com/facebook/folly/blob/1d4690d0a3/folly/FBVector.h#L1273-L1308">`fbvector::make_window`</a>.
-Bloomberg's [[BSL]] also does this optimization.
-
-
-### Swap ### {#benefit-swap}
-
-Given a reliable way of detecting trivial relocatability,
-we can optimize any routine that uses the moral equivalent of `std::swap`, such as
-`std::rotate`, `std::partition`, or `std::sort`.
-
-Optimizing `std::swap` produces massive code-size improvements for all swap-based
-algorithms, including `std::sort` and `std::rotate`. 
-See [[CppNow]] <a href="https://www.youtube.com/watch?v=SGdfPextuAU&t=19m56s">@19:56–21:22</a>,
-and see [this Godbolt](https://p1144.godbolt.org/z/PPYhcYd8d).
-[This Quick-Bench](https://quick-bench.com/q/suAss7ElmwgLDbOJQGnlEseheSQ) shows a 25% speedup
-in `std::rotate` when it is allowed to use bitwise swap on a Rule-of-Zero type.
-
-
-## Assertions, not assumptions ## {#benefit-assertions}
-
-Some data structures might reasonably assert the trivial relocatability of
-their elements, just as they sometimes assert the stronger property of trivial *copyability* today.
-This might help them guarantee reasonable performance, or guarantee exception-safety.
-
-For an example of how `std::is_trivially_relocatable` is being used this way in practice,
-see [[StdxError]].
-
-
-## Eliminate manual warrants, improve safety ## {#doing-it-wrong}
-
-Many real-world codebases contain templates which require
-trivial relocatability of their template parameters, but cannot today *verify*
-trivial relocatability. For example, until 2012 [[Folly]]
-[required](https://github.com/facebook/folly/blob/93b0f543f20b8ef3a4c1e34591370011e2dc7168/folly/FBVector.h#L337-L348)
-the programmer to warrant the trivial relocatability of any type stored in a `folly::fbvector`:
-
-```cpp
-    class Widget {
-        std::vector<int> lst_;
-    };
-
-    folly::fbvector<Widget> vec;  // FAIL AT COMPILE TIME for lack of warrant
-```
-
-This merely encouraged the programmer to add the warrant and continue. An incorrect
-warrant was discovered only at runtime, via undefined behavior. See
-[[CppNow]] <a href="https://www.youtube.com/watch?v=SGdfPextuAU&t=27m26s">@27:26–31:47</a>;
-for real-world examples see Folly issues [#889](https://github.com/facebook/folly/issues/889),
-[#35](https://github.com/facebook/folly/issues/35), [#316](https://github.com/facebook/folly/issues/316),
-[#498](https://github.com/facebook/folly/issues/498).
-
-```cpp
-    class Gadget {
-        std::list<int> lst_;
-    };
-    // sigh, add the warrant on autopilot
-    template<> struct folly::IsRelocatable<Gadget> : std::true_type {};
-
-    folly::fbvector<Gadget> vec;  // CRASH AT RUNTIME due to fraudulent warrant
-```
-
-> Note: Folly's `fbvector` was [patched](https://github.com/facebook/folly/commit/8dd82d48dd46f43f2ea9b4ed49634a2d3f7ecb43)
-> in December 2012 to accept both trivially relocatable and non-trivially relocatable types,
-> in line with `std::vector`. Since then, the effect of an incorrect warrant
-> remains the same — UB and crash — but a missing warrant simply disables the optimization.
-
-If this proposal is adopted, then Folly can start using `static_assert(std::is_trivially_relocatable_v<T>)`
-resp. `if constexpr (std::is_trivially_relocatable_v<T>)`
-in the implementation of `fbvector`, and the programmer can stop writing explicit warrants.
-Finally, the programmer can start writing assertions of correctness, which aids maintainability and
-can even find real bugs. [Example:](https://p1144.godbolt.org/z/7b8893sjr)
-
-```cpp
-    class Widget {
-        std::vector<int> lst_;
-    };
-    static_assert(std::is_trivially_relocatable_v<Widget>);  // correctly SUCCEEDS
-
-    class Gadget {
-        std::list<int> lst_;
-    };
-    static_assert(std::is_trivially_relocatable_v<Gadget>);  // correctly ERRORS
-```
-
-The improvement in user experience and safety in real-world codebases
-([[Folly]], [[BSL]], [[Qt]], [[HPX]], [[Amadeus]], [[Abseil]], etc.)
-is the most important benefit to be gained by this proposal.
-
-# Design goals # {#design-goals}
-
-Briefly: We want to support all five of the following use-cases ([Godbolt](https://godbolt.org/z/W8e6ansPf)).
-
-```cpp
-    static_assert(std::is_trivially_relocatable_v<std::unique_ptr<int>>); // #1
-
-    struct RuleOfZero { std::unique_ptr<int> p_; };
-    static_assert(std::is_trivially_relocatable_v<RuleOfZero>); // #2
-
-    struct [[trivially_relocatable]] RuleOf3 {
-        RuleOf3(RuleOf3&&);
-        RuleOf3& operator=(RuleOf3&&);
-        ~RuleOf3();
-    };
-    static_assert(std::is_trivially_relocatable_v<RuleOf3>); // #3
-
-    struct [[trivially_relocatable]] Wrap0 {
-        boost::container::static_vector<int, 10> v_;
-        static_assert(!std::is_trivially_relocatable_v<decltype(v_)>);
-            // it's not annotated, but we know it's actually trivial
-    };
-    static_assert(std::is_trivially_relocatable_v<Wrap0>); // #4
-
-    struct [[trivially_relocatable]] Wrap3 {
-        Wrap3(Wrap3&&);
-        Wrap3& operator=(Wrap3&&);
-        ~Wrap3();
-        int i_;
-        boost::interprocess::offset_ptr<int> p_ = &i_;
-        static_assert(!std::is_trivially_relocatable_v<decltype(p_)>);
-            // it's not trivial, but we preserve our invariant correctly
-    };
-    static_assert(std::is_trivially_relocatable_v<Wrap3>); // #5
-```
-
-## Non-goals ## {#design-non-goals}
-
-Note: This section was new in P1144R9.
-
-We propose special support for trivially relocatable types, but no particular support for
-types that are relocatable in other ways. The two most-frequently-asked scenarios are:
-
-- "Never-empty types," e.g. `gsl::not_null<unique_ptr<int>>`. Such types are not movable (because by design
-        they never enter a moved-from state), but they are swappable and could in theory be
-        relocatable (but not via move-and-destroy, since they cannot be moved).
-        P1144 supports the physical possibility that `is_trivially_relocatable_v<T> && !is_relocatable_v<T>`,
-        but keeps the status quo w.r.t. library support for such types;
-        e.g. you can't `resize`, `insert`, or `erase` a `vector` of such types.
-        P1144's `std::relocate_at` rejects such types.
-
-- Types that are "efficiently but non-trivially relocatable," e.g. libc++'s `tuple<string, list<int>>`,
-        where the ideal relocation operation would trivially relocate the string and
-        move-and-destroy the list; this is not trivial, but still faster than move-and-destroy'ing
-        the whole `tuple`. P1144 keeps the status quo w.r.t. such types, and doesn't
-        provide any way to optimize their relocation.
-        See ["Cheaply relocatable, but not trivially relocatable"](https://quuxplusone.github.io/blog/2018/10/26/cheaply-but-not-trivially-relocatable/)
-        (October 2018).
-
-The most promising active proposal for "non-trivial relocation" is [[P2785R3]]. It proposes a
-"relocation constructor" like this:
-
-```cpp
-    struct A {
-        A(A) = default;
-    };
-```
-
-which the compiler deduces is trivial iff all of `A`'s members are trivially relocatable.
-This solves both of the above "non-goal" scenarios.
-However, [[P2785R3]] fails to support our positive goals `Wrap0` and `Wrap3`, which are
-trivially relocatable despite having some *non-trivial* members. In other words, P1144 is
-forward-compatible with (does not close the door to) [[P2785R3]]; and vice versa,
-adopting [[P2785R3]] would not solve two of P1144's five advertised use-cases. WG21 might
-well want to adopt both proposals. But P1144 solves "the 99% problem"; P1144 might
-not leave enough performance on the table to motivate the further adoption of [[P2785R3]].
-
-Notably, P1144R10 is almost entirely a subset of [[P2785R3]]; the only significant difference
-is that [[P2785R3]] doesn't propose the `[[trivially_relocatable]]` warrant itself.
-(P2785 proposes that to make a type trivially relocatable, you `=default`
-its relocation constructor. P1144 can't do that, and anyway wants to support `Wrap0` and `Wrap3`.)
-
-<small>
-<table>
-<tr><th>P1144</th><th>P2785R3</th></tr>
-<tr><td>`[[trivially_relocatable]]`</td><td></td></tr>
-<tr><td></td><td><code>T(T) = default;</code></td></tr>
-<tr><td></td><td><code>T&amp; operator=(T) = default;</code></td></tr>
-<tr><td>QoI `[[trivially_relocatable]]`<br>on STL containers</td><td>Mandate relocation ctors<br>for all STL containers</td></tr>
-<tr><td></td><td><code>T t = reloc u;</code> (ends <code>u</code>'s lifetime)</td></tr>
-<tr><td><code>std::is_trivially_relocatable_v&lt;T></code></td><td><code>std::is_trivially_relocatable_v&lt;T></code></td></tr>
-<tr><td><code>concept std::relocatable&lt;T></code></td><td></td></tr>
-<tr><td><code>std::relocate_at(psrc, pdst);</code></td><td><code>std::construct_at(pdst, reloc *psrc);</code></td></tr>
-<tr><td><code>T t = std::relocate(psrc);</code></td><td><code>T t = std::destroy_relocate(psrc);</code></td></tr>
-<tr><td><code>FwdIt std::uninitialized_relocate(<br>&emsp; InIt, InIt, FwdIt)</code></td><td><code>FwdIt std::uninitialized_relocate(<br>&emsp; InIt, InIt, FwdIt)</code></td></tr>
-<tr><td><code>pair&lt;InIt, FwdIt> std::uninitialized_relocate_n(<br>&emsp; InIt, Size, FwdIt)</code></td><td><code>pair&lt;InIt, FwdIt> std::uninitialized_relocate_n(<br>&emsp; InIt, Size, FwdIt)</code></td></tr>
-<tr><td><code>Bidi2 std::uninitialized_relocate_backward(<br>&emsp; Bidi1, Bidi1, Bidi2)</code></td><td></td></tr>
-<tr><td></td><td><code>std::relocate_t</code>, <code>std::relocate</code> tag type</td></tr>
-<tr><td></td><td><code>vector&lt;T>::relocate_out(<br>&emsp; const_iterator, const_iterator, OutIt) etc.</code></td></tr>
-<tr><td></td><td><code>T queue&lt;T>::pop(relocate_t)</code> etc.</td></tr>
-</table>
-</small>
-
-
-# Proposed wording for C++26 # {#wording}
+* Facebook Folly defines its `folly::IsRelocatable` trait in terms of P1144's
+    `std::is_trivially_relocatable<T>` if `__cpp_lib_trivially_relocatable` is defined.
+    Otherwise, Folly falls back on `is_trivially_copyable`.
+
+* Stellar HPX defines `hpx::is_trivially_relocatable` in terms of P1144's
+    `std::is_trivially_relocatable<T>` if `HPX_HAVE_P1144_RELOCATE_AT` is defined
+    at build time.
+
+* Google Abseil defines `absl::is_trivially_relocatable` with P1144 semantics.
+    Abseil will directly use Clang's `__is_trivially_relocatable(T)` builtin,
+    but not when compiled with Clang trunk — only if `__cpp_impl_trivially_relocatable` is defined.
+    ([Godbolt.](https://godbolt.org/z/znMPE6hqv))
+
+* Carnegie Mellon's ParlayLib project defines <a href="https://github.com/cmuparlay/parlaylib/blob/36459f4/include/parlay/type_traits.h#L250-L304"><code>parlay::is_trivially_relocatable</code></a>
+    in terms of P1144's `std::is_trivially_relocatable<T>` if `__cpp_lib_trivially_relocatable` is defined.
+    Otherwise, Parlay falls back on the Clang builtin.
+
+<b>Wait. Clang has a builtin trait for this?</b>
+
+Yes. That builtin was added to trunk by Devin Jeanpierre <a href="https://github.com/llvm/llvm-project/commit/19aa2db023c0128913da223d4fb02c474541ee22">in February 2022</a>,
+about a year before P2786 was released to the public. The commit message indicated that
+"rather than trying to pick a winning proposal for trivial relocation operations"
+Clang would implement its own semantics, which turned out to be very similar to the semantics
+chosen by P2786 the next year.
+
+Sadly, Clang's chosen semantics have proven useless to many existing libraries. Folly, Abseil,
+HPX, and Subspace all considered using Clang's builtin and decided against it, due to its
+current semantics. Giuseppe D'Angelo, on the KDAB company blog, <a href="https://www.kdab.com/qt-and-trivial-relocation-part-5/">observes</a>:
+
+> P2786’s design is limiting and not user-friendly, to the point that there have been
+> serious concerns that existing libraries may not make use of it at all. In particular,
+> P2786’s relocation semantics do not match Qt’s. With my Qt hat on, <i>it soon became
+> clear that we could not have used P2786 in Qt to replace our own implementation of trivial relocation.</i>
+
+[There was an effort in March 2024](https://github.com/llvm/llvm-project/pull/84621) to
+give Clang trunk's `__is_trivially_relocatable(T)` P1144 semantics. The pull request was
+supported with comments by maintainers of Abseil, Qt, AMC, Subspace, HPX, and
+several smaller libraries as well.
+As of this writing (October 2024), the pull request has not been accepted.
+These libraries continue to rely on P1144's feature-test macros (or just use `is_trivially_copyable`),
+because Clang trunk doesn't support their use-cases.
+
+<b>And everyone just uses <code>memcpy</code> instead of <code>std::uninitialized_relocate</code>, right?</b>
+
+Right. Many of them have implemented a P1144-alike API in <i>terms</i> of <code>memcpy</code>, though:
+
+* Amadeus AMC's <a href="https://github.com/AmadeusITGroup/amc/blob/c38e46e/include/amc/memory.hpp#L500-L522"><code>amc::uninitialized_relocate</code></a>,
+    `uninitialized_relocate_n`, and `relocate_at`
+
+* HPX's <a href="https://github.com/STEllAR-GROUP/hpx/blob/659e0ea/libs/core/type_support/include/hpx/type_support/uninitialized_relocation_primitives.hpp"><code>hpx::experimental::uninitialized_relocate</code></a>,
+    `uninitialized_relocate_n`, `uninitialized_relocate_backward`, and
+    <a href="https://github.com/STEllAR-GROUP/hpx/blob/bd32982/libs/core/type_support/include/hpx/type_support/relocate_at.hpp#L124-L133"><code>relocate_at</code></a>
+
+* Parlay's <a href="https://github.com/cmuparlay/parlaylib/blob/36459f4/include/parlay/relocation.h"><code>uninitialized_relocate</code></a>
+    and `uninitialized_relocate_n`
+
+* Qt's <a href="https://github.com/qt/qtbase/blob/cb40a1f/src/corelib/tools/qcontainertools_impl.h#L71-L87"><code>q_uninitialized_relocate_n</code></a>
+
+<b>Could these two halves of the feature be severed?</b>
+
+You mean, ship just the `is_trivially_relocatable<T>` trait in C++26, and then worry about the
+algorithms like `uninitialized_relocate` (and the `trivially_relocatable` attribute itself) for C++29?
+Sure, and I'd be fine with that — as long as the standard trait were defined in the P1144 way,
+so that all these libraries can start using it.
+
+<b>Hasn't P2786 adjusted its trait in that direction recently?</b>
+
+Yes. Following EWG's clawback in St Louis 2024, P2786R7 decided that its `is_replaceable` trait should
+consider the move-assignment operator as well as the move-constructor. That's a positive step. But, as
+of this writing, P2786 still considers unannotated types "eligible for trivial relocation" when they have
+a non-defaulted copy-constructor — whereas P1144 conservatively will not <i>assume</i> that any type is
+trivially relocatable unless it is well-understood by the compiler (i.e., Rule of Zero).
+Also, P2786 considers unannotated types "eligible for trivial relocation" even if they are polymorphic;
+see [[Polymorphic]] for how that can cause segfaults in supposedly "well-defined" code.
+
+Beyond the criteria for relocatability, P2786 has other unacceptable downsides. It bifurcates
+the P1144 trait into two traits — `is_trivially_relocatable` and `is_replaceable`, where in fact the <i>latter</i>
+corresponds to what everyone names `is_trivially_relocatable` today. That will lead to confusion.
+P2786 invents new functions like `swap_value_representations` and `trivially_relocate`, again not reflecting
+existing practice. `swap_value_representations` is defined to magically omit copying vptrs (even of
+subobjects), which means different codegen for different "replaceable" types of the same size and alignment.
+Contrariwise, P1144 allows us to share the same code for all trivially relocatable types of the same size, as seen
+in <a href="https://godbolt.org/z/fxd7MY754">this Godbolt</a>. That's basically the point of calling the code "trivial"!
+
+It is unambiguously a good thing every time P2786 takes a step toward P1144. But many of those steps remain to be taken.
+
+<b>And EWG still refuses to directly discuss P1144 itself?</b>
+
+So far, yes. I remain hopeful that one day that may change.
+
+<b>Where can I learn more about trivial relocation?</b>
+
+Besides <a href="https://quuxplusone.github.io/blog/tags/#relocatability">Arthur's blog</a>,
+you might also want to look at:
+
+* ["Trivially relocatable types in C++/Subspace"](https://orodu.net/2023/01/15/trivially-relocatable.html), by Dana Jansens
+* ["Qt and trivial relocation"](https://www.kdab.com/qt-and-trivial-relocation-part-5/), by Giuseppe D'Angelo, on the KDAB blog
+* ["Relocation semantics in the HPX library"](https://isidorostsa.github.io/gsoc2023/), by Isidoros Tsaousis
+* ["Object relocation"](https://github.com/facebook/folly/blob/main/folly/docs/FBVector.md#object-relocation) in the Folly repository
+
+
+# Proposed wording # {#wording}
 
 The wording in this section is relative to the current working draft.
 
-Note: There is no difficulty in changing the attribute syntax to a contextual-keyword syntax;
-the only difference is aesthetic. We can defer that decision to the last minute. This wording
-is patterned on the precedent set by `[[no_unique_address]]`.
-
-Note: Our feature-test macros follow the pattern set by `__cpp_impl_coroutine`+`__cpp_lib_coroutine`
-and `__cpp_impl_three_way_comparison`+`__cpp_lib_three_way_comparison`.
-
-## Predefined macro names [cpp.predefined] ## {#wording-cpp.predefined}
+## [cpp.predefined] ## {#wording-cpp.predefined}
 
 Add a feature-test macro to the table in
 <a href="https://eel.is/c++draft/cpp.predefined#tab:cpp.predefined.ft">[cpp.predefined]</a>:
@@ -450,7 +200,7 @@ __cpp_implicit_move               202207L
 </blockquote></small>
 
 
-## Header `<version>` synopsis [version.syn] ## {#wording-version.syn}
+## [version.syn] ## {#wording-version.syn}
 
 Add a feature-test macro to <a href="https://eel.is/c++draft/version.syn">[version.syn]/2</a>:
 
@@ -463,7 +213,7 @@ Add a feature-test macro to <a href="https://eel.is/c++draft/version.syn">[versi
 </blockquote></small>
 
 
-## Relocation operation [defns.relocation] ## {#wording-defns.relocation}
+## [defns.relocation] ## {#wording-defns.relocation}
 
 Add a new section in <a href="http://eel.is/c++draft/intro.defs">[intro.defs]</a>:
 
@@ -474,12 +224,42 @@ consisting of a move construction immediately followed by a destruction of the s
 </blockquote></small>
 
 
-## Trivially relocatable class [class.prop] ## {#wording-class.prop}
+## [basic.types.general] ## {#wording-basic.types.general}
 
-Note: For the "if supported" wording, compare <a href="https://eel.is/c++draft/dcl.attr.nouniqueaddr#2.sentence-2">[dcl.attr.nouniqueaddr]/2</a>
+Add a new section in <a href="http://eel.is/c++draft/basic.types.general">[basic.types.general]</a>:
+
+<small><blockquote>
+9․ Arithmetic types ([basic.fundamental]), enumeration types, pointer types, pointer-to-member types ([basic.compound]),
+`std::nullptr_t`, and <i>cv</i>-qualified versions of these types are collectively called <i>scalar types</i>.
+Scalar types, trivially copyable class types ([class.prop]), arrays of such types, and <i>cv</i>-qualified versions
+of these types are collectively called <i>trivially copyable types</i>.
+Scalar types, trivial class types ([class.prop]), arrays of such types, and <i>cv</i>-qualified versions of these types
+are collectively called <i>trivial types</i>. Scalar types, standard-layout class types ([class.prop]), arrays of such types,
+and <i>cv</i>-qualified versions of these types are collectively called <i>standard-layout types</i>.
+Scalar types, implicit-lifetime class types ([class.prop]), array types, and <i>cv</i>-qualified versions of these types
+are collectively called <i>implicit-lifetime types</i>.
+
+<p><ins>x․ Trivially copyable types, trivially relocatable class types (<a href="#wording-class.prop">[class.prop]</a>), arrays of such types,
+and <i>cv</i>-qualified versions of these types are collectively called <i>trivially relocatable types</i>.
+
+<p><ins>[*Note:* For a trivially relocatable type, the relocation operation (<a href="#wording-defns.relocation">[defns.relocation]</a>) as performed by,
+for example, `std::swap_ranges` or `std::vector::reserve`, is tantamount
+to a simple copy of the underlying bytes. *—end note*]</ins>
+
+<p><ins>[*Note:* It is likely that many standard library types are trivially relocatable types. *—end note*]</ins>
+
+10․ A type is a <i>literal type</i> if it is: [...]
+</blockquote></small>
+
+
+## [class.prop] ## {#wording-class.prop}
+
+<p class="note"><b>DRAFTING NOTE:</b>
+For the "if supported" wording, compare <a href="https://eel.is/c++draft/dcl.attr.nouniqueaddr#2.sentence-2">[dcl.attr.nouniqueaddr]/2</a>
 and <a href="https://eel.is/c++draft/cpp.cond#5.sentence-1">[cpp.cond]/5</a>.
 
-Note: The wording proposed here deliberately echoes the existing "trivially copyable" wording.
+<p class="note"><b>DRAFTING NOTE:</b>
+The wording proposed here deliberately echoes the existing "trivially copyable" wording.
 "Copyable" and "relocatable" are siblings; every trivially copyable type is trivially relocatable by definition.
 However, CWG already knows the wording for "trivially copyable" does not match library-writers' expectations;
 see [[P3279]] for examples and a possible direction. If that direction is taken, then we'd certainly
@@ -508,37 +288,11 @@ if that attribute is supported by the implementation (<a href="#wording-cpp.cond
 <p>3․ A class `S` is a <i>standard-layout class</i> if it: [...]
 </blockquote></small>
 
-## Trivially relocatable type [basic.types.general] ## {#wording-basic.types.general}
 
-Add a new section in <a href="http://eel.is/c++draft/basic.types.general">[basic.types.general]</a>:
+## [dcl.attr.trivreloc] ## {#wording-dcl.attr.trivreloc}
 
-<small><blockquote>
-9․ Arithmetic types ([basic.fundamental]), enumeration types, pointer types, pointer-to-member types ([basic.compound]),
-`std::nullptr_t`, and <i>cv</i>-qualified versions of these types are collectively called <i>scalar types</i>.
-Scalar types, trivially copyable class types ([class.prop]), arrays of such types, and <i>cv</i>-qualified versions
-of these types are collectively called <i>trivially copyable types</i>.
-Scalar types, trivial class types ([class.prop]), arrays of such types, and <i>cv</i>-qualified versions of these types
-are collectively called <i>trivial types</i>. Scalar types, standard-layout class types ([class.prop]), arrays of such types,
-and <i>cv</i>-qualified versions of these types are collectively called <i>standard-layout types</i>.
-Scalar types, implicit-lifetime class types ([class.prop]), array types, and <i>cv</i>-qualified versions of these types
-are collectively called <i>implicit-lifetime types</i>.
-
-<p><ins>x․ Trivially copyable types, trivially relocatable class types (<a href="#wording-class.prop">[class.prop]</a>), arrays of such types,
-and <i>cv</i>-qualified versions of these types are collectively called <i>trivially relocatable types</i>.
-
-<p><ins>[*Note:* For a trivially relocatable type, the relocation operation ([defns.relocation]) as performed by,
-for example, `std::swap_ranges` or `std::vector::reserve`, is tantamount
-to a simple copy of the underlying bytes. *—end note*]</ins>
-
-<p><ins>[*Note:* It is intended that most standard library types be trivially relocatable types. *—end note*]</ins>
-
-10․ A type is a <i>literal type</i> if it is: [...]
-</blockquote></small>
-
-
-## Trivially relocatable attribute [dcl.attr.trivreloc] ## {#wording-dcl.attr.trivreloc}
-
-Note: For the "Recommended practice" wording, compare <a href="https://eel.is/c++draft/dcl.attr.nouniqueaddr#2.sentence-2">[dcl.attr.nouniqueaddr]/2</a>.
+<p class="note"><b>DRAFTING NOTE:</b>
+For the "Recommended practice" wording, compare <a href="https://eel.is/c++draft/dcl.attr.nouniqueaddr#2.sentence-2">[dcl.attr.nouniqueaddr]/2</a>.
 
 Add a new section after <a href="http://eel.is/c++draft/dcl.attr.nouniqueaddr">[dcl.attr.nouniqueaddr]</a>:
 
@@ -568,7 +322,7 @@ can cause a class type to be trivially relocatable (<a href="#wording-class.prop
 </blockquote></small>
 
 
-### `__has_cpp_attribute` entry [cpp.cond] ### {#wording-cpp.cond}
+## [cpp.cond] ## {#wording-cpp.cond}
 
 Add a new entry to the table of supported attributes in
 <a href="https://eel.is/c++draft/cpp.cond">[cpp.cond]</a>:
@@ -582,7 +336,34 @@ unlikely              201803L
 </blockquote></small>
 
 
-## `relocatable` concept [concept.relocatable] ## {#wording-concept.relocatable}
+## [concepts.syn] ## {#wording-concepts.syn}
+
+Modify <a href="http://eel.is/c++draft/concepts.syn">[concepts.syn]</a> as follows:
+
+<small><blockquote>
+<pre>
+  <i>// [concept.copyconstructible], concept copy_constructible</i>
+  template&lt;class T>
+    concept copy_constructible = <i>see below</i>;
+
+  <i>// <a href="#wording-concept.relocatable">[concept.relocatable]</a>, concept relocatable</i>
+  template&lt;class T>
+    concept relocatable = <i>see below</i>;
+</pre>
+</blockquote></small>
+
+
+## [concept.relocatable] ## {#wording-concept.relocatable}
+
+<p class="note"><b>DRAFTING NOTE:</b>
+We intend that a type may be relocatable
+regardless of whether it is copy-constructible; but, if it is copy-constructible then copy-and-destroy
+must have the same semantics as move-and-destroy. We intend that a type may be relocatable regardless of
+whether it is assignable; but, if it is assignable then assignment must have the same semantics as
+destroy-and-copy or destroy-and-move.
+The semantic requirements on assignment help us optimize `vector::insert` and `vector::erase`.
+`pmr::forward_list<int>` satisfies `relocatable`, but it models `relocatable`
+only when all relevant objects have equal allocators.
 
 Add a new section after <a href="http://eel.is/c++draft/concept.copyconstructible">[concept.copyconstructible]</a>:
 
@@ -613,129 +394,8 @@ and `u2` a distinct complete object of type `T` equal to `rv`.
 
 </blockquote></small>
 
-Note: We intend that a type may be relocatable
-regardless of whether it is copy-constructible; but, if it is copy-constructible then copy-and-destroy
-must have the same semantics as move-and-destroy. We intend that a type may be relocatable regardless of
-whether it is assignable; but, if it is assignable then assignment must have the same semantics as
-destroy-and-copy or destroy-and-move.
-The semantic requirements on assignment help us optimize `vector::insert` and `vector::erase`.
-`pmr::forward_list<int>` satisfies `relocatable`, but it models `relocatable`
-only when all relevant objects have equal allocators.
 
-
-## Type trait `is_trivially_relocatable` [meta.unary.prop] ## {#wording-meta.unary.prop}
-
-Add a new entry to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
-
-<small><blockquote>
-<table>
-<tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr>
-<tr>
-<td>`template<class T> struct is_trivially_copyable;`</td>
-<td>`T` is a trivially copyable type ([basic.types.general])</td>
-<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
-</tr>
-<tr>
-<td><ins>`template<class T> struct is_trivially_relocatable;`</ins></td>
-<td><ins>`T` is a trivially relocatable type (<a href="#wording-basic.types.general">[basic.types.general]</a>)</ins></td>
-<td><ins>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</ins></td>
-</tr>
-<tr>
-<td>`template<class T> struct is_standard_layout;`</td>
-<td>`T` is a standard-layout type ([basic.types.general])</td>
-<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
-</tr>
-</table>
-</blockquote></small>
-
-
-## `relocate_at` and `relocate` ## {#wording-specialized.relocate}
-
-Note:
-These functions have both been implemented in my libc++ fork; for `relocate`, see [this Godbolt](https://p1144.godbolt.org/z/MqPjWfe3e)
-and [[StdRelocateIsCute]]. My implementation of their "as-if-by-memcpy" codepaths relies on
-Clang's `__builtin_memmove`; vendors can use any vendor-specific means to implement them.
-The wording also deliberately permits a low-quality implementation with no such codepath at all.
-See [[CppNow]] <a href="https://www.youtube.com/watch?v=SGdfPextuAU&t=45m23s">@45:23–48:39</a>.
-
-Add a new section after <a href="http://eel.is/c++draft/specialized.destroy">[specialized.destroy]</a>:
-
-<small><blockquote>
-<ins><b>`relocate` [specialized.relocate]</b></ins>
-
-<p><pre>
-  <ins>template&lt;class T></ins>
-  <ins>T *relocate_at(T* source, T* dest);</ins>
-</pre>
-<p><ins>1․ *Mandates:* `T` is a complete non-array object type.</ins>
-<p><ins>2․ *Effects:* Equivalent to:</ins>
-<pre>
-  <ins>struct guard { T *t; ~guard() { destroy_at(t); } } g(source);</ins>
-  <ins>return ::new (<i>voidify</i>(*dest)) T(std::move(*source));</ins>
-</pre>
-<ins>except that if `T` is trivially relocatable ([basic.types.general]), side effects
-associated with the relocation of the value of `*source` might not happen.</ins>
-
-<pre>
-  <ins>template&lt;class T></ins>
-  <ins>[[nodiscard]] remove_cv_t&lt;T> relocate(T* source);</ins>
-</pre>
-<p><ins>3․ *Mandates:* `T` is a complete non-array object type.</ins>
-<p><ins>4․ *Effects:* Equivalent to:</ins>
-<pre>
-  <ins>remove_cv_t<&lt;T> t = std::move(source);</ins>
-  <ins>destroy_at(source);</ins>
-  <ins>return t;</ins>
-</pre>
-<ins>except that if `T` is trivially relocatable ([basic.types]), side effects
-associated with the relocation of the object's value might not happen.</ins>
-</blockquote></small>
-
-
-## Nothrow bidirectional iterator [algorithms.requirements] ## {#wording-algorithms.requirements}
-
-Modify <a href="https://eel.is/c++draft/algorithms.requirements">[algorithms.requirements]</a> as follows:
-
-<small><blockquote>
-
-* If an algorithm's template parameter is named `InputIterator`, `InputIterator1`, <del>or</del> `InputIterator2`, <ins>or
-    `NoThrowInputIterator`,</ins> the template argument shall meet the *Cpp17InputIterator* requirements ([input.iterators]).
-
-* If an algorithm's template parameter is named `OutputIterator`, `OutputIterator1`, or `OutputIterator2`, the template argument
-    shall meet the `Cpp17OutputIterator` requirements ([output.iterators]).
-
-* If an algorithm's template parameter is named `ForwardIterator`, `ForwardIterator1`,
-    `ForwardIterator2`, <del>or</del> `NoThrowForwardIterator`, <ins>`NoThrowForwardIterator1`, or `NoThrowForwardIterator2`,</ins> the
-    template argument shall meet the *Cpp17ForwardIterator* requirements ([forward.iterators]) if it is required to be a mutable iterator,
-    or model `forward_iterator` ([iterator.concept.forward]) otherwise.
-
-* If an algorithm's template parameter is
-    named <ins>`NoThrowInputIterator`,</ins> `NoThrowForwardIterator`, <ins>`NoThrowForwardIterator1`, or `NoThrowForwardIterator2`,</ins> the
-    template argument is also required to have the property that no exceptions are thrown
-    from increment, assignment, or comparison of, or indirection through, valid iterators.
-
-* If an algorithm's template parameter is named `BidirectionalIterator`,
-    `BidirectionalIterator1`, <del>or</del> `BidirectionalIterator2`, <ins>`NoThrowBidirectionalIterator1`, or `NoThrowBidirectionalIterator2`,</ins> the
-    template argument shall meet the *Cpp17BidirectionalIterator* requirements ([bidirectional.iterators])
-    if it is required to be a mutable iterator, or model `bidirectional_iterator` ([iterator.concept.bidir]) otherwise.
-
-* <ins>If an algorithm's template parameter is named `NoThrowBidirectionalIterator1` or `NoThrowBidirectionalIterator2`, the
-    template argument is also required to have the property that no exceptions are thrown
-    from increment, decrement, assignment, or comparison of, or indirection through, valid iterators.</ins>
-
-</blockquote></small>
-
-
-## `uninitialized_relocate`, `uninitialized_relocate_n`, `uninitialized_relocate_backward` [uninitialized.relocate] ## {#wording-uninitialized.relocate}
-
-Note: Compare to <a href="https://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a> and
-<a href="https://eel.is/c++draft/alg.copy">[alg.copy]</a>. The <i>Remarks</i> allude to blanket wording
-in <a href="http://eel.is/c++draft/specialized.algorithms#general-2">[specialized.algorithms.general]/2</a>.
-
-Note: I don't propose `ranges::uninitialized_relocate`, because if it worked like `ranges::uninitialized_move`
-then it would take two ranges (of possibly different lengths). On success, it would relocate-out-of only
-`distance(OR)` elements of `IR`; but if an exception were thrown, it would destroy all the elements of `IR`.
-That's a bad contract. Therefore, we omit the `ranges` overloads until someone presents a suitable design.
+## [memory.syn] ## {#wording-memory.syn}
 
 Modify <a href="http://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:
 
@@ -803,20 +463,121 @@ Modify <a href="http://eel.is/c++draft/memory.syn">[memory.syn]</a> as follows:
 
   <ins>template&lt;class NoThrowBidirectionalIterator1, class NoThrowBidirectionalIterator2></ins>
     <ins>NoThrowBidirectionalIterator2</ins>
-      <ins>uninitialized_relocate_backward(NoThrowBidirectionalIterator1 first, BidirectionalIterator1 last,</ins>
+      <ins>uninitialized_relocate_backward(NoThrowBidirectionalIterator1 first,</ins>
+                                      <ins>NoThrowBidirectionalIterator1 last,</ins>
                                       <ins>NoThrowBidirectionalIterator2 result);</ins>        <ins>// freestanding</ins>
   <ins>template&lt;class ExecutionPolicy, class NoThrowBidirectionalIterator1, class NoThrowBidirectionalIterator2></ins>
     <ins>NoThrowBidirectionalIterator2</ins>
       <ins>uninitialized_relocate_backward(ExecutionPolicy&& exec,</ins>
-                                      <ins>NoThrowBidirectionalIterator1 first, NoThrowBidirectionalIterator1 last,</ins>
+                                      <ins>NoThrowBidirectionalIterator1 first,</ins>
+                                      <ins>NoThrowBidirectionalIterator1 last,</ins>
                                       <ins>NoThrowBidirectionalIterator2 result);</ins>        <ins>// freestanding</ins>
 
   template&lt;class NoThrowForwardIterator, class T>
     void uninitialized_fill(NoThrowForwardIterator first,                           // freestanding
                             NoThrowForwardIterator last, const T& x);
+  [...]
+    template&lt;<i>nothrow-input-iterator</i> I>
+      requires destructible&lt;iter_value_t&lt;I>>
+        constexpr I destroy_n(I first, iter_difference_t&lt;I> n) noexcept;            // freestanding
+  }
 
+  <ins><i>// <a href="#wording-specialized.relocate">[specialized.relocate]</a>, relocate</i></ins>
+  <ins>template&lt;class T></ins>
+  <ins>T *relocate_at(T* source, T* dest);</ins>                                               <ins>// freestanding</ins>
+
+  <ins>template&lt;class T></ins>
+  <ins>remove_cv_t&lt;T> relocate(T* source);</ins>                                               <ins>// freestanding</ins>
+
+  // [unique.ptr], class template unique_ptr
 </pre>
 </blockquote></small>
+
+
+## [meta.type.synop] ## {#wording-meta.type.synop}
+
+Modify <a href="http://eel.is/c++draft/meta.type.synop">[meta.type.synop]</a> as follows:
+
+<small><blockquote>
+<pre>
+  [...]
+  <i>// <a href="#wording-meta.unary.prop">[meta.unary.prop]</a>, type properties</i>
+  template&lt;class T> struct is_const;
+  template&lt;class T> struct is_volatile;
+  template&lt;class T> struct is_trivial;
+  template&lt;class T> struct is_trivially_copyable;
+  <ins>template&lt;class T> struct is_trivially_relocatable;</ins>
+  template&lt;class T> struct is_standard_layout;
+  [...]
+</pre>
+</blockquote></small>
+
+## [meta.unary.prop] ## {#wording-meta.unary.prop}
+
+Add a new entry to Table 47 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a>:
+
+<small><blockquote>
+<table>
+<tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr>
+<tr>
+<td>`template<class T> struct is_trivially_copyable;`</td>
+<td>`T` is a trivially copyable type ([basic.types.general])</td>
+<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
+</tr>
+<tr>
+<td><ins>`template<class T> struct is_trivially_relocatable;`</ins></td>
+<td><ins>`T` is a trivially relocatable type (<a href="#wording-basic.types.general">[basic.types.general]</a>)</ins></td>
+<td><ins>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</ins></td>
+</tr>
+<tr>
+<td>`template<class T> struct is_standard_layout;`</td>
+<td>`T` is a standard-layout type ([basic.types.general])</td>
+<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
+</tr>
+</table>
+</blockquote></small>
+
+
+## [algorithms.requirements] ## {#wording-algorithms.requirements}
+
+Modify <a href="https://eel.is/c++draft/algorithms.requirements">[algorithms.requirements]</a> as follows:
+
+<small><blockquote>
+
+* If an algorithm's template parameter is named `InputIterator`, `InputIterator1`, <del>or</del> `InputIterator2`, <ins>or
+    `NoThrowInputIterator`,</ins> the template argument shall meet the *Cpp17InputIterator* requirements ([input.iterators]).
+
+* If an algorithm's template parameter is named `OutputIterator`, `OutputIterator1`, or `OutputIterator2`, the template argument
+    shall meet the `Cpp17OutputIterator` requirements ([output.iterators]).
+
+* If an algorithm's template parameter is named `ForwardIterator`, `ForwardIterator1`,
+    `ForwardIterator2`, <del>or</del> `NoThrowForwardIterator`, <ins>`NoThrowForwardIterator1`, or `NoThrowForwardIterator2`,</ins> the
+    template argument shall meet the *Cpp17ForwardIterator* requirements ([forward.iterators]) if it is required to be a mutable iterator,
+    or model `forward_iterator` ([iterator.concept.forward]) otherwise.
+
+* If an algorithm's template parameter is
+    named <ins>`NoThrowInputIterator`,</ins> `NoThrowForwardIterator`, <ins>`NoThrowForwardIterator1`, or `NoThrowForwardIterator2`,</ins> the
+    template argument is also required to have the property that no exceptions are thrown
+    from increment, assignment, or comparison of, or indirection through, valid iterators.
+
+* If an algorithm's template parameter is named `BidirectionalIterator`,
+    `BidirectionalIterator1`, <del>or</del> `BidirectionalIterator2`, <ins>`NoThrowBidirectionalIterator1`, or `NoThrowBidirectionalIterator2`,</ins> the
+    template argument shall meet the *Cpp17BidirectionalIterator* requirements ([bidirectional.iterators])
+    if it is required to be a mutable iterator, or model `bidirectional_iterator` ([iterator.concept.bidir]) otherwise.
+
+* <ins>If an algorithm's template parameter is named `NoThrowBidirectionalIterator1` or `NoThrowBidirectionalIterator2`, the
+    template argument is also required to have the property that no exceptions are thrown
+    from increment, decrement, assignment, or comparison of, or indirection through, valid iterators.</ins>
+
+</blockquote></small>
+
+
+## [uninitialized.relocate] ## {#wording-uninitialized.relocate}
+
+<p class="note"><b>DRAFTING NOTE:</b>
+Compare to <a href="https://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a> and
+<a href="https://eel.is/c++draft/alg.copy">[alg.copy]</a>. The <i>Remarks</i> allude to blanket wording
+in <a href="http://eel.is/c++draft/specialized.algorithms#general-2">[specialized.algorithms.general]/2</a>.
 
 Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uninitialized.move]</a>:
 
@@ -841,8 +602,8 @@ Add a new section after <a href="http://eel.is/c++draft/uninitialized.move">[uni
     <ins>throw;</ins>
   <ins>}</ins>
 </pre>
-<ins>except that if the iterators' common value type is trivially relocatable, side effects
-associated with the relocation of the object's value might not happen.</ins>
+<p><ins>except that if the iterators' common value type is trivially relocatable (<a href="#wording-basic.types.general">[basic.types.general]</a>),
+side effects associated with the relocation of values do not happen.</ins>
 <p><ins>2․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.</ins>
 
@@ -865,15 +626,16 @@ ranges are destroyed.</ins>
     <ins>throw;</ins>
   <ins>}</ins>
 </pre>
-<ins>except that if the iterators' common value type is trivially relocatable, side effects
-associated with the relocation of the object's value might not happen.</ins>
+<p><ins>except that if the iterators' common value type is trivially relocatable (<a href="#wording-basic.types.general">[basic.types.general]</a>),
+side effects associated with the relocation of values do not happen.</ins>
 <p><ins>4․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.</ins>
 
 <pre>
   <ins>template&lt;class NoThrowBidirectionalIterator1, class NoThrowBidirectionalIterator2></ins>
     <ins>NoThrowBidirectionalIterator2</ins>
-      <ins>uninitialized_relocate_backward(NoThrowBidirectionalIterator1 first, NoThrowBidirectionalIterator1 last,</ins>
+      <ins>uninitialized_relocate_backward(NoThrowBidirectionalIterator1 first,</ins>
+                                      <ins>NoThrowBidirectionalIterator1 last,</ins>
                                       <ins>NoThrowBidirectionalIterator2 result);</ins>
 </pre>
 
@@ -893,223 +655,52 @@ ranges are destroyed.</ins>
     <ins>throw;</ins>
   <ins>}</ins>
 </pre>
-<ins>except that if the iterators' common value type is trivially relocatable, side effects
-associated with the relocation of the object's value might not happen.</ins>
+<p><ins>except that if the iterators' common value type is trivially relocatable (<a href="#wording-basic.types.general">[basic.types.general]</a>),
+side effects associated with the relocation of values do not happen.</ins>
 <p><ins>6․ *Remarks:* If an exception is thrown, all objects in both the source and destination
 ranges are destroyed.</ins>
 </blockquote></small>
 
 
-# Rationale and alternatives # {#alternatives}
+## [specialized.relocate] ## {#wording-specialized.relocate}
 
-## Attribute `[[maybe_trivially_relocatable]]` ## {#maybe-trivially-relocatable}
+Add a new section after <a href="http://eel.is/c++draft/specialized.destroy">[specialized.destroy]</a>:
 
-My Clang implementation, currently available on Godbolt, supports both
-`[[trivially_relocatable]]` and another attribute called `[[clang::maybe_trivially_relocatable]]`,
-as suggested by John McCall in 2018 and also explored by <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a> in 2023.
-Where `[[trivially_relocatable]]` is a "sharp knife" that always cuts what you aim it at,
-`[[maybe_trivially_relocatable]]` is a "dull knife" that refuses to cut certain materials.
+<small><blockquote>
+<ins><b>`relocate` [specialized.relocate]</b></ins>
 
-* `[[maybe_trivially_relocatable]]` fails to support [[#design-goals]] examples #4 and #5.
+<p><pre>
+  <ins>template&lt;class T></ins>
+  <ins>T *relocate_at(T* source, T* dest);</ins>
+</pre>
+<p><ins>1․ *Mandates:* `T` is a complete non-array object type.</ins>
+<p><ins>2․ *Effects:* Equivalent to:</ins>
+<pre>
+  <ins>struct guard { T *t; ~guard() { destroy_at(t); } } g(source);</ins>
+  <ins>return ::new (<i>voidify</i>(*dest)) T(std::move(*source));</ins>
+</pre>
+<p><ins>except that if `T` is trivially relocatable (<a href="#wording-basic.types.general">[basic.types.general]</a>),
+side effects associated with the relocation of the value of `*source` do not happen.</ins>
 
-* See <a href="https://quuxplusone.github.io/blog/2023/03/10/sharp-knife-dull-knife/">"Should the compiler sometimes reject a `[[trivially_relocatable]]` warrant?"</a> (2023-03-10).
+<pre>
+  <ins>template&lt;class T></ins>
+  <ins>remove_cv_t&lt;T> relocate(T* source);</ins>
+</pre>
+<p><ins>3․ *Mandates:* `T` is a complete non-array object type.</ins>
+<p><ins>4․ *Effects:* Equivalent to:</ins>
+<pre>
+  <ins>remove_cv_t&lt;T> t = std::move(source);</ins>
+  <ins>destroy_at(source);</ins>
+  <ins>return t;</ins>
+</pre>
+<p><ins>except that if `T` is trivially relocatable (<a href="#wording-basic.types.general">[basic.types.general]</a>),
+side effects associated with the relocation of the value of `*source` do not happen.</ins>
+</blockquote></small>
 
-* See [P1144R4 §6.2](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1144r4.html#maybe-trivially-relocatable).
-
-In Issaquah (February 2023), <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a>
-suggested a "dull knife" design similar to `[[clang::maybe_trivially_relocatable]]`.
-EWGI took a three-way straw poll on `[[trivially_relocatable]]` versus `[[maybe_trivially_relocatable]]`,
-with an inconclusive 7–5–6 vote (the author of P1144 voting "For" and the three representatives of P2786
-voting "Against"; i.e. the vote sans authors was 6–5–3).
-
-## Relevance of `operator=` ## {#relevance-of-assignment}
-
-Here's how current implementations define "is trivially relocatable":
-
-<small>
-
-- Mainline Clang `__is_trivially_relocatable(T)`: Trivially move-constructible and trivially destructible, or has `[[clang::trivial_abi]]`
-- Arthur's Clang (P1144) `__is_trivially_relocatable(T)`: Trivially copyable, or has `[[clang::trivial_abi]]`, or has `[[trivially_relocatable]]`
-- Facebook [[Folly]]'s `folly::IsRelocatable<T>`: `is_trivially_copyable<T>` or has member typedef `T::IsRelocatable`
-- Bloomberg [[BSL]]'s `bslmf::IsBitwiseMoveable<T>`: Has a conversion to `bslmf::NestedTraitDeclaration<T, bslmf::IsBitwiseMoveable, true>`,
-    or has a conversion to `bslmf::NestedTraitDeclaration<T, bslmf::IsBitwiseCopyable, true>`, or `is_trivially_copyable<T>`,
-    or `sizeof(T) == 1`
-- Google [[Abseil]]'s `absl::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`
-- [[Amadeus]] AMC's `amc::is_trivially_relocatable<T>`: `is_trivially_copyable<T>` or has member typedef `T::trivially_relocatable`
-- Nvidia [[Thrust]]'s `thrust::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or `proclaim_trivially_relocatable` is specialized for `T`
-- [[HPX]]'s `hpx::experimental::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or the trait is specialized for `T`
-- [[ParlayLib]]'s `parlay::is_trivially_relocatable<T>`: `is_trivially_copyable<T>`, or `__is_trivially_relocatable(T)` on Clang;
-    or the trait is specialized for `T`
-- [[PocketPy]]'s `pkpy::is_trivially_relocatable_v<T>`: `is_trivially_copyable<T>` and `is_trivially_destructible<T>`, or `TriviallyRelocatable` is specialized for `T`
-
-</small>
-
-Notice that all library implementors (except Parlay on Clang, due to the Clang builtin's current behavior)
-agree that a type with trivial move-constructor, trivial destructor, *and non-trivial assignment operator*
-is considered non-trivially relocatable. That is, the assignment operator is relevant!
-
-P1144 preserves that behavior, and justifies it by pointing out that relocation
-can replace assignment in `vector::erase` and `std::swap`, among other algorithms. Existing codebases (most notably [[Folly]], [[Amadeus]], and [[BSL]])
-have written a lot of code that branches on `is_trivially_relocatable`, taking an optimized codepath when `is_trivially_relocatable`
-and an unoptimized codepath otherwise. P1144 carefully proposes a definition for `std::is_trivially_relocatable` that keeps
-those codebases safe, and that never reports a type `T` as `is_trivially_relocatable` when it's not physically safe
-to use `T` with such an optimized codepath.
-
-Here's a worked example showing why [[BSL]] pays attention to the assignment operator:
-
-<small>
-```cpp
-    #include <bsl_vector.h>
-    using namespace BloombergLP::bslmf;
-
-    struct T : NestedTraitDeclaration<T, IsBitwiseMoveable> {
-        int i_;
-        T(int i) : i_(i) {}
-        T(const T&) = default;
-        void operator=(const T&) noexcept { puts("Called operator="); }
-        ~T() = default;
-    };
-    int main() {
-        bsl::vector<T> v = {1,2};
-        v.erase(v.begin());
-          // prints nothing; bsl::vector::erase is optimized
-    }
-
-    struct U {
-        int i_;
-        U(int i) : i_(i) {}
-        U(const U&) = default;
-        void operator=(const U&) noexcept { puts("Called operator="); }
-        ~U() = default;
-    };
-    int main() {
-        bsl::vector<U> v = {1,2};
-        v.erase(v.begin());
-          // prints "Called operator="; BSL believes that a non-defaulted
-          // assignment operator makes U non-trivially relocatable.
-          // P1144 agrees. std::is_trivially_relocatable_v<U>
-          // must remain false, so as not to change the
-          // behavior of bsl::vector<U>.
-    }
-```
-</small>
-
-## Confusing interactions with `std::pmr` ## {#pmr-concerns}
-
-Note: See ["P1144 PMR koans"](https://quuxplusone.github.io/blog/2023/06/03/p1144-pmr-koans/) (June 2023)
-for additional analysis of the problem cases.
-
-Note: This section was added in P1144R5, revised in R7, R8, and R10.
-Here I assume libc++, where `std::string` is trivially relocatable.
-
-P1144 treats move as an optimization of copy; thus we assume that it always ought to be
-safe to replace "copy and destroy" with "move and destroy" (and thus with "relocate").
-This is informed by Arthur's experience standardizing "implicit move" in <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1155r3.html">P1155</a>
-(C++20) and <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2266r3.html">P2266</a> (C++23).
-"Implicit move" affects `pmr` types because their copy differs from their move. [Example](https://godbolt.org/z/sGKhxbsrK):
-
-<small>
-```cpp
-struct ByValueSink {
-    ByValueSink(std::pmr::vector<int> v) : v_(std::move(v)) {}
-    std::pmr::vector<int> v_;
-};
-
-ByValueSink f(std::pmr::memory_resource *mr) {
-    auto v = std::pmr::vector<int>(mr);
-    return v;
-      // C++17, Clang 12-: Copies (changes allocator)
-      // C++20, GCC, Clang 13+: Moves (preserves allocator)
-}
-```
-</small>
-
-We didn't care about this when fiddling with implicit move; P1144 implicitly believes we shouldn't
-care about it now. (This position might be debatable, but it's definitely part of the worldview that
-led to P1144's specific proposed semantics, so it's good to have this background in mind.)
-
-Some types invariably model `relocatable`; that is, their assignment is naturally tantamount to construct-and-destroy.
-But for `pmr` types and polymorphic types, assignment is *not* tantamount to construct-and-destroy, *except*
-under certain conditions. For `pmr` types, the condition is "both objects have the same
-allocator." For polymorphic types, the condition is "both objects have the same dynamic type."
-
-```cpp
-    std::vector<Derived> dv = { ~~~ };
-    dv.erase(dv.begin());
-      // Every object in the vector certainly has the same dynamic type.
-
-    std::pmr::vector<std::pmr::string> pv = { ~~~ };
-    pv.erase(pv.begin());
-      // Every string in the vector certainly has the same allocator.
-
-    Derived da[5] = { ~~~ };
-    std::rotate(da, da+2, da+5);
-      // Every object in the contiguous range certainly has the same dynamic type.
-
-    std::pmr::string pa[5] = { ~~~ };
-    std::rotate(pa, pa+2, pa+5);
-      // Objects in the contiguous range might have different allocators?
-```
-
-P1144 aims to permit efficient insertion and erasure in `std::vector`.
-[Example:](https://p1144.godbolt.org/z/vv5q69q44)
-
-```cpp
-    std::vector<std::string> vs(501);
-    vs.erase(vs.begin());
-```
-
-This `erase` requires us to shift down 500 `std::string` objects. We can do this
-by 500 calls to `string::operator=` followed by one call to `~string`, or by
-one call to `~string` followed by a `memmove`, as in [[BSL]] (also [[Folly]], [[Amadeus]];
-see [[#applications|table §2.1]]). We want to permit BSL's implementation.
-That's why the definition of `concept relocatable` in [[#wording-concept.relocatable|§4.8]]
-places semantic requirements on `T`'s assignment operators (if they exist) as well as on
-`T`'s constructors and destructors.
-
-If `pmr::string` is considered trivially relocatable, this will trickle down into all Rule-of-Zero
-types with a `pmr::string` member. ([Godbolt.](https://godbolt.org/z/nhf38n33G))
-
-```cpp
-    static_assert(std::is_trivially_relocatable_v<std::pmr::string>);
-      // Before: not true, of course
-      // After: suppose this is true
-    struct A {
-      std::pmr::string ps;
-    };
-    static_assert(std::is_trivially_relocatable_v<A>);
-      // After: then this will also be true, by the Rule of Zero
-    std::vector<A> v;
-    v.push_back({std::pmr::string("one", &mr1)});
-    v.push_back({std::pmr::string("two", &mr2)});
-    v.erase(v.begin());
-      // Before: Well-defined behavior, acts as-if by assignment
-      // After: Do we somehow make this a precondition violation?
-    assert(v[0].ps.get_allocator().resource() == &mr1);
-      // Before: Succeeds
-      // After: Might fail (and on a quality implementation, *will* fail)
-```
-
-If we (1) advertise `pmr::string` as `is_trivially_relocatable`; (2) propagate
-trivial relocatability in the core language as both P1144 and P2786 propose to do; and
-(3) optimize vector insert and erase for trivially relocatable types; then we inevitably
-arrive here. Arthur's solution is to impose preconditions on user-defined types
-used within certain parts of the STL: Just as their destructors are forbidden to (dynamically)
-throw exceptions, and their copy constructors are forbidden to (dynamically) make things that aren't copies,
-their assignment operators ought to be forbidden to (dynamically) violate
-`concept relocatable`'s semantic requirements.
-
-The proximate conclusion, as far as P1144 is concerned, is that `pmr::string`
-should not be warranted trivially relocatable by any library vendor *unless* they're
-willing to place preconditions on how the user can use it in STL containers and algorithms
-(which probably wouldn't be conforming, before further evolution in this space).
-
-The further evolution is out of scope for P1144, but see [[P2959R0]] for further elaboration
-of the problem, and [[P3055R1]] for a proposed solution.
 
 # Acknowledgements # {#acknowledgements}
 
-Thanks to Pablo Halpern for [[N4158]], to which this paper bears a striking resemblance —
+Thanks to Pablo Halpern for [[N4158]], to which this proposal bears a striking resemblance —
 including the meaning assigned to the word "trivial," and the library-algorithm approach to avoiding the
 problems with "lame duck objects" discussed in
 <a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2002/n1377.htm#Alternative%20move%20designs">the final section</a>
@@ -1122,7 +713,7 @@ Significantly different approaches to this problem have previously appeared in R
 Niall Douglas's [[P1029R3]] (treating trivial relocatability as an aspect of move-construction in isolation,
 rather than an aspect of the class type as a whole).
 
-A less different approach is taken by Mungo Gill & Alisdair Meredith's [[P2786R5]].
+A less different approach is taken by Mungo Gill & Alisdair Meredith's [[P2786]].
 [[P2814R1]] compares P2786R0 against P1144R8.
 
 Thanks to Elias Kosunen, Niall Douglas, John Bandela, and Nicolas Lesser for their feedback on early drafts of P1144R0.
@@ -1134,32 +725,50 @@ Many thanks to Matt Godbolt for allowing me to install my Clang fork on Compiler
 
 Thanks to Nicolas Lesser and John McCall for their review comments on the original Clang pull request [[D50119]].
 Thanks to Amirreza Ashouri for reviving the Clang effort in 2024 as
-<a href="https://github.com/llvm/llvm-project/pull/84621">#84621</a>.
+<a href="https://github.com/llvm/llvm-project/pull/84621">#84621</a>, and to the dozens of GitHub users
+who have starred and library maintainers who have commented in support of that review.
 
-Thanks to Howard Hinnant for appearing with me on [[CppChat]], and to Jon Kalb and Phil Nash for hosting us.
+Thanks to Howard Hinnant for appearing with me on [[CppChat]] in 2018, and to Jon Kalb and Phil Nash for hosting us.
 
 Thanks to Marc Glisse for his work integrating a "trivially relocatable" trait into GNU libstdc++ (see [[Deque]])
 and for answering my questions on [GCC bug 87106](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=87106).
 
 Thanks to Dana Jansens for her contributions re overlapping and non-standard-layout types (see [[Subspace]]),
 to Alisdair Meredith for our extensive discussions during the February 2023 drafting of P2786R0,
-to Giuseppe D'Angelo and Thiago Maceira for contributing the Qt entries in [[#applications|table §2.1]],
 and to Giuseppe D'Angelo for extensive review comments and discussion.
 
 Thanks to Charles Salvia (`stdx::error`), Isidoros Tsaousis-Seiras (HPX), Orvid King (Folly),
 Daniel Anderson (Parlay), and Derek Mauro (Abseil) for their work integrating P1144 into their
-respective libraries.
+respective libraries. Special thanks to Stéphane Janel (AMC) for doing the work completely
+independently, such that I only found out after the fact. :)
 
 Thanks to Giuseppe D'Angelo for [[P3233]]. Thanks to
 Alan de Freitas, Daniel Liam Anderson, Giuseppe D'Angelo, Hans Goudey, Hartmut Kaiser, Isidoros Tsaousis,
 Jacques Lucke, Krystian Stasiowski, Shreyas Atre, Stéphane Janel, and Thiago Maciera for [[P3236]].
+
+Thanks to... you? If you can help (by adding relevant support to your third-party library;
+by submitting P1144-style optimizations to standard libraries; by writing a GCC patch;
+by writing a blog post; in any other way), please reach out!
 
 
 Appendix A: Straw polls {#polls}
 =================================
 
 
-## Polls taken at EWGI at Issaquah on 2023-02-10 ## {#taken-polls-2023-02-10}
+## Poll taken in EWG at St Louis on 2024-06-28 ## {#taken-polls-2024-06-28}
+
+Pablo Halpern presented [[P2786]] along with a sketch of P2786's roadmap to parity with P1144
+(namely [[P2967]], [[P3239]], and [[D3262]]).
+On the other side, Giuseppe D'Angelo presented [[P3233]] and [[P3236]].
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+<tr><th><small>Given the new information received (P3233R0, P3236R1, P3278R0), we wish to un-forward P2786 from CWG and bring it back to EWG.</th>
+<th> 21 </th><th> 15 </th><th> 3 </th><th> 6 </th><th> 5 </th></tr>
+</table>
+
+
+## Polls taken in EWGI at Issaquah on 2023-02-10 ## {#taken-polls-2023-02-10}
 
 Arthur O'Dwyer presented [[P1144R6]]. Alisdair Meredith presented
 <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2786r0.pdf">P2786R0</a> (which proposed a
@@ -1184,7 +793,7 @@ of an attribute). EWGI took the following [straw polls](https://wiki.edg.com/bin
 <th> 0 </th><th> 7 </th><th> 4 </th><th> 3 </th><th> 1 </th></tr>
 </table>
 
-## Polls taken at EWGI at Prague on 2020-02-13 ## {#taken-polls-2020-02-13}
+## Polls taken in EWGI at Prague on 2020-02-13 ## {#taken-polls-2020-02-13}
 
 Corentin Jabot championed P1144R4. EWGI discussed P1144R4 and Niall Douglas's [[P1029R3]] consecutively,
 then took the following [straw polls](https://wiki.edg.com/bin/view/Wg21prague/P1144R4SG17)
@@ -1207,91 +816,6 @@ then took the following [straw polls](https://wiki.edg.com/bin/view/Wg21prague/P
 </table>
 
 For polls taken September–November 2018, see [[P1144R6]].
-
-
-Appendix B: Sample code {#samples}
-=======================
-
-See [[P1144R6]]'s Appendix B for reference implementations of `relocate`, `relocate_at`, and
-P1144R6's version of the `uninitialized_relocate` library algorithm, plus
-a conditionally trivially relocatable `std::optional<T>`.
-
-
-Appendix C: Examples of non-trivially relocatable class types {#non-trivial-samples}
-=============================================================
-
-See [[P1144R6]]'s Appendix C for compilable examples of types that are *not* trivially relocatable,
-for each of the following reasons:
-
-- Class contains pointer to self (e.g. libstdc++'s `std::string`)
-- Allocated memory contains pointer to self (e.g. libstdc++'s `std::list`)
-- Class invariant depends on `this` (e.g. <a href="https://www.boost.org/doc/libs/1_67_0/doc/html/interprocess/offset_ptr.html">`boost::interprocess::offset_ptr`</a>)
-- Program invariant depends on `this` (e.g. a global registry of `Widget` addresses)
-- Polymorphic object effectively relies on offset-into-self (see also [[Polymorphic]])
-
-
-Appendix D: Implementation experience {#implementation}
-=====================================
-
-## Core-language implementations ## {#implementation-core}
-
-Clang trunk provides a compiler builtin `__is_trivially_relocatable(T)`
-(see [[D114732]]), which is largely the same as the trait proposed in this paper.
-There remain slight differences; the only major one is that Clang still incorrectly reports
-types with user-provided assignment operators (and, on Windows, destructors) as "trivially relocatable."
-See the recently fixed [Clang #67498](https://github.com/llvm/llvm-project/issues/67498)
-and [Clang #77091](https://github.com/llvm/llvm-project/issues/77091), as well as
-<a href="https://github.com/abseil/abseil-cpp/commit/6b4af2497bf3ec56b070fdd6d8c2cf5996c17dbe">Abseil 6b4af24</a>.
-
-As of February 2024, Clang trunk has no equivalent of the `[[trivially_relocatable]]`
-attribute, so `__is_trivially_relocatable(T)` is true only when `T` is
-trivially copyable and/or trivial for purposes of calls. But Clang's current status
-is compatible with P1144, modulo the few unintentional differences listed in the
-previous paragraph.
-
-[Arthur's fork of Clang](https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable) implements
-all of P1144 (since 2018), and has been kept up-to-date with the latest P1144. See it in action
-[on godbolt.org](https://p1144.godbolt.org/z/jf67zx5hq), under the name "x86-64 clang (experimental P1144)."
-
-## Library implementations ## {#implementation-lib}
-
-Since 2018, [Arthur maintains a fork of libc++](https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable)
-with a fully optimizing implementation of P1144. See it in action
-[on godbolt.org](https://p1144.godbolt.org/z/KasGGoE64), under the name "x86-64 clang (experimental P1144)."
-([Here](https://p1144.godbolt.org/z/t28saC) is another example showing P1144's interaction with fancy allocators.)
-
-Since 2023, [Arthur maintains a fork of libstdc++](https://github.com/Quuxplusone/gcc/tree/trivially-relocatable)
-with a conforming implementation of P1144, although it omits some optimizations. For example, `std::relocate` never
-lowers to `memcpy`, and (as of February 2024) `vector` reallocation never relocates. See it in action
-[on godbolt.org](https://p1144.godbolt.org/z/zTvKPzxer), under the name "x86-64 clang (experimental P1144),"
-by passing `-stdlib=libstdc++` on the command line.
-
-Since at least December 2018, Nvidia's [[Thrust]] implements `is_trivially_relocatable`, but uses it only as
-a detail of device-to-device copy. No relevant algorithms or container optimizations are provided.
-
-Since October 2020, Carnegie Mellon's [[ParlayLib]] implements `uninitialized_relocate{,_n}` in the `parlay` namespace.
-
-Since 2021, [[Amadeus]] AMC provides perhaps the most comprehensively optimizing `Vector`, `SmallVector`, and `StaticVector`
-implementations, as well as P1144-compatible `uninitialized_relocate{,_n}` and `relocate_at` in the `amc` namespace.
-
-Since September 2023, Stellar [[HPX]] implements `relocate_at` and `uninitialized_relocate{,_n}`
-in the `hpx::experimental` namespace. This was a GSoC project.
-
-[[Qt]] implements `q_uninitialized_relocate_n` in the `QtPrivate` namespace, but (unlike P1144's `std::uninitialized_relocate_n`)
-does not support overlap; it optimizes to `memcpy`. Qt also provides `q_relocate_overlap_n`, which optimizes to `memmove`.
-
-Since November 2018, libstdc++ optimizes `vector::reserve`
-for types that manually specialize `std::__is_bitwise_relocatable`.
-([Godbolt.](https://godbolt.org/z/f7971hEcG))
-As of February 2024, the only libstdc++ library type for which `__is_bitwise_relocatable` has
-been specialized is `deque`. See [[Deque]].
-
-[[ParlayLib]], [[PocketPy]], [[HPX]], [[Thrust]], [[Qt]], [[Folly]], and [[BSL]] all provide "type traits" that are intended
-to be manually specialized by the client programmer. When compiled with a P1144-compliant compiler,
-[[HPX]] and [[ParlayLib]] do not require (in fact, they forbid) the client programmer to specialize
-these type traits.
-
-See [[#applications|table §2.1]] for more details on most of these library implementations.
 
 
 <pre class=biblio>
@@ -1510,14 +1034,14 @@ See [[#applications|table §2.1]] for more details on most of these library impl
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2785r3.html",
     "date": "June 2023"
   },
-  "P2786R5": {
+  "P2786": {
     "authors": [
       "Mungo Gill",
       "Alisdair Meredith"
     ],
     "title": "Trivial Relocatability For C++26",
-    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2786r5.pdf",
-    "date": "April 2024"
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2786r7.pdf",
+    "date": "September 2024"
   },
   "P2959R0": {
     "authors": [
@@ -1525,6 +1049,31 @@ See [[#applications|table §2.1]] for more details on most of these library impl
     "title": "Relocation within containers",
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p2959r0.html",
     "date": "October 2023"
+  },
+  "P2967": {
+    "authors": [
+      "Alisdair Meredith",
+      "Mungo Gill"
+    ],
+    "title": "Relocation has a library interface",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2967r1.pdf",
+    "date": "May 2024"
+  },
+  "P3239": {
+    "authors": [
+      "Alisdair Meredith"
+    ],
+    "title": "A relocating swap",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3239r0.pdf",
+    "date": "May 2024"
+  },
+  "D3262": {
+    "authors": [
+      "Alisdair Meredith"
+    ],
+    "title": "Specifying Trivially Relocatable Types in the Standard Library",
+    "href": "https://isocpp.org/files/papers/D3262R0.pdf",
+    "date": "unreleased (May 2024)"
   },
   "P3055R1": {
     "authors": [
@@ -1548,17 +1097,14 @@ See [[#applications|table §2.1]] for more details on most of these library impl
       "Daniel Liam Anderson",
       "Giuseppe D'Angelo",
       "Hans Goudey",
-      "Hartmut Kaiser",
-      "Isidoros Tsaousis",
       "Jacques Lucke",
       "Krystian Stasiowski",
-      "Shreyas Atre",
       "Stéphane Janel",
       "Thiago Maciera"
     ],
     "title": "Please reject P2786 and adopt P1144",
-    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3236r0.html",
-    "date": "April 2024"
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3236r1.html",
+    "date": "May 2024"
   },
   "P3279": {
     "authors": [
