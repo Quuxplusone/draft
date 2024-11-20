@@ -2,8 +2,8 @@
 Title: Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists
 Shortname: D3016
 Revision: 5
-!Draft Revision: 16
-Audience: LWG
+!Draft Revision: 19
+Audience: LEWG, LWG
 Status: D
 Group: WG21
 URL:
@@ -13,7 +13,7 @@ Abstract:
   We resolve some inconsistencies among [iterator.range] functions, notably
   `begin`/`end`, `data`, and `empty`, as applied to `valarray`, `initializer_list`,
   and braced initializer lists. We also resolve LWG3624, LWG3625, and LWG4131.
-Date: 2024-09-18
+Date: 2024-11-21
 </pre>
 
 <style>
@@ -26,7 +26,13 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 
 - R5 (during Wrocław):
 
+    - LWG voted 7–1–0 to forward R4 to plenary, but then retracted that vote and asked LEWG to re-confirm the
+          design decision that the generic free functions `begin`, `data`, etc. remain non-noexcept.
+          LWG asks LEWG to discuss and poll [[#reconfirm]]. Then this paper can return to LWG.
+
     - Add `<typeindex>` to the [resolution for LWG3624](#wording-lwg3624).
+
+    - Merge LWG issue resolutions back into "Proposed Wording," per jwakely; LWG approves of these resolutions.
 
 - R4 (pre-LWG in Wrocław):
 
@@ -291,9 +297,6 @@ it already doesn't work for `cbegin`, `rbegin`, or `size`), and the fix in code 
 *so* surgical (include `<iterator>` or `<span>`) that I don't think the lack of
 deprecation period will matter.
 
-[[LWG3624]], [[LWG3625]], and [[LWG4131]] somewhat intersect this proposal, but do not conflict with it.
-We expect these issues to be resolved along the lines given in [[#wording-lwg3624]].
-
 # Implementation experience # {#experience}
 
 Arthur has implemented [[#wording]] in his fork of libc++ ([source](https://github.com/Quuxplusone/llvm-project/commit/p3016-valarray-and-initializer-list)),
@@ -314,6 +317,61 @@ but the primary template `begin(C&)` is non-noexcept
 `il.begin()` and `ranges::begin(il)` remain noexcept.
 
 `std::begin(valarray)` remains non-noexcept.
+
+## Question LWG wants LEWG to re-confirm ## {#reconfirm}
+
+The test above concerns a "previously guaranteed standard API, which now changes":
+namely, the `noexcept`-ness of `std::begin` when applied to an lvalue of type `std::initializer_list`.
+LWG wants LEWG to re-confirm that part of the design.
+Papers [[P0884]] and [[P3155]] guide that library templates should not use conditional `noexcept`-specs,
+so `std::begin` right now is specified as follows:
+
+<small><blockquote>
+<pre>
+    template&lt;class C> constexpr auto begin(C& c)
+      -> decltype(c.begin());
+</pre>
+</blockquote></small>
+
+LWG says, "We already break the guideline from [[P0884]] by making other important APIs, like
+<a href="https://eel.is/c++draft/range.access.begin">`std::ranges::begin`</a>, conditionally noexcept.
+It seems worth considering `std::begin`, `std::end`, `std::data`, and `std::empty` as important enough
+to add a conditional `noexcept`." That is, we could re-specify `std::begin` as:
+
+<small><blockquote>
+<pre>
+    template&lt;class C> constexpr auto begin(C& c)
+      <ins>noexcept(noexcept(c.begin()))</ins>
+      -> decltype(c.begin());
+</pre>
+</blockquote></small>
+
+<a href="https://eel.is/c++draft/res.on.exception.handling#5">[res.on.exception.handling]/5</a> allows
+vendors to add this conditional `noexcept` if they want to — and in fact Microsoft STL
+<a href="https://github.com/microsoft/STL/blob/fec1c8b6a13e5411edebbddc3ad98258f5e282d2/stl/inc/xutility#L2031-L2035">already does</a>,
+but libc++ and libstdc++ do not.
+
+- `cbegin` and `cend` already have conditional noexcept-specs.
+- `rbegin`, `rend`, `crbegin`, `crend`, `size`, `ssize` have none.
+- `begin`, `end`, `data`, `empty` have none (right now).
+- Do we want to add conditional noexcept-specs to `begin`, `end`, `data`, `empty` as part of P3016?
+
+The author's view is that the current design is the right one <b>for P3016's scope</b>.
+It might independently be a good idea to guarantee conditional noexcept-specs to <b>all ten</b> functions;
+but it shouldn't be done as <b>part of P3016</b> and it shouldn't be done <b>piecemeal</b>.
+It's particularly silly to guarantee a noexcept-spec for `std::data` but not for `std::size`.
+
+Meanwhile, if libc++ and libstdc++ are worried about this test case, they should follow Microsoft's
+lead and add conforming noexcept-specs to all ten functions, all the way back to C++11, as permitted
+(if not guaranteed) by today's standard.
+
+### Requested Poll ### {#poll-wording}
+
+Add a conditional `noexcept`-specification to `std::begin`, `std::end`, `std::data`, and `std::empty`
+as part of P3016? (A "yes" vote means: Send P3016R6 back to LWG with those four functions modified.
+A "no" vote means: confirm the current design and send P3016R5 back to LWG as-is.)
+
+SF — F — N — A — SA
 
 
 ## Tony Table ## {#tony-table}
@@ -402,16 +460,15 @@ but the primary template `begin(C&)` is non-noexcept
 </tr>
 </table>
 
-# Possible resolutions for LWG3624, LWG3625, and LWG4131 # {#wording-lwg3624}
+# Proposed wording # {#wording}
 
-Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:
+Note: Vendors should provide `__cpp_lib_initializer_list` if `il.data()` and `il.empty()`
+are well-formed. Vendors should provide `__cpp_lib_valarray` if `va.begin()` and `va.end()` are well-formed
+and the free-function `begin` and `end` have been removed from `<valarray>`.
 
-<small><blockquote>
-<p>1. In addition to being available via inclusion of the `<iterator>` header, the function templates in [iterator.range]
-are available when any of the following headers are included: `<array>`, `<deque>`, `<flat_map>`, `<flat_set>`,
-`<forward_list>`, `<list>`, `<map>`, <ins>`<optional>`,</ins> `<regex>`, `<set>`, `<span>`, <ins>`<stacktrace>`,</ins>
-`<string>`, `<string_view>`, `<unordered_map>`, `<unordered_set>`, <ins><code>&lt;valarray></code>,</ins> and `<vector>`.
-</blockquote></small>
+## Resolve LWG3624 ## {#wording-lwg3624}
+
+The following changes resolve [[LWG3624]].
 
 Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:
 
@@ -467,12 +524,6 @@ but it uses `std::reverse_iterator` indirectly in the same way, and we certainly
 The exact mechanism by which the library vendor satisfies
 <a href="https://eel.is/c++draft/dcl.init.list#2.sentence-4">[dcl.init.list]/2</a>
 should be left unspecified in this case.
-
-# Proposed wording # {#wording}
-
-Note: Vendors should provide `__cpp_lib_initializer_list` if `il.data()` and `il.empty()`
-are well-formed. Vendors should provide `__cpp_lib_valarray` if `va.begin()` and `va.end()` are well-formed
-and the free-function `begin` and `end` have been removed from `<valarray>`.
 
 ## [version.syn] ## {#wording-version.syn}
 
@@ -654,7 +705,7 @@ namespace std {
 
     <ins>constexpr const E* data() const noexcept;</ins>
     constexpr size_t size() const noexcept;     // number of elements
-    <ins>[[nodiscard]] constexpr bool empty() const noexcept;</ins>
+    <ins>constexpr bool empty() const noexcept;</ins>
     constexpr const E* begin() const noexcept;  // first element
     constexpr const E* end() const noexcept;    // one past the last element
   };
@@ -695,7 +746,7 @@ constexpr size_t size() const noexcept;
 <p>3․ Returns: The number of elements in the array.
 <p>4․ Complexity: Constant <del>time</del>.
 <pre>
-<ins>[[nodiscard]] constexpr bool empty() const noexcept;</ins>
+<ins>constexpr bool empty() const noexcept;</ins>
 </pre>
 <p><ins>x․ Returns: `size() == 0`.</ins>
 <p><del><b>17.10.5 Initializer list range access [support.initlist.range]</b></del>
@@ -720,6 +771,7 @@ Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</
 <pre>
 #include &lt;compare>              // see [compare.syn]
 #include &lt;concepts>             // see [concepts.syn]
+<ins>#include &lt;initializer_list>     // see [initializer.list.syn]</ins>
 
 namespace std {
 </pre>
@@ -762,11 +814,11 @@ namespace std {
   template&lt;class T, ptrdiff_t N> constexpr ptrdiff_t
     ssize(const T (&amp;array)\[N]) noexcept;
 
-  template&lt;class C> [[nodiscard]] constexpr auto
+  template&lt;class C> constexpr auto
     empty(const C& c) -> decltype(c.empty());
-  template&lt;class T, size_t N> [[nodiscard]] constexpr bool
+  template&lt;class T, size_t N> constexpr bool
     empty(const T (&amp;array)\[N]) noexcept;
-  <del>template&lt;class E> [[nodiscard]] constexpr bool</del>
+  <del>template&lt;class E> constexpr bool</del>
     <del>empty(initializer_list&lt;E> il) noexcept;</del>
 
   template&lt;class C> constexpr auto data(C& c) -> decltype(c.data());
@@ -779,18 +831,21 @@ namespace std {
 
 ## [iterator.range] ## {#wording-iterator.range}
 
+LWG approved this addition of `<stacktrace>` to resolve [[LWG3625]].
+LWG approved this addition of `<optional>` to resolve [[LWG4131]].
+
 Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:
 
 <small><blockquote>
 <p>1. In addition to being available via inclusion of the `<iterator>` header, the function templates in [iterator.range]
 are available when any of the following headers are included: `<array>`, `<deque>`, `<flat_map>`, `<flat_set>`,
-`<forward_list>`, `<list>`, `<map>`, `<regex>`, `<set>`, `<span>`, `<string>`, `<string_view>`,
-`<unordered_map>`, `<unordered_set>`, <ins><code>&lt;valarray></code>,</ins> and `<vector>`.
+`<forward_list>`, `<inplace_vector>`, `<list>`, `<map>`, <ins>`<optional>`,</ins> `<regex>`, `<set>`, `<span>`, <ins>`<stacktrace>`,</ins>
+`<string>`, `<string_view>`, `<unordered_map>`, `<unordered_set>`, <ins><code>&lt;valarray></code>,</ins> and `<vector>`.
 
 [...]
 
 <pre>
-<del>template&lt;class E> [[nodiscard]] constexpr bool empty(initializer_list&lt;E> il) noexcept;</del>
+<del>template&lt;class E> constexpr bool empty(initializer_list&lt;E> il) noexcept;</del>
 </pre>
 <p><del>22․ Returns: `il.size() == 0`.</del>
 <p>[...]
@@ -960,6 +1015,23 @@ valarray(initializer_list&lt;T> il);
     ],
     "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2613r1.html",
     "date": "June 2022"
+  },
+  "P0884": {
+    "title": "Extending the noexcept policy, rev0",
+    "authors": [
+      "Nicolai Josuttis"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf",
+    "date": "February 2018"
+  },
+  "P3155": {
+    "title": "noexcept policy for SD-9 (The Lakos Rule)",
+    "authors": [
+      "Timur Doumler",
+      "John Lakos"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3155r0.pdf",
+    "date": "February 2024"
   }
 }
 </pre>
