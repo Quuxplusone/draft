@@ -1,0 +1,348 @@
+<pre class='metadata'>
+Title: `is_trivially_relocatable`: One trait or two?
+Shortname: D3559
+Revision: 0
+!Draft Revision: 1
+Audience: EWG, LEWG
+Status: D
+Group: WG21
+URL:
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Trivial relocation is used by Abseil, AMC, BSL, Folly, HPX, Parlay, Pocketpy, Qt, Subspace, Thrust,
+  and others, all with a single trait `is_trivially_relocatable` matching P1144's semantics.
+  P2786 proposes two traits instead: P2786 changes `is_trivially_relocatable`
+  to imply only a subset of its current meaning, and adds `is_replaceable` to fill in the gap.
+  We argue that P2786's change will generate both inconvenience and actual bugs.
+Date: 2025-01-07
+</pre>
+
+<style>
+p    {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+table.noborder tr td {border: none;}
+</style>
+
+
+# Changelog # {#changelog}
+
+- R0 (pre-Hagenberg 2025): Initial revision.
+
+# Background # {#background}
+
+"Relocation" is the quantity-preserving analog of "copying." A set of trivially copyable objects can have
+arbitrarily many *copies* of their values made at arbitrary memory locations simply by putting the right bytes there.
+A set of trivially relocatable objects can be *relocated* to arbitrary memory locations simply by putting the
+right bytes there if and only if the mapping from source values to destination values is 1:1.
+
+Many important libraries care about this ability to arbitrarily relocate objects via memcpy:
+e.g. in `erase`, in `swap`, in the move-assignment operator of `inplace_vector`, etc. These optimizations
+are not always safe. These optimizations are safe *only* when the objects in question can have their values
+arbitrarily relocated in a way tantamount to memcpy. For example, it's not safe to optimize `swap(t, t)`
+into `__libcpp_memswap(&t, &t, __libcpp_datasizeof<T>)` unless `T` has this special property; it's not
+safe to optimize `inplace_vector<T>` move-assignment unless `T` has this special property; and so on.
+`tuple<int&>` lacks this property. `struct S {pmr::vector<int> v_;}` lacks this property.
+Both P1144 and P2786 agree on this baseline truth about when optimizations are safe to perform.
+
+Let's call this property *P*. Many important libraries care about property *P*. They've written their
+own type-trait for *P*, and gate their optimizations on that type-trait.
+
+---
+
+The latest revision of [[P2786R11]] proposes two new traits for the Standard Library:
+
+- `std::is_replaceable_v<T>` means roughly that assignment is tantamount to destroy-and-move-construct.
+- `std::is_trivially_relocatable_v<T>` means that destroy-and-move-construct is tantamount to memcpy.
+
+P2786 points out, correctly, that a library who cares about property *P* can write their own type-trait as:
+
+```c++
+template <class T>
+constexpr bool has_property_p_v =
+  std::is_trivially_relocatable_v<T> &&  // P2786 semantics
+  std::is_replaceable_v<T>;
+```
+
+---
+
+[[P1144]], in contrast, has always proposed a single trait, named `std::is_trivially_relocatable_v<T>`,
+corresponding precisely to property *P*:
+
+```c++
+template <class T>
+constexpr bool has_property_p_v =
+  std::is_trivially_relocatable_v<T>;  // P1144 semantics
+```
+
+---
+
+What sorts of names do libraries actually pick, in practice, for this type-trait that I've been calling
+`has_property_p`?
+
+<table>
+<tr><td><i>Third-party library</i></td><td><i>Name for property P</i></td></tr>
+<tr><td>Abseil</td><td><code>absl::is_trivially_relocatable</code></td></tr>
+<tr><td>Amadeus AMC</td><td><code>amc::is_trivially_relocatable</code></td></tr>
+<tr><td>Bloomberg BSL</td><td><code>bslmf::IsBitwiseMoveable</code></td></tr>
+<tr><td>Folly</td><td><code>folly::IsRelocatable</code></td></tr>
+<tr><td>HPX</td><td><code>hpx::experimental::is_trivially_relocatable</code></td></tr>
+<tr><td>CMU Parlay</td><td><code>parlay::is_trivially_relocatable</code></td></tr>
+<tr><td>PocketPy</td><td><code>pkpy::is_trivially_relocatable_v</code></td></tr>
+<tr><td>Qt</td><td><code>Q_IS_RELOCATABLE</code></td></tr>
+<tr><td>Google Skia</td><td><code>sk_is_trivially_relocatable</code></td></tr>
+<tr><td>Subspace</td><td><code>sus::mem::TriviallyRelocatable</code></td></tr>
+<tr><td>Thrust</td><td><code>thrust::is_trivially_relocatable</code></td></tr>
+<tr><td>arturbac/small_vectors</td><td><code>small_vectors::is_relocatable_v</code></td></tr>
+<tr><td>snncpp/snn-core</td><td><code>snn::is_trivially_relocatable</code></td></tr>
+<tr><td>charles-salvia/std_error</td><td><code>stdx::is_trivially_relocatable</code></td></tr>
+<tr><td>sarah-quinones/veg</td><td><code>veg::trivially_relocatable</code></td></tr>
+</table>
+
+Abseil, Folly, HPX, Parlay, and Subspace all explicitly define their trait in terms of P1144's
+`std::is_trivially_relocatable` whenever the compiler advertises support for P1144. A typical
+implementation goes like this:
+
+```c++
+namespace lib {
+  // Define a trait for property P,
+  // by the name is_trivially_relocatable.
+  template <class T>
+  struct is_trivially_relocatable :
+  #if __cpp_lib_trivially_relocatable // P1144
+    std::is_trivially_relocatable<T> {};
+  #else
+    std::is_trivially_copyable<T> {};
+  #endif
+}
+~~~~
+if constexpr (lib::is_trivially_relocatable<T>::value) {
+  ~~~~ memcpy ~~~~
+}
+```
+
+Notice that this relies on the Standard Library to define `std::is_trivially_relocatable`
+with P1144 semantics. That is, if their STL vendor decides to define the feature-test macro
+`__cpp_lib_trivially_relocatable` but to give `std::is_trivially_relocatable` some other
+semantics that are laxer than P1144's — for example, to give it P2786R11's proposed semantics instead —
+then this library will mis-optimize. For example, it will use memswap to swap objects
+that can't be swapped that way. It will use memmove to shift objects (e.g. in `vector::erase`)
+that can't be shifted that way.
+
+P2786 basically asks that all third-party libraries should "fix themselves" by changing
+their code in one of two ways: Either they'll have to modify their definition of the
+property-*P* trait, like this:
+
+```c++
+namespace lib {
+  // Define a trait for property P,
+  // by the name is_trivially_relocatable.
+  template <class T>
+  struct is_trivially_relocatable :
+  #if __cplusplus >= 20XXYYL  // P2786
+    // Unfortunately the STL's version is weaker than ours
+    std::bool_constant<std::is_trivially_relocatable_v<T> && std::is_replaceable_v<T>> {};
+  #else
+    std::is_trivially_copyable<T> {};
+  #endif
+}
+~~~~
+if constexpr (lib::is_trivially_relocatable<T>::value) {
+  ~~~~ memcpy ~~~~
+}
+```
+
+Or else they'll have let their type-trait's own meaning shift from property *P*
+to the weaker property *Q*, and carefully modify every call-site, like this:
+
+```c++
+namespace lib {
+  // Define a trait for property Q (no longer P),
+  // by the name is_trivially_relocatable.
+  template <class T>
+  struct is_trivially_relocatable :
+  #if __cplusplus >= 20XXYYL  // P2786
+    std::is_trivially_relocatable<T> {};
+  #else
+    std::is_trivially_move_constructible<T> {};
+  #endif
+
+  template <class T>
+  struct is_replaceable :
+  #if __cplusplus >= 20XXYYL  // P2786
+    std::is_replaceable<T> {};
+  #else
+    std::is_trivially_copyable<T> {};
+  #endif
+}
+~~~~
+if constexpr (lib::is_trivially_relocatable<T>::value &&
+              lib::is_replaceable<T>::value) {
+  ~~~~ memcpy ~~~~
+}
+```
+
+Neither of these are appealing solutions.
+Even worse, if neither solution is applied (or a solution is applied inconsistently),
+then the clients of `lib` will find themselves memcpying objects with property *Q* in
+situations where property *P* is required for safety — i.e., in situations where memcpy
+has the wrong physical behavior — leading to wild pointers, the eliding of important side-effects,
+or worse.
+
+We should not put a trait named `std::is_trivially_relocatable`
+into the Standard Library unless it has the same *meaning* as today's library vendors understand
+by `lib::is_trivially_relocatable`. That is, property *P*.
+
+
+# Libraries overwhelmingly prefer a single trait # {#prefer}
+
+In June 2024, Arthur [catalogued](https://quuxplusone.github.io/blog/2024/06/15/who-uses-trivial-relocation/)
+21 libraries that use traits or algorithms relating in some way to "trivial relocation."
+
+14 of these libraries define a single trait for property *P* (that is, P1144 semantics). Of those,
+8 of them explicitly refer to P1144 and implement the set of library algorithms and/or
+container optimizations that P1144 proposes.
+5 libraries (listed in the timeline below) use P1144's feature-test macros.
+
+Vice versa, 2 libraries define a single trait for property *Q* (that is, P2786 semantics):
+these are Thermadiag/seq and OleErikPeistorpet/OE-Lib. Their traits are true for `tuple<int&>`,
+although it's unclear if every use of these traits is correct.
+
+As for standard libraries themselves: Both libc++ and libstdc++ define private traits
+which use P1144 semantics (they are false for `tuple<int&>`), but currently use their traits
+only to optimize vector reallocation, so they remain safe if either P1144 or P2786 is chosen.
+Microsoft STL does not perform any relocation optimizations.
+
+No library ever defines anything corresponding to P2786's `is_replaceable` as a standalone trait.
+
+No library defines both a trait for property *P* and one for property *Q*. That is, the 14 libraries
+that care about *P* do not seem to care about *Q*; and the 2 libraries that seem to care about *Q* do not
+seem to care about *P*. We can define a trait that captures most (but not all) of property *Q*...
+
+```c++
+namespace lib {
+  template <class T>
+  struct has_property_q :
+    std::bool_constant<has_property_p<T> || std::is_trivially_move_constructible_v<T>> {};
+}
+static_assert(lib::has_property_q<std::tuple<int&>>);
+```
+
+...but none of the 14 libraries above seem to care about capturing that particular
+set of semantics; they're happy to capture property *P* alone. *P* is the property
+most salient to their optimizations. We should give property *P* the good name.
+
+
+# Timeline of P2786 and P1144 # {#timeline}
+
+The committee history, as I understand it, goes like this:
+
+<table class="noborder">
+<tr><td>2018</td><td>Oct</td><td> P1144 is published </td></tr>
+<tr><td>2020</td><td>Feb</td><td> P1144 voted forward by EWGI (1–3–4–1–0); remains in EWGI </td></tr>
+<tr><td>2023</td><td>Feb</td><td>
+P2786 is published<br>
+P1144 voted forward by EWGI (0–7–4–3–1); remains in EWGI<br>
+P2786 voted forward by EWGI (1–8–3–3–1); goes to EWG<br>
+</td></tr>
+<tr><td rowspan="4">2024</td><td>Feb</td><td> P2786 voted forward by EWG (7–9–6–0–2); goes to CWG </td></tr>
+<tr><td>Apr</td><td> [[P3233]] and [[P3236]] are published </td></tr>
+<tr><td>Jun</td><td> P2786 voted backward by EWG (21–15–3–6–5); goes back to EWG </td></tr>
+<tr><td>Nov</td><td>
+P2786 voted sideways by EWG (10-10-2-7-2); goes to LEWG<br>
+P2786 voted sideways by LEWG (11-4-0-1-8); goes to EWG</td></tr>
+</table>
+
+The implementation history goes like this. For our purposes here, "P1144 semantics" means
+simply that a type with a funky assignment operator (such as `tuple<int&>`) *is not* trivially relocatable;
+"P2786 semantics" means simply that it *is*.
+
+<table class="noborder">
+<tr><td>2012</td><td>Dec</td><td> Facebook Folly adds `IsRelocatable` with P1144 semantics </td></tr>
+<tr><td>2013</td><td></td><td> Bloomberg BSL uses `BitwiseMoveable` with P1144 semantics </td></tr>
+<tr><td rowspan="2">2015</td><td>Jul</td><td> Qt adds `isRelocatable` with P1144 semantics </td></tr>
+<tr><td>Sep</td><td> OleErikPeistorpet/OE-Lib adds `is_trivially_relocatable` with P1144 semantics </td></tr>
+<tr><td rowspan="3"></td><td>Jul</td><td> Arthur O'Dwyer implements P1144 in a Clang fork, available on <a href="https://godbolt.org/z/WE1jfrP36">godbolt.org</a> (full libc++ and libstdc++ support) </td></tr>
+<tr><td>Oct</td><td>
+P1144R0 is published<br>
+libstdc++ adds `__is_bitwise_relocatable` with P1144 semantics
+</td></tr>
+<tr><td>Nov</td><td> OleErikPeistorpet/OE-Lib changes from P1144 to P2786 semantics </td></tr>
+<tr><td rowspan="2">2021</td><td>Feb</td><td> sarah-quinones/veg adds `trivially_relocatable` with P1144 semantics </td></tr>
+<tr><td>Apr</td><td> Amadeus AMC uses `is_trivially_relocatable` with P1144 semantics </td></tr>
+<tr><td rowspan="4">2022</td><td>Feb</td><td> arturbac/small_vectors uses `is_relocatable` with P1144 semantics </td></tr>
+<tr><td>May</td><td> Subspace adds `relocate_one_by_memcpy` with P2786 semantics </td></tr>
+<tr><td>Sep</td><td> snncpp/snn-core uses `is_trivially_relocatable` with P1144 semantics </td></tr>
+<tr><td>Oct</td><td> Google Skia adds `sk_is_trivially_relocatable` with P1144 semantics </td></tr>
+<tr><td rowspan="5">2023</td><td>Jan</td><td> Subspace changes from P2786 to P1144 semantics </td></tr>
+<tr><td>Feb</td><td> P2786R0 is published </td></tr>
+<tr><td>Jul</td><td> Ste||ar HPX explores both P2786 and P1144 during GSoC 2023 </td></tr>
+<tr><td>Oct</td><td> Quuxplusone/SG14 uses P1144's feature-test macro </td></tr>
+<tr><td>Nov</td><td> charles-salvia/std_error adds P1144's feature-test macro </td></tr>
+<tr><td rowspan="6">2024</td><td>Jan</td><td> Ste||ar HPX adds `is_trivially_relocatable` with P1144 semantics </td></tr>
+<tr><td>Feb</td><td>
+libc++ adds `__libcpp_is_trivially_relocatable` with compiler-dependent semantics<br>
+CMU Parlay adds P1144's feature-test macro<br>
+Pocketpy adds `is_trivially_relocatable_v` with P1144 semantics<br>
+Google Abseil adds P1144's feature-test macro<br>
+Corentin Jabot <a href="https://github.com/cor3ntin/llvm-project/commit/1e4f55ec27bc1bd1cc299f045bcc33ae831b0425">implements</a> P2786 in a Clang fork,
+ available on <a href="https://godbolt.org/z/hzqaacE1Y">godbolt.org</a> (no library support)<br>
+</td></tr>
+<tr><td>Mar</td><td>
+Amirreza Ashouri <a href="https://github.com/llvm/llvm-project/pull/84621">proposes</a> Clang's `__is_trivially_relocatable` builtin should have P1144 semantics.
+Commenters in favor include AMC, HPX, Parlay, Qt, and Subspace
+</td></tr>
+<tr><td>Apr</td><td> P3236R0 is published. Signatories include AMC, Blender, Folly, HPX, Parlay, and Qt </td></tr>
+<tr><td>Jun</td><td> Facebook Folly adds P1144's feature-test macro </td></tr>
+<tr><td>Aug</td><td> ultimatepp/ultimatepp adds `is_trivially_relocatable` with P1144 semantics </td></tr>
+</table>
+
+# Learn more about trivial relocation # {#learn-more}
+
+Besides <a href="https://quuxplusone.github.io/blog/tags/#relocatability">Arthur's blog</a>,
+you might also want to look at:
+
+* ["Trivially relocatable types in C++/Subspace"](https://orodu.net/2023/01/15/trivially-relocatable.html), by Dana Jansens
+* ["Qt and trivial relocation"](https://www.kdab.com/qt-and-trivial-relocation-part-5/), by Giuseppe D'Angelo, on the KDAB blog
+* ["Relocation semantics in the HPX library"](https://isidorostsa.github.io/gsoc2023/), by Isidoros Tsaousis
+* ["Object relocation"](https://github.com/facebook/folly/blob/main/folly/docs/FBVector.md#object-relocation) in the Folly repository
+
+<pre class=biblio>
+{
+  "P1144": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "std::is_trivially_relocatable",
+    "href": "https://open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1144r12.html",
+    "date": "October 2024"
+  },
+  "P2786R11": {
+    "authors": [
+      "Mungo Gill",
+      "et al"
+    ],
+    "title": "Trivial Relocatability For C++26",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2786r11.html",
+    "date": "December 2024"
+  },
+  "P3233": {
+    "authors": [
+      "Giuseppe D'Angelo"
+    ],
+    "title": "Issues with P2786 (‘Trivial Relocatability For C++26’)",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3233r0.html",
+    "date": "April 2024"
+  },
+  "P3236": {
+    "authors": [
+      "Alan de Freitas",
+      "et al"
+    ],
+    "title": "Please reject P2786 and accept P1144",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3236r1.html",
+    "date": "May 2024"
+  }
+}
+</pre>
