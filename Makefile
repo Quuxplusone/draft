@@ -1,5 +1,6 @@
 
 all: \
+    d3559-one-trait-or-two.html \
     d2447-std-span-over-initializer-list.html \
     d1808-contra-p0339.html \
     d1837-remove-class-type-nttps.html \
