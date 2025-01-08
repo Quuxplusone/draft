@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2952R1: auto&amp; operator=(X&amp;&amp;) = default</title>
+  <title>D2952R2: auto&amp; operator=(X&amp;&amp;) = default</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1561,10 +1561,11 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version 82ce88815, updated Thu Sep 7 16:33:55 2023 -0700" name="generator">
+  <meta content="Bikeshed version ac5ea272d, updated Fri Dec 6 15:45:15 2024 -0800" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
+  <meta content="dark light" name="color-scheme">
 <style>
-hilite  {background-color: #FFFF00; font-weight: bold;}
+p    {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
@@ -1639,7 +1640,6 @@ pre .property::before, pre .property::after {
 }
 </style>
 <style>/* Boilerplate: style-colors */
-
 /* Any --*-text not paired with a --*-bg is assumed to have a transparent bg */
 :root {
     color-scheme: light dark;
@@ -1909,7 +1909,6 @@ a[href].issue-return {
 }
 </style>
 <style>/* Boilerplate: style-selflinks */
-
 :root {
     --selflink-text: white;
     --selflink-bg: gray;
@@ -1969,7 +1968,6 @@ a.self-link::before            { content: "¶"; }
 dfn > a.self-link::before      { content: "#"; }
 </style>
 <style>/* Boilerplate: style-syntax-highlighting */
-
 code.highlight { padding: .1em; border-radius: .3em; }
 pre.highlight, pre > code.highlight { display: block; padding: 1em; margin: .5em 0; overflow: auto; border-radius: 0; }
 
@@ -2026,7 +2024,6 @@ c-[vc] { color: #0077aa } /* Name.Variable.Class */
 c-[vg] { color: #0077aa } /* Name.Variable.Global */
 c-[vi] { color: #0077aa } /* Name.Variable.Instance */
 c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
-
 
 @media (prefers-color-scheme: dark) {
     .highlight:not(.idl) { background: rgba(255, 255, 255, .05); }
@@ -2094,19 +2091,19 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2952R1<br>auto&amp; operator=(X&amp;&amp;) = default</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2023-12-07">2023-12-07</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D2952R2<br>auto&amp; operator=(X&amp;&amp;) = default</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2025-01-08">2025-01-08</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
      <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:mjtaylor214@hotmail.com">Matthew Taylor</a>
      <dt>Audience:
-     <dd>EWG
+     <dd>CWG
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>15
+     <dd>16
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2115,10 +2112,9 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
    <p>Current C++ forbids explicitly defaulted functions to have placeholder return types such as <code class="highlight"><c- k>auto</c-><c- o>&amp;</c-></code>,
-
-  except for C++20’s <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code>. We remove this syntactic restriction
-  in cases where the deduced return type would be the same as the expected one.
-  This allows more consistency and less repetition when declaring defaulted functions.</p>
+except for C++20’s <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code>. We remove this syntactic restriction
+in cases where the deduced return type would be the same as the expected one.
+This allows more consistency and less repetition when declaring defaulted functions.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -2137,13 +2133,14 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
       <li><a href="#impact"><span class="secno">3.7</span> <span class="content">Impact on existing code</span></a>
      </ol>
     <li><a href="#experience"><span class="secno">4</span> <span class="content">Implementation experience</span></a>
+    <li><a href="#polls"><span class="secno">5</span> <span class="content">Straw poll results</span></a>
     <li>
-     <a href="#wording"><span class="secno">5</span> <span class="content">Proposed wording</span></a>
+     <a href="#wording"><span class="secno">6</span> <span class="content">Proposed wording</span></a>
      <ol class="toc">
-      <li><a href="#wording-class.eq"><span class="secno">5.1</span> <span class="content">[class.eq]</span></a>
-      <li><a href="#wording-class.spaceship"><span class="secno">5.2</span> <span class="content">[class.spaceship]</span></a>
-      <li><a href="#wording-class.compare.secondary"><span class="secno">5.3</span> <span class="content">[class.compare.secondary]</span></a>
-      <li><a href="#wording-class.copy.assign"><span class="secno">5.4</span> <span class="content">[class.copy.assign]</span></a>
+      <li><a href="#wording-class.eq"><span class="secno">6.1</span> <span class="content">[class.eq]</span></a>
+      <li><a href="#wording-class.spaceship"><span class="secno">6.2</span> <span class="content">[class.spaceship]</span></a>
+      <li><a href="#wording-class.compare.secondary"><span class="secno">6.3</span> <span class="content">[class.compare.secondary]</span></a>
+      <li><a href="#wording-class.copy.assign"><span class="secno">6.4</span> <span class="content">[class.copy.assign]</span></a>
      </ol>
     <li>
      <a href="#references"><span class="secno"></span> <span class="content">References</span></a>
@@ -2155,6 +2152,14 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <main>
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
+    <li data-md>
+     <p>R2 (pre-Hagenberg):</p>
+     <ul>
+      <li data-md>
+       <p>Forward to CWG (see <a href="#polls">§ 5 Straw poll results</a>).</p>
+      <li data-md>
+       <p>Fix one mistake in a drafting note ("deleted" to "ill-formed").</p>
+     </ul>
     <li data-md>
      <p>R1:</p>
      <ul>
@@ -2173,7 +2178,8 @@ such as in this real code from libc++'s test suite:</p>
       <th>Today
       <th>After P2952
      <tr>
-      <td> <small><pre class="highlight"><c- k>struct</c-> <c- nc>ForwardDiffView</c-> <c- p>{</c->
+      <td> <small><pre class="highlight">
+<c- k>struct</c-> <c- nc>ForwardDiffView</c-> <c- p>{</c->
   <c- p>[...]</c->
   <c- n>ForwardDiffView</c-><c- p>(</c-><c- n>ForwardDiffView</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
   <c- n>ForwardDiffView</c-><c- p>(</c-><c- k>const</c-> <c- n>ForwardDiffView</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2182,7 +2188,8 @@ such as in this real code from libc++'s test suite:</p>
   <c- p>[...]</c->
 <c- p>};</c->
 </pre></small> 
-      <td> <small><pre class="highlight"><c- k>struct</c-> <c- nc>ForwardDiffView</c-> <c- p>{</c->
+      <td> <small><pre class="highlight">
+<c- k>struct</c-> <c- nc>ForwardDiffView</c-> <c- p>{</c->
   <c- p>[...]</c->
   <c- n>ForwardDiffView</c-><c- p>(</c-><c- n>ForwardDiffView</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
   <c- n>ForwardDiffView</c-><c- p>(</c-><c- k>const</c-> <c- n>ForwardDiffView</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2199,11 +2206,13 @@ such as in this real code from libc++'s test suite:</p>
       <th>Today
       <th>After P2952
      <tr>
-      <td> <small><pre class="highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+      <td> <small><pre class="highlight">
+<c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- b>bool</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- b>bool</c-> <c- k>operator</c-><c- o>&lt;</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 </pre></small> 
-      <td> <small><pre class="highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+      <td> <small><pre class="highlight">
+<c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- k>auto</c-> <c- k>operator</c-><c- o>&lt;</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>rhs</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 </pre></small> 
@@ -2308,7 +2317,7 @@ of class <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex<
 
 <c- k>struct</c-> <c- nc>Weird</c-> <c- p>{</c-> <c- b>int</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- n>Weird</c-><c- p>)</c-> <c- k>const</c-><c- p>;</c-> <c- p>};</c->
 <c- n>Container</c-><c- o>&lt;</c-><c- n>Weird</c-><c- o>></c-> <c- n>cw</c-><c- p>;</c->
-  <c- c1>// OK, &lt;=> is deleted because Weird’s operator&lt;=></c->
+  <c- c1>// OK, &lt;=> is deleted because Weird's operator&lt;=></c->
   <c- c1>// returns a non-comparison-category type</c->
 </pre>
    <p>Similarly for dependent return types:</p>
@@ -2324,33 +2333,33 @@ of class <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex<
    <p>Therefore we can’t just say "<code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> <em>shall</em> have a return type which is a comparison category type";
 we must say that if the return type is not a comparison category type then the operator is defaulted as deleted.</p>
    <h3 class="heading settled" data-level="3.3" id="deducing-this"><span class="secno">3.3. </span><span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span><a class="self-link" href="#deducing-this"></a></h3>
-   <p>The resolution of <a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> (adopted for C++23) permits defaulted functions to have explicit object parameters.
+   <p><a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> (adopted for C++23) permits defaulted functions to have explicit object parameters.
 This constrains the wordings we can choose for <code class="highlight"><c- k>operator</c-><c- o>=</c-></code>: we can’t say “the return type is deduced
 as if from <code class="highlight"><c- k>return</c-> <c- o>*</c-><c- k>this</c-></code>” because there might not be a <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</p>
    <p>There’s a quirk with rvalue-ref-qualified assignment operators — not <em>move</em> assignment, but
 assignment where the <em>destination</em> object is explicitly rvalue-ref-qualified.</p>
    <ul>
     <li data-md>
-     <p><code class="highlight"><c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- p>{</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-></code> deduces an lvalue reference; but</p>
+     <p><code class="highlight"><c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- p>{</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-></code> deduces an lvalue reference</p>
     <li data-md>
-     <p><code class="highlight"><c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-></code> deduces an rvalue reference.</p>
+     <p><code class="highlight"><c- k>auto</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-></code> deduces an rvalue reference</p>
    </ul>
    <p>Nonetheless, a <em>defaulted</em> assignment operator always returns an lvalue reference
 (<a href="https://eel.is/c++draft/class.copy.assign#6.sentence-1">[class.copy.assign]/6</a>, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>),
 regardless of whether it’s declared using explicit object syntax.</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
   <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK today</c->
-  <c- n>A</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed, return type isn’t A&amp;</c->
+  <c- n>A</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed, return type isn't A&amp;</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- p>{</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK, deduces A&amp;</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed OK, deduces A&amp;</c->
 <c- p>};</c->
 <c- k>struct</c-> <c- nc>B</c-> <c- p>{</c->
-  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// Error, self can’t bind to B&amp;</c->
+  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// Error, self can't bind to B&amp;</c->
   <c- n>B</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK, deduces B&amp;&amp;</c->
   <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK</c->
   <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK</c->
-  <c- n>B</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed, return type isn’t B&amp;</c->
+  <c- n>B</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed, return type isn't B&amp;</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed OK, deduces B&amp;</c->
 <c- p>};</c->
 </pre>
@@ -2358,14 +2367,15 @@ regardless of whether it’s declared using explicit object syntax.</p>
 to forbid them entirely (<a data-link-type="biblio" href="#biblio-p2953" title="Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;">[P2953]</a>). However, P2952 doesn’t need to treat them specially.
 Defaulted assignment operators invariably return lvalue references, so we invariably deduce as-if-from
 an lvalue reference, full stop.</p>
+   <p>See <a href="#polls">§ 5 Straw poll results</a>.</p>
    <h3 class="heading settled" data-level="3.4" id="new-burden"><span class="secno">3.4. </span><span class="content">Burden on specifying new defaultable operators</span><a class="self-link" href="#new-burden"></a></h3>
    <p>We propose to leave <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> alone
 and reinterpret its term "return type" to mean the actual return type, not the declared return type.
 This will, by default, permit the programmer to use placeholder return types on their defaulted operators.
 So there is a new burden on the specification of the defaultable operator, to specify exactly how
 return type deduction works for the implicitly defined operator.</p>
-   <div class="example" id="example-fff0a9a8">
-    <a class="self-link" href="#example-fff0a9a8"></a> <a data-link-type="biblio" href="#biblio-p1046r2" title="Automatically Generate More Operators">[P1046R2]</a> proposed to make <code class="highlight"><c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-></code> defaultable in the same way as a
+   <div class="example" id="example-09bb643e">
+    <a class="self-link" href="#example-09bb643e"></a> <a data-link-type="biblio" href="#biblio-p1046r2" title="Automatically Generate More Operators">[P1046R2]</a> proposed to make <code class="highlight"><c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-></code> defaultable in the same way as a
 secondary comparison operator. It would presumably have done this by
 adding wording to <a href="https://eel.is/c++draft/over.oper#over.inc">[over.inc]</a>. After P2952, this
 added wording would need to include a sentence like: 
@@ -2379,8 +2389,8 @@ because it is a template and secondly because its deduced return type is <code c
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>add_postfix_increment</c-> <c- p>{</c->
     <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Self</c-><c- o>></c->
     <c- k>auto</c-> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- k>this</c-> <c- n>Self</c-><c- o>&amp;</c-><c- p>,</c-> <c- b>int</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-      <c- c1>// Today: ill-formed, can’t default operator++</c->
-      <c- c1>// After P1046R2: presumably still not OK, can’t default a template</c->
+      <c- c1>// Today: ill-formed, can't default operator++</c->
+      <c- c1>// After P1046R2: presumably still not OK, can't default a template</c->
 <c- p>};</c->
 <c- k>struct</c-> <c- nc>S</c-> <c- o>:</c-> <c- n>add_postfix_increment</c-> <c- p>{</c->
     <c- b>int</c-> <c- n>i</c-><c- p>;</c->
@@ -2625,15 +2635,42 @@ As shown in <a href="#corner-cases">§ 3.6 Existing corner cases</a>, we do pr
 </pre>
    <h2 class="heading settled" data-level="4" id="experience"><span class="secno">4. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>None yet.</p>
-   <h2 class="heading settled" data-level="5" id="wording"><span class="secno">5. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
-   <h3 class="heading settled" data-level="5.1" id="wording-class.eq"><span class="secno">5.1. </span><span class="content">[class.eq]</span><a class="self-link" href="#wording-class.eq"></a></h3>
-   <p class="note" role="note"><span class="marker">Note:</span> The phrase "equality operator function" (<a href="https://eel.is/c++draft/over.binary">[over.binary]</a>)
-covers both <code class="highlight"><c- o>==</c-></code> or <code class="highlight"><c- o>!=</c-></code>. But <code class="highlight"><c- o>!=</c-></code> is not covered by [class.eq]; it’s covered by [class.compare.secondary] below.</p>
+   <h2 class="heading settled" data-level="5" id="polls"><span class="secno">5. </span><span class="content">Straw poll results</span><a class="self-link" href="#polls"></a></h2>
+   <p>Arthur O’Dwyer presented P2592R1 in the EWG telecon of 2025-01-08. The following straw polls were taken.
+The first was interpreted as "no consensus"; the second was interpreted as consensus (pending electronic polling).</p>
+   <table class="def">
+    <tbody>
+     <tr>
+      <th style="width: 70%;">
+      <th><strong>SF</strong>
+      <th><strong>F</strong>
+      <th><strong>N</strong>
+      <th><strong>A</strong>
+      <th><strong>SA</strong>
+     <tr>
+      <th><small>EWG prefers this paper contains the change in P2953 <br>(banning explicitly defaulted operator= with rvalue ref-qualifier). <br>[Chair: This means EWG wants to see this paper again.]</small>
+      <th> 2 
+      <th> 4 
+      <th> 9 
+      <th> 1 
+      <th> 0 
+     <tr>
+      <th><small>Forward P2952R1 to CWG for inclusion in C++26, pending online polling.</small>
+      <th> 3 
+      <th> 10 
+      <th> 4 
+      <th> 1 
+      <th> 0 
+   </table>
+   <h2 class="heading settled" data-level="6" id="wording"><span class="secno">6. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
+   <h3 class="heading settled" data-level="6.1" id="wording-class.eq"><span class="secno">6.1. </span><span class="content">[class.eq]</span><a class="self-link" href="#wording-class.eq"></a></h3>
+   <p class="note" role="note"><b>DRAFTING NOTE:</b> The phrase "equality operator function" (<a href="https://eel.is/c++draft/over.binary">[over.binary]</a>)
+means <code class="highlight"><c- o>==</c-></code> or <code class="highlight"><c- o>!=</c-></code>. But <code class="highlight"><c- o>!=</c-></code> is not covered by [class.eq]; it’s covered by [class.compare.secondary] below. </p>
    <p>Modify <a href="https://eel.is/c++draft/class.eq">[class.eq]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <del>1․ A defaulted equality operator function ([over.binary]) shall have a declared return type <code class="highlight"><c- b>bool</c-></code>.</del> <p>2․ A defaulted <code class="highlight"><c- o>==</c-></code> operator function for a class <code class="highlight"><c- n>C</c-></code> is defined as deleted unless, for each <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> in the expanded list of subobjects for an object <code class="highlight"><c- n>x</c-></code> of type <code class="highlight"><c- n>C</c-></code>, <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>==</c-> <c- n>x</c-></code><sub><i>i</i></sub> is usable
+    <small> <p><del>1․ A defaulted equality operator function ([over.binary]) shall have a declared return type <code class="highlight"><c- b>bool</c-></code>.</del> </p><p>2․ A defaulted <code class="highlight"><c- o>==</c-></code> operator function for a class <code class="highlight"><c- n>C</c-></code> is defined as deleted unless, for each <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> in the expanded list of subobjects for an object <code class="highlight"><c- n>x</c-></code> of type <code class="highlight"><c- n>C</c-></code>, <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>==</c-> <c- n>x</c-></code><sub><i>i</i></sub> is usable
 ([class.compare.default]).</p> <p>3․ The return value <code class="highlight"><c- n>V</c-></code> of a defaulted <code class="highlight"><c- o>==</c-></code> operator function with parameters <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> is determined by comparing corresponding elements <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> and <code class="highlight"><c- n>y</c-></code><sub><i>i</i></sub> in the expanded lists of subobjects for <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> (in increasing index order)
 until the first index <i>i</i> where <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>==</c-></code> <code class="highlight"><c- n>y</c-></code><sub><i>i</i></sub> <del>yields a result value
 which</del> , <del>when</del> contextually converted to <code class="highlight"><c- b>bool</c-></code>, yields <code class="highlight">false</code>.
@@ -2645,14 +2682,14 @@ contains a placeholder type, its return type is deduced as if from <code class="
 <c- p>};</c->
 </pre><p>— <i>end example</i>]</p> </small>
    </blockquote>
-   <h3 class="heading settled" data-level="5.2" id="wording-class.spaceship"><span class="secno">5.2. </span><span class="content">[class.spaceship]</span><a class="self-link" href="#wording-class.spaceship"></a></h3>
-   <p class="note" role="note"><span class="marker">Note:</span> There are only three "comparison category types" in C++, and <code class="highlight"><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-></code> is implicitly convertible
+   <h3 class="heading settled" data-level="6.2" id="wording-class.spaceship"><span class="secno">6.2. </span><span class="content">[class.spaceship]</span><a class="self-link" href="#wording-class.spaceship"></a></h3>
+   <p class="note" role="note"><b>DRAFTING NOTE:</b> There are only three "comparison category types" in C++, and <code class="highlight"><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-></code> is implicitly convertible
 to all three of them. The status quo already effectively forbids <code class="highlight"><c- o>&lt;=></c-></code> to return a non-comparison-category type,
 since either <code class="highlight"><c- n>R</c-></code> is deduced as a common comparison type (which is a comparison category type by definition), or else
 a synthesized three-way comparison of type <code class="highlight"><c- n>R</c-></code> must exist (which means <code class="highlight"><c- n>R</c-></code> must be a comparison category type),
 or else the sequence <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> must be empty (in which case there are no restrictions on <code class="highlight"><c- n>R</c-></code> except
 that it be constructible from <code class="highlight"><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-></code>). We strengthen the wording to directly mandate that the
-return type be a comparison category type, even in the empty case.</p>
+return type be a comparison category type, even in the empty case. </p>
    <p>Modify <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a> as follows:</p>
    <p><small></small></p>
    <blockquote><small> [...]<p></p> <p>2․ Let <code class="highlight"><c- n>R</c-></code> be the declared return type of a defaulted three-way comparison operator function, and let <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> be the elements of the expanded list of subobjects for an object <code class="highlight"><c- n>x</c-></code> of type <code class="highlight"><c- n>C</c-></code>.</p> <p>— (2.1) If <code class="highlight"><c- n>R</c-></code> <del>is <code class="highlight"><c- k>auto</c-></code>,</del> <ins>contains a placeholder type,</ins> then let <i>cv<sub>i</sub></i> <code class="highlight"><c- n>R</c-></code><sub><i>i</i></sub> be the type of the expression <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>&lt;=></c-> <c- n>x</c-></code><sub><i>i</i></sub>. The operator function is defined as deleted if that expression is not usable
@@ -2664,10 +2701,13 @@ the same type</del> is determined by comparing corresponding elements <code clas
 yields <code class="highlight">true</code>; <code class="highlight"><c- n>V</c-></code> is <del>a copy of</del> <code class="highlight"><c- n>v</c-></code><sub><i>i</i></sub>.
 If no such index exists, <code class="highlight"><c- n>V</c-></code> is <del><code class="highlight"><c- k>static_cast</c-><c- o>&lt;</c-><c- n>R</c-><c- o>></c-><c- p>(</c-></code></del><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-></code><del><code class="highlight"><c- p>)</c-></code></del>.</p> <ins>x․ A defaulted three-way comparison operator function which is not deleted shall have a return type which is a comparison category type
 ([cmp.categories.pre]).</ins> <p>4․ The <i>common comparison type</i> <code class="highlight"><c- n>U</c-></code> of a possibly-empty list of <i>n</i> comparison category types <code class="highlight"><c- n>T</c-></code><sub>0</sub>, <code class="highlight"><c- n>T</c-></code><sub>1</sub>, ..., <code class="highlight"><c- n>T</c-></code><sub>n-1</sub> is defined as follows:</p> <p>[...]</p> </small></blockquote>
-   <h3 class="heading settled" data-level="5.3" id="wording-class.compare.secondary"><span class="secno">5.3. </span><span class="content">[class.compare.secondary]</span><a class="self-link" href="#wording-class.compare.secondary"></a></h3>
+   <h3 class="heading settled" data-level="6.3" id="wording-class.compare.secondary"><span class="secno">6.3. </span><span class="content">[class.compare.secondary]</span><a class="self-link" href="#wording-class.compare.secondary"></a></h3>
    <p>Modify <a href="https://eel.is/c++draft/class.compare.secondary">[class.compare.secondary]</a> as follows:</p>
    <p><small></small></p>
-   <blockquote><small> 1․ A <i>secondary comparison operator</i> is a relational operator ([expr.rel]) or the <code class="highlight"><c- o>!=</c-></code> operator.<p></p> <del>A defaulted operator function ([over.binary]) for a secondary comparison operator <code class="highlight">@</code> shall have a declared return type <code class="highlight"><c- b>bool</c-></code>.</del> <p>2․ <del>The</del> <ins>A defaulted secondary comparison</ins> operator function with parameters <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> is defined as deleted if</p> <p>— (2.1) overload resolution ([over.match]), as applied to <code class="highlight"><c- n>x</c-> @ <c- n>y</c-></code>, does not result in a usable candidate, or</p> <p>— (2.2) the candidate selected by overload resolution is not a rewritten candidate.</p> <p>Otherwise, the operator function yields <code class="highlight"><c- n>x</c-> @ <c- n>y</c-></code>. The defaulted operator function is not considered as a candidate
+   <blockquote>
+    <p></p>
+    <small> <p>1․ A <i>secondary comparison operator</i> is a relational operator ([expr.rel]) or the <code class="highlight"><c- o>!=</c-></code> operator. <del>A
+defaulted operator function ([over.binary]) for a secondary comparison operator <code class="highlight">@</code> shall have a declared return type <code class="highlight"><c- b>bool</c-></code>.</del> </p><p>2․ <del>The</del> <ins>A defaulted secondary comparison</ins> operator function with parameters <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> is defined as deleted if</p> <p>— (2.1) overload resolution ([over.match]), as applied to <code class="highlight"><c- n>x</c-> @ <c- n>y</c-></code>, does not result in a usable candidate, or</p> <p>— (2.2) the candidate selected by overload resolution is not a rewritten candidate.</p> <p>Otherwise, the operator function yields <code class="highlight"><c- n>x</c-> @ <c- n>y</c-></code>. The defaulted operator function is not considered as a candidate
 in the overload resolution for the <code class="highlight">@</code> operator.</p> <ins>x․ A defaulted secondary comparison operator function shall have the return type <code class="highlight"><c- b>bool</c-></code>. If its declared return type
 contains a placeholder type, its return type is deduced as if from <code class="highlight"><c- k>return</c-> true<c- p>;</c-></code>.</ins> <p>3․ [<i>Example 1</i>:</p> <pre class="highlight"><c- k>struct</c-> <c- nc>HasNoLessThan</c-> <c- p>{</c-> <c- p>};</c->
 
@@ -2675,15 +2715,13 @@ contains a placeholder type, its return type is deduced as if from <code class="
   <c- k>friend</c-> <c- n>HasNoLessThan</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>,</c-> <c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>);</c->
   <c- b>bool</c-> <c- k>operator</c-><c- o>&lt;</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK, function is deleted</c->
 <c- p>};</c->
-</pre><p>— <i>end example</i>]</p> </small></blockquote>
-   <h3 class="heading settled" data-level="5.4" id="wording-class.copy.assign"><span class="secno">5.4. </span><span class="content">[class.copy.assign]</span><a class="self-link" href="#wording-class.copy.assign"></a></h3>
-   <p class="note" role="note"><span class="marker">Note:</span> <a href="https://eel.is/c++draft/class.copy.assign#6.sentence-1">[class.copy.assign]/6</a> already clearly states that "The implicitly-declared copy/move assignment operator for class <code class="highlight"><c- n>X</c-></code> has the return type <code class="highlight"><c- n>X</c-><c- o>&amp;</c-></code>."
+</pre><p>— <i>end example</i>]</p> </small>
+   </blockquote>
+   <h3 class="heading settled" data-level="6.4" id="wording-class.copy.assign"><span class="secno">6.4. </span><span class="content">[class.copy.assign]</span><a class="self-link" href="#wording-class.copy.assign"></a></h3>
+   <p class="note" role="note"><b>DRAFTING NOTE:</b> <a href="https://eel.is/c++draft/class.copy.assign#6.sentence-1">[class.copy.assign]/6</a> already clearly states that "The implicitly-declared copy/move assignment operator for class <code class="highlight"><c- n>X</c-></code> has the return type <code class="highlight"><c- n>X</c-><c- o>&amp;</c-></code>."
 But we need this new wording to ensure that an <em>explicitly-defaulted</em> copy/move assignment operator
-will deduce that same type. (If it didn’t deduce that type, then the explicitly-defaulted operator
-would be deleted, as in example <code class="highlight"><c- n>B</c-></code> below.)</p>
-   <p class="note" role="note"><span class="marker">Note:</span> Arthur initially proposed that [class.copy.assign]/14 should say "...returns <em>an lvalue reference to</em> the object for which...", but Jens Maurer thought that wouldn’t be
-an improvement from CWG’s point of view. Maybe it should say "...returns the assignment operator’s
-object parameter (<a href="https://eel.is/c++draft/dcl.fct#def:parameter,object">[dcl.fct]</a>)" instead.</p>
+will deduce that same type. (If it deduces a different type, then the explicitly-defaulted operator
+becomes ill-formed, as in example <code class="highlight"><c- n>B</c-></code> below.) </p>
    <p>Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:</p>
    <p><small></small></p>
    <blockquote><small> 14․ The implicitly-defined copy/move assignment operator for a class returns
@@ -2721,7 +2759,7 @@ reference to the object for which the assignment operator is invoked.</ins> </p>
       on = !document.body.classList.contains('toc-sidebar');
     }
 
-    /* Don’t scroll to compensate for the ToC if we’re above it already. */
+    /* Don't scroll to compensate for the ToC if we're above it already. */
     var headY = 0;
     var head = document.querySelector('.head');
     if (head) {
@@ -2752,16 +2790,16 @@ reference to the object for which the assignment operator is invoked.</ins> </p>
       }
       if (toggle.matches(':hover')) {
         /* Unfocus button when not using keyboard navigation,
-           because I don’t know where else to send the focus. */
+           because I don't know where else to send the focus. */
         toggle.blur();
       }
     }
   }
 
   function createSidebarToggle() {
-    /* Create the sidebar toggle in JS; it shouldn’t exist when JS is off. */
+    /* Create the sidebar toggle in JS; it shouldn't exist when JS is off. */
     var toggle = document.createElement('a');
-      /* This should probably be a button, but appearance isn’t standards-track.*/
+      /* This should probably be a button, but appearance isn't standards-track.*/
     toggle.id = 'toc-toggle';
     toggle.class = 'toc-toggle';
     toggle.href = '#toc';
@@ -2777,7 +2815,7 @@ reference to the object for which the assignment operator is invoked.</ins> </p>
     toggle.addEventListener('click', toggler, false);
 
 
-    /* Get <nav id=toc-nav>, or make it if we don’t have one. */
+    /* Get <nav id=toc-nav>, or make it if we don't have one. */
     var tocNav = document.getElementById('toc-nav');
     if (!tocNav) {
       tocNav = document.createElement('p');
@@ -2785,7 +2823,7 @@ reference to the object for which the assignment operator is invoked.</ins> </p>
       /* Prepend for better keyboard navigation */
       document.body.insertBefore(tocNav, document.body.firstChild);
     }
-    /* While we’re at it, make sure we have a Jump to Toc link. */
+    /* While we're at it, make sure we have a Jump to Toc link. */
     var tocJump = document.getElementById('toc-jump');
     if (!tocJump) {
       tocJump = document.createElement('a');
@@ -2813,7 +2851,7 @@ reference to the object for which the assignment operator is invoked.</ins> </p>
     }, false);
   }
   else {
-    console.warn("Can’t find Table of Contents. Please use <nav id='toc'> around the ToC.");
+    console.warn("Can't find Table of Contents. Please use <nav id='toc'> around the ToC.");
   }
 
   /* Wrap tables in case they overflow */

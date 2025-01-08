@@ -1,9 +1,9 @@
 <pre class='metadata'>
 Title: auto& operator=(X&&) = default
 Shortname: D2952
-Revision: 1
-!Draft Revision: 15
-Audience: EWG
+Revision: 2
+!Draft Revision: 16
+Audience: CWG
 Status: D
 Group: WG21
 URL:
@@ -15,16 +15,22 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2023-12-07
+Date: 2025-01-08
 </pre>
 
 <style>
-hilite  {background-color: #FFFF00; font-weight: bold;}
+p    {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R2 (pre-Hagenberg):
+
+    - Forward to CWG (see [[#polls]]).
+
+    - Fix one mistake in a drafting note ("deleted" to "ill-formed").
 
 - R1:
 
@@ -225,15 +231,15 @@ we must say that if the return type is not a comparison category type then the o
 
 ## "Deducing `this`" and CWG2586 ## {#deducing-this}
 
-The resolution of [[CWG2586]] (adopted for C++23) permits defaulted functions to have explicit object parameters.
+[[CWG2586]] (adopted for C++23) permits defaulted functions to have explicit object parameters.
 This constrains the wordings we can choose for `operator=`: we can't say “the return type is deduced
 as if from `return *this`” because there might not be a `*this`.
 
 There's a quirk with rvalue-ref-qualified assignment operators — not *move* assignment, but
 assignment where the *destination* object is explicitly rvalue-ref-qualified.
 
-* `auto&& operator=(const B&) && { return *this; }` deduces an lvalue reference; but
-* `auto&& operator=(this B&& self, const B&) { return self; }` deduces an rvalue reference.
+* `auto&& operator=(const B&) && { return *this; }` deduces an lvalue reference
+* `auto&& operator=(this B&& self, const B&) { return self; }` deduces an rvalue reference
 
 Nonetheless, a *defaulted* assignment operator always returns an lvalue reference
 (<a href="https://eel.is/c++draft/class.copy.assign#6.sentence-1">[class.copy.assign]/6</a>,
@@ -263,6 +269,7 @@ to forbid them entirely ([[P2953]]). However, P2952 doesn't need to treat them s
 Defaulted assignment operators invariably return lvalue references, so we invariably deduce as-if-from
 an lvalue reference, full stop.
 
+See [[#polls]].
 
 ## Burden on specifying new defaultable operators ## {#new-burden}
 
@@ -423,17 +430,35 @@ struct C {
 
 None yet.
 
+# Straw poll results # {#polls}
+
+Arthur O'Dwyer presented P2592R1 in the EWG telecon of 2025-01-08. The following straw polls were taken.
+The first was interpreted as "no consensus"; the second was interpreted as consensus (pending electronic polling).
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>EWG prefers this paper contains the change in P2953
+<br>(banning explicitly defaulted operator= with rvalue ref-qualifier).
+<br>[Chair: This means EWG wants to see this paper again.]</small></th>
+<th> 2 </th><th> 4 </th><th> 9 </th><th> 1 </th><th> 0 </th></tr>
+
+<tr><th><small>Forward P2952R1 to CWG for inclusion in C++26, pending online polling.</small></th>
+<th> 3 </th><th> 10 </th><th> 4 </th><th> 1 </th><th> 0 </th></tr>
+</table>
+
 # Proposed wording # {#wording}
 
 ## [class.eq] ## {#wording-class.eq}
 
-Note: The phrase "equality operator function" (<a href="https://eel.is/c++draft/over.binary">[over.binary]</a>)
-covers both `==` or `!=`. But `!=` is not covered by [class.eq]; it's covered by [class.compare.secondary] below.
+<p class="note"><b>DRAFTING NOTE:</b>
+The phrase "equality operator function" (<a href="https://eel.is/c++draft/over.binary">[over.binary]</a>)
+means `==` or `!=`. But `!=` is not covered by [class.eq]; it's covered by [class.compare.secondary] below.
 
 Modify <a href="https://eel.is/c++draft/class.eq">[class.eq]</a> as follows:
 
 <small><blockquote>
-<del>1․ A defaulted equality operator function ([over.binary]) shall have a declared return type `bool`.</del>
+<p><del>1․ A defaulted equality operator function ([over.binary]) shall have a declared return type `bool`.</del>
 
 2․ A defaulted `==` operator function for a class `C` is defined as deleted unless, for each `x`<sub><i>i</i></sub>
 in the expanded list of subobjects for an object `x` of type `C`, `x`<sub><i>i</i></sub> `== x`<sub><i>i</i></sub> is usable
@@ -461,7 +486,8 @@ struct D {
 
 ## [class.spaceship] ## {#wording-class.spaceship}
 
-Note: There are only three "comparison category types" in C++, and `strong_ordering::equal` is implicitly convertible
+<p class="note"><b>DRAFTING NOTE:</b>
+There are only three "comparison category types" in C++, and `strong_ordering::equal` is implicitly convertible
 to all three of them. The status quo already effectively forbids `<=>` to return a non-comparison-category type,
 since either `R` is deduced as a common comparison type (which is a comparison category type by definition), or else
 a synthesized three-way comparison of type `R` must exist (which means `R` must be a comparison category type),
@@ -510,8 +536,8 @@ If no such index exists, `V` is <del>`static_cast<R>(`</del>`std::strong_orderin
 Modify <a href="https://eel.is/c++draft/class.compare.secondary">[class.compare.secondary]</a> as follows:
 
 <small><blockquote>
-1․ A <i>secondary comparison operator</i> is a relational operator ([expr.rel]) or the `!=` operator.
-<del>A defaulted operator function ([over.binary]) for a secondary comparison operator `@` shall have a declared return type `bool`.</del>
+<p>1․ A <i>secondary comparison operator</i> is a relational operator ([expr.rel]) or the `!=` operator. <del>A
+defaulted operator function ([over.binary]) for a secondary comparison operator `@` shall have a declared return type `bool`.</del>
 
 2․ <del>The</del> <ins>A defaulted secondary comparison</ins> operator function with parameters `x` and `y` is defined as deleted if
 
@@ -539,16 +565,12 @@ struct C {
 
 ## [class.copy.assign] ## {#wording-class.copy.assign}
 
-Note: <a href="https://eel.is/c++draft/class.copy.assign#6.sentence-1">[class.copy.assign]/6</a>
+<p class="note"><b>DRAFTING NOTE:</b>
+<a href="https://eel.is/c++draft/class.copy.assign#6.sentence-1">[class.copy.assign]/6</a>
 already clearly states that "The implicitly-declared copy/move assignment operator for class `X` has the return type `X&`."
 But we need this new wording to ensure that an *explicitly-defaulted* copy/move assignment operator
-will deduce that same type. (If it didn't deduce that type, then the explicitly-defaulted operator
-would be deleted, as in example `B` below.)
-
-Note: Arthur initially proposed that [class.copy.assign]/14 should say "...returns
-*an lvalue reference to* the object for which...", but Jens Maurer thought that wouldn't be
-an improvement from CWG's point of view. Maybe it should say "...returns the assignment operator's
-object parameter (<a href="https://eel.is/c++draft/dcl.fct#def:parameter,object">[dcl.fct]</a>)" instead.
+will deduce that same type. (If it deduces a different type, then the explicitly-defaulted operator
+becomes ill-formed, as in example `B` below.)
 
 Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
 
