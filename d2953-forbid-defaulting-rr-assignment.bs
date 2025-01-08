@@ -1,9 +1,9 @@
 <pre class='metadata'>
 Title: Forbid defaulting operator=(X&&) &&
 Shortname: D2953
-Revision: 1
-!Draft Revision: 7
-Audience: EWG
+Revision: 2
+!Draft Revision: 8
+Audience: EWGI
 Status: D
 Group: WG21
 URL:
@@ -15,7 +15,7 @@ Abstract:
   ref-qualification. This permits implausible
   signatures like `A& operator=(const A&) && = default`, where the left-hand
   operand is rvalue-ref-qualified. We propose to forbid such signatures.
-Date: 2023-10-12
+Date: 2025-01-08
 </pre>
 
 <style>
@@ -27,13 +27,13 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
+- R2 (pre-Hagenberg):
+
+    - Add poll results from the EWG telecon of 2025-01-08.
+
 - R1:
 
     - Propose an "ambitious" overhaul as well as the "conservative" surgery.
-
-- R0:
-
-    - Initial revision.
 
 
 # Motivation and proposal # {#proposal}
@@ -46,7 +46,7 @@ For example, the signature `const A& operator=(const A&) const& = default` is fo
 because it is additionally const-qualified, and also because its return type differs
 from the implicitly-defaulted `A&`. This might be considered unfortunate, because that's
 a reasonable signature for a const-assignable proxy-reference type.
-But programmers aren't clamoring for that signature to be supported, so we do not propose to support it here.
+But programmers aren't clamoring for that signature to be supported, so we do not propose it here.
 
 Our concern is that the *unrealistic* signature `A& operator=(const A&) && = default` is
 *permitted!* This has three minor drawbacks:
@@ -66,35 +66,38 @@ to its implicit signature an *rvalue* ref-qualifier.
 ```cpp
 struct C {
   C& operator=(const C&) && = default;
-    // Today: Well-formed
-    // Tomorrow: Deleted
+    // C++26: Well-formed
+    // Proposed: Unusable (deleted or ill-formed)
 };
 
 struct D {
   D& operator=(this D&& self, const C&) = default;
-    // Today: Well-formed
-    // Tomorrow: Deleted
+    // C++26: Well-formed
+    // Proposed: Unusable (deleted or ill-formed)
 };
 ```
+
+This proposal applies only to *explicitly defaulted* `operator=`, and only when the
+object parameter itself is rvalue-ref-qualified. We propose that it remain legal to
+write rvalue-ref-qualified `operator=` functions by hand; the compiler simply shouldn't
+assume it knows how to default one.
 
 
 ## Interaction with P2952 ## {#p2952}
 
 [[CWG2586]] (adopted for C++23) permits `operator=` to have an explicit object parameter.
 
-[[P2952]] proposes that `operator=` should (also) be allowed to have a placeholder return type.
-If P2952 is adopted without P2953, then we'll have:
+[[P2952]] (currently in CWG for C++26) proposes that `operator=` should (also) be allowed to have a placeholder return type.
+If C++26 gets P2952 without P2953, then we'll have:
 
 ```cpp
 struct C {
   auto&& operator=(this C&& self, const C&) { return self; }
-    // Today: OK, deduces C&&
-    // After P2952: Still OK, still deduces C&&
-    // Proposed: Still OK, still deduces C&&
+    // C++26: OK, still deduces C&&
 
   auto&& operator=(this C&& self, const C&) = default;
-    // Today: Ill-formed, return type involves placeholder
-    // After P2952: OK, deduces C&
+    // C++23: Ill-formed, return type contains auto
+    // C++26 after P2952: OK, deduces C&
     // Proposed (conservative): Deleted, object parameter is not C&
     // Proposed (ambitious): Ill-formed, object parameter is not C&
 };
@@ -102,15 +105,15 @@ struct C {
 
 The first, non-defaulted, operator "does the natural thing" by returning its left-hand operand,
 and deduces `C&&`. The second operator also "does the natural thing" by being defaulted; but
-after P2952 it will deduce `C&`. (For rationale, see [[P2952]] §3.3 "Deducing `this` and CWG2586.")
+it deduces `C&`. (For rationale, see [[P2952]] §3.3 "Deducing `this` and CWG2586.")
 The two "natural" implementations deduce different types! This looks inconsistent.
 
 If we adopt P2953 alongside P2952, then the second `operator=` will go back to being unusable,
 which reduces the perception of inconsistency.
 
 <table>
-<tr><td></td><th>Today</th><th>P2952</th></tr>
-<tr><th>Today</th><td><code>C&&</code>/ill-formed</td><td><code>C&&</code>/<code>C&</code></td></tr>
+<tr><td></td><th>C++23</th><th>P2952</th></tr>
+<tr><th>C++23</th><td><code>C&&</code>/ill-formed</td><td><code>C&&</code>/<code>C&</code></td></tr>
 <tr><th>P2953</th><td><code>C&&</code>/ill-formed</td><td><code>C&&</code>/deleted</td></tr>
 </table>
 
@@ -191,11 +194,45 @@ no problems except in the relevant parts of Clang's own test suite.
 There is no implementation experience for [[#wording2]].
 
 
+# Straw poll results # {#polls}
+
+Arthur O'Dwyer presented P2592R1 (not P2953, but P2952) in the EWG telecon of 2025-01-08. In addition
+to the vote forwarding P2952 to CWG, the following straw poll relevant to P2953 was taken. The result
+was interpreted as "no consensus"; but the numbers (6 for, 1 against) are still a strong signal that
+EWG was favorably inclined toward P2953 in general.
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>EWG prefers this paper contains the change in P2953
+<br>(banning explicitly defaulted operator= with rvalue ref-qualifier).
+<br>[Chair: This means EWG wants to see this paper again.]</small></th>
+<th> 2 </th><th> 4 </th><th> 9 </th><th> 1 </th><th> 0 </th></tr>
+</table>
+
+## Proposed polls ## {#proposed-polls}
+
+The author suggests the following straw polls.
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>EWG prefers the approach in [[#wording2]], which additionally makes
+<code>S& operator=(const S&&) = default;</code> and <code>C& operator=(const C&) const = default;</code>
+ill-formed rather than merely defaulted-as-deleted.</th>
+<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
+
+<tr><th><small>Advance P2953 to CWG for C++26.</th>
+<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
+</table>
+
+
 # Proposed wording (conservative) # {#wording}
 
 ## [dcl.fct.def.default] ## {#wording-dcl.fct.def.default}
 
-Note: The only defaultable special member functions are default constructors,
+<p class="note"><b>DRAFTING NOTE:</b>
+The only defaultable special member functions are default constructors,
 copy/move constructors, copy/move assignment operators, and destructors. Of these,
 only the assignment operators can ever be cvref-qualified at all.
 
@@ -245,12 +282,20 @@ in a way other than as allowed by the preceding rules, then:
 
 # Proposed wording (ambitious) # {#wording2}
 
-Note: The intent of this "ambitious" wording is to lock down the signatures
+<p class="note"><b>DRAFTING NOTE:</b>
+The intent of this "ambitious" wording is to lock down the signatures
 of defaultable member functions as much as possible, and make errors as eager
 as possible, *except* in the cases covered by [[#deleted-versus-ill-formed]]
 (which we want to keep working, i.e., "defaulted as deleted").
 
 ## [dcl.fct.def.default] ## {#wording2-dcl.fct.def.default}
+
+<p class="note"><b>DRAFTING NOTE:</b>
+Basically all of this wording is concerned specifically with copy/move assignment operators,
+so it might be nice to move it out of [dcl.fct.def.default] and into <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a>.
+Also note that right now a difference in `noexcept`-ness is handled explicitly by [dcl.fct.def.default]
+for special member functions but only by omission-and-note in <a href="https://eel.is/c++draft/class.compare#default-note-1">[class.compare]</a>
+for comparison operators.
 
 Modify <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> as follows:
 
@@ -275,7 +320,7 @@ from the corresponding special member function <code>F</code><sub>2</sub> that w
     object parameter <del>is</del> of type <del>(possibly
     different) “reference to C”</del> <ins>`C&`</ins>, in which case the type of <code>F</code><sub>1</sub>
     would differ from the type of <code>F</code><sub>2</sub> in that the type of <code>F</code><sub>1</sub>
-    has an additional parameter; <ins>and</ins>
+    has an additional parameter;
 
 * (2.3) <code>F</code><sub>1</sub> and <code>F</code><sub>2</sub> may have differing exception specifications; <del>and</del>
 
@@ -300,39 +345,6 @@ in a way other than as allowed by the preceding rules, then<del>:</del>
 <p>[...]
 </blockquote></small>
 
-## [class.copy.assign] ## {#wording2-class.copy.assign}
-
-Note: If we do the wording patch above, then I think nothing in [class.copy.assign] needs
-to change. But much of the wording above is concerned specifically with copy/move assignment operators,
-so it might be nice to move that wording out of [dcl.fct.def.default] and into [class.copy.assign].
-Also note that right now a difference in `noexcept`-ness is handled explicitly by [dcl.fct.def.default]
-for special member functions but only by omission-and-note in <a href="https://eel.is/c++draft/class.compare#default-note-1">[class.compare]</a>
-for comparison operators.
-
-Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
-
-<small><blockquote>
-TODO FIXME BUG HACK
-</blockquote></small>
-
-
-
-# Proposed straw polls # {#straw-polls}
-
-The next revision of this paper (if any) will be guided by the outcomes of these three straw polls.
-
-<table class="def">
-<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
-
-<tr><th><small>EWG would like to forbid rvalue-ref-qualified assignment operators (by any means, not necessarily by this proposed wording).</th>
-<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
-
-<tr><th><small>EWG would like to pursue [[#wording2]] (regardless of the next poll).</th>
-<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
-
-<tr><th><small>Advance [[#wording]] to CWG (regardless of the previous poll).</th>
-<th> – </th><th> — </th><th> — </th><th> — </th><th> — </th></tr>
-</table>
 
 <pre class=biblio>
 {
