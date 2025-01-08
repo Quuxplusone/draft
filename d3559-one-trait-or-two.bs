@@ -2,7 +2,7 @@
 Title: `is_trivially_relocatable`: One trait or two?
 Shortname: D3559
 Revision: 0
-!Draft Revision: 1
+!Draft Revision: 2
 Audience: EWG, LEWG
 Status: D
 Group: WG21
@@ -94,7 +94,6 @@ What sorts of names do libraries actually pick, in practice, for this type-trait
 <tr><td>Google Skia</td><td><code>sk_is_trivially_relocatable</code></td></tr>
 <tr><td>Subspace</td><td><code>sus::mem::TriviallyRelocatable</code></td></tr>
 <tr><td>Thrust</td><td><code>thrust::is_trivially_relocatable</code></td></tr>
-<tr><td>arturbac/small_vectors</td><td><code>small_vectors::is_relocatable_v</code></td></tr>
 <tr><td>snncpp/snn-core</td><td><code>snn::is_trivially_relocatable</code></td></tr>
 <tr><td>charles-salvia/std_error</td><td><code>stdx::is_trivially_relocatable</code></td></tr>
 <tr><td>sarah-quinones/veg</td><td><code>veg::trivially_relocatable</code></td></tr>
@@ -200,7 +199,7 @@ by `lib::is_trivially_relocatable`. That is, property *P*.
 In June 2024, Arthur [catalogued](https://quuxplusone.github.io/blog/2024/06/15/who-uses-trivial-relocation/)
 21 libraries that use traits or algorithms relating in some way to "trivial relocation."
 
-14 of these libraries define a single trait for property *P* (that is, P1144 semantics). Of those,
+13 of these libraries define a single trait for property *P* (that is, P1144 semantics). Of those,
 8 of them explicitly refer to P1144 and implement the set of library algorithms and/or
 container optimizations that P1144 proposes.
 5 libraries (listed in the timeline below) use P1144's feature-test macros.
@@ -216,7 +215,7 @@ Microsoft STL does not perform any relocation optimizations.
 
 No library ever defines anything corresponding to P2786's `is_replaceable` as a standalone trait.
 
-No library defines both a trait for property *P* and one for property *Q*. That is, the 14 libraries
+No library defines both a trait for property *P* and one for property *Q*. That is, the 13 libraries
 that care about *P* do not seem to care about *Q*; and the 2 libraries that seem to care about *Q* do not
 seem to care about *P*. We can define a trait that captures most (but not all) of property *Q*...
 
@@ -229,7 +228,7 @@ namespace lib {
 static_assert(lib::has_property_q<std::tuple<int&>>);
 ```
 
-...but none of the 14 libraries above seem to care about capturing that particular
+...but none of the 13 libraries above seem to care about capturing that particular
 set of semantics; they're happy to capture property *P* alone. *P* is the property
 most salient to their optimizations. We should give property *P* the good name.
 
@@ -271,8 +270,7 @@ libstdc++ adds `__is_bitwise_relocatable` with P1144 semantics
 <tr><td>Nov</td><td> OleErikPeistorpet/OE-Lib changes from P1144 to P2786 semantics </td></tr>
 <tr><td rowspan="2">2021</td><td>Feb</td><td> sarah-quinones/veg adds `trivially_relocatable` with P1144 semantics </td></tr>
 <tr><td>Apr</td><td> Amadeus AMC uses `is_trivially_relocatable` with P1144 semantics </td></tr>
-<tr><td rowspan="4">2022</td><td>Feb</td><td> arturbac/small_vectors uses `is_relocatable` with P1144 semantics </td></tr>
-<tr><td>May</td><td> Subspace adds `relocate_one_by_memcpy` with P2786 semantics </td></tr>
+<tr><td rowspan="3">2022</td><tr><td>May</td><td> Subspace adds `relocate_one_by_memcpy` with P2786 semantics </td></tr>
 <tr><td>Sep</td><td> snncpp/snn-core uses `is_trivially_relocatable` with P1144 semantics </td></tr>
 <tr><td>Oct</td><td> Google Skia adds `sk_is_trivially_relocatable` with P1144 semantics </td></tr>
 <tr><td rowspan="5">2023</td><td>Jan</td><td> Subspace changes from P2786 to P1144 semantics </td></tr>
