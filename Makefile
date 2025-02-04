@@ -23,7 +23,8 @@ all: \
     d3031-lambda.html \
     d3055-relocation.html \
     d3279-trivial.html \
-    d3418-inplace-vector.html
+    d3418-inplace-vector.html \
+    d3612-proxy-reference.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err

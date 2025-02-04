@@ -1,0 +1,421 @@
+<pre class='metadata'>
+Title: Harmonize proxy-reference operations (LWG 3638 and 4187)
+Shortname: D3612
+Revision: 0
+!Draft Revision: 1
+Audience: LWG
+Status: D
+Group: WG21
+URL:
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  Proposed resolutions for two interrelated LWG issues.
+  LWG 3638 adds ADL swap to `vector<bool>::reference`.
+  LWG 4187 adds const-assignability to `bitset<N>::reference`.
+  These two types' value-semantic operations should not gratuitously diverge.
+  Use the same signatures and specification techniques for both.
+Date: 2025-02-04
+</pre>
+
+<style>
+p    {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
+ins  {background-color: #CCFFCC; text-decoration: underline;}
+del  {background-color: #FFCACA; text-decoration: line-through;}
+table.noborder tr td {border: none;}
+</style>
+
+
+# Changelog # {#changelog}
+
+- R0 (pre-Hagenberg 2025): Initial revision.
+
+# Background # {#background}
+
+From scratch, the simplest proxy-reference type for `bool` would look like this:
+
+```c++
+struct Reference {
+  bool *p_;
+  Reference(bool& r) : p_(&r) {}
+  Reference(const Reference&) = default;
+  Reference operator=(Reference rhs) const {
+    *p_ = *rhs.p_;
+    return *this;
+  }
+  operator bool() const {
+    return *p_;
+  }
+  Reference operator=(bool b) const {
+    *p_ = b;
+    return *this;
+  }
+  friend void swap(Reference lhs, Reference rhs) {
+    std::swap(*lhs.p_, *rhs.p_);
+  }
+};
+```
+
+<b>1.</b> Let `r` be a variable of type `Reference`.
+We need `operator=(bool)` so that `r = true` will compile.
+But we also need `operator=(Reference)` so that the compiler will not generate us a defaulted copy-assignment operator.
+Both `operator=`s are const-qualified following [[P2321]]'s guidance ([§5.3](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2321r2.html#vectorboolreference));
+see also ["Field-testing <nobr>-Wassign-to-class-rvalue</nobr>"](https://quuxplusone.github.io/blog/2024/12/13/wassign-to-class-rvalue/).
+
+<b>2.</b> Now, C++20's `vector<bool>::reference` already had a non-const-qualified `operator=(bool)`.
+It would have broken ABI if [[P2321]] had simply *added* `const` to that member function.
+Therefore P2321 added a whole new const-qualified overload of `operator=(bool)` alongside the pre-existing
+non-const-qualified `operator=(bool)`. We wouldn't do that from scratch, but we do it for backward compatibility.
+
+<b>3.</b> P2321 also established the precedent that `operator=(bool)` and `operator=(bool) const` return lvalue references
+to `Reference`, rather than prvalues of type `Reference`. We wouldn't do that from scratch either, but we do it now because of P2321.
+
+<b>4.</b> We don't need an `operator=(const Reference&) const` because `Reference` is already implicitly convertible
+to `bool`. If `cr` is of type `const Reference`, then `cr = cr2` will end up calling `cr.operator=(bool(cr2))`,
+which is fine. (Again, [[P2321]] has already established this pattern.)
+
+<b>5.</b> We must provide ADL `swap`. The generic `std::swap` is inappropriate for two reasons:
+
+- We need `swap(v[1], v[2])` to work even when the expression `v[1]` is a prvalue `Reference`. The generic `std::swap(T&, T&)`
+    doesn't accept prvalue arguments.
+
+- The generic algorithm `Reference t = r1; r1 = r2; r2 = t;` fails to swap the values of the referents of `r1` and `r2`.
+
+If this `Reference` is the `iter_reference_t` of some iterator type, then that iterator type might do well also to provide an `iter_swap`;
+but that doesn't affect the rationale above; we must invariably provide an ADL `swap`.
+
+<b>6.</b> Consider `swap(r, b)`, where `b` is an lvalue of type `bool`. If `bool&` is implicitly convertible to `Reference`,
+this will happily use the single overload of ADL `swap` above. But in the STL, `vector<bool>::reference` and `bitset<N>::reference`
+are not implicitly convertible from `bool&`. (This is as it should be: you shouldn't be able to create one referring to an arbitrary `bool`
+of your own.) So, in order to make `swap(r, b)` and `swap(b, r)` compile, we'll need two additional overloads of `swap`.
+This matches the proposed resolution of [[LWG3638]].
+
+The final product (omitting `constexpr` and `noexcept`) looks like this:
+
+```c++
+struct Reference {
+  bool *p_;
+  explicit Reference(bool* p) : p_(p) {} // exposition only
+  Reference(const Reference&) = default;
+  Reference& operator=(const Reference& rhs) { // C++98
+    *p_ = *rhs.p_;
+    return *this;
+  }
+  operator bool() const {
+    return *p_;
+  }
+  Reference& operator=(bool b) { // C++98
+    *p_ = b;
+    return *this;
+  }
+  const Reference& operator=(bool b) const { // P2321
+    *p_ = b;
+    return *this;
+  }
+  friend void swap(Reference lhs, Reference rhs) {
+    std::swap(*lhs.p_, *rhs.p_);
+  }
+  friend void swap(Reference lhs, bool& rhs) {
+    std::swap(*lhs.p_, rhs);
+  }
+  friend void swap(bool& lhs, Reference rhs) {
+    std::swap(lhs, *rhs.p_);
+  }
+};
+```
+
+We propose to apply this pattern consistently in both `vector<bool>::reference` (resolving [[LWG3638]])
+and `bitset<N>::reference` (resolving [[LWG4187]]).
+
+# Don't mandate triviality # {#triviality}
+
+Today the copy constructors of `vector<bool>::reference` and `bitset::reference` are specified with `=default`;
+but because we don't specify their data members, this says nothing normative about the copy constructor's noexceptness and triviality.
+These explicitly defaulted declarations were added to C++20 by <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0619r4.html">P0619</a>,
+merely to avoid relying on <a href="https://eel.is/c++draft/depr.impldec">[depr.impldec]</a>. Prior to C++20 these types
+did not specify a copy constructor at all, which was interpreted as a request for implicitly defaulted copy and move constructors,
+which *still* said nothing normative about noexceptness and triviality.
+
+Both copy constructors are trivial in practice, on all three vendors.
+
+However, there is implementation divergence on the destructors. All vendors give `vector<bool>::reference` a trivial destructor;
+but only libc++ gives `bitset::reference` a trivial destructor. libstdc++ and Microsoft give `bitset::reference` a non-trivial
+user-provided destructor. This means that the two types have visibly different calling conventions ([Godbolt](https://godbolt.org/z/xMjffoMfT)).
+We cannot mandate a change here, because ABI.
+
+<p><table>
+<tr><th></th><td colspan="3" style="text-align:center;">Trivial copy constructor?</td><td colspan="3" style="text-align:center;">Trivial destructor?</td></tr>
+<tr><th></th><th>libstdc++</th><th>libc++</th><th>Microsoft</th><th>libstdc++</th><th>libc++</th><th>Microsoft</th></tr>
+<tr><th><tt>vector&lt;bool>::reference</tt></th><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+<tr><th><tt>bitset&lt;N>::reference</tt></th><td>Yes</td><td>Yes</td><td>Yes</td><td><b>No</b></td><td>Yes</td><td><b>No</b></td></tr>
+</table>
+
+We conceivably *could* require triviality of any operation with "Yes"es all across its row above.
+But, since we can't get it for `bitset::reference`'s destructor; I don't
+want to introduce gratuitous differences in specification between `bitset::reference` and `vector<bool>::reference`;
+and it doesn't seem very important whether a proxy reference's *copy constructor* is normatively specified to be trivial —
+I don't think it's worth the bother to specify.
+
+# Proposed wording # {#wording}
+
+## [template.bitset.general] ## {#wording-template.bitset.general}
+
+<p class="note"><b>DRAFTING NOTE:</b>
+This resolves [[LWG4187]].
+We don't add a const-qualified overload of `reference::flip` because I don't think anyone cares about `flip`.
+We don't rearrange the members to match [vector.bool]'s order because that
+can be done later, editorially.
+
+
+Modify <a href="http://eel.is/c++draft/template.bitset.general">[template.bitset.general]</a> as follows:
+
+<small><blockquote>
+<pre>
+namespace std {
+  template&lt;size_t N> class bitset {
+  public:
+    <i>// bit reference</i>
+    class reference {
+    public:
+      constexpr reference(const reference& <ins>x</ins>) <ins>noexcept</ins> <del>= default</del>;
+      constexpr ~reference();
+      constexpr reference& operator=(bool x) noexcept;              <i>// for b[i] = x;</i>
+      constexpr reference& operator=(const reference& <ins>x</ins>) noexcept;    <i>// for b[i] = b[j];</i>
+      <ins>constexpr const reference& operator=(bool x) const noexcept;</ins>
+      constexpr bool operator~() const noexcept;                    <i>// flips the bit</i>
+      constexpr operator bool() const noexcept;                     <i>// for x = b[i];</i>
+      constexpr reference& flip() noexcept;                         <i>// for b[i].flip();</i>
+      <ins>friend constexpr void swap(reference x, reference y) noexcept;</ins>
+      <ins>friend constexpr void swap(reference x, bool& y) noexcept;</ins>
+      <ins>friend constexpr void swap(bool& x, reference y) noexcept;</ins>
+    };
+
+[...]
+
+  };
+
+  // [bitset.hash], hash support
+  template&lt;class T> struct hash;
+  template&lt;size_t N> struct hash&lt;bitset&lt;N>>;
+}
+</pre>
+<p>1․ The class template `bitset<N>` describes an object that can store a sequence consisting of a fixed number of bits, `N`.
+
+<p>2․ Each bit represents either the value zero (reset) or one (set). To *toggle* a bit is to change the value zero to one, or the value one to zero.
+Each bit has a non-negative position `pos`. When converting between an object of <del>class</del> <ins>type</ins> `bitset<N>` and a value of some integral type,
+bit position `pos` corresponds to the *bit value* `1 << pos`. The integral value corresponding to two or more bits is the sum of their bit values.
+
+<p><ins>x․ `reference` is a class that simulates a reference to a single bit in the sequence.</ins>
+
+<p><pre>
+  <ins>constexpr reference::reference(const reference& x) noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* Initializes `*this` to refer to the same bit as `x`.</ins>
+
+<p><pre>
+  <ins>constexpr reference::~reference();</ins>
+</pre>
+<p><ins>x․ *Effects:* None.</ins>
+
+<p><pre>
+  <ins>constexpr reference& reference::operator=(bool x) noexcept;</ins>
+  <ins>constexpr reference& reference::operator=(const reference& x) noexcept;</ins>
+  <ins>constexpr const reference& reference::operator=(bool x) const noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* Sets the bit referred to by `*this` if `bool(x)` is `true`, and clears it otherwise.</ins>
+<p><ins>x․ *Returns:* `*this`.</ins>
+
+<p><pre>
+ <ins>constexpr void swap(reference x, reference y) noexcept;</ins>
+ <ins>constexpr void swap(reference x, bool& y) noexcept;</ins>
+ <ins>constexpr void swap(bool& x, reference y) noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* Exchanges the values denoted by `x` and `y` as if by:</ins>
+<pre>
+  <ins>bool b = x;</ins>
+  <ins>x = y;</ins>
+  <ins>y = b;</ins>
+</pre>
+
+<p><pre>
+  <ins>constexpr reference& reference::flip() noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* `*this = !*this;`</ins>
+
+<p>3․ The functions described in [template.bitset] can report three kinds of errors, each associated with a distinct exception [...]
+
+</blockquote></small>
+
+## [vector.bool] ## {#wording-vector.bool}
+
+<p class="note"><b>DRAFTING NOTE:</b>
+This resolves [[LWG3638]].
+
+Modify <a href="http://eel.is/c++draft/vector.bool">[vector.bool]</a> as follows:
+
+<small><blockquote>
+<pre>
+namespace std {
+  template&lt;class Allocator>
+  class vector&lt;bool, Allocator> {
+  public:
+    <i>// types</i>
+    using value_type             = bool;
+    using allocator_type         = Allocator;
+    using pointer                = <i>implementation-defined</i>;
+    using const_pointer          = <i>implementation-defined</i>;
+    using const_reference        = bool;
+    using size_type              = <i>implementation-defined</i>; <i>// see [container.requirements]</i>
+    using difference_type        = <i>implementation-defined</i>; <i>// see [container.requirements]</i>
+    using iterator               = <i>implementation-defined</i>; <i>// see [container.requirements]</i>
+    using const_iterator         = <i>implementation-defined</i>; <i>// see [container.requirements]</i>
+    using reverse_iterator       = std::reverse_iterator&lt;iterator>;
+    using const_reverse_iterator = std::reverse_iterator&lt;const_iterator>;
+
+    <i>// bit reference</i>
+    class reference {
+    public:
+      constexpr reference(const reference&) <ins>noexcept</ins> <del>= default</del>;
+      constexpr ~reference();
+      constexpr operator bool() const noexcept;
+      constexpr reference& operator=(bool x) noexcept;
+      constexpr reference& operator=(const reference& x) noexcept;
+      constexpr const reference& operator=(bool x) const noexcept;
+      constexpr void flip() noexcept;   // flips the bit
+      <ins>friend constexpr void swap(reference x, reference y) noexcept;</ins>
+      <ins>friend constexpr void swap(reference x, bool& y) noexcept;</ins>
+      <ins>friend constexpr void swap(bool& x, reference y) noexcept;</ins>
+    };
+
+[...]
+
+    constexpr void swap(vector&)
+      noexcept(allocator_traits&lt;Allocator>::propagate_on_container_swap::value ||
+               allocator_traits&lt;Allocator>::is_always_equal::value);
+    <del>static constexpr void swap(reference x, reference y) noexcept;</del>
+    constexpr void flip() noexcept;     <i>// flips all bits</i>
+    constexpr void clear() noexcept;
+  };
+}
+</pre>
+<p>[...]
+
+<p>4․ `reference` is a class that simulates <ins>a reference to a single bit in the sequence.</ins> <del>the
+behavior of references of a single bit in `vector<bool>`.
+The conversion function returns `true` when the bit is set, and `false` otherwise.
+The assignment operators set the bit when the argument is (convertible to) `true` and clear it otherwise.
+`flip` reverses the state of the bit.</del>
+
+<p><pre>
+  <ins>constexpr reference::reference(const reference& x) noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* Initializes `*this` to refer to the same bit as `x`.</ins>
+
+<p><pre>
+  <ins>constexpr reference::~reference();</ins>
+</pre>
+<p><ins>x․ *Effects:* None.</ins>
+
+<p><pre>
+  <ins>constexpr reference& reference::operator=(bool x) noexcept;</ins>
+  <ins>constexpr reference& reference::operator=(const reference& x) noexcept;</ins>
+  <ins>constexpr const reference& reference::operator=(bool x) const noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* Sets the bit referred to by `*this` when `bool(x)` is `true`, and clears it otherwise.</ins>
+<p><ins>x․ *Returns:* `*this`.</ins>
+
+<p><pre>
+  <ins>constexpr void reference::flip() noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* `*this = !*this;`</ins>
+
+<p><pre>
+ <ins>constexpr void swap(reference x, reference y) noexcept;</ins>
+ <ins>constexpr void swap(reference x, bool& y) noexcept;</ins>
+ <ins>constexpr void swap(bool& x, reference y) noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* Exchanges the values denoted by `x` and `y` as if by:</ins>
+<pre>
+  <ins>bool b = x;</ins>
+  <ins>x = y;</ins>
+  <ins>y = b;</ins>
+</pre>
+
+<p><pre>
+  <ins>constexpr reference& reference::flip() noexcept;</ins>
+</pre>
+<p><ins>x․ *Effects:* `*this = !*this;`</ins>
+
+<p><pre>
+  constexpr void flip() noexcept;
+</pre>
+<p>5․ *Effects:* Replaces each element in the container with its complement.
+
+<p><pre>
+  <del>static constexpr void swap(reference x, reference y) noexcept;</del>
+</pre>
+<p><del>6․ *Effects:* Exchanges the contents of `x` and `y` as if by:</del>
+<pre>
+  <del>bool b = x;</del>
+  <del>x = y;</del>
+  <del>y = b;</del>
+</pre>
+</blockquote></small>
+
+## [depr.vector.bool.swap] ## {#wording-depr.vector.bool.swap}
+
+Create a new subclause [depr.vector.bool.swap] under <a href="https://eel.is/c++draft/#depr">[depr]</a>:
+
+<small><blockquote>
+<p><ins><b>D.? Deprecated <code>vector&lt;bool, Allocator></code> swap [depr.vector.bool.swap]</b></ins>
+
+<p><ins>x․ The following member is declared in addition to those members specified in <a href="#wording-vector.bool">[vector.bool]</a>:</ins>
+<pre>
+<ins>namespace std {</ins>
+  <ins>template&lt;class Allocator> class vector&lt;bool, Allocator> {</ins>
+  <ins>public:</ins>
+    <ins>static constexpr void swap(reference x, reference y) noexcept;</ins>
+  <ins>};</ins>
+<ins>}</ins>
+</pre>
+
+<p><pre>
+  <ins>static constexpr void swap(reference x, reference y) noexcept;</ins>
+</pre>
+<ins>x․ *Effects:* Exchanges the values denoted by `x` and `y` as if by:</ins>
+<pre>
+<ins>bool b = x;</ins>
+<ins>x = y;</ins>
+<ins>y = b;</ins>
+</pre>
+</blockquote></small>
+
+
+<pre class=biblio>
+{
+  "P2321": {
+    "authors": [
+      "Tim Song"
+    ],
+    "title": "zip",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2021/p2321r2.html",
+    "date": "June 2021"
+  },
+  "LWG3638": {
+    "authors": [
+      "Jonathan Wakely"
+    ],
+    "title": "vector<bool>::swap(reference, reference) is useless",
+    "href": "https://cplusplus.github.io/LWG/issue3638",
+    "date": "November 2021"
+  },
+  "LWG4187": {
+    "authors": [
+      "Arthur O'Dwyer"
+    ],
+    "title": "bitset::reference should be const-assignable",
+    "href": "https://cplusplus.github.io/LWG/issue4187",
+    "date": "December 2024"
+  }
+}
+</pre>
