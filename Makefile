@@ -24,7 +24,8 @@ all: \
     d3055-relocation.html \
     d3279-trivial.html \
     d3418-inplace-vector.html \
-    d3612-proxy-reference.html
+    d3612-proxy-reference.html \
+    d3623-valarray.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
