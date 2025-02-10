@@ -1,0 +1,512 @@
+<pre class='metadata'>
+Title: Add noexcept to [iterator.range] (LWG 3537)
+Shortname: D3623
+Revision: 0
+!Draft Revision: 1
+Audience: LEWGI
+Status: D
+Group: WG21
+URL:
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  P3016R5 "Resolve inconsistencies in begin/end for <code>valarray</code> and braced initializer lists"
+  increases consistency by moving the whole overload set of `std::begin`, `std::data`,
+  etc., into `<iterator>`, and permitting `initializer_list` and `valarray` to use the generic
+  algorithms instead of dedicated overloads. But the generic algorithms are (on paper) never-noexcept.
+  P3016 was sent back on the grounds that the noexcept guarantee on e.g. `std::data(il)` was important;
+  so, let's increase consistency again (and standardize Microsoft's existing practice) by adding
+  noexcept-specs to all ten generic algorithms.
+  This also resolves LWG3537.
+Date: 2025-02-10
+</pre>
+
+<style>
+hilite  {background-color: #FFFF00; font-weight: bold;}
+ins     {background-color: #CCFFCC; text-decoration: underline;}
+del     {background-color: #FFCACA; text-decoration: line-through;}
+</style>
+
+# Changelog # {#changelog}
+
+- R0 (during Hagenberg):
+
+    - Initial revision
+
+
+# Background # {#background}
+
+In C++23, <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> defines ten overload sets:
+`std::begin`, `end`, `cbegin`, `cend`, `rbegin`, `rend`, `crbegin`, `crend`, `data`, `size`, `ssize`, `empty`.
+Each of these consists of a generic (template) overload plus dedicated overloads for certain types
+(namely, built-in array and `initializer_list`).
+
+[[P3016R5]] removes the dedicated overloads for `initializer_list` wherever possible. For example:
+
+<blockquote><small>
+<pre>
+  template&lt;class C> constexpr auto data(C& c) -> decltype(c.data());
+  template&lt;class C> constexpr auto data(const C& c) -> decltype(c.data());
+  template&lt;class T, size_t N> constexpr T* data(T (&amp;array)\[N]) noexcept;
+  <del>template&lt;class E> constexpr const E* data(initializer_list&lt;E> il) noexcept;</del>
+</pre>
+</small></blockquote>
+
+That design was approved for C++26 by LEWG in Tokyo (2024-03-22), 4–8–2–0–0, and proceeded to LWG.
+However, some in LWG objected that this changed the observable behavior of:
+
+```cpp
+    bool f(std::initializer_list<int> il) { return noexcept(std::data(il)); }
+```
+
+So LEWG in Hagenberg (2025-02-10) re-voted, 2–12–5–0–2, to apply conditional noexcept-specs
+to the generic overloads of `data`, `empty`, `begin`, and `end` and re-forward P3016 with
+that amendment.
+
+P3016's motivation was to *increase* consistency, not decrease it. Therefore, we should
+add conditional noexcept-specs not just to `data` but also to `size`; not just to `size`
+but also to `ssize`; and so on. However, LEWGchair asks that this addition be presented
+in a separate paper so that it can be properly discussed. This (P3623) is that paper.
+
+# Proposal # {#proposal}
+
+In the paper standard for C++23, we find (<a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a>,
+<a href="https://eel.is/c++draft/valarray.syn">[valarray.syn]</a>, <a href="https://eel.is/c++draft/initializer.list.syn">[initializer.list.syn]</a>,
+<a href="https://eel.is/c++draft/fs.filesystem.syn">[fs.filesystem.syn]</a>):
+
+- `begin`, `end`: noexcept for arrays, `initializer_list`, and `[recursive_]directory_iterator`; otherwise never-noexcept
+- `data`, `empty`: noexcept for arrays and `initializer_list`; otherwise never-noexcept
+- `cbegin`, `cend`: conditionally noexcept
+- `rbegin`, `rend`, `crbegin`, `crend`: never-noexcept
+- `size`, `ssize`: noexcept for arrays; otherwise never-noexcept
+
+This is explained by two historical quirks:
+
+- The generic `cbegin` and `cend` are conditionally noexcept, despite no other generic algorithm being so.
+    (This is because there are no dedicated overloads of `cbegin` or `cend`, because [[LWG2128]] didn't think
+    we needed them. Then, when [[LWG2280]] wanted to make the array and `initializer_list` overloads `noexcept`,
+    there were no dedicated overloads to modify, so we just added a conditional noexcept-spec to the
+    generic template.)
+
+- The dedicated overloads of `rbegin` and `rend` are never-noexcept, despite every other dedicated overload being so.
+    (I suspect this is because `reverse_iterator`'s constructor remains never-noexcept. [[N3263]] guaranteed
+    that `ctr.rbegin()` would be noexcept for all STL containers, but made no such guarantee about reversing
+    an *arbitrary* iterator.)
+
+We propose to add `cbegin`-style conditional noexcept-specs everywhere we can.
+
+## What about `rbegin(arr)`? ## {#rbegin-arr}
+
+What about `rbegin` and `rend` on a built-in array type? The paper standard says that `rbegin`
+is non-noexcept even on arrays and `initializer_list`s. This is [[LWG3537]].
+
+<blockquote><small>
+<pre>
+  template&lt;class C> constexpr auto rbegin(C& c) -> decltype(c.rbegin());
+  template&lt;class C> constexpr auto rbegin(const C& c) -> decltype(c.rbegin());
+  template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*> rbegin(T (&amp;array)\[N])
+  template&lt;class E> constexpr reverse_iterator&lt;const E*>
+    rbegin(initializer_list&lt;E> il);
+</pre>
+</small></blockquote>
+
+Microsoft STL has put unconditional `noexcept` on `rbegin(arr)` and `rbegin(il)` since
+<a href="https://github.com/microsoft/STL/commit/5def9e7c6beef7357939124ad6c9d5c98fe9d45f">August 2022</a>.
+
+libstdc++ has put unconditional `noexcept` on `rbegin(arr)` and `rbegin(il)` since
+<a href="https://github.com/gcc-mirror/gcc/commit/00b46c00c8d9003c61e8f817668ad3380e16fedb">March 2021</a>.
+
+libc++ continues to leave them both unmarked.
+
+
+## Implementation experience ## {#implementation-experience}
+
+Yes: fully on Microsoft, and "mostly" on libstdc++.
+
+Microsoft STL has put noexcept-specs on `cbegin`, `cend` since pre-2019;
+on `begin`, `end`, `rbegin`, `rend`, `crbegin`, `crend`, `data`, `size`, `ssize`, `empty` since
+<a href="https://github.com/microsoft/STL/commit/5def9e7c6beef7357939124ad6c9d5c98fe9d45f">August 2022</a>.
+
+GNU libstdc++ has put noexcept-specs on `cbegin`, `cend` since
+<a href="https://github.com/gcc-mirror/gcc/commit/8bae22b708305524126b9462999890242c7e809e">January 2015</a>;
+on `data`, `size`, `empty` since
+<a href="https://github.com/gcc-mirror/gcc/commit/1949122881af310b7b0177105d515d62e59a630b">November 2017</a>;
+on `begin`, `end`, `ssize` since
+<a href="https://github.com/gcc-mirror/gcc/commit/8692cb10e82e72af70b690c23be5e5096bb999d2">November 2024</a>.
+It continues to leave unmarked the generic `rbegin` and `rend`.
+
+libc++ has put noexcept-specs on `cbegin`, `cend` since
+<a href="https://github.com/llvm/llvm-project/commit/cb950c9dc9bff37367068310bdfad75c7274915c">October 2023</a>.
+It continues to leave unmarked `begin`, `end`, `rbegin`, `rend`, `crbegin`, `crend`, `data`, `size`, `ssize`, and `empty`.
+
+## Tony Table ## {#tony-table}
+
+<table>
+<tr>
+<td>
+```cpp
+  std::vector<int> v;
+  int arr[10];
+
+  static_assert(noexcept(v.begin()));
+    // guaranteed
+  static_assert(noexcept(std::begin(arr)));
+    // guaranteed
+  static_assert(noexcept(std::begin(v)));
+    // passes on MS and libstdc++, fails on libc++
+
+  static_assert(noexcept(v.rbegin()));
+    // guaranteed
+  static_assert(noexcept(std::rbegin(arr)));
+    // passes on MS and libstdc++, fails on libc++
+  static_assert(noexcept(std::rbegin(v)));
+    // passes on MS, fails on libstdc++ and libc++
+```
+</td>
+<td>
+```cpp
+  std::vector<int> v;
+  int arr[10];
+
+  static_assert(noexcept(v.begin()));
+    // guaranteed
+  static_assert(noexcept(std::begin(arr)));
+    // guaranteed
+  static_assert(noexcept(std::begin(v)));
+    // guaranteed
+
+  static_assert(noexcept(v.rbegin()));
+    // guaranteed
+  static_assert(noexcept(std::rbegin(arr)));
+    // guaranteed
+  static_assert(noexcept(std::rbegin(v)));
+    // guaranteed
+```
+</td>
+</tr>
+</table>
+
+
+# Proposed wording (relative to the draft IS) # {#wording}
+
+This paper's proposed wording is expressed as a diff against the current draft standard,
+for ease of readability.
+
+If P3623 is approved by LEWG, then I'll create a P3016R6
+containing the merge of these changes and [[P3016R5]]'s changes,
+and ask LEWG to re-vote to forward P3016R6 to LWG.
+
+If P3623 is rejected, I'll just plan to revisit this whole area in some later cycle.
+
+## [iterator.synopsis] ## {#wording-iterator.synopsis}
+
+Modify <a href="https://eel.is/c++draft/iterator.synopsis">[iterator.synopsis]</a> as follows:
+
+<small><blockquote>
+<b>25.2 Header &lt;iterator> synopsis [iterator.synopsis]</b>
+
+<pre>
+#include &lt;compare>              // see [compare.syn]
+#include &lt;concepts>             // see [concepts.syn]
+
+namespace std {
+</pre>
+[...]
+<pre>
+  <i>// [iterator.range], range access</i>
+  template&lt;class C> constexpr auto begin(C& c)
+    <ins>noexcept(noexcept(c.begin()))</ins> -> decltype(c.begin());
+  template&lt;class C> constexpr auto begin(const C& c)
+    <ins>noexcept(noexcept(c.begin()))</ins> -> decltype(c.begin());
+  template&lt;class C> constexpr auto end(C& c)
+    <ins>noexcept(noexcept(c.end()))</ins> -> decltype(c.end());
+  template&lt;class C> constexpr auto end(const C& c)
+    <ins>noexcept(noexcept(c.end()))</ins> -> decltype(c.end());
+  template&lt;class T, size_t N> constexpr T* begin(T (&amp;array)\[N]) noexcept;
+  template&lt;class T, size_t N> constexpr T* end(T (&amp;array)\[N]) noexcept;
+  template&lt;class C> constexpr auto cbegin(const C& c)
+    noexcept(noexcept(std::begin(c))) -> decltype(std::begin(c));
+  template&lt;class C> constexpr auto cend(const C& c)
+    noexcept(noexcept(std::end(c))) -> decltype(std::end(c));
+  template&lt;class C> constexpr auto rbegin(C& c)
+    <ins>noexcept(noexcept(c.rbegin()))</ins> -> decltype(c.rbegin());
+  template&lt;class C> constexpr auto rbegin(const C& c)
+    <ins>noexcept(noexcept(c.rbegin()))</ins> -> decltype(c.rbegin());
+  template&lt;class C> constexpr auto rend(C& c)
+    <ins>noexcept(noexcept(c.rend()))</ins> -> decltype(c.rend());
+  template&lt;class C> constexpr auto rend(const C& c)
+    <ins>noexcept(noexcept(c.rend()))</ins> -> decltype(c.rend());
+  template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*>
+    rbegin(T (&amp;array)\[N]) <ins>noexcept;</ins>
+  template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*>
+    rend(T (&amp;array)\[N]) <ins>noexcept</ins>;
+  template&lt;class E> constexpr reverse_iterator&lt;const E*>
+    rbegin(initializer_list&lt;E> il) <ins>noexcept</ins>;
+  template&lt;class E> constexpr reverse_iterator&lt;const E*>
+    rend(initializer_list&lt;E> il) <ins>noexcept</ins>;
+  template&lt;class C> constexpr auto crbegin(const C& c)
+    <ins>noexcept(noexcept(std::rbegin(c)))</ins> -> decltype(std::rbegin(c));
+  template&lt;class C> constexpr auto crend(const C& c)
+    <ins>noexcept(noexcept(std::rend(c)))</ins> -> decltype(std::rend(c));
+
+  template&lt;class C> constexpr auto size(const C& c)
+    <ins>noexcept(noexcept(c.size()))</ins> -> decltype(c.size());
+  template&lt;class T, size_t N> constexpr size_t
+    size(const T (&amp;array)\[N]) noexcept;
+
+  template&lt;class C> constexpr auto
+    ssize(const C& c) <ins>noexcept(noexcept(c.size()))</ins>
+      -> common_type_t&lt;ptrdiff_t, make_signed_t&lt;decltype(c.size())>>;
+  template&lt;class T, ptrdiff_t N> constexpr ptrdiff_t
+    ssize(const T (&amp;array)\[N]) noexcept;
+
+  template&lt;class C> constexpr auto empty(const C& c)
+    <ins>noexcept(noexcept(c.empty()))</ins> -> decltype(c.empty());
+  template&lt;class T, size_t N> constexpr bool
+    empty(const T (&amp;array)\[N]) noexcept;
+  template&lt;class E> constexpr bool
+    empty(initializer_list&lt;E> il) noexcept;
+
+  template&lt;class C> constexpr auto data(C& c)
+    <ins>noexcept(noexcept(c.data()))</ins> -> decltype(c.data());
+  template&lt;class C> constexpr auto data(const C& c)
+    <ins>noexcept(noexcept(c.data()))</ins> -> decltype(c.data());
+  template&lt;class T, size_t N> constexpr T* data(T (&amp;array)\[N]) noexcept;
+  template&lt;class E> constexpr const E* data(initializer_list&lt;E> il) noexcept;
+}
+</pre>
+</blockquote></small>
+
+## [iterator.range] ## {#wording-iterator.range}
+
+Modify <a href="https://eel.is/c++draft/iterator.range">[iterator.range]</a> as follows:
+
+<small><blockquote>
+<p>1. In addition to being available via inclusion of the `<iterator>` header, the function templates in [iterator.range]
+are available when any of the following headers are included: `<array>`, `<deque>`, `<flat_map>`, `<flat_set>`,
+`<forward_list>`, `<inplace_vector>`, `<list>`, `<map>`, `<regex>`, `<set>`, `<span>`,
+`<string>`, `<string_view>`, `<unordered_map>`, `<unordered_set>`, and `<vector>`.
+
+<p><pre>
+template&lt;class C> constexpr auto begin(C& c)
+  <ins>noexcept(noexcept(c.begin()))</ins> -> decltype(c.begin());
+template&lt;class C> constexpr auto begin(const C& c)
+  <ins>noexcept(noexcept(c.begin()))</ins> -> decltype(c.begin());
+</pre>
+<p>2. *Returns:* `c.begin()`.
+
+<p><pre>
+template&lt;class C> constexpr auto end(C& c)
+  <ins>noexcept(noexcept(c.end()))</ins> -> decltype(c.end());
+template&lt;class C> constexpr auto end(const C& c)
+  <ins>noexcept(noexcept(c.end()))</ins> -> decltype(c.end());
+</pre>
+<p>3. *Returns:* `c.end()`.
+
+<p><pre>
+template&lt;class T, size_t N> constexpr T* begin(T (&amp;array)\[N]) noexcept;
+</pre>
+<p>4. *Returns:* `array`.
+
+<p><pre>
+template&lt;class T, size_t N> constexpr T* end(T (&amp;array)\[N]) noexcept;
+</pre>
+<p>5. *Returns:* `array + N`.
+
+<p><pre>
+template&lt;class C> constexpr auto cbegin(const C& c) noexcept(noexcept(std::begin(c)))
+  -> decltype(std::begin(c));
+</pre>
+<p>6. *Returns:* `std::begin(c)`.
+
+<p><pre>
+template*lt;class C> constexpr auto cend(const C& c) noexcept(noexcept(std::end(c)))
+  -> decltype(std::end(c));
+</pre>
+<p>7. *Returns:* `std::end(c)`.
+
+<p><pre>
+template&lt;class C> constexpr auto rbegin(C& c)
+  <ins>noexcept(noexcept(c.rbegin()))</ins> -> decltype(c.rbegin());
+template&lt;class C> constexpr auto rbegin(const C& c)
+  <ins>noexcept(noexcept(c.rbegin()))</ins> -> decltype(c.rbegin());
+</pre>
+<p>8. *Returns:* `c.rbegin()`.
+
+<p><pre>
+template&lt;class C> constexpr auto rend(C& c)
+  <ins>noexcept(noexcept(c.rend()))</ins> -> decltype(c.rend());
+template&lt;class C> constexpr auto rend(const C& c)
+  <ins>noexcept(noexcept(c.rend()))</ins> -> decltype(c.rend());
+</pre>
+<p>9. *Returns:* `c.rend()`.
+
+<p><pre>
+template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*> rbegin(T (&amp;array)\[N]) <ins>noexcept</ins>;
+</pre>
+<p>10. *Returns:* `reverse_iterator<T*>(array + N)`.
+
+<p><pre>
+template&lt;class T, size_t N> constexpr reverse_iterator&lt;T*> rend(T (&amp;array)\[N]) <ins>noexcept</ins>;
+</pre>
+<p>11. *Returns:* `reverse_iterator<T*>(array)`.
+
+<p><pre>
+template&lt;class E> constexpr reverse_iterator&lt;const E*> rbegin(initializer_list&lt;E> il) <ins>noexcept</ins>;
+</pre>
+<p>12. *Returns:* `reverse_iterator<const E*>(il.end())`.
+
+<p><pre>
+template&lt;class E> constexpr reverse_iterator&lt;const E*> rend(initializer_list&lt;E> il) <ins>noexcept</ins>;
+</pre>
+<p>13. *Returns:* `reverse_iterator<const E*>(il.begin())`.
+
+<p><pre>
+template&lt;class C> constexpr auto crbegin(const C& c)
+  <ins>noexcept(noexcept(std::rbegin(c)))</ins> -> decltype(std::rbegin(c));
+</pre>
+<p>14. *Returns:* `std::rbegin(c)`.
+
+<p><pre>
+template&lt;class C> constexpr auto crend(const C& c)
+  <ins>noexcept(noexcept(std::rend(c)))</ins> -> decltype(std::rend(c));
+</pre>
+<p>15. *Returns:* `std::rend(c)`.
+
+<p><pre>
+template&lt;class C> constexpr auto size(const C& c)
+  <ins>noexcept(noexcept(c.size()))</ins> -> decltype(c.size());
+</pre>
+<p>16. *Returns:* `c.size()`.
+
+<p><pre>
+template&lt;class T, size_t N> constexpr size_t size(const T (&amp;array)\[N]) noexcept;
+</pre>
+<p>17. *Returns:* `N`.
+
+<p><pre>
+template&lt;class C> constexpr auto ssize(const C& c)
+  <ins>noexcept(noexcept(c.size()))</ins> -> common_type_t&lt;ptrdiff_t, make_signed_t&lt;decltype(c.size())>>;
+</pre>
+<p>18. *Effects:* Equivalent to:
+<pre>
+  return static_cast&lt;common_type_t&lt;ptrdiff_t, make_signed_t&lt;decltype(c.size())>>>(c.size());
+</pre>
+
+<p><pre>
+template&lt;class T, ptrdiff_t N> constexpr ptrdiff_t ssize(const T (&amp;array)\[N]) noexcept;
+</pre>
+<p>19. *Returns:* `N`.
+
+<p><pre>
+template&lt;class C> constexpr auto empty(const C& c) -> decltype(c.empty());
+</pre>
+<p>20. *Returns:* `c.empty()`.
+
+<p><pre>
+template&lt;class T, size_t N> constexpr bool empty(const T (&amp;array)\[N]) noexcept;
+</pre>
+<p>21. *Returns:* `false`.
+
+<p><pre>
+template&lt;class E> constexpr bool empty(initializer_list&lt;E> il) noexcept;
+</pre>
+<p>22. *Returns:* `il.size() == 0`.
+
+<p><pre>
+template&lt;class C> constexpr auto data(C& c)
+  <ins>noexcept(noexcept(c.data()))</ins> -> decltype(c.data());
+template&lt;class C> constexpr auto data(const C& c)
+  <ins>noexcept(noexcept(c.data()))</ins> -> decltype(c.data());
+</pre>
+<p>23. *Returns:* `c.data()`.
+
+<p><pre>
+template&lt;class T, size_t N> constexpr T* data(T (&amp;array)\[N]) noexcept;
+</pre>
+<p>24. *Returns:* `array`.
+
+<p><pre>
+template&lt;class E> constexpr const E* data(initializer_list&lt;E> il) noexcept;
+</pre>
+<p>25․ Returns: `il.begin()`.
+</blockquote></small>
+
+
+<pre class=biblio>
+{
+  "LWG2058": {
+    "title": "valarray and begin/end",
+    "authors": [
+      "Gabriel Dos Reis"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue2058",
+    "date": "May 2011–October 2012"
+  },
+  "LWG2128": {
+    "title": "Absence of global functions cbegin/cend",
+    "authors": [
+      "Dmitry Polukhin"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue2128",
+    "date": "January 2012–January 2016"
+  },
+  "LWG2280": {
+    "title": "begin/end for arrays should be constexpr and noexcept",
+    "authors": [
+      "Andy Sawyer"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue2280",
+    "date": "August 2013–January 2016"
+  },
+  "LWG3537": {
+    "title": "Missing noexcept for std::rbegin/rend for arrays and initializer_list",
+    "authors": [
+      "Jiang An"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3537",
+    "date": "March 2021"
+  },
+  "LWG3624": {
+    "title": "Inconsistency of <typeinfo>, <initializer_list>, and <compare>",
+    "authors": [
+      "Jiang An"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3624",
+    "date": "October 2021"
+  },
+  "LWG3625": {
+    "title": "Should <stacktrace> provide range access function templates?",
+    "authors": [
+      "Jiang An"
+    ],
+    "href": "https://cplusplus.github.io/LWG/issue3625",
+    "date": "October 2021"
+  },
+  "N3623": {
+    "title": "More on noexcept for the Containers Library",
+    "authors": [
+      "J. Daniel Garcia"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2011/n3263.htm",
+    "date": "March 2011"
+  },
+  "P0884": {
+    "title": "Extending the noexcept policy, rev0",
+    "authors": [
+      "Nicolai Josuttis"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2018/p0884r0.pdf",
+    "date": "February 2018"
+  },
+  "P3155": {
+    "title": "noexcept policy for SD-9 (The Lakos Rule)",
+    "authors": [
+      "Timur Doumler",
+      "John Lakos"
+    ],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3155r0.pdf",
+    "date": "February 2024"
+  }
+}
+</pre>
