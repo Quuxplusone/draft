@@ -2,8 +2,8 @@
 Title: Add noexcept to [iterator.range] (LWG 3537)
 Shortname: D3623
 Revision: 0
-!Draft Revision: 1
-Audience: LEWGI
+!Draft Revision: 2
+Audience: LEWG
 Status: D
 Group: WG21
 URL:
@@ -29,9 +29,8 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R0 (during Hagenberg):
-
-    - Initial revision
+- R0 (during Hagenberg): Initial (and only) revision. LEWG forwarded to LWG by a vote of 16–11–0–1–0.
+    These changes will be incorporated into P3016R6, to be seen by LWG.
 
 
 # Background # {#background}
@@ -121,7 +120,7 @@ libc++ continues to leave them both unmarked.
 
 ## Implementation experience ## {#implementation-experience}
 
-Yes: fully on Microsoft, and "mostly" on libstdc++.
+Yes: fully on Microsoft, "mostly" on libstdc++, "partly" on libc++.
 
 Microsoft STL has put noexcept-specs on `cbegin`, `cend` since pre-2019;
 on `begin`, `end`, `rbegin`, `rend`, `crbegin`, `crend`, `data`, `size`, `ssize`, `empty` since
@@ -135,9 +134,13 @@ on `begin`, `end`, `ssize` since
 <a href="https://github.com/gcc-mirror/gcc/commit/8692cb10e82e72af70b690c23be5e5096bb999d2">November 2024</a>.
 It continues to leave unmarked the generic `rbegin` and `rend`.
 
-libc++ has put noexcept-specs on `cbegin`, `cend` since
+libc++ has put noexcept-specs on `data`, `size`, `empty` since
+<a href="https://github.com/llvm/llvm-project/commit/d1dcda19695afbbd7d3a245bec607be2f09492f7">November 2017</a>;
+on `ssize` since
+<a href="https://github.com/llvm/llvm-project/commit/7d3986ea30111015565a3e56530e31aad82dfb6f">February 2019</a>;
+on `cbegin`, `cend` since
 <a href="https://github.com/llvm/llvm-project/commit/cb950c9dc9bff37367068310bdfad75c7274915c">October 2023</a>.
-It continues to leave unmarked `begin`, `end`, `rbegin`, `rend`, `crbegin`, `crend`, `data`, `size`, `ssize`, and `empty`.
+It continues to leave unmarked the generic `begin`, `end`, `rbegin`, `rend`, `crbegin`, and `crend`.
 
 ## Tony Table ## {#tony-table}
 
@@ -390,7 +393,7 @@ template&lt;class C> constexpr auto ssize(const C& c)
 </pre>
 <p>18. *Effects:* Equivalent to:
 <pre>
-  return static_cast&lt;common_type_t&lt;ptrdiff_t, make_signed_t&lt;decltype(c.size())>>>(c.size());
+      return static_cast&lt;common_type_t&lt;ptrdiff_t, make_signed_t&lt;decltype(c.size())>>>(c.size());
 </pre>
 
 <p><pre>
@@ -399,7 +402,8 @@ template&lt;class T, ptrdiff_t N> constexpr ptrdiff_t ssize(const T (&amp;array)
 <p>19. *Returns:* `N`.
 
 <p><pre>
-template&lt;class C> constexpr auto empty(const C& c) -> decltype(c.empty());
+template&lt;class C> constexpr auto empty(const C& c)
+  <ins>noexcept(noexcept(c.empty()))</ins> -> decltype(c.empty());
 </pre>
 <p>20. *Returns:* `c.empty()`.
 
