@@ -2094,7 +2094,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R13<br>std::is_trivially_relocatable</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2025-04-20">2025-04-20</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2025-05-12">2025-05-12</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt>Audience:
@@ -2102,7 +2102,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>75
+     <dd>76
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2116,7 +2116,13 @@ Let’s make it part of the C++ standard.</p>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
    <ol class="toc" role="directory">
-    <li><a href="#intro"><span class="secno">1</span> <span class="content">What’s going on here?</span></a>
+    <li>
+     <a href="#intro"><span class="secno">1</span> <span class="content">What’s going on here?</span></a>
+     <ol class="toc">
+      <li><a href="#input-sjanel"><span class="secno">1.1</span> <span class="content">Statement from Stéphane Janel</span></a>
+      <li><a href="#input-vfalco"><span class="secno">1.2</span> <span class="content">Statement from Vinnie Falco</span></a>
+      <li><a href="#input-msteffens"><span class="secno">1.3</span> <span class="content">Statement from Michael Steffens</span></a>
+     </ol>
     <li><a href="#scope"><span class="secno">2</span> <span class="content">Scope and design</span></a>
     <li>
      <a href="#wording"><span class="secno">3</span> <span class="content">Proposed wording</span></a>
@@ -2226,6 +2232,58 @@ as a diff against the current Working Draft. We gladly list ourselves as coautho
 in the same way that five Bloomberg employees listed themselves as coauthors of <a data-link-type="biblio" href="#biblio-p2786r13" title="Trivial Relocatability For C++26">[P2786R13]</a>.
 Unlike them, we come from a variety of backgrounds and maintain a variety of libraries.</p>
    <p>We beg WG21 to resolve the community’s concerns before it is too late.</p>
+   <h3 class="heading settled" data-level="1.1" id="input-sjanel"><span class="secno">1.1. </span><span class="content">Statement from Stéphane Janel</span><a class="self-link" href="#input-sjanel"></a></h3>
+   <p>Stéphane Janel is the maintainer of <a href="https://github.com/AmadeusITGroup/amc/">AmadeusITGroup/amc</a>, a collection
+of high-performance C++ containers used in the Amadeus pricing and shopping engines.</p>
+   <blockquote>
+    <p>Hello Arthur,</p>
+    <p>As already discussed together, I am hugely in favor of P1144 against P2786.</p>
+    <p>The reasons are perfectly described <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3233r0.html">here</a> and for me the main point is that P1144 better integrates with current type traits,
+and is much more natural to use. I don’t know how to target WG21 though, feel free to forward my email if it can help.</p>
+   </blockquote>
+   <h3 class="heading settled" data-level="1.2" id="input-vfalco"><span class="secno">1.2. </span><span class="content">Statement from Vinnie Falco</span><a class="self-link" href="#input-vfalco"></a></h3>
+   <p>Vinnie Falco is the maintainer of <a href="https://github.com/boostorg/json/">Boost.JSON</a>, a portable C++ library of
+containers and algorithms that implement the JSON lightweight data-interchange format.</p>
+   <blockquote>
+    <p>Boost.JSON makes intense use of trivial relocation for its variant-like container, <a href="https://github.com/boostorg/json/blob/0b1048adf7571b42ae9f684b63e4383241b9e4a1/include/boost/json/value.hpp#L55"><code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>json</c-><c- o>::</c-><c- n>value</c-></code></a>,
+which can hold any kind of JSON node including arrays, objects, and strings.</p>
+    <p>This means when resizing an array of values (represented by the type <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>json</c-><c- o>::</c-><c- n>array</c-></code>)
+or an unordered container of values (represented by the type <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>json</c-><c- o>::</c-><c- n>object</c-></code>),
+the implementation can <a href="https://github.com/boostorg/json/blob/0b1048adf7571b42ae9f684b63e4383241b9e4a1/include/boost/json/impl/array.ipp#L692">simply <code class="highlight"><c- n>relocate</c-></code></a> the contents of the container. The implementation of <code class="highlight"><c- n>relocate</c-><c- p>()</c-></code> for an array of <code class="highlight"><c- n>value</c-></code> is <a href="https://github.com/boostorg/json/blob/0b1048adf7571b42ae9f684b63e4383241b9e4a1/include/boost/json/value.hpp#L4152">simply <code class="highlight"><c- n>memcpy</c-></code></a>.</p>
+    <p>Since Boost.JSON requires only C++11 we have to make some assumptions which are in principle not portable,
+yet in practice work everywhere (we have not gotten any reports of malfunctions).
+To keep the library’s data types clean and first-class, we adopted Peter Dimov’s "pilfer construction" approach
+from <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0308r0.html">P0308R0</a>,
+which is related to trivial relocation.</p>
+    <p>I’m happy to answer questions about the library if it can help the committee make better design choices,
+although it seems like decisions have already been made. Unfortunately I do not have the motivation
+to get more involved as there is little indication that quality of outcome is proportional to the level of effort invested.</p>
+   </blockquote>
+   <h3 class="heading settled" data-level="1.3" id="input-msteffens"><span class="secno">1.3. </span><span class="content">Statement from Michael Steffens</span><a class="self-link" href="#input-msteffens"></a></h3>
+   <p>Dr. Michael Steffens is the author of <a href="https://gitlab.com/misteffens/TrivialityInversion/-/tree/main">misteffens/TrivialityInversion</a>,
+a public proof-of-concept for storage-location-agnostic C++ container types. His <code class="highlight"><c- n>BoundedVector</c-></code> type includes an <code class="highlight"><c- n>offset_ptr</c-></code>-into-self as a data member, making <code class="highlight"><c- n>BoundedVector</c-></code> trivially relocatable (for most types)
+even though one of its data members is not.</p>
+   <blockquote>
+    <p>It seems that you are raising a lot of concerns with P2786 — on
+different abstraction levels — but the key concern in my context
+seems to be the lack of opt-in trivial relocatability.
+I have read arguments in favor of that opt-out-only, claiming
+that it’s safer not to allow opt-in, overriding what the compiler could
+deduce on its own, as that could be done in error. And it’s not seen as
+a functional gap, but only a missed opportunity for optimization.</p>
+    <p>In my particular case (as in <code class="highlight"><c- n>boost</c-><c- o>::</c-><c- n>interprocess</c-></code>) the motivation is not
+optimization, but storing objects in shared memory and coping with their
+different address offsets in different processes. As C++ standards do
+not cover IPC at all yet, we map the use of SHM to trivial
+copying or relocation, as if objects would end their life in one process
+and be memmoved to the other process (and back, as needed), being aware
+that the memmove never actually happens. Instead it’s kind of an excuse
+to start/end object lifetimes on the other side without construction or
+destruction. This use case cannot be covered at all without the opt-in.</p>
+    <p>If I understood everything right until this point, sure, I’d like to
+lend a hand on the P1144 side, based on the need to have a workaround
+for IPC.</p>
+   </blockquote>
    <h2 class="heading settled" data-level="2" id="scope"><span class="secno">2. </span><span class="content">Scope and design</span><a class="self-link" href="#scope"></a></h2>
    <p>In this rebased proposal, we propose:</p>
    <ul>

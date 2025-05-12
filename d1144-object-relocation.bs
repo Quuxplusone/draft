@@ -2,7 +2,7 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 13
-!Draft Revision: 75
+!Draft Revision: 76
 Audience: WG21
 Status: D
 Group: WG21
@@ -11,7 +11,7 @@ Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
   P1144 trivial relocation is used by Abseil, AMC, BSL, Folly, HPX, Parlay, Pocketpy, Qt, Subspace, and Thrust.
   Let's make it part of the C++ standard.
-Date: 2025-04-20
+Date: 2025-05-12
 </pre>
 
 <style>
@@ -91,6 +91,77 @@ in the same way that five Bloomberg employees listed themselves as coauthors of 
 Unlike them, we come from a variety of backgrounds and maintain a variety of libraries.
 
 We beg WG21 to resolve the community's concerns before it is too late.
+
+
+## Statement from Stéphane Janel ## {#input-sjanel}
+
+Stéphane Janel is the maintainer of [AmadeusITGroup/amc](https://github.com/AmadeusITGroup/amc/), a collection
+of high-performance C++ containers used in the Amadeus pricing and shopping engines.
+
+> Hello Arthur,
+>
+> As already discussed together, I am hugely in favor of P1144 against P2786.
+>
+> The reasons are perfectly described [here](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3233r0.html)
+> and for me the main point is that P1144 better integrates with current type traits,
+> and is much more natural to use. I don't know how to target WG21 though, feel free to forward my email if it can help.
+
+
+## Statement from Vinnie Falco ## {#input-vfalco}
+
+Vinnie Falco is the maintainer of [Boost.JSON](https://github.com/boostorg/json/), a portable C++ library of
+containers and algorithms that implement the JSON lightweight data-interchange format.
+
+> Boost.JSON makes intense use of trivial relocation for its variant-like container,
+> [`boost::json::value`](https://github.com/boostorg/json/blob/0b1048adf7571b42ae9f684b63e4383241b9e4a1/include/boost/json/value.hpp#L55),
+> which can hold any kind of JSON node including arrays, objects, and strings.
+>
+> This means when resizing an array of values (represented by the type `boost::json::array`)
+> or an unordered container of values (represented by the type `boost::json::object`),
+> the implementation can [simply `relocate`](https://github.com/boostorg/json/blob/0b1048adf7571b42ae9f684b63e4383241b9e4a1/include/boost/json/impl/array.ipp#L692)
+> the contents of the container. The implementation of `relocate()` for an array of `value` is
+> [simply `memcpy`](https://github.com/boostorg/json/blob/0b1048adf7571b42ae9f684b63e4383241b9e4a1/include/boost/json/value.hpp#L4152).
+>
+> Since Boost.JSON requires only C++11 we have to make some assumptions which are in principle not portable,
+> yet in practice work everywhere (we have not gotten any reports of malfunctions).
+> To keep the library's data types clean and first-class, we adopted Peter Dimov's "pilfer construction" approach
+> from [P0308R0](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0308r0.html),
+> which is related to trivial relocation.
+>
+> I'm happy to answer questions about the library if it can help the committee make better design choices,
+> although it seems like decisions have already been made. Unfortunately I do not have the motivation
+> to get more involved as there is little indication that quality of outcome is proportional to the level of effort invested.
+
+
+## Statement from Michael Steffens ## {#input-msteffens}
+
+Dr. Michael Steffens is the author of [misteffens/TrivialityInversion](https://gitlab.com/misteffens/TrivialityInversion/-/tree/main),
+a public proof-of-concept for storage-location-agnostic C++ container types. His `BoundedVector` type includes an
+`offset_ptr`-into-self as a data member, making `BoundedVector` trivially relocatable (for most types)
+even though one of its data members is not.
+
+> It seems that you are raising a lot of concerns with P2786 — on
+> different abstraction levels — but the key concern in my context
+> seems to be the lack of opt-in trivial relocatability.
+> I have read arguments in favor of that opt-out-only, claiming
+> that it's safer not to allow opt-in, overriding what the compiler could
+> deduce on its own, as that could be done in error. And it's not seen as
+> a functional gap, but only a missed opportunity for optimization.
+>
+> In my particular case (as in `boost::interprocess`) the motivation is not
+> optimization, but storing objects in shared memory and coping with their
+> different address offsets in different processes. As C++ standards do
+> not cover IPC at all yet, we map the use of SHM to trivial
+> copying or relocation, as if objects would end their life in one process
+> and be memmoved to the other process (and back, as needed), being aware
+> that the memmove never actually happens. Instead it's kind of an excuse
+> to start/end object lifetimes on the other side without construction or
+> destruction. This use case cannot be covered at all without the opt-in.
+>
+> If I understood everything right until this point, sure, I'd like to
+> lend a hand on the P1144 side, based on the need to have a workaround
+> for IPC.
+
 
 # Scope and design # {#scope}
 
