@@ -1561,7 +1561,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version b25686b9f, updated Fri Mar 14 14:15:20 2025 -0700" name="generator">
+  <meta content="Bikeshed version 9a7a6709a, updated Tue May 27 16:45:34 2025 -0700" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
   <meta content="dark light" name="color-scheme">
 <style>
@@ -2094,15 +2094,26 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   <div class="head">
    <p data-fill-with="logo"></p>
    <h1 class="p-name no-ref" id="title">D1144R13<br>std::is_trivially_relocatable</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2025-05-12">2025-05-12</time></span></h2>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2025-05-13">2025-05-13</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
+     <dt class="editor">Authors:
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:artur@ebasoft.com.pl">Artur Bać</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:dlanders@andrew.cmu.edu">Daniel Liam Anderson</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:kaffedesk@gmail.com">Enrico Mauro</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:coachhagins@gmail.com">Jody Hagins</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:michael_steffens@posteo.de">Michael Steffens</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:stephane.janel@gmail.com">Stéphane Janel</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:vinnie.falco@gmail.com">Vinnie Falco</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:wjwray@gmail.com">Will Wray</a>
+     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:webrown.cpp@gmail.com">Walter E. Brown</a>
      <dt>Audience:
      <dd>WG21
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>76
+     <dd>77
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2110,7 +2121,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
   </div>
   <div class="p-summary" data-fill-with="abstract">
    <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
-   <p>P1144 trivial relocation is used by Abseil, AMC, BSL, Folly, HPX, Parlay, Pocketpy, Qt, Subspace, and Thrust.
+   <p>P1144-style trivial relocation is used by Abseil, AMC, BSL, Folly, HPX, Parlay, Pocketpy, Qt, Subspace, and Thrust.
 Let’s make it part of the C++ standard.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
@@ -2122,6 +2133,7 @@ Let’s make it part of the C++ standard.</p>
       <li><a href="#input-sjanel"><span class="secno">1.1</span> <span class="content">Statement from Stéphane Janel</span></a>
       <li><a href="#input-vfalco"><span class="secno">1.2</span> <span class="content">Statement from Vinnie Falco</span></a>
       <li><a href="#input-msteffens"><span class="secno">1.3</span> <span class="content">Statement from Michael Steffens</span></a>
+      <li><a href="#input-aodwyer"><span class="secno">1.4</span> <span class="content">Statement from Arthur O’Dwyer</span></a>
      </ol>
     <li><a href="#scope"><span class="secno">2</span> <span class="content">Scope and design</span></a>
     <li>
@@ -2230,7 +2242,7 @@ P1144’s attribute syntax is unobtrusive by comparison: <code class="highlight"
    <p>Therefore we submit this revision of P1144, which addresses all of these problems directly,
 as a diff against the current Working Draft. We gladly list ourselves as coauthors of this proposal,
 in the same way that five Bloomberg employees listed themselves as coauthors of <a data-link-type="biblio" href="#biblio-p2786r13" title="Trivial Relocatability For C++26">[P2786R13]</a>.
-Unlike them, we come from a variety of backgrounds and maintain a variety of libraries.</p>
+Unlike them, we come from a variety of backgrounds and maintain a variety of codebases.</p>
    <p>We beg WG21 to resolve the community’s concerns before it is too late.</p>
    <h3 class="heading settled" data-level="1.1" id="input-sjanel"><span class="secno">1.1. </span><span class="content">Statement from Stéphane Janel</span><a class="self-link" href="#input-sjanel"></a></h3>
    <p>Stéphane Janel is the maintainer of <a href="https://github.com/AmadeusITGroup/amc/">AmadeusITGroup/amc</a>, a collection
@@ -2284,6 +2296,22 @@ destruction. This use case cannot be covered at all without the opt-in.</p>
 lend a hand on the P1144 side, based on the need to have a workaround
 for IPC.</p>
    </blockquote>
+   <h3 class="heading settled" data-level="1.4" id="input-aodwyer"><span class="secno">1.4. </span><span class="content">Statement from Arthur O’Dwyer</span><a class="self-link" href="#input-aodwyer"></a></h3>
+   <p>Arthur O’Dwyer is the maintainer of <a href="https://github.com/Quuxplusone/SG14">Quuxplusone/SG14</a>,
+a library of containers and algorithms pioneered by the low-latency study group.
+He also maintains a non-public <code class="highlight"><c- n>Vector</c-></code> implementation and a public P1144+P3516-compliant <a href="https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable">fork of libc++</a>.
+He was previously the sole credited author of P1144 up to R12.</p>
+   <blockquote>
+    <p>I want to be clear: I did not <em>invent</em> trivial relocation in my P1144R0. That paper was based
+on implementations already in the wild in 2018: notably BSL, Qt, and Folly.
+Since then, more than a dozen other libraries have adopted the same semantics and most (including Qt)
+have adopted the terminology from P1144 and P3516.
+At least five library authors have written blogs or documentation about their use of "trivial relocation": <a href="https://github.com/facebook/folly/blob/main/folly/docs/FBVector.md#object-relocation">Folly</a>, <a href="https://github.com/AmadeusITGroup/amc/?tab=readme-ov-file#what-is-a-trivially-relocatable-type">AMC</a>, <a href="https://www.kdab.com/qt-and-trivial-relocation-part-5/">Qt</a>, <a href="https://orodu.net/2023/01/15/trivially-relocatable.html">Subspace</a>, <a href="https://isidorostsa.github.io/gsoc2023/">HPX</a>. Without exception,
+the people using it and writing about it follow the same path:
+the semantics recorded in (not originated by!) P1144 and P3516.</p>
+    <p>Standardizing the prevailing term of art, as documented in the five links above, would be great.
+WG21’s repurposing the prevailing term for a different meaning will lead only to confusion and safety bugs.</p>
+   </blockquote>
    <h2 class="heading settled" data-level="2" id="scope"><span class="secno">2. </span><span class="content">Scope and design</span><a class="self-link" href="#scope"></a></h2>
    <p>In this rebased proposal, we propose:</p>
    <ul>
@@ -2300,12 +2328,13 @@ Otherwise we preserve the <code class="highlight"><c- n>std</c-><c- o>::</c-><c-
 What is important is that they must be <em>trivial;</em> they must not be allowed to perform non-trivial "fixup" of the
 relocated objects (e.g. to fix up the vptrs of polymorphic objects).</p>
     <li data-md>
-     <p>Remove the terms <em>default-movable</em> and <em>eligible for trivial relocation</em> (<a href="#wording-class.prop">[class.prop]</a>).</p>
+     <p>Remove the terms <em>default-movable</em> and <em>eligible for trivial relocation</em> (<a href="#wording-class.prop">[class.prop]</a>).
+They are no longer needed.</p>
     <li data-md>
      <p>Remove the terms <em>replaceable type</em> (<a href="#wording-basic.types.general">[basic.types.general]</a>), <em>eligible for replacement</em>, and <em>replaceable class</em> (<a href="#wording-class.prop">[class.prop]</a>)
 and the <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>is_replaceable</c-></code> type-trait (<a href="#wording-meta.type.synop">[meta.type.synop]</a>)
 Nothing in <a data-link-type="biblio" href="#biblio-n5008" title="Working Draft — Programming Languages — C++">[N5008]</a> (nor <a data-link-type="biblio" href="#biblio-p3516" title="Uninitialized algorithms for relocation">[P3516]</a>) depends on these notions.
-We believe they are likely to cause confusion to end-users, particularly in their similarity to the existing
+They are likely to cause confusion to end-users, particularly in their similarity to the existing
 term of art "transparently replaceable" (<a href="https://eel.is/c++draft/basic.life#def:transparently_replaceable">[basic.life]</a>).
 We believe they <a href="https://stackoverflow.com/questions/79534079/what-is-the-purpose-semantics-of-p2786-is-replaceable">are not useful</a> to library authors.</p>
     <li data-md>

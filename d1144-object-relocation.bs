@@ -2,16 +2,26 @@
 Title: std::is_trivially_relocatable
 Shortname: D1144
 Revision: 13
-!Draft Revision: 76
+!Draft Revision: 77
 Audience: WG21
 Status: D
 Group: WG21
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+Editor: Artur Bać, artur@ebasoft.com.pl
+Editor: Daniel Liam Anderson, dlanders@andrew.cmu.edu
+Editor: Enrico Mauro, kaffedesk@gmail.com
+Editor: Jody Hagins, coachhagins@gmail.com
+Editor: Michael Steffens, michael_steffens@posteo.de
+Editor: Stéphane Janel, stephane.janel@gmail.com
+Editor: Vinnie Falco, vinnie.falco@gmail.com
+Editor: Will Wray, wjwray@gmail.com
+Editor: Walter E. Brown, webrown.cpp@gmail.com
 URL:
 Markup Shorthands: markdown yes, biblio yes, markup yes
 Abstract:
-  P1144 trivial relocation is used by Abseil, AMC, BSL, Folly, HPX, Parlay, Pocketpy, Qt, Subspace, and Thrust.
+  P1144-style trivial relocation is used by Abseil, AMC, BSL, Folly, HPX, Parlay, Pocketpy, Qt, Subspace, and Thrust.
   Let's make it part of the C++ standard.
-Date: 2025-05-12
+Date: 2025-05-13
 </pre>
 
 <style>
@@ -21,17 +31,6 @@ del  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #
 good  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
 bad  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #550000); text-decoration: underline;}
 </style>
-
-<!--
-Editor: Arthur O'Dwyer <arthur.j.odwyer@gmail.com> (maintainer of https://github.com/Quuxplusone/SG14)
-Editor: Artur Bać, <artur@ebasoft.com.pl> (maintainer of https://github.com/arturbac/small_vectors)
-Editor: Enrico Mauro <kaffedesk@gmail.com>
-Editor: Jody Hagins <coachhagins@gmail.com>
-Editor: Michael Steffens <michael_steffens@posteo.de> (maintainer of https://gitlab.com/misteffens/TrivialityInversion)
-Editor: Stéphane Janel <stephane.janel@gmail.com> (maintainer of https://github.com/AmadeusITGroup/amc)
-Editor: Will Wray <wjwray@gmail.com>
-Editor: Walter E. Brown <webrown.cpp@gmail.com>
--->
 
 # What's going on here? # {#intro}
 
@@ -88,7 +87,7 @@ In addition, the Working Draft version of P2786R13 contains several problems tha
 Therefore we submit this revision of P1144, which addresses all of these problems directly,
 as a diff against the current Working Draft. We gladly list ourselves as coauthors of this proposal,
 in the same way that five Bloomberg employees listed themselves as coauthors of [[P2786R13]].
-Unlike them, we come from a variety of backgrounds and maintain a variety of libraries.
+Unlike them, we come from a variety of backgrounds and maintain a variety of codebases.
 
 We beg WG21 to resolve the community's concerns before it is too late.
 
@@ -163,6 +162,31 @@ even though one of its data members is not.
 > for IPC.
 
 
+## Statement from Arthur O'Dwyer ## {#input-aodwyer}
+
+Arthur O'Dwyer is the maintainer of [Quuxplusone/SG14](https://github.com/Quuxplusone/SG14),
+a library of containers and algorithms pioneered by the low-latency study group.
+He also maintains a non-public `Vector` implementation and a public P1144+P3516-compliant
+[fork of libc++](https://github.com/Quuxplusone/llvm-project/tree/trivially-relocatable).
+He was previously the sole credited author of P1144 up to R12.
+
+> I want to be clear: I did not *invent* trivial relocation in my P1144R0. That paper was based
+> on implementations already in the wild in 2018: notably BSL, Qt, and Folly.
+> Since then, more than a dozen other libraries have adopted the same semantics and most (including Qt)
+> have adopted the terminology from P1144 and P3516.
+> At least five library authors have written blogs or documentation about their use of "trivial relocation":
+> [Folly](https://github.com/facebook/folly/blob/main/folly/docs/FBVector.md#object-relocation),
+> [AMC](https://github.com/AmadeusITGroup/amc/?tab=readme-ov-file#what-is-a-trivially-relocatable-type),
+> [Qt](https://www.kdab.com/qt-and-trivial-relocation-part-5/),
+> [Subspace](https://orodu.net/2023/01/15/trivially-relocatable.html),
+> [HPX](https://isidorostsa.github.io/gsoc2023/). Without exception,
+> the people using it and writing about it follow the same path:
+> the semantics recorded in (not originated by!) P1144 and P3516.
+>
+> Standardizing the prevailing term of art, as documented in the five links above, would be great.
+> WG21's repurposing the prevailing term for a different meaning will lead only to confusion and safety bugs.
+
+
 # Scope and design # {#scope}
 
 In this rebased proposal, we propose:
@@ -180,12 +204,13 @@ In this rebased proposal, we propose:
     relocated objects (e.g. to fix up the vptrs of polymorphic objects).
 
 - Remove the terms *default-movable* and *eligible for trivial relocation* (<a href="#wording-class.prop">[class.prop]</a>).
+    They are no longer needed.
 
 - Remove the terms *replaceable type* (<a href="#wording-basic.types.general">[basic.types.general]</a>),
     *eligible for replacement*, and *replaceable class* (<a href="#wording-class.prop">[class.prop]</a>)
     and the `std::is_replaceable` type-trait (<a href="#wording-meta.type.synop">[meta.type.synop]</a>)
     Nothing in [[N5008]] (nor [[P3516]]) depends on these notions.
-    We believe they are likely to cause confusion to end-users, particularly in their similarity to the existing
+    They are likely to cause confusion to end-users, particularly in their similarity to the existing
     term of art "transparently replaceable" (<a href="https://eel.is/c++draft/basic.life#def:transparently_replaceable">[basic.life]</a>).
     We believe they [are not useful](https://stackoverflow.com/questions/79534079/what-is-the-purpose-semantics-of-p2786-is-replaceable)
     to library authors.
