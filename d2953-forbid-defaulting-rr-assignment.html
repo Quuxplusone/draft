@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D2953R3: Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;</title>
+  <title>D2953R2: Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1561,7 +1561,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version 97a1608be, updated Mon Feb 3 16:09:34 2025 -0800" name="generator">
+  <meta content="Bikeshed version 9a7a6709a, updated Tue May 27 16:45:34 2025 -0700" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
   <meta content="dark light" name="color-scheme">
 <style>
@@ -2092,8 +2092,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D2953R3<br>Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2025-01-08">2025-01-08</time></span></h2>
+   <h1 class="p-name no-ref" id="title">D2953R2<br>Forbid defaulting operator=(X&amp;&amp;) &amp;&amp;</h1>
+   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2025-06-10">2025-06-10</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
@@ -2103,7 +2103,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>10
+     <dd>11
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2114,8 +2114,8 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <p>Current C++ permits explicitly-defaulted special members to differ from their
 implicitly-defaulted counterparts in various ways, including parameter type and
 ref-qualification. This permits implausible
-signatures like <code class="highlight"><c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-></code>, where the left-hand
-operand is rvalue-ref-qualified. We propose to forbid such signatures.</p>
+declarations like <code class="highlight"><c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-></code>, where the left-hand
+operand is rvalue-ref-qualified. We propose to forbid such declarations.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
    <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
@@ -2155,16 +2155,18 @@ operand is rvalue-ref-qualified. We propose to forbid such signatures.</p>
    <h2 class="heading settled" data-level="1" id="changelog"><span class="secno">1. </span><span class="content">Changelog</span><a class="self-link" href="#changelog"></a></h2>
    <ul>
     <li data-md>
-     <p>R3 (unreleased):</p>
-     <ul>
-      <li data-md>
-       <p>Add electronic poll results after the EWG telecon of 2025-01-08.</p>
-     </ul>
-    <li data-md>
-     <p>R2 (pre-Hagenberg):</p>
+     <p>R2 (pre-Sofia):</p>
      <ul>
       <li data-md>
        <p>Add poll results from the EWG telecon of 2025-01-08.</p>
+      <li data-md>
+       <p>Add electronic poll results after the EWG telecon of 2025-01-08.</p>
+      <li data-md>
+       <p>Update the vendor-divergence table: GCC has fixed <a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116162">#116162</a>.</p>
+      <li data-md>
+       <p>Replace the word "signature" with "declaration" in the motivation section. ("Signature" doesn’t include return type.)</p>
+      <li data-md>
+       <p>Add a missing clause to the "ambitious" wording. (Thanks, Jens Maurer.)</p>
      </ul>
     <li data-md>
      <p>R1:</p>
@@ -2176,25 +2178,24 @@ operand is rvalue-ref-qualified. We propose to forbid such signatures.</p>
    <h2 class="heading settled" data-level="2" id="proposal"><span class="secno">2. </span><span class="content">Motivation and proposal</span><a class="self-link" href="#proposal"></a></h2>
    <p>Currently, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a> permits an explicitly defaulted special member function to differ from the
 implicit one by adding <i>ref-qualifiers</i>, but not <i>cv-qualifiers</i>.</p>
-   <p>For example, the signature <code class="highlight"><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-><c- o>&amp;</c-> <c- o>=</c-> <c- k>default</c-></code> is forbidden
+   <p>For example, the declaration <code class="highlight"><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-><c- o>&amp;</c-> <c- o>=</c-> <c- k>default</c-></code> is forbidden
 because it is additionally const-qualified, and also because its return type differs
-from the implicitly-defaulted <code class="highlight"><c- n>A</c-><c- o>&amp;</c-></code>. This might be considered unfortunate, because that’s
+from the implicitly-defaulted <code class="highlight"><c- n>A</c-><c- o>&amp;</c-></code>. This might be considered unfortunate, because it’s
 a reasonable signature for a const-assignable proxy-reference type.
-But programmers aren’t clamoring for that signature to be supported, so we do not propose it here.</p>
-   <p>Our concern is that the <em>unrealistic</em> signature <code class="highlight"><c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-></code> is <em>permitted!</em> This has three minor drawbacks:</p>
+But programmers aren’t clamoring for that declaration to be supported, so we do not propose it here.</p>
+   <p>Our concern is that the <em>unrealistic</em> declaration <code class="highlight"><c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-></code> is <em>permitted!</em> This has three minor drawbacks:</p>
    <ul>
     <li data-md>
-     <p>The possibility of these unrealistic signatures makes C++ harder to understand.
-Before writing <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;) = default">[P2952]</a>, Arthur didn’t know such signatures were possible.</p>
+     <p>The possibility of these unrealistic declarations makes C++ harder to understand.</p>
     <li data-md>
-     <p>The wording to permit these signatures is at least a tiny bit more complicated than
+     <p>The wording to permit these declarations is at least a tiny bit more complicated than
 if they weren’t permitted.</p>
     <li data-md>
      <p>The quirky interaction with <a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> and <a data-link-type="biblio" href="#biblio-p2952" title="auto&amp; operator=(X&amp;&amp;) = default">[P2952]</a> discussed in the next subsection.</p>
    </ul>
    <p>To eliminate all three drawbacks,
-we propose that a defaulted copy/move assignment operator should not be allowed to add
-to its implicit signature an <em>rvalue</em> ref-qualifier.</p>
+we propose that an explicitly defaulted copy/move assignment operator should not be allowed to add
+an <em>rvalue</em> ref-qualifier to the type it would have had if implicitly defaulted.</p>
 <pre class="language-cpp highlight"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
     <c- c1>// C++26: Well-formed</c->
@@ -2299,13 +2300,13 @@ plus our opinion as to the conforming behavior, and our proposed behavior.</p>
       <td>✓
       <td class="newcol">✓
       <td>✓
-      <td>✗
+      <td>✓
      <tr>
       <td><a href="https://godbolt.org/z/hxc9za5KT">link</a>
       <td>
 <pre class="highlight"><c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
       <td>deleted
-      <td bgcolor="#FFCACA">✗
+      <td><a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116162">✓</a>
       <td bgcolor="#FFCACA">✗
       <td>deleted
       <td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a>
@@ -2316,7 +2317,7 @@ plus our opinion as to the conforming behavior, and our proposed behavior.</p>
       <td>
 <pre class="highlight"><c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
       <td>deleted
-      <td bgcolor="#FFCACA">✗
+      <td><a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116162">✓</a>
       <td bgcolor="#FFCACA">✗
       <td>deleted
       <td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a>
@@ -2372,10 +2373,41 @@ plus our opinion as to the conforming behavior, and our proposed behavior.</p>
       <td>deleted
       <td>deleted
       <td>deleted
-      <td bgcolor="#FFCACA">inconsistent
+      <td>deleted
       <td class="newcol"><a href="https://eel.is/c++draft/class.copy.assign#7.3">deleted</a>
       <td>deleted
       <td>deleted
+     <tr>
+      <td><a href="https://godbolt.org/z/bdf15WjYG">link</a>
+      <td>
+<pre class="highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c-> <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;</c-><c- p>);</c-> <c- p>};</c->
+<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
+  <c- n>A</c-> <c- n>a</c-><c- p>;</c->
+  <c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+<c- p>};</c-></pre>
+      <td>deleted
+      <td>deleted
+      <td bgcolor="#FFCACA">✗
+      <td>deleted
+      <td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a>
+      <td>deleted
+      <td>deleted
+     <tr>
+      <td><a href="https://godbolt.org/z/KjcxqsYPb">link</a>
+      <td>
+<pre class="highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c-> <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;</c-><c- p>);</c-> <c- p>};</c->
+<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
+  <c- n>A</c-> <c- n>a</c-><c- p>;</c->
+  <c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>);</c->
+<c- p>};</c->
+<c- n>C</c-><c- o>&amp;</c-> <c- n>C</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
+      <td>✗
+      <td>✗
+      <td>✗
+      <td>✗
+      <td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.7">✗</a>
+      <td>✗
+      <td>✗
    </table>
    <h2 class="heading settled" data-level="3" id="experience"><span class="secno">3. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
    <p>Arthur has implemented <a href="#wording">§ 5 Proposed wording (conservative)</a> in his fork of Clang, and used it to compile
@@ -2449,9 +2481,11 @@ object parameter <del>is</del> of type <del>(possibly
 different) “reference to C”</del> <ins><code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code></ins>, in which case the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> would differ from the type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> in that the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> has an additional parameter;</p> </li><li data-md><p>(2.3) <code class="highlight"><c- n>F</c-></code><sub>1</sub> and <code class="highlight"><c- n>F</c-></code><sub>2</sub> may have differing exception specifications; and</p> </li><li data-md><p>(2.4) if <code class="highlight"><c- n>F</c-></code><sub>2</sub> has a non-object parameter of type <code class="highlight"><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-></code>, the corresponding
 non-object parameter of <code class="highlight"><c- n>F</c-></code><sub>1</sub> may be of type <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code>.</p> </li></ul> <p>If the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> differs from the type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> in a way other than as allowed by the preceding rules, then: </p><ul><li data-md><p>(2.5) if <del><code class="highlight"><c- n>F</c-></code><sub>1</sub></del> <ins><code class="highlight"><c- n>F</c-></code><sub>2</sub></ins> is an assignment operator, and the return type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> differs from the return type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> or <code class="highlight"><c- n>F</c-></code><sub>1</sub>’s non-object parameter type is not a reference, the program is ill-formed;</p> </li><li data-md><p>(2.6) otherwise, if <code class="highlight"><c- n>F</c-></code><sub>1</sub> is explicitly defaulted on its first declaration, it is defined as deleted;</p> </li><li data-md><p>(2.7) otherwise, the program is ill-formed.</p> </li></ul> <p>[...] </p></small></blockquote>
    <h2 class="heading settled" data-level="6" id="wording2"><span class="secno">6. </span><span class="content">Proposed wording (ambitious)</span><a class="self-link" href="#wording2"></a></h2>
-   <p class="note" role="note"><b>DRAFTING NOTE:</b> The intent of this "ambitious" wording is to lock down the signatures
+   <p class="note" role="note"><b>DRAFTING NOTE:</b> The intent of this "ambitious" wording is to lock down the permissible types
 of defaultable member functions as much as possible, and make errors as eager
 as possible, <em>except</em> in the cases covered by <a href="#deleted-versus-ill-formed">§ 2.2 "Deleted" versus "ill-formed"</a> (which we want to keep working, i.e., "defaulted as deleted"). </p>
+   <p class="note" role="note"><b>DRAFTING NOTE:</b> The new (2.5) ensures that <code class="highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c-> <c- n>A</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;</c-><c- p>);</c-> <c- p>};</c-> <c- k>struct</c-> <c- nc>C</c-> <c- p>{</c-> <c- n>A</c-> <c- n>a</c-><c- p>;</c-> <c- n>C</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- p>};</c-></code> remains defined-as-deleted, and <code class="highlight"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c-> <c- n>A</c-><c- p>(</c-><c- n>A</c-><c- o>&amp;</c-><c- p>);</c-> <c- p>};</c-> <c- k>struct</c-> <c- nc>C</c-> <c- p>{</c-> <c- n>A</c-> <c- n>a</c-><c- p>;</c-> <c- n>C</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- p>};</c-></code> remains ill-formed (not defined-as-deleted, despite that it matches the pattern in (2.5); because
+it also differs in a second way). </p>
    <h3 class="heading settled" data-level="6.1" id="wording2-dcl.fct.def.default"><span class="secno">6.1. </span><span class="content">[dcl.fct.def.default]</span><a class="self-link" href="#wording2-dcl.fct.def.default"></a></h3>
    <p class="note" role="note"><b>DRAFTING NOTE:</b> Basically all of this wording is concerned specifically with copy/move assignment operators,
 so it might be nice to move it out of [dcl.fct.def.default] and into <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a>.
@@ -2466,7 +2500,9 @@ an assignment operator with an implicit object parameter of type <code class="hi
 object parameter <del>is</del> of type <del>(possibly
 different) “reference to C”</del> <ins><code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code></ins>, in which case the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> would differ from the type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> in that the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> has an additional parameter;</p> </li><li data-md><p>(2.3) <code class="highlight"><c- n>F</c-></code><sub>1</sub> and <code class="highlight"><c- n>F</c-></code><sub>2</sub> may have differing exception specifications; <del>and</del></p> </li><li data-md><p>(2.4) if <code class="highlight"><c- n>F</c-></code><sub>2</sub> has a non-object parameter of type <code class="highlight"><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-></code>, the corresponding
 non-object parameter of <code class="highlight"><c- n>F</c-></code><sub>1</sub> may be of type <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code><ins>; and</ins></p> </li><li data-md><ins>(2.5) if <code class="highlight"><c- n>F</c-></code><sub>2</sub> has a non-object parameter of type <code class="highlight"><c- n>C</c-><c- o>&amp;</c-></code>, the corresponding
-non-object parameter of <code class="highlight"><c- n>F</c-></code><sub>1</sub> may be of type <code class="highlight"><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-></code></ins>. </li></ul> <p>If the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> differs from the type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> in a way other than as allowed by the preceding rules, then<del>:</del> </p><ul><li data-md><del>(2.5) if <code class="highlight"><c- n>F</c-></code><sub>1</sub> is an assignment operator, and the return type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> differs from the return type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> or <code class="highlight"><c- n>F</c-></code><sub>1</sub>’s non-object parameter type is not a reference, the program is ill-formed;</del> </li><li data-md><del>(2.6) otherwise, if <code class="highlight"><c- n>F</c-></code><sub>1</sub> is explicitly
+non-object parameter of <code class="highlight"><c- n>F</c-></code><sub>1</sub> may be of type <code class="highlight"><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-></code>; in this case only,
+if <code class="highlight"><c- n>F</c-></code><sub>1</sub> is explicitly defaulted on its first declaration then it is defined as deleted;
+otherwise the program is ill-formed.</ins> </li></ul> <p>If the type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> differs from the type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> in a way other than as allowed by the preceding rules, then<del>:</del> </p><ul><li data-md><del>(2.5) if <code class="highlight"><c- n>F</c-></code><sub>1</sub> is an assignment operator, and the return type of <code class="highlight"><c- n>F</c-></code><sub>1</sub> differs from the return type of <code class="highlight"><c- n>F</c-></code><sub>2</sub> or <code class="highlight"><c- n>F</c-></code><sub>1</sub>’s non-object parameter type is not a reference, the program is ill-formed;</del> </li><li data-md><del>(2.6) otherwise, if <code class="highlight"><c- n>F</c-></code><sub>1</sub> is explicitly
 defaulted on its first declaration, it is defined as deleted;</del> </li><li data-md><del>(2.7) otherwise,</del> the program is ill-formed. </li></ul> <p>[...] </p></small></blockquote>
   </main>
 <script>

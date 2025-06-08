@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Forbid defaulting operator=(X&&) &&
 Shortname: D2953
-Revision: 3
-!Draft Revision: 10
+Revision: 2
+!Draft Revision: 11
 Audience: EWGI
 Status: D
 Group: WG21
@@ -13,9 +13,9 @@ Abstract:
   Current C++ permits explicitly-defaulted special members to differ from their
   implicitly-defaulted counterparts in various ways, including parameter type and
   ref-qualification. This permits implausible
-  signatures like `A& operator=(const A&) && = default`, where the left-hand
-  operand is rvalue-ref-qualified. We propose to forbid such signatures.
-Date: 2025-01-08
+  declarations like `A& operator=(const A&) && = default`, where the left-hand
+  operand is rvalue-ref-qualified. We propose to forbid such declarations.
+Date: 2025-06-10
 </pre>
 
 <style>
@@ -27,13 +27,13 @@ del     {background-color: #FFCACA; text-decoration: line-through;}
 
 # Changelog # {#changelog}
 
-- R3 (unreleased):
-
-    - Add electronic poll results after the EWG telecon of 2025-01-08.
-
-- R2 (pre-Hagenberg):
+- R2 (pre-Sofia):
 
     - Add poll results from the EWG telecon of 2025-01-08.
+    - Add electronic poll results after the EWG telecon of 2025-01-08.
+    - Update the vendor-divergence table: GCC has fixed [#116162](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116162).
+    - Replace the word "signature" with "declaration" in the motivation section. ("Signature" doesn't include return type.)
+    - Add a missing clause to the "ambitious" wording. (Thanks, Jens Maurer.)
 
 - R1:
 
@@ -46,26 +46,25 @@ Currently, <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.de
 permits an explicitly defaulted special member function to differ from the
 implicit one by adding <i>ref-qualifiers</i>, but not <i>cv-qualifiers</i>.
 
-For example, the signature `const A& operator=(const A&) const& = default` is forbidden
+For example, the declaration `const A& operator=(const A&) const& = default` is forbidden
 because it is additionally const-qualified, and also because its return type differs
-from the implicitly-defaulted `A&`. This might be considered unfortunate, because that's
+from the implicitly-defaulted `A&`. This might be considered unfortunate, because it's
 a reasonable signature for a const-assignable proxy-reference type.
-But programmers aren't clamoring for that signature to be supported, so we do not propose it here.
+But programmers aren't clamoring for that declaration to be supported, so we do not propose it here.
 
-Our concern is that the *unrealistic* signature `A& operator=(const A&) && = default` is
+Our concern is that the *unrealistic* declaration `A& operator=(const A&) && = default` is
 *permitted!* This has three minor drawbacks:
 
-* The possibility of these unrealistic signatures makes C++ harder to understand.
-    Before writing [[P2952]], Arthur didn't know such signatures were possible.
+* The possibility of these unrealistic declarations makes C++ harder to understand.
 
-* The wording to permit these signatures is at least a tiny bit more complicated than
+* The wording to permit these declarations is at least a tiny bit more complicated than
     if they weren't permitted.
 
 * The quirky interaction with [[CWG2586]] and [[P2952]] discussed in the next subsection.
 
 To eliminate all three drawbacks,
-we propose that a defaulted copy/move assignment operator should not be allowed to add
-to its implicit signature an *rvalue* ref-qualifier.
+we propose that an explicitly defaulted copy/move assignment operator should not be allowed to add
+an *rvalue* ref-qualifier to the type it would have had if implicitly defaulted.
 
 ```cpp
 struct C {
@@ -163,11 +162,11 @@ plus our opinion as to the conforming behavior, and our proposed behavior.
 <small><table>
 <tr><th>URL</th><th>Code</th><th>Clang</th><th>GCC</th><th>MSVC</th><th>EDG</th><th class="newcol">Correct</th><th>Proposed<br>(conservative)</th><th>Proposed<br>(ambitious)</th></tr>
 <tr><td><a href="https://godbolt.org/z/WezedYYE3">link</a></td><td><pre>C& operator=(C&) = default;</pre></td>
-    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="newcol">✓</td><td>✓</td><td>✗</td></tr>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="newcol">✓</td><td>✓</td><td>✓</td></tr>
 <tr><td><a href="https://godbolt.org/z/hxc9za5KT">link</a></td><td><pre>C& operator=(const C&&) = default;</pre></td>
-    <td>deleted</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td><td>deleted</td><td>✗</td></tr>
+    <td>deleted</td><td><a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116162">✓</a></td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td><td>deleted</td><td>✗</td></tr>
 <tr><td><a href="https://godbolt.org/z/ojM541bTM">link</a></td><td><pre>C& operator=(const C&) const = default;</pre></td>
-    <td>deleted</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td><td>deleted</td><td>✗</td></tr>
+    <td>deleted</td><td><a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116162">✓</a><td bgcolor="#FFCACA">✗</td><td>deleted</td><td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td><td>deleted</td><td>✗</td></tr>
 <tr><td><a href="https://godbolt.org/z/hchco3rcK">link</a></td><td><pre>C& operator=(const C&) && = default;</pre></td>
     <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a></td><td>deleted</td><td>✗</td></tr>
 <tr><td><a href="https://godbolt.org/z/5P6EKrGjo">link</a></td><td><pre>C&& operator=(const C&) && = default;</pre></td>
@@ -185,7 +184,20 @@ struct C {
   volatile M m;
   C& operator=(const C&) = default;
 };</pre></td>
-    <td>deleted</td><td>deleted</td><td>deleted</td><td bgcolor="#FFCACA">inconsistent</td><td class="newcol"><a href="https://eel.is/c++draft/class.copy.assign#7.3">deleted</a></td><td>deleted</td><td>deleted</td></tr>
+    <td>deleted</td><td>deleted</td><td>deleted</td><td>deleted</td><td class="newcol"><a href="https://eel.is/c++draft/class.copy.assign#7.3">deleted</a></td><td>deleted</td><td>deleted</td></tr>
+<tr><td><a href="https://godbolt.org/z/bdf15WjYG">link</a></td><td><pre>struct A { A& operator=(A&); };
+struct C {
+  A a;
+  C& operator=(const C&) = default;
+};</pre></td>
+    <td>deleted</td><td>deleted</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td><td>deleted</td><td>deleted</td></tr>
+<tr><td><a href="https://godbolt.org/z/KjcxqsYPb">link</a></td><td><pre>struct A { A& operator=(A&); };
+struct C {
+  A a;
+  C& operator=(const C&);
+};
+C& C::operator=(const C&) = default;</pre></td>
+    <td>✗</td><td>✗</td><td>✗</td><td>✗</td><td class="newcol"><a href="https://eel.is/c++draft/dcl.fct.def.default#2.7">✗</a></td><td>✗</td><td>✗</td></tr>
 </table></small>
 
 
@@ -291,10 +303,16 @@ in a way other than as allowed by the preceding rules, then:
 # Proposed wording (ambitious) # {#wording2}
 
 <p class="note"><b>DRAFTING NOTE:</b>
-The intent of this "ambitious" wording is to lock down the signatures
+The intent of this "ambitious" wording is to lock down the permissible types
 of defaultable member functions as much as possible, and make errors as eager
 as possible, *except* in the cases covered by [[#deleted-versus-ill-formed]]
 (which we want to keep working, i.e., "defaulted as deleted").
+
+<p class="note"><b>DRAFTING NOTE:</b>
+The new (2.5) ensures that `struct A { A(A&); }; struct C { A a; C(const C&) = default; };`
+remains defined-as-deleted, and `struct A { A(A&); }; struct C { A a; C&& operator=(const C&) = default; };`
+remains ill-formed (not defined-as-deleted, despite that it matches the pattern in (2.5); because
+it also differs in a second way).
 
 ## [dcl.fct.def.default] ## {#wording2-dcl.fct.def.default}
 
@@ -336,7 +354,9 @@ from the corresponding special member function <code>F</code><sub>2</sub> that w
     non-object parameter of <code>F</code><sub>1</sub> may be of type `C&`<ins>; and</ins>
 
 * <ins>(2.5) if <code>F</code><sub>2</sub> has a non-object parameter of type `C&`, the corresponding
-    non-object parameter of <code>F</code><sub>1</sub> may be of type `const C&`</ins>.
+    non-object parameter of <code>F</code><sub>1</sub> may be of type `const C&`; in this case only,
+    if <code>F</code><sub>1</sub> is explicitly defaulted on its first declaration then it is defined as deleted;
+    otherwise the program is ill-formed.</ins>
 
 <p>If the type of <code>F</code><sub>1</sub> differs from the type of <code>F</code><sub>2</sub>
 in a way other than as allowed by the preceding rules, then<del>:</del>
