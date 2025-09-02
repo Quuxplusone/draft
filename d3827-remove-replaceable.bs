@@ -1,0 +1,367 @@
+<pre class='metadata'>
+Title: Wording for US NB comment 9
+Shortname: D3827
+Revision: 0
+!Draft Revision: 1
+Audience: WG21
+Status: D
+Group: WG21
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+URL:
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  US NB comment 9 objects to the new notion of "replaceability," which is unused anywhere
+  in the Standard and whose precise semantics are unclear even to library implementors.
+Date: 2025-09-01
+</pre>
+
+<style>
+body {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
+ins  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
+del  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #440000); text-decoration: line-through;}
+good  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
+bad  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #550000); text-decoration: underline;}
+</style>
+
+# US NB comment 9 # {#comment}
+
+The new notion of "replaceable types" (6.9.1) is confusingly similar to the existing notions of
+"transparently replaceable objects" (6.8.4) and "replaceable functions", such as replaceable
+allocation functions (9.6.5) and replaceable contract-violation handlers (6.11.3).
+
+The new notion of "replaceable" is not used by any C++26 library machinery. Therefore it does
+not need to exist in C++26. The proposed change is entirely removal of various terms of art
+all of which are dangling loose ends. The removal of this type trait has no effect on the rest of C++.
+
+There are 88 instances of the string "`replaceab`" in the Committee Draft.
+Adopting the proposed change will remove 36 instances concerned with `replaceable_if_eligible`, leaving:
+
+- 13 instances concerned with "system_context_replaceability"
+- 4 concerned with "transparently replaceable"
+- 35 instances concerned with replaceable functions
+
+# Important note # {#important}
+
+We needn't touch anything not listed below.
+Literally nothing in the Standard depends on this inutile notion.
+
+# Proposed wording # {#wording}
+
+The wording in this section is relative to the Committee Draft of C++26, [[N5013]].
+
+
+## [basic.types.general] ## {#wording-basic.types.general}
+
+Modify <a href="http://eel.is/c++draft/basic.types.general">[basic.types.general]</a> as follows:
+
+<small><blockquote>
+9․ Arithmetic types ([basic.fundamental]), enumeration types, pointer types, pointer-to-member types ([basic.compound]), `std::nullptr_t`, and cv-qualified versions of these types
+are collectively called <i>scalar types</i>.
+Scalar types, trivially copyable class types ([class.prop]), arrays of such types, and cv-qualified versions of these types
+are collectively called <i>trivially copyable types</i>.
+Scalar types, trivially relocatable class types ([class.prop]), arrays of such types, and cv-qualified versions of these types
+are collectively called <i>trivially relocatable types</i>. <del>Cv-unqualified scalar types, replaceable class types ([class.prop]),
+and arrays of such types are collectively called <i>replaceable types</i>.</del> Scalar types,
+standard-layout class types ([class.prop]), arrays of such types, and cv-qualified versions of these types
+are collectively called <i>standard-layout types</i>.
+Scalar types, implicit-lifetime class types ([class.prop]), array types, and cv-qualified versions of these types
+are collectively called <i>implicit-lifetime types</i>.
+
+10․ A type is a <i>literal type</i> if it is: [...]
+</blockquote></small>
+
+
+## [class.pre] ## {#wording-class.pre}
+
+Modify <a href="http://eel.is/c++draft/class.pre">[class.pre]</a> as follows:
+
+<small><blockquote>
+<i>class-property-specifier</i>:<br>
+&emsp; <code>final</code><br>
+&emsp; <code>trivially_relocatable_if_eligible</code><br>
+&emsp; <del><code>replaceable_if_eligible</code></del>
+
+[...]
+
+<p>5․ Each <i>class-property-specifier</i> shall appear at most once within a single <i>class-property-specifier-seq</i>.
+Whenever a <i>class-key</i> is followed by a <i>class-head-name</i>, the identifier
+`final`<del>,</del> <ins>or</ins> `trivially_relocatable_if_eligible`, <del> or `replaceable_if_eligible`,</del> and
+a colon or left brace, the identifier is interpreted as a <i>class-property-specifier</i>.
+
+<p>[<i>Example</i>:<pre>
+  struct A;
+  struct A final {};      // OK, definition of struct A,
+                          // not value-initialization of variable final
+
+  struct X {
+   struct C { constexpr operator int() { return 5; } };
+   struct B trivially_relocatable_if_eligible : C{};
+                          // OK, definition of nested class B,
+                          // not declaration of a bit-field member
+                          // trivially_relocatable_if_eligible
+  };
+</pre>
+—<i>end example</i>]
+</blockquote></small>
+
+## [class.prop] ## {#wording-class.prop}
+
+Modify <a href="http://eel.is/c++draft/class.prop">[class.prop]</a> as follows:
+
+<small><blockquote>
+<p>[...]
+
+<p>4․ A class `C` is a <i>trivially relocatable class</i> if it is eligible for trivial relocation and
+- has the `trivially_relocatable_if_eligible` <i>class-property-specifier</i>,
+- is a union with no user-declared special member functions, or
+- is default-movable.
+
+<p>5․ [<i>Note:</i> A class with const-qualified or reference non-static data members can be trivially relocatable. —<i>end note</i>]
+
+<p><del>6․ A class `C` is <i>eligible for replacement</i> unless</del>
+- <del>it has a base class that is not a replaceable class,</del>
+- <del>it has a non-static data member that is not of a replaceable type,</del>
+- <del>overload resolution fails or selects a deleted constructor
+    when direct-initializing an object of type `C` from an xvalue of type `C` ([dcl.init.general]),</del>
+- <del>overload resolution fails or selects a deleted assignment operator function 
+    when assigning to an lvalue of type `C` from an xvalue of type `C` ([expr.assign], [over.assign])), or</del>
+- <del>it has a deleted destructor.</del>
+
+<p><del>7․ A class `C` is a <i>replaceable class</i> if it is eligible for replacement and</del>
+- <del>has the `replaceable_if_eligible` <i>class-property-specifier</i>,</del>
+- <del>is a union with no user-declared special member functions, or</del>
+- <del>is default-movable.</del>
+
+<p>8․ [<i>Note:</i> Accessibility of the special member functions is not considered when establishing trivial relocatability <del>or replaceability</del>. —<i>end note</i>]
+
+<p>9․ [<i>Note:</i> Not all trivially copyable classes are trivially relocatable <del>or replaceable</del>. —<i>end note</i>]
+
+<p>10․ A class `S` is a <i>standard-layout class</i> if it: [...]
+</blockquote></small>
+
+
+## [diff.cpp23.dcl.dcl] ## {#wording-diff.cpp23.dcl.dcl}
+
+Modify <a href="http://eel.is/c++draft/diff.cpp23.dcl.dcl">[diff.cpp23.dcl.dcl]</a> as follows:
+
+<small><blockquote>
+<p>1. Affected subclause: [dcl.decl.general]<br>
+Change: Introduction of `trivially_relocatable_if_eligible` <del>and `replaceable_if_eligible`</del>
+as <del>identifiers</del> <ins>an identifier</ins> with special meaning.<br>
+Rationale: Support declaration of trivially relocatable <del>and replaceable</del> types.<br>
+Effect on original feature: Valid C++ 2023 code can become ill-formed.<br>
+
+<p>[<i>Example</i>:
+<pre>
+  struct C {};
+  struct C <del>replaceable_if_eligible</del> <ins>trivially_relocatable_if_eligible</ins> {};    // was well-formed (new variable <del>replaceable_if_eligible</del> <ins>trivially_relocatable_if_eligible</ins>)
+                                          // now ill-formed (redefines C)
+</pre>
+—<i>end example</i>]
+</blockquote></small>
+
+
+## [diff.cpp23.library] ## {#wording-diff.cpp23.library}
+
+Note: This clause should point to [cpp.replace.general], not [res.on.macro.definitions];
+that is the subject of US NB comment 57.
+
+Modify <a href="http://eel.is/c++draft/diff.cpp23.library">[diff.cpp23.library]</a> as follows:
+
+<small><blockquote>
+<p>2. Affected subclause: [res.on.macro.definitions]<br>
+Change: Additional restrictions on macro names.<br>
+Rationale: Avoid hard to diagnose or non-portable constructs.<br>
+Effect on original feature: Names of special identifiers may not be used
+as macro names. Valid C++ 2023 code that defines <del>`replaceable_if_eligible` or
+`trivially_relocatable_if_eligible` as macros</del> <ins>a macro
+named `trivially_relocatable_if_eligible`</ins> is invalid in this revision of C++.
+</blockquote></small>
+
+
+## [expr.prim.lambda.closure] ## {#wording-expr.prim.lambda.closure}
+
+Modify <a href="http://eel.is/c++draft/expr.prim.lambda.closure">[expr.prim.lambda.closure]</a> as follows:
+
+<small><blockquote>
+<p>3. The closure type is not an aggregate type ([dcl.init.aggr]);
+it is a structural type ([temp.param]) if and only if the lambda has no <i>lambda-capture</i>.
+An implementation may define the closure type differently from what is described below provided this does not alter
+the observable behavior of the program other than by changing:
+- the size and/or alignment of the closure type,
+- whether the closure type is trivially copyable ([class.prop]),
+- whether the closure type is trivially relocatable ([class.prop]),
+- <del>whether the closure type is replaceable ([class.prop]),</del> or
+- whether the closure type is a standard-layout class ([class.prop]).
+
+An implementation shall not add members of rvalue reference type to the closure type.
+</blockquote></small>
+
+
+## [lex.name] ## {#wording-lex.name}
+
+Modify <a href="http://eel.is/c++draft/lex.name">[lex.name]</a> as follows:
+
+<small><blockquote>
+<p>2. The identifiers in Table 4 have a special meaning when appearing in a certain context.
+When referred to in the grammar, these identifiers are used explicitly rather than using the
+<i>identifier</i> grammar production. Unless otherwise specified, any ambiguity as to whether
+a given <i>identifier</i> has a special meaning is resolved to interpret the token as a
+regular <i>identifier</i>.
+
+<p>Table 4 — Identifiers with special meaning
+<pre>
+  final     import  post  <del>replaceable_if_eligible</del>
+  override  module  pre   trivially_relocatable_if_eligible
+</pre>
+</blockquote></small>
+
+
+## [library.class.props] ## {#wording-library.class.props}
+
+Modify <a href="https://eel.is/c++draft/library.class.props">[library.class.props]</a> as follows:
+
+<small><blockquote>
+<p>1. Unless explicitly stated otherwise, it is unspecified whether any class described in [support] through [exec] and [depr]
+is a trivially copyable class, a standard-layout class, or an implicit-lifetime class ([class.prop]).
+<p>2. Unless explicitly stated otherwise, it is unspecified whether any class for which trivial relocation
+(i.e., the effects of `trivially_relocate` ([obj.lifetime])) would be semantically equivalent to move-construction
+of the destination object followed by destruction of the source object is a trivially relocatable class ([class.prop]).
+<p><del>3. Unless explicitly stated otherwise, it is unspecified whether a class `C` is a replaceable class ([class.prop])
+if assigning an xvalue `a` of type `C` to an object `b` of type `C` is semantically equivalent to destroying `b` and then
+constructing from `a` in <code>b</code>'s place.</del>
+</blockquote></small>
+
+## [meta.reflection.traits] ## {#wording-meta.reflection.traits}
+
+Modify <a href="http://eel.is/c++draft/meta.reflection.traits">[meta.reflection.traits]</a> as follows:
+
+<small><blockquote>
+<pre>
+  [...]
+  consteval bool is_trivially_copyable_type(info type);
+  consteval bool is_trivially_relocatable_type(info type);
+  <del>consteval bool is_replaceable_type(info type);</del>
+  consteval bool is_standard_layout_type(info type);
+  [...]
+</pre>
+</blockquote></small>
+
+## [meta.syn] ## {#wording-meta.syn}
+
+Modify <a href="http://eel.is/c++draft/meta.syn">[meta.syn]</a> as follows:
+
+<small><blockquote>
+<pre>
+  [...]
+  consteval bool is_trivially_copyable_type(info type);
+  consteval bool is_trivially_relocatable_type(info type);
+  <del>consteval bool is_replaceable_type(info type);</del>
+  consteval bool is_standard_layout_type(info type);
+  [...]
+</pre>
+</blockquote></small>
+
+## [meta.type.synop] ## {#wording-meta.type.synop}
+
+Modify <a href="http://eel.is/c++draft/meta.type.synop">[meta.type.synop]</a> as follows:
+
+<small><blockquote>
+<pre>
+  [...]
+  template&lt;class T> struct is_trivially_copyable;
+  template&lt;class T> struct is_trivially_relocatable;
+  <del>template&lt;class T> struct is_replaceable;</del>
+  template&lt;class T> struct is_standard_layout;
+  [...]
+  template&lt;class T>
+    constexpr bool is_implicit_lifetime_v = is_implicit_lifetime&lt;T>::value;
+  <del>template&lt;class T></del>
+    <del>constexpr bool is_replaceable_v = is_replaceable&lt;T>::value;</del>
+  template&lt;class T>
+    constexpr bool has_virtual_destructor_v = has_virtual_destructor&lt;T>::value;
+</pre>
+</blockquote></small>
+
+
+## [meta.unary.prop] ## {#wording-meta.unary.prop}
+
+Modify Table 54 in <a href="http://eel.is/c++draft/meta.unary.prop">[meta.unary.prop]</a> as follows:
+
+<small><blockquote>
+<table>
+<tr><th>Template</th><th>Condition</th><th>Preconditions</th></tr>
+<tr>
+<td>`template<class T> struct is_trivially_copyable;`</td>
+<td>`T` is a trivially copyable type ([basic.types.general])</td>
+<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
+</tr>
+<tr>
+<td>`template<class T> struct is_trivially_relocatable;`</td>
+<td>`T` is a trivially relocatable type (<a href="#wording-basic.types.general">[basic.types.general]</a>)</td>
+<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
+</tr>
+<tr>
+<td><del>`template<class T> struct is_replaceable;`</del></td>
+<td><del>`T` is a replaceable type (<a href="#wording-basic.types.general">[basic.types.general]</a>)</del></td>
+<td><del>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</del></td>
+</tr>
+<tr>
+<td>`template<class T> struct is_standard_layout;`</td>
+<td>`T` is a standard-layout type ([basic.types.general])</td>
+<td>`remove_all_extents_t<T>` shall be a complete type or <i>cv</i> `void`.</td>
+</tr>
+</table>
+</blockquote></small>
+
+
+<pre class=biblio>
+{
+  "N5013": {
+    "title": "Committee Draft — Programming Languages — C++",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5013.pdf",
+    "date": "August 2025"
+  },
+  "P1144R13": {
+    "authors": [
+      "Arthur O'Dwyer",
+      "Artur Bać",
+      "Daniel Liam Anderson",
+      "Enrico Mauro",
+      "Jody Hagins",
+      "Michael Steffens",
+      "Stéphane Janel",
+      "Vinnie Falco",
+      "Will Wray",
+      "Walter E. Brown"
+    ],
+    "title": "std::is_trivially_relocatable",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1144r10.html",
+    "date": "May 2025"
+  },
+  "P3233": {
+    "authors": [
+      "Giuseppe D'Angelo"
+    ],
+    "title": "Issues with P2786 ('Trivial Relocatability For C++26')",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3233r0.html",
+    "date": "April 2024"
+  },
+  "P3236": {
+    "authors": [
+      "Alan de Freitas; Daniel Liam Anderson; Giuseppe D'Angelo; Hans Goudey; Jacques Lucke; Krystian Stasiowski; Stéphane Janel; Thiago Maciera"
+    ],
+    "title": "Please reject P2786 and adopt P1144",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3236r1.html",
+    "date": "May 2024"
+  },
+  "P3780": {
+    "authors": [
+      "Giuseppe D'Angelo"
+    ],
+    "title": "Detecting bitwise trivially relocatable types",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3780r0.html",
+    "date": "June 2025"
+  }
+}
+</pre>

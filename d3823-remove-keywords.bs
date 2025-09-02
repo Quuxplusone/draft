@@ -1,0 +1,266 @@
+<pre class='metadata'>
+Title: Wording for US NB comment 10
+Shortname: D3823
+Revision: 0
+!Draft Revision: 1
+Audience: WG21
+Status: D
+Group: WG21
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+URL:
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  US NB comment 10 objects to the new "identifiers with special meaning" `trivially_relocatable_if_eligible`
+  and `replaceable_if_eligible`. Compiler vendors will have to add their own keywords or
+  attributes to deal with older language versions anyway (e.g. to get the optimizations for `unique_ptr`
+  in C++20 mode); the new identifiers cause grammatical ambiguities; the new identifiers are laughably ugly;
+  the new identifiers are not even necessary unless you are writing your own resource-management type in a
+  C++26-only codebase.
+Date: 2025-09-01
+</pre>
+
+<style>
+body {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
+ins  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
+del  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #440000); text-decoration: line-through;}
+good  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
+bad  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #550000); text-decoration: underline;}
+</style>
+
+# US NB comment 10 # {#comment}
+
+The new identifiers with special meaning `trivially_relocatable_if_eligible` and `replaceable_if_eligible`
+are embarrassingly verbose. They are too long for practical use.
+
+They will not see use in industry because their semantics do not match the semantics requested
+by over a dozen industry veterans representing seven major projects
+(Amadeus, Blender, Boost, Parlay, Folly, Qt, HPX)
+across [[P3233]], [[P3236]], [[P1144R13]], [[P3780]], etc.
+
+Compiler vendors will have to add a `__keyword` or `[[attribute]]` anyway,
+to permit their library vendor to optimize types like `unique_ptr` in pre-C++26 modes.
+Library vendors cannot use the new identifiers with special meaning outside of C++26 mode.
+
+Even in C++26 mode, a compiler-specific "opt-in" (P1144-style) attribute or keyword
+may be needed in order to support constexpr `optional` and `inplace_vector`,
+for which the P2786-style warrant is insufficient.
+
+The new identifiers as such are useful only for user-defined resource-management classes,
+in C++26-only codebases. (Rule-of-Zero classes do not need them. C++23 codebases must
+use a vendor-specific mechanism such as an attribute.)
+This is a very small fraction of a small fraction: permitting this syntax gains very
+little in performance, but loses much in confusion to the industry and embarrassment
+to the Committee.
+
+For all these reasons these identifiers should be removed from C++26, and their design
+reconsidered for C++29 after there has been any implementation and usage experience.
+We can safely remove these identifiers with special meaning,
+without at all harming the library feature of "relocation" itself.
+
+# Important note # {#important}
+
+We needn't touch the library clauses; we needn't touch the traits;
+literally nothing in the Standard depends on these embarrassing and inutile keywords.
+(In fact, as US NB comment 9 points out, nothing in the Standard depends on
+the notion of "replaceability" either.)
+
+# Proposed wording # {#wording}
+
+The wording in this section is relative to the Committee Draft of C++26, [[N5013]].
+
+
+## [class.pre] ## {#wording-class.pre}
+
+Modify <a href="http://eel.is/c++draft/class.pre">[class.pre]</a> as follows:
+
+<small><blockquote>
+<i>class-property-specifier</i>:<br>
+&emsp; <code>final</code><br>
+&emsp; <del><code>trivially_relocatable_if_eligible</code></del><br>
+&emsp; <del><code>replaceable_if_eligible</code></del>
+
+[...]
+
+<p>5․ Each <i>class-property-specifier</i> shall appear at most once within a single <i>class-property-specifier-seq</i>.
+Whenever a <i>class-key</i> is followed by a <i>class-head-name</i>, the identifier
+`final`, <del>`trivially_relocatable_if_eligible`, or `replaceable_if_eligible`,</del> and a colon or left brace,
+the identifier is interpreted as a <i>class-property-specifier</i>.
+
+<p>[<i>Example</i>:<pre>
+  struct A;
+  struct A final {};      // OK, definition of struct A,
+                          // not value-initialization of variable final
+
+  struct X {
+   struct C { constexpr operator int() { return 5; } };
+   struct B <del>trivially_relocatable_if_eligible</del> <ins>final</ins> : C{};
+                          // OK, definition of nested class B,
+                          // not declaration of a bit-field member
+                          // <del>trivially_relocatable_if_eligible</del> <ins>final</ins>
+  };
+</pre>
+—<i>end example</i>]
+</blockquote></small>
+
+## [class.prop] ## {#wording-class.prop}
+
+Modify <a href="http://eel.is/c++draft/class.prop">[class.prop]</a> as follows:
+
+<small><blockquote>
+<p>1․ A <i>trivially copyable class</i> is a class:
+- that has at least one eligible copy constructor, move constructor, copy assignment operator, or move assignment operator ([special], [class.copy.ctor], [class.copy.assign]),
+- where each eligible copy constructor, move constructor, copy assignment operator, and move assignment operator is trivial, and
+- that has a trivial, non-deleted destructor ([class.dtor]).
+
+<p>2․ A class `C` is <i>default-movable</i> if
+- overload resolution for direct-initializing an object of type `C` from an xvalue of type `C` selects a constructor that is a direct member of `C`
+    and is neither user-provided nor deleted,
+- overload resolution for assigning to an lvalue of type `C` from an xvalue of type `C` selects an assignment operator function that is a direct member of `C`
+    and is neither user-provided nor deleted, and
+- `C` has a destructor that is neither user-provided nor deleted.
+
+<p>3․ A class is <i>eligible for trivial relocation</i> unless it
+- has any virtual base classes,
+- has a base class that is not a trivially relocatable class,
+- has a non-static data member of an object type that is not of a trivially relocatable type, or
+- has a deleted destructor,
+
+except that it is implementation-defined whether an otherwise-eligible union having one or more subobjects of polymorphic class type
+is eligible for trivial relocation.
+
+<p>4․ A class `C` is a <i>trivially relocatable class</i> if it is eligible for trivial relocation and
+- <del>has the `trivially_relocatable_if_eligible` <i>class-property-specifier</i>,</del>
+- is a union with no user-declared special member functions, or
+- is default-movable.
+
+<p>5․ [<i>Note:</i> A class with const-qualified or reference non-static data members can be trivially relocatable. —<i>end note</i>]
+
+<p>6․ A class `C` is <i>eligible for replacement</i> unless
+- it has a base class that is not a replaceable class,
+- it has a non-static data member that is not of a replaceable type,
+- overload resolution fails or selects a deleted constructor
+    when direct-initializing an object of type `C` from an xvalue of type `C` ([dcl.init.general]),
+- overload resolution fails or selects a deleted assignment operator function 
+    when assigning to an lvalue of type `C` from an xvalue of type `C` ([expr.assign], [over.assign])), or
+- it has a deleted destructor.
+
+<p>7․ A class `C` is a <i>replaceable class</i> if it is eligible for replacement and
+- <del>has the `replaceable_if_eligible` <i>class-property-specifier</i>,</del>
+- is a union with no user-declared special member functions, or
+- is default-movable.
+
+<p>8․ [<i>Note:</i> Accessibility of the special member functions is not considered when establishing trivial relocatability or replaceability. —<i>end note</i>]
+
+<p>9․ [<i>Note:</i> Not all trivially copyable classes are trivially relocatable or replaceable. —<i>end note</i>]
+
+<p>10․ A class `S` is a <i>standard-layout class</i> if it: [...]
+</blockquote></small>
+
+
+## [diff.cpp23.dcl.dcl] ## {#wording-diff.cpp23.dcl.dcl}
+
+Modify <a href="http://eel.is/c++draft/diff.cpp23.dcl.dcl">[diff.cpp23.dcl.dcl]</a> as follows:
+
+<small><blockquote>
+<p><del>1. Affected subclause: [dcl.decl.general]</del><br>
+<del>Change: Introduction of `trivially_relocatable_if_eligible` and `replaceable_if_eligible`
+as identifiers with special meaning.</del><br>
+<del>Rationale: Support declaration of trivially relocatable and replaceable types.</del><br>
+<del>Effect on original feature: Valid C++ 2023 code can become ill-formed.</del><br>
+
+<p><del>[<i>Example</i>:</del>
+<pre>
+  <del>struct C {};</del>
+  <del>struct C replaceable_if_eligible {};    // was well-formed (new variable replaceable_if_eligible)</del>
+                                          <del>// now ill-formed (redefines C)</del>
+</pre>
+<del>—<i>end example</i>]</del>
+</blockquote></small>
+
+
+## [diff.cpp23.library] ## {#wording-diff.cpp23.library}
+
+Note: This clause should point to [cpp.replace.general], not [res.on.macro.definitions];
+that is the subject of US NB comment 57.
+
+Modify <a href="http://eel.is/c++draft/diff.cpp23.library">[diff.cpp23.library]</a> as follows:
+
+<small><blockquote>
+<p><del>2. Affected subclause: [res.on.macro.definitions]</del><br>
+<del>Change: Additional restrictions on macro names.</del><br>
+<del>Rationale: Avoid hard to diagnose or non-portable constructs.</del><br>
+<del>Effect on original feature: Names of special identifiers may not be used
+as macro names. Valid C++ 2023 code that defines `replaceable_if_eligible` or
+`trivially_relocatable_if_eligible` as macros is invalid in this revision of C++.</del>
+</blockquote></small>
+
+
+## [lex.name] ## {#wording-lex.name}
+
+Modify <a href="http://eel.is/c++draft/lex.name">[lex.name]</a> as follows:
+
+<small><blockquote>
+<p>2. The identifiers in Table 4 have a special meaning when appearing in a certain context.
+When referred to in the grammar, these identifiers are used explicitly rather than using the
+<i>identifier</i> grammar production. Unless otherwise specified, any ambiguity as to whether
+a given <i>identifier</i> has a special meaning is resolved to interpret the token as a
+regular <i>identifier</i>.
+
+<p>Table 4 — Identifiers with special meaning
+<pre>
+  final     import  post  <del>replaceable_if_eligible</del>
+  override  module  pre   <del>trivially_relocatable_if_eligible</del>
+</pre>
+</blockquote></small>
+
+
+<pre class=biblio>
+{
+  "N5013": {
+    "title": "Committee Draft — Programming Languages — C++",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5013.pdf",
+    "date": "August 2025"
+  },
+  "P1144R13": {
+    "authors": [
+      "Arthur O'Dwyer",
+      "Artur Bać",
+      "Daniel Liam Anderson",
+      "Enrico Mauro",
+      "Jody Hagins",
+      "Michael Steffens",
+      "Stéphane Janel",
+      "Vinnie Falco",
+      "Will Wray",
+      "Walter E. Brown"
+    ],
+    "title": "std::is_trivially_relocatable",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p1144r10.html",
+    "date": "May 2025"
+  },
+  "P3233": {
+    "authors": [
+      "Giuseppe D'Angelo"
+    ],
+    "title": "Issues with P2786 ('Trivial Relocatability For C++26')",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3233r0.html",
+    "date": "April 2024"
+  },
+  "P3236": {
+    "authors": [
+      "Alan de Freitas; Daniel Liam Anderson; Giuseppe D'Angelo; Hans Goudey; Jacques Lucke; Krystian Stasiowski; Stéphane Janel; Thiago Maciera"
+    ],
+    "title": "Please reject P2786 and adopt P1144",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3236r1.html",
+    "date": "May 2024"
+  },
+  "P3780": {
+    "authors": [
+      "Giuseppe D'Angelo"
+    ],
+    "title": "Detecting bitwise trivially relocatable types",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/p3780r0.html",
+    "date": "June 2025"
+  }
+}
+</pre>

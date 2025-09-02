@@ -25,7 +25,9 @@ all: \
     d3279-trivial.html \
     d3418-inplace-vector.html \
     d3612-proxy-reference.html \
-    d3623-valarray.html
+    d3623-valarray.html \
+    d3823-remove-keywords.html \
+    d3827-remove-replaceable.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
