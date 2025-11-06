@@ -2,7 +2,7 @@
  <head>
   <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
   <meta content="width=device-width, initial-scale=1, shrink-to-fit=no" name="viewport">
-  <title>D3612R0: Harmonize proxy-reference operations (LWG 3638 and 4187)</title>
+  <title>D3612R1: Harmonize proxy-reference operations (LWG 3638 and 4187)</title>
 <style data-fill-with="stylesheet">/******************************************************************************
  *                   Style sheet for the W3C specifications                   *
  *
@@ -1561,7 +1561,7 @@ Possible extra rowspan handling
     blockquote c-[vi] { color: inherit; } /* Name.Variable.Instance */
     blockquote c-[il] { color: inherit; } /* Literal.Number.Integer.Long */
   </style>
-  <meta content="Bikeshed version 97a1608be, updated Mon Feb 3 16:09:34 2025 -0800" name="generator">
+  <meta content="Bikeshed version 1453201ca, updated Wed Nov 5 21:01:59 2025 +0000" name="generator">
   <link href="https://isocpp.org/favicon.ico" rel="icon">
   <meta content="dark light" name="color-scheme">
 <style>
@@ -1880,7 +1880,7 @@ body {
 }
 .invalid.example:not(.no-marker)::before,
 .illegal.example:not(.no-marker)::before {
-    content: "Invalid Example" counter(example);
+    content: "Invalid Example " counter(example);
 }
 
 figcaption {
@@ -2092,25 +2092,26 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
  <body class="h-entry">
   <div class="head">
    <p data-fill-with="logo"></p>
-   <h1 class="p-name no-ref" id="title">D3612R0<br>Harmonize proxy-reference operations (LWG 3638 and 4187)</h1>
-   <h2 class="no-num no-toc no-ref heading settled" id="profile-and-date"><span class="content">Draft Proposal, <time class="dt-updated" datetime="2025-02-04">2025-02-04</time></span></h2>
+   <h1 class="no-ref p-name" id="title">D3612R1<br>Harmonize proxy-reference operations (LWG 3638 and 4187)</h1>
+   <h2 class="heading no-num no-ref no-toc settled" id="profile-and-date"><span class="content">Draft Proposal,
+    <time class="dt-updated" datetime="2025-11-06">2025-11-06</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Author:
-     <dd class="editor p-author h-card vcard"><a class="p-name fn u-email email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
+     <dd class="editor h-card p-author vcard"><a class="email fn p-name u-email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
      <dt>Audience:
      <dd>LWG
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>1
+     <dd>2
     </dl>
    </div>
    <div data-fill-with="warning"></div>
    <hr title="Separator for header">
   </div>
   <div class="p-summary" data-fill-with="abstract">
-   <h2 class="no-num no-toc no-ref heading settled" id="abstract"><span class="content">Abstract</span></h2>
+   <h2 class="heading no-num no-ref no-toc settled" id="abstract"><span class="content">Abstract</span></h2>
    <p>Proposed resolutions for two interrelated LWG issues.
 LWG 3638 adds ADL swap to <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- b>bool</c-><c- o>>::</c-><c- n>reference</c-></code>.
 LWG 4187 adds const-assignability to <code class="highlight"><c- n>bitset</c-><c- o>&lt;</c-><c- n>N</c-><c- o>>::</c-><c- n>reference</c-></code>.
@@ -2118,7 +2119,7 @@ These two types' value-semantic operations should not gratuitously diverge.
 Use the same signatures and specification techniques for both.</p>
   </div>
   <nav data-fill-with="table-of-contents" id="toc">
-   <h2 class="no-num no-toc no-ref" id="contents">Table of Contents</h2>
+   <h2 class="no-num no-ref no-toc" id="contents">Table of Contents</h2>
    <ol class="toc" role="directory">
     <li><a href="#changelog"><span class="secno">1</span> <span class="content">Changelog</span></a>
     <li><a href="#background"><span class="secno">2</span> <span class="content">Background</span></a>
@@ -2142,10 +2143,12 @@ Use the same signatures and specification techniques for both.</p>
    <ul>
     <li data-md>
      <p>R0 (pre-Hagenberg 2025): Initial revision.</p>
+    <li data-md>
+     <p>R1 (during Kona 2025): Two editorial corrections. Approved by LWG for C++26.</p>
    </ul>
    <h2 class="heading settled" data-level="2" id="background"><span class="secno">2. </span><span class="content">Background</span><a class="self-link" href="#background"></a></h2>
    <p>From scratch, the simplest proxy-reference type for <code class="highlight"><c- b>bool</c-></code> would look like this:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Reference</c-> <c- p>{</c->
+<pre class="highlight language-c++"><c- k>struct</c-> <c- nc>Reference</c-> <c- p>{</c->
   <c- b>bool</c-> <c- o>*</c-><c- n>p_</c-><c- p>;</c->
   <c- n>Reference</c-><c- p>(</c-><c- b>bool</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <c- o>:</c-> <c- n>p_</c-><c- p>(</c-><c- o>&amp;</c-><c- n>r</c-><c- p>)</c-> <c- p>{}</c->
   <c- n>Reference</c-><c- p>(</c-><c- k>const</c-> <c- n>Reference</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2182,17 +2185,20 @@ which is fine. (Again, <a data-link-type="biblio" href="#biblio-p2321" title="zi
    <p><b>5.</b> We must provide ADL <code class="highlight"><c- n>swap</c-></code>. The generic <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-></code> is inappropriate for two reasons:</p>
    <ul>
     <li data-md>
-     <p>We need <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>v</c-><c- p>[</c-><c- mi>1</c-><c- p>],</c-> <c- n>v</c-><c- p>[</c-><c- mi>2</c-><c- p>])</c-></code> to work even when the expression <code class="highlight"><c- n>v</c-><c- p>[</c-><c- mi>1</c-><c- p>]</c-></code> is a prvalue <code class="highlight"><c- n>Reference</c-></code>. The generic <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-><c- p>)</c-></code> doesn’t accept prvalue arguments.</p>
+     <p>We need <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>v</c-><c- p>[</c-><c- mi>1</c-><c- p>],</c-> <c- n>v</c-><c- p>[</c-><c- mi>2</c-><c- p>])</c-></code> to work even when the expression <code class="highlight"><c- n>v</c-><c- p>[</c-><c- mi>1</c-><c- p>]</c-></code> is a prvalue <code class="highlight"><c- n>Reference</c-></code>. The generic <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>swap</c-><c- p>(</c-><c- n>T</c-><c- o>&amp;</c-><c- p>,</c-> <c- n>T</c-><c- o>&amp;</c-><c- p>)</c-></code>
+doesn’t accept prvalue arguments.</p>
     <li data-md>
      <p>The generic algorithm <code class="highlight"><c- n>Reference</c-> <c- n>t</c-> <c- o>=</c-> <c- n>r1</c-><c- p>;</c-> <c- n>r1</c-> <c- o>=</c-> <c- n>r2</c-><c- p>;</c-> <c- n>r2</c-> <c- o>=</c-> <c- n>t</c-><c- p>;</c-></code> fails to swap the values of the referents of <code class="highlight"><c- n>r1</c-></code> and <code class="highlight"><c- n>r2</c-></code>.</p>
    </ul>
    <p>If this <code class="highlight"><c- n>Reference</c-></code> is the <code class="highlight"><c- n>iter_reference_t</c-></code> of some iterator type, then that iterator type might do well also to provide an <code class="highlight"><c- n>iter_swap</c-></code>;
 but that doesn’t affect the rationale above; we must invariably provide an ADL <code class="highlight"><c- n>swap</c-></code>.</p>
    <p><b>6.</b> Consider <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>r</c-><c- p>,</c-> <c- n>b</c-><c- p>)</c-></code>, where <code class="highlight"><c- n>b</c-></code> is an lvalue of type <code class="highlight"><c- b>bool</c-></code>. If <code class="highlight"><c- b>bool</c-><c- o>&amp;</c-></code> is implicitly convertible to <code class="highlight"><c- n>Reference</c-></code>,
-this will happily use the single overload of ADL <code class="highlight"><c- n>swap</c-></code> above. But in the STL, <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- b>bool</c-><c- o>>::</c-><c- n>reference</c-></code> and <code class="highlight"><c- n>bitset</c-><c- o>&lt;</c-><c- n>N</c-><c- o>>::</c-><c- n>reference</c-></code> are not implicitly convertible from <code class="highlight"><c- b>bool</c-><c- o>&amp;</c-></code>. (This is as it should be: you shouldn’t be able to create one referring to an arbitrary <code class="highlight"><c- b>bool</c-></code> of your own.) So, in order to make <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>r</c-><c- p>,</c-> <c- n>b</c-><c- p>)</c-></code> and <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>b</c-><c- p>,</c-> <c- n>r</c-><c- p>)</c-></code> compile, we’ll need two additional overloads of <code class="highlight"><c- n>swap</c-></code>.
+this will happily use the single overload of ADL <code class="highlight"><c- n>swap</c-></code> above. But in the STL, <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- b>bool</c-><c- o>>::</c-><c- n>reference</c-></code> and <code class="highlight"><c- n>bitset</c-><c- o>&lt;</c-><c- n>N</c-><c- o>>::</c-><c- n>reference</c-></code>
+are not implicitly convertible from <code class="highlight"><c- b>bool</c-><c- o>&amp;</c-></code>. (This is as it should be: you shouldn’t be able to create one referring to an arbitrary <code class="highlight"><c- b>bool</c-></code>
+of your own.) So, in order to make <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>r</c-><c- p>,</c-> <c- n>b</c-><c- p>)</c-></code> and <code class="highlight"><c- n>swap</c-><c- p>(</c-><c- n>b</c-><c- p>,</c-> <c- n>r</c-><c- p>)</c-></code> compile, we’ll need two additional overloads of <code class="highlight"><c- n>swap</c-></code>.
 This matches the proposed resolution of <a data-link-type="biblio" href="#biblio-lwg3638" title="vector<bool>::swap(reference, reference) is useless">[LWG3638]</a>.</p>
    <p>The final product (omitting <code class="highlight"><c- k>constexpr</c-></code> and <code class="highlight"><c- k>noexcept</c-></code>) looks like this:</p>
-<pre class="language-c++ highlight"><c- k>struct</c-> <c- nc>Reference</c-> <c- p>{</c->
+<pre class="highlight language-c++"><c- k>struct</c-> <c- nc>Reference</c-> <c- p>{</c->
   <c- b>bool</c-> <c- o>*</c-><c- n>p_</c-><c- p>;</c->
   <c- n>explicit</c-> <c- nf>Reference</c-><c- p>(</c-><c- b>bool</c-><c- o>*</c-> <c- n>p</c-><c- p>)</c-> <c- o>:</c-> <c- n>p_</c-><c- p>(</c-><c- n>p</c-><c- p>)</c-> <c- p>{}</c-> <c- c1>// exposition only</c->
   <c- n>Reference</c-><c- p>(</c-><c- k>const</c-> <c- n>Reference</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2276,15 +2282,20 @@ want to introduce gratuitous differences in specification between <code class="h
 and it doesn’t seem very important whether a proxy reference’s <em>copy constructor</em> is normatively specified to be trivial —​I don’t think it’s worth the bother to specify.</p>
    <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
    <h3 class="heading settled" data-level="4.1" id="wording-template.bitset.general"><span class="secno">4.1. </span><span class="content">[template.bitset.general]</span><a class="self-link" href="#wording-template.bitset.general"></a></h3>
-   <p class="note" role="note"><b>DRAFTING NOTE:</b> This resolves <a data-link-type="biblio" href="#biblio-lwg4187" title="bitset::reference should be const-assignable">[LWG4187]</a>.
+   <p class="note" role="note"><b>DRAFTING NOTE:</b>
+This resolves <a data-link-type="biblio" href="#biblio-lwg4187" title="bitset::reference should be const-assignable">[LWG4187]</a>.
 We don’t add a const-qualified overload of <code class="highlight"><c- n>reference</c-><c- o>::</c-><c- n>flip</c-></code> because I don’t think anyone cares about <code class="highlight"><c- n>flip</c-></code>.
 We don’t rearrange the members to match [vector.bool]'s order because that
-can be done later, editorially. </p>
+can be done later, editorially.
+
+
+</p>
    <p>Modify <a href="http://eel.is/c++draft/template.bitset.general">[template.bitset.general]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c->
+    <small>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c->
   <c- k>template</c-><c- o>&lt;</c-><c- b>size_t</c-> <c- n>N</c-><c- o>></c-> <c- k>class</c-> <c- nc>bitset</c-> <c- p>{</c->
   <c- k>public</c-><c- o>:</c->
     <i><c- c1>// bit reference</c-></i>
@@ -2311,29 +2322,58 @@ can be done later, editorially. </p>
   <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- o>></c-> <c- k>struct</c-> <c- nc>hash</c-><c- p>;</c->
   <c- k>template</c-><c- o>&lt;</c-><c- b>size_t</c-> <c- n>N</c-><c- o>></c-> <c- k>struct</c-> <c- nc>hash</c-><c- o>&lt;</c-><c- n>bitset</c-><c- o>&lt;</c-><c- n>N</c-><c- o>>></c-><c- p>;</c->
 <c- p>}</c->
-</pre><p>1․ The class template <code class="highlight"><c- n>bitset</c-><c- o>&lt;</c-><c- n>N</c-><c- o>></c-></code> describes an object that can store a sequence consisting of a fixed number of bits, <code class="highlight"><c- n>N</c-></code>. </p><p>2․ Each bit represents either the value zero (reset) or one (set). To <em>toggle</em> a bit is to change the value zero to one, or the value one to zero.
+</pre><p>1․ The class template <code class="highlight"><c- n>bitset</c-><c- o>&lt;</c-><c- n>N</c-><c- o>></c-></code> describes an object that can store a sequence consisting of a fixed number of bits, <code class="highlight"><c- n>N</c-></code>.
+
+</p><p>2․ Each bit represents either the value zero (reset) or one (set). To <em>toggle</em> a bit is to change the value zero to one, or the value one to zero.
 Each bit has a non-negative position <code class="highlight"><c- n>pos</c-></code>. When converting between an object of <del>class</del> <ins>type</ins> <code class="highlight"><c- n>bitset</c-><c- o>&lt;</c-><c- n>N</c-><c- o>></c-></code> and a value of some integral type,
-bit position <code class="highlight"><c- n>pos</c-></code> corresponds to the <em>bit value</em> <code class="highlight"><c- mi>1</c-> <c- o>&lt;&lt;</c-> <c- n>pos</c-></code>. The integral value corresponding to two or more bits is the sum of their bit values. </p><p><ins>x․ <code class="highlight"><c- n>reference</c-></code> is a class that simulates a reference to a single bit in the sequence.</ins> </p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>::</c-><c- n>reference</c-><c- p>(</c-><c- k>const</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> Initializes <code class="highlight"><c- o>*</c-><c- k>this</c-></code> to refer to the same bit as <code class="highlight"><c- n>x</c-></code>.</ins> </p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>::~</c-><c- n>reference</c-><c- p>();</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> None.</ins> </p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>reference</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- b>bool</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+bit position <code class="highlight"><c- n>pos</c-></code> corresponds to the <em>bit value</em> <code class="highlight"><c- mi>1</c-> <c- o>&lt;&lt;</c-> <c- n>pos</c-></code>. The integral value corresponding to two or more bits is the sum of their bit values.
+
+</p><p><ins>x․ <code class="highlight"><c- n>reference</c-></code> is a class that simulates a reference to a single bit in the sequence.</ins>
+
+</p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>::</c-><c- n>reference</c-><c- p>(</c-><c- k>const</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> Initializes <code class="highlight"><c- o>*</c-><c- k>this</c-></code> to refer to the same bit as <code class="highlight"><c- n>x</c-></code>.</ins>
+
+</p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>::~</c-><c- n>reference</c-><c- p>();</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> None.</ins>
+
+</p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>reference</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- b>bool</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
   <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>reference</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
   <ins><c- k>constexpr</c-> <c- k>const</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>reference</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- b>bool</c-> <c- n>x</c-><c- p>)</c-> <c- k>const</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> Sets the bit referred to by <code class="highlight"><c- o>*</c-><c- k>this</c-></code> if <code class="highlight"><c- b>bool</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> is <code class="highlight">true</code>, and clears it otherwise.</ins> </p><p><ins>x․ <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</ins> </p><p></p><pre class="highlight"> <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> Sets the bit referred to by <code class="highlight"><c- o>*</c-><c- k>this</c-></code> if <code class="highlight"><c- b>bool</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> is <code class="highlight">true</code>, and clears it otherwise.</ins>
+</p><p><ins>x․ <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</ins>
+
+</p><p></p><pre class="highlight"> <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
  <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- b>bool</c-><c- o>&amp;</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
  <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- b>bool</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> Exchanges the values denoted by <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> as if by:</ins> </p><pre class="highlight"><ins><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>x</c-><c- p>;</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> Exchanges the values denoted by <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> as if by:</ins>
+</p><pre class="highlight"><ins><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>x</c-><c- p>;</c-></ins>
 <ins><c- n>x</c-> <c- o>=</c-> <c- n>y</c-><c- p>;</c-></ins>
 <ins><c- n>y</c-> <c- o>=</c-> <c- n>b</c-><c- p>;</c-></ins>
-</pre> <p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- nf>reference::flip</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-> <c- o>=</c-> <c- o>!*</c-><c- k>this</c-><c- p>;</c-></code></ins> </p><p>3․ The functions described in [template.bitset] can report three kinds of errors, each associated with a distinct exception [...] </p></small>
+</pre>
+<p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- nf>reference::flip</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> Equivalent to <code class="highlight"><c- o>*</c-><c- k>this</c-> <c- o>=</c-> <c- o>!*</c-><c- k>this</c-></code>.</ins>
+</p><p><ins>x․ <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</ins>
+
+</p><p>3․ The functions described in [template.bitset] can report three kinds of errors, each associated with a distinct exception [...]
+
+</p></small>
    </blockquote>
    <h3 class="heading settled" data-level="4.2" id="wording-vector.bool"><span class="secno">4.2. </span><span class="content">[vector.bool]</span><a class="self-link" href="#wording-vector.bool"></a></h3>
-   <p class="note" role="note"><b>DRAFTING NOTE:</b> This resolves <a data-link-type="biblio" href="#biblio-lwg3638" title="vector<bool>::swap(reference, reference) is useless">[LWG3638]</a>. </p>
+   <p class="note" role="note"><b>DRAFTING NOTE:</b>
+This resolves <a data-link-type="biblio" href="#biblio-lwg3638" title="vector<bool>::swap(reference, reference) is useless">[LWG3638]</a>.
+
+</p>
    <p>Modify <a href="http://eel.is/c++draft/vector.bool">[vector.bool]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c->
+    <small>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c->
   <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c->
   <c- k>class</c-> <c- nc>vector</c-><c- o>&lt;</c-><c- b>bool</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>></c-> <c- p>{</c->
   <c- k>public</c-><c- o>:</c->
@@ -2375,25 +2415,50 @@ bit position <code class="highlight"><c- n>pos</c-></code> corresponds to the <e
     <c- k>constexpr</c-> <c- b>void</c-> <c- nf>clear</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c->
   <c- p>};</c->
 <c- p>}</c->
-</pre><p>[...] </p><p>4․ <code class="highlight"><c- n>reference</c-></code> is a class that simulates <ins>a reference to a single bit in the sequence.</ins> <del>the
+</pre><p>[...]
+
+</p><p>4․ <code class="highlight"><c- n>reference</c-></code> is a class that simulates <ins>a reference to a single bit in the sequence.</ins> <del>the
 behavior of references of a single bit in <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- b>bool</c-><c- o>></c-></code>.
 The conversion function returns <code class="highlight">true</code> when the bit is set, and <code class="highlight">false</code> otherwise.
-The assignment operators set the bit when the argument is (convertible to) <code class="highlight">true</code> and clear it otherwise. <code class="highlight"><c- n>flip</c-></code> reverses the state of the bit.</del> </p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>::</c-><c- n>reference</c-><c- p>(</c-><c- k>const</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> Initializes <code class="highlight"><c- o>*</c-><c- k>this</c-></code> to refer to the same bit as <code class="highlight"><c- n>x</c-></code>.</ins> </p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>::~</c-><c- n>reference</c-><c- p>();</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> None.</ins> </p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>reference</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- b>bool</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+The assignment operators set the bit when the argument is (convertible to) <code class="highlight">true</code> and clear it otherwise.
+<code class="highlight"><c- n>flip</c-></code> reverses the state of the bit.</del>
+
+</p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>::</c-><c- n>reference</c-><c- p>(</c-><c- k>const</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> Initializes <code class="highlight"><c- o>*</c-><c- k>this</c-></code> to refer to the same bit as <code class="highlight"><c- n>x</c-></code>.</ins>
+
+</p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>::~</c-><c- n>reference</c-><c- p>();</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> None.</ins>
+
+</p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>reference</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- b>bool</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
   <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>reference</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
   <ins><c- k>constexpr</c-> <c- k>const</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- n>reference</c-><c- o>::</c-><c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- b>bool</c-> <c- n>x</c-><c- p>)</c-> <c- k>const</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> Sets the bit referred to by <code class="highlight"><c- o>*</c-><c- k>this</c-></code> when <code class="highlight"><c- b>bool</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> is <code class="highlight">true</code>, and clears it otherwise.</ins> </p><p><ins>x․ <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</ins> </p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>reference::flip</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-> <c- o>=</c-> <c- o>!*</c-><c- k>this</c-><c- p>;</c-></code></ins> </p><p></p><pre class="highlight"> <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> Sets the bit referred to by <code class="highlight"><c- o>*</c-><c- k>this</c-></code> when <code class="highlight"><c- b>bool</c-><c- p>(</c-><c- n>x</c-><c- p>)</c-></code> is <code class="highlight">true</code>, and clears it otherwise.</ins>
+</p><p><ins>x․ <em>Returns:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</ins>
+
+</p><p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>reference::flip</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> Equivalent to <code class="highlight"><c- o>*</c-><c- k>this</c-> <c- o>=</c-> <c- o>!*</c-><c- k>this</c-></code>.</ins>
+
+</p><p></p><pre class="highlight"> <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
  <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- b>bool</c-><c- o>&amp;</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
  <ins><c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- b>bool</c-><c- o>&amp;</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> Exchanges the values denoted by <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> as if by:</ins> </p><pre class="highlight"><ins><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>x</c-><c- p>;</c-></ins>
+</pre>
+<p><ins>x․ <em>Effects:</em> Exchanges the values denoted by <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> as if by:</ins>
+</p><pre class="highlight"><ins><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>x</c-><c- p>;</c-></ins>
 <ins><c- n>x</c-> <c- o>=</c-> <c- n>y</c-><c- p>;</c-></ins>
 <ins><c- n>y</c-> <c- o>=</c-> <c- n>b</c-><c- p>;</c-></ins>
-</pre> <p></p><pre class="highlight">  <ins><c- k>constexpr</c-> <c- n>reference</c-><c- o>&amp;</c-> <c- nf>reference::flip</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <p><ins>x․ <em>Effects:</em> <code class="highlight"><c- o>*</c-><c- k>this</c-> <c- o>=</c-> <c- o>!*</c-><c- k>this</c-><c- p>;</c-></code></ins> </p><p></p><pre class="highlight">  <c- k>constexpr</c-> <c- b>void</c-> <c- nf>flip</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c->
-</pre> <p>5․ <em>Effects:</em> Replaces each element in the container with its complement. </p><p></p><pre class="highlight">  <del><c- k>static</c-> <c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
-</pre> <p><del>6․ <em>Effects:</em> Exchanges the contents of <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> as if by:</del> </p><pre class="highlight"><del><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>x</c-><c- p>;</c-></del>
+</pre>
+<p></p><pre class="highlight">  <c- k>constexpr</c-> <c- b>void</c-> <c- nf>flip</c-><c- p>()</c-> <c- k>noexcept</c-><c- p>;</c->
+</pre>
+<p>5․ <em>Effects:</em> Replaces each element in the container with its complement.
+
+</p><p></p><pre class="highlight">  <del><c- k>static</c-> <c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></del>
+</pre>
+<p><del>6․ <em>Effects:</em> Exchanges the contents of <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> as if by:</del>
+</p><pre class="highlight"><del><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>x</c-><c- p>;</c-></del>
 <del><c- n>x</c-> <c- o>=</c-> <c- n>y</c-><c- p>;</c-></del>
 <del><c- n>y</c-> <c- o>=</c-> <c- n>b</c-><c- p>;</c-></del>
 </pre></small>
@@ -2403,14 +2468,21 @@ The assignment operators set the bit when the argument is (convertible to) <code
    <p><small></small></p>
    <blockquote>
     <p></p>
-    <small> <p><ins><b>D.? Deprecated <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- b>bool</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>></c-></code> swap [depr.vector.bool.swap]</b></ins> </p><p><ins>x․ The following member is declared in addition to those members specified in <a href="#wording-vector.bool">[vector.bool]</a>:</ins> </p><pre class="highlight"><ins><c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c-></ins>
+    <small>
+<p><ins><b>D.? Deprecated <code class="highlight"><c- n>vector</c-><c- o>&lt;</c-><c- b>bool</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>></c-></code> swap [depr.vector.bool.swap]</b></ins>
+
+</p><p><ins>x․ The following member is declared in addition to those members specified in <a href="#wording-vector.bool">[vector.bool]</a>:</ins>
+</p><pre class="highlight"><ins><c- k>namespace</c-> <c- nn>std</c-> <c- p>{</c-></ins>
   <ins><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Allocator</c-><c- o>></c-> <c- k>class</c-> <c- nc>vector</c-><c- o>&lt;</c-><c- b>bool</c-><c- p>,</c-> <c- n>Allocator</c-><c- o>></c-> <c- p>{</c-></ins>
   <ins><c- k>public</c-><c- o>:</c-></ins>
     <ins><c- k>static</c-> <c- k>constexpr</c-> <c- b>void</c-> <c- n>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
   <ins><c- p>};</c-></ins>
 <ins><c- p>}</c-></ins>
-</pre> <p></p><pre class="highlight">  <ins><c- k>static</c-> <c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
-</pre> <ins>x․ <em>Effects:</em> Exchanges the values denoted by <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> as if by:</ins> <pre class="highlight"><ins><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>x</c-><c- p>;</c-></ins>
+</pre>
+<p></p><pre class="highlight">  <ins><c- k>static</c-> <c- k>constexpr</c-> <c- b>void</c-> <c- nf>swap</c-><c- p>(</c-><c- n>reference</c-> <c- n>x</c-><c- p>,</c-> <c- n>reference</c-> <c- n>y</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>;</c-></ins>
+</pre>
+<ins>x․ <em>Effects:</em> Exchanges the values denoted by <code class="highlight"><c- n>x</c-></code> and <code class="highlight"><c- n>y</c-></code> as if by:</ins>
+<pre class="highlight"><ins><c- b>bool</c-> <c- n>b</c-> <c- o>=</c-> <c- n>x</c-><c- p>;</c-></ins>
 <ins><c- n>x</c-> <c- o>=</c-> <c- n>y</c-><c- p>;</c-></ins>
 <ins><c- n>y</c-> <c- o>=</c-> <c- n>b</c-><c- p>;</c-></ins>
 </pre></small>
@@ -2545,8 +2617,8 @@ The assignment operators set the bit when the argument is (convertible to) <code
 
 })();
 </script>
-  <h2 class="no-num no-ref heading settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
-  <h3 class="no-num no-ref heading settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
+  <h2 class="heading no-num no-ref settled" id="references"><span class="content">References</span><a class="self-link" href="#references"></a></h2>
+  <h3 class="heading no-num no-ref settled" id="informative"><span class="content">Informative References</span><a class="self-link" href="#informative"></a></h3>
   <dl>
    <dt id="biblio-lwg3638">[LWG3638]
    <dd>Jonathan Wakely. <a href="https://cplusplus.github.io/LWG/issue3638"><cite>vector&lt;bool>::swap(reference, reference) is useless</cite></a>. November 2021. URL: <a href="https://cplusplus.github.io/LWG/issue3638">https://cplusplus.github.io/LWG/issue3638</a>
