@@ -1570,6 +1570,10 @@ ins  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #
 del  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #440000); text-decoration: line-through;}
 good  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
 bad  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #550000); text-decoration: underline;}
+table.comparison-table td { padding: 0.5em 1em; text-align: left; }
+table.comparison-table th { padding: 1em 1em; text-align: left; }
+div.smaller { font-size: 80%; }
+div.smaller h3 { margin-top: 1rem; }
 </style>
 <style>/* Boilerplate: style-autolinks */
 .css.css, .property.property, .descriptor.descriptor {
@@ -2098,14 +2102,15 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
     <time class="dt-updated" datetime="2025-12-09">2025-12-09</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
-     <dt class="editor">Author:
+     <dt class="editor">Authors:
      <dd class="editor h-card p-author vcard"><a class="email fn p-name u-email" href="mailto:arthur.j.odwyer@gmail.com">Arthur O'Dwyer</a>
+     <dd class="editor h-card p-author vcard"><a class="email fn p-name u-email" href="mailto:shyeyian@gmail.com">Yi'an Ye</a>
      <dt>Audience:
      <dd>WG21
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>1
+     <dd>2
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2126,39 +2131,40 @@ C++26 is released.</p>
     <li>
      <a href="#blog-post"><span class="secno">2</span> <span class="content">Two kinds of tag types</span></a>
      <ol class="toc">
-      <li><a href="#disambiguation-tag-types"><span class="secno">2.1</span> <span class="content">Disambiguation tag types</span></a>
-      <li><a href="#concept-tag-types"><span class="secno">2.2</span> <span class="content">Concept tag types</span></a>
-      <li><a href="#differences-between-the-two-kinds"><span class="secno">2.3</span> <span class="content">Differences between the two kinds</span></a>
-      <li><a href="#wrong-naming-in-execution"><span class="secno">2.4</span> <span class="content">Wrong-naming in <code class="highlight"><c- o>&lt;</c-><c- n>execution</c-><c- o>></c-></code></span></a>
+      <li><a href="#disambiguation-tags"><span class="secno">2.1</span> <span class="content">Disambiguation tag types</span></a>
+      <li><a href="#concept-tags"><span class="secno">2.2</span> <span class="content">Concept tag types</span></a>
+      <li><a href="#difference-table"><span class="secno">2.3</span> <span class="content">Differences between the two kinds</span></a>
+      <li><a href="#wrong-naming"><span class="secno">2.4</span> <span class="content">Wrong-naming in <code class="highlight"><c- o>&lt;</c-><c- n>execution</c-><c- o>></c-></code></span></a>
      </ol>
+    <li><a href="#additional-motivation"><span class="secno">3</span> <span class="content">Additional motivation</span></a>
     <li>
-     <a href="#wording"><span class="secno">3</span> <span class="content">Proposed wording</span></a>
+     <a href="#wording"><span class="secno">4</span> <span class="content">Proposed wording</span></a>
      <ol class="toc">
-      <li><a href="#wording-execution.syn"><span class="secno">3.1</span> <span class="content">[execution.syn]</span></a>
-      <li><a href="#wording-exec.sched"><span class="secno">3.2</span> <span class="content">[exec.sched]</span></a>
-      <li><a href="#wording-exec.recv.concepts"><span class="secno">3.3</span> <span class="content">[exec.recv.concepts]</span></a>
-      <li><a href="#wording-exec.opstate.general"><span class="secno">3.4</span> <span class="content">[exec.opstate.general]</span></a>
-      <li><a href="#wording-exec.snd.expos"><span class="secno">3.5</span> <span class="content">[exec.snd.expos]</span></a>
-      <li><a href="#wording-exec.snd.concepts"><span class="secno">3.6</span> <span class="content">[exec.snd.concepts]</span></a>
-      <li><a href="#wording-exec.connect"><span class="secno">3.7</span> <span class="content">[exec.connect]</span></a>
-      <li><a href="#wording-exec.schedule.from"><span class="secno">3.8</span> <span class="content">[exec.schedule.from]</span></a>
-      <li><a href="#wording-exec.let"><span class="secno">3.9</span> <span class="content">[exec.let]</span></a>
-      <li><a href="#wording-exec.spawn.future"><span class="secno">3.10</span> <span class="content">[exec.spawn.future]</span></a>
-      <li><a href="#wording-exec.sync.wait"><span class="secno">3.11</span> <span class="content">[exec.sync.wait]</span></a>
-      <li><a href="#wording-exec.spawn"><span class="secno">3.12</span> <span class="content">[exec.spawn]</span></a>
-      <li><a href="#wording-exec.cmplsig"><span class="secno">3.13</span> <span class="content">[exec.cmplsig]</span></a>
-      <li><a href="#wording-exec.as.awaitable"><span class="secno">3.14</span> <span class="content">[exec.as.awaitable]</span></a>
-      <li><a href="#wording-exec.inline.scheduler"><span class="secno">3.15</span> <span class="content">[exec.inline.scheduler]</span></a>
-      <li><a href="#wording-exec.task.scheduler"><span class="secno">3.16</span> <span class="content">[exec.task.scheduler]</span></a>
-      <li><a href="#wording-task.class"><span class="secno">3.17</span> <span class="content">[task.class]</span></a>
-      <li><a href="#wording-task.state"><span class="secno">3.18</span> <span class="content">[task.state]</span></a>
-      <li><a href="#wording-exec.counting.scopes.general"><span class="secno">3.19</span> <span class="content">[exec.counting.scopes.general]</span></a>
+      <li><a href="#wording-execution.syn"><span class="secno">4.1</span> <span class="content">[execution.syn]</span></a>
+      <li><a href="#wording-exec.sched"><span class="secno">4.2</span> <span class="content">[exec.sched]</span></a>
+      <li><a href="#wording-exec.recv.concepts"><span class="secno">4.3</span> <span class="content">[exec.recv.concepts]</span></a>
+      <li><a href="#wording-exec.opstate.general"><span class="secno">4.4</span> <span class="content">[exec.opstate.general]</span></a>
+      <li><a href="#wording-exec.snd.expos"><span class="secno">4.5</span> <span class="content">[exec.snd.expos]</span></a>
+      <li><a href="#wording-exec.snd.concepts"><span class="secno">4.6</span> <span class="content">[exec.snd.concepts]</span></a>
+      <li><a href="#wording-exec.connect"><span class="secno">4.7</span> <span class="content">[exec.connect]</span></a>
+      <li><a href="#wording-exec.schedule.from"><span class="secno">4.8</span> <span class="content">[exec.schedule.from]</span></a>
+      <li><a href="#wording-exec.let"><span class="secno">4.9</span> <span class="content">[exec.let]</span></a>
+      <li><a href="#wording-exec.spawn.future"><span class="secno">4.10</span> <span class="content">[exec.spawn.future]</span></a>
+      <li><a href="#wording-exec.sync.wait"><span class="secno">4.11</span> <span class="content">[exec.sync.wait]</span></a>
+      <li><a href="#wording-exec.spawn"><span class="secno">4.12</span> <span class="content">[exec.spawn]</span></a>
+      <li><a href="#wording-exec.cmplsig"><span class="secno">4.13</span> <span class="content">[exec.cmplsig]</span></a>
+      <li><a href="#wording-exec.as.awaitable"><span class="secno">4.14</span> <span class="content">[exec.as.awaitable]</span></a>
+      <li><a href="#wording-exec.inline.scheduler"><span class="secno">4.15</span> <span class="content">[exec.inline.scheduler]</span></a>
+      <li><a href="#wording-exec.task.scheduler"><span class="secno">4.16</span> <span class="content">[exec.task.scheduler]</span></a>
+      <li><a href="#wording-task.class"><span class="secno">4.17</span> <span class="content">[task.class]</span></a>
+      <li><a href="#wording-task.state"><span class="secno">4.18</span> <span class="content">[task.state]</span></a>
+      <li><a href="#wording-exec.counting.scopes.general"><span class="secno">4.19</span> <span class="content">[exec.counting.scopes.general]</span></a>
      </ol>
    </ol>
   </nav>
   <main>
    <h2 class="heading settled" data-level="1" id="introduction"><span class="secno">1. </span><span class="content">Introduction</span><a class="self-link" href="#introduction"></a></h2>
-   <p>This paper is condensed from the blog post <a href="https://quuxplusone.github.io/blog/2025/12/03/tag-types/">"Two kinds of tag types: <code class="highlight"><c- n>foo_t</c-></code> and <code class="highlight"><c- n>foo_tag</c-></code>"</a>
+   <p>This paper is condensed from Arthur O’Dwyer’s blog post <a href="https://quuxplusone.github.io/blog/2025/12/03/tag-types/">"Two kinds of tag types: <code class="highlight"><c- n>foo_t</c-></code> and <code class="highlight"><c- n>foo_tag</c-></code>"</a>
 (2025-12-03). However, the impetus for that blog post and for this proposal itself was identified
 by Yi’an Ye in the std-proposals thread <a href="https://lists.isocpp.org/std-proposals/2025/11/15884.php">"[execution] sender_t or sender_tag?"</a> (2025-11-10).</p>
    <h2 class="heading settled" data-level="2" id="blog-post"><span class="secno">2. </span><span class="content">Two kinds of tag types</span><a class="self-link" href="#blog-post"></a></h2>
@@ -2168,7 +2174,7 @@ there are at least two major disjoint use-cases for tag types, and the STL (as o
 therefore uses two distinct naming conventions for their identifiers.</p>
    <p>There is no widely recognized nomenclature for these two kinds of tag types, as far as I know,
 so I’m going to call them <em>disambiguation</em> tags and <em>concept</em> tags.</p>
-   <h3 class="heading settled" data-level="2.1" id="disambiguation-tag-types"><span class="secno">2.1. </span><span class="content">Disambiguation tag types</span><a class="self-link" href="#disambiguation-tag-types"></a></h3>
+   <h3 class="heading settled" data-level="2.1" id="disambiguation-tags"><span class="secno">2.1. </span><span class="content">Disambiguation tag types</span><a class="self-link" href="#disambiguation-tags"></a></h3>
    <p>A disambiguation tag type looks like this:</p>
 <pre class="highlight language-c++"><c- k>struct</c-> <c- nc>foo_t</c-> <c- p>{};</c-> <c- c1>// maybe with an explicit ctor</c->
 <c- kr>inline</c-> <c- n>constexpr</c-> <c- n>foo_t</c-> <c- n>foo</c-> <c- o>=</c-> <c- n>foo_t</c-><c- p>();</c->
@@ -2203,7 +2209,7 @@ function, except that we can’t, because the function is a constructor. Example
 <a href="https://en.cppreference.com/w/cpp/memory/new/nothrow"><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>nothrow_t</c-></code></a> is passed to <code class="highlight"><c- k>operator</c-> <c- k>new</c-></code>.
 <a href="https://en.cppreference.com/w/cpp/memory/new/destroying_delete_t"><code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>destroying_delete_t</c-></code></a>
 is passed to <code class="highlight"><c- k>operator</c-> <c- k>delete</c-></code>.</p>
-   <h3 class="heading settled" data-level="2.2" id="concept-tag-types"><span class="secno">2.2. </span><span class="content">Concept tag types</span><a class="self-link" href="#concept-tag-types"></a></h3>
+   <h3 class="heading settled" data-level="2.2" id="concept-tags"><span class="secno">2.2. </span><span class="content">Concept tag types</span><a class="self-link" href="#concept-tags"></a></h3>
    <p>A concept tag type looks like this instead:</p>
 <pre class="highlight language-c++"><c- k>struct</c-> <c- nc>foo_tag</c-> <c- p>{};</c->
 
@@ -2227,16 +2233,15 @@ So the template will dispatch on a member typedef with a name conventionally end
    <p>You can combine this pattern with inheritance, to build a class hierarchy
 of concept tags corresponding to your concept hierarchy of concepts. Then my user-supplied
 class <code class="highlight"><c- n>U</c-></code> should (or is assumed to) model your <code class="highlight"><c- k>concept</c-> <c- nc>foo</c-></code> exactly when <code class="highlight"><c- n>U</c-><c- o>::</c-><c- n>your_category</c-></code>
-is — <em>or is derived from</em> — <code class="highlight"><c- n>foo_tag</c-></code>. The STL does it:</p>
+is — <em>or is derived from</em> — <code class="highlight"><c- n>foo_tag</c-></code>. <a href="https://eel.is/c++draft/iterator.concept.forward">The STL does it</a>:</p>
 <pre class="highlight language-c++"><c- k>struct</c-> <c- nc>forward_iterator_tag</c-> <c- o>:</c-> <c- n>input_iterator_tag</c-> <c- p>{};</c->
 
-<c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>T</c-><c- o>></c->
-<c- n>concept</c-> <c- n>forward_iterator</c-> <c- o>=</c-> <c- n>input_iterator</c-><c- o>&lt;</c-><c- n>T</c-><c- o>></c-> <c- o>&amp;&amp;</c-> <c- o>~~~~</c-><c- p>;</c->
+<c- n>template</c-><c- o>&lt;</c-><c- n>class</c-> <c- n>I</c-><c- o>></c->
+<c- n>concept</c-> <c- n>forward_iterator</c-> <c- o>=</c->
+  <c- n>input_iterator</c-><c- o>&lt;</c-><c- n>I</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+  <c- n>derived_from</c-><c- o>&lt;</c-><c- n>ITER_CONCEPT</c-><c- p>(</c-><c- n>I</c-><c- p>),</c-> <c- n>forward_iterator_tag</c-><c- o>></c-> <c- o>&amp;&amp;</c->
+  <c- o>~~~~</c-><c- p>;</c->
 </pre>
-   <p>Of course the STL’s iterator machinery long predates concepts, and when Concepts arrived
-in C++20 there was some retrofitting involved; so in fact the STL has member typedefs named
-both <code class="highlight"><c- n>U</c-><c- o>::</c-><c- n>iterator_category</c-></code> and <code class="highlight"><c- n>U</c-><c- o>::</c-><c- n>iterator_concept</c-></code>, and (since C++20) ordinary users
-never need to supply either of them.</p>
    <p>In this pattern the tag’s name (sans <code class="highlight"><c- n>_tag</c-></code>) always denotes a concept — a category of behaviors
 that the user-supplied type has — and the member typedef name always ends in <code class="highlight"><c- n>_category</c-></code>
 or <code class="highlight"><c- n>_concept</c-></code>. The C++23 STL has only one family of examples:</p>
@@ -2261,19 +2266,41 @@ or <code class="highlight"><c- n>_concept</c-></code>. The C++23 STL has only on
     <li data-md>
      <p><code class="highlight"><c- n>storage_category</c-></code> (<code class="highlight"><c- n>dense_tag</c-></code>, <code class="highlight"><c- n>packed_tag</c-></code>, <code class="highlight"><c- n>sparse_tag</c-></code>, etc.) in Boost.uBlas</p>
    </ul>
-   <h3 class="heading settled" data-level="2.3" id="differences-between-the-two-kinds"><span class="secno">2.3. </span><span class="content">Differences between the two kinds</span><a class="self-link" href="#differences-between-the-two-kinds"></a></h3>
-   <p>| Disambiguation tags | Concept tags |
-|---------------------|--------------|
-| Ends with <code class="highlight"><c- n>_t</c-></code> | Ends with <code class="highlight"><c- n>_tag</c-></code> |
-| Without the suffix it’s an inline constexpr variable | Without the suffix it’s a concept |
-| Used in concrete programming | Used only in generic programming |
-| No associated member typedef | Associated member typedef ending with <code class="highlight"><c- n>_category</c-></code> or <code class="highlight"><c- n>_concept</c-></code> |
-| Named in the caller | Named in the typedef definition, and in the callee |
-| Callee is usually a constructor | Callee is generic-programming machinery |
-| Never derive from each other | May derive from each other to form a hierarchy |</p>
-   <h3 class="heading settled" data-level="2.4" id="wrong-naming-in-execution"><span class="secno">2.4. </span><span class="content">Wrong-naming in <code class="highlight"><c- o>&lt;</c-><c- n>execution</c-><c- o>></c-></code></span><a class="self-link" href="#wrong-naming-in-execution"></a></h3>
-   <p>The <code class="highlight"><c- o>&lt;</c-><c- n>execution</c-><c- o>></c-></code> header, a.k.a. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2300r10.html">P2300</a>
-"Senders and Receivers" (S&amp;R), adds four new "concept tags," following the pattern precisely
+   <h3 class="heading settled" data-level="2.3" id="difference-table"><span class="secno">2.3. </span><span class="content">Differences between the two kinds</span><a class="self-link" href="#difference-table"></a></h3>
+   <table class="comparison-table">
+    <thead>
+     <tr>
+      <th>Disambiguation tags
+      <th>Concept tags
+    <tbody>
+     <tr>
+      <td>Ends with <code class="highlight"><c- n>_t</c-></code>
+      <td>Ends with <code class="highlight"><c- n>_tag</c-></code>
+     <tr>
+      <td>Without the suffix it’s an inline constexpr variable
+      <td>Without the suffix it’s a concept
+     <tr>
+      <td>Used in concrete programming
+      <td>Used only in generic programming
+     <tr>
+      <td>No associated member typedef
+      <td>Associated member typedef ending with <code class="highlight"><c- n>_category</c-></code> or <code class="highlight"><c- n>_concept</c-></code>
+     <tr>
+      <td>Named in the caller
+      <td>Named in the typedef definition, and in the callee
+     <tr>
+      <td>Callee is usually a constructor
+      <td>Callee is generic-programming machinery
+     <tr>
+      <td>Never derive from each other
+      <td>May derive from each other to form a hierarchy
+     <tr>
+      <td>No associated concept
+      <td>Concept often involves <code class="highlight"><c- n>derived_from</c-></code>
+   </table>
+   <h3 class="heading settled" data-level="2.4" id="wrong-naming"><span class="secno">2.4. </span><span class="content">Wrong-naming in <code class="highlight"><c- o>&lt;</c-><c- n>execution</c-><c- o>></c-></code></span><a class="self-link" href="#wrong-naming"></a></h3>
+   <p>The <code class="highlight"><c- o>&lt;</c-><c- n>execution</c-><c- o>></c-></code> header (added in <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2300r10.html">P2300</a>)
+adds four new "concept tags," following the pattern precisely
 to the letter, <em>except</em> that (as of December 2025) it misnames them using <code class="highlight"><c- n>_t</c-></code> rather
 than <code class="highlight"><c- n>_tag</c-></code>. In each case we have the tag type and its associated concept:</p>
 <pre class="highlight language-c++"><c- k>struct</c-> <c- nc>sender_t</c-> <c- p>{};</c->
@@ -2289,17 +2316,48 @@ has a member typedef ending in <code class="highlight"><c- n>_concept</c-></code
 <c- p>};</c->
 </pre>
    <p>This follows the "concept tag" pattern to the letter... except for the naming of <code class="highlight"><c- n>sender_t</c-></code>!</p>
-   <p>| Property of <code class="highlight"><c- n>sender_t</c-></code> | Disambiguation<br>tag-like | Concept<br>tag-like |
-|-----------|----------------|--------------|
-| Ends with <code class="highlight"><c- n>_t</c-></code> | ✅ | ❌ |
-| Without the suffix it’s a concept | ❌ | ✅ |
-| Used only in generic programming | ❌ | ✅ |
-| Associated member typedef ending with <code class="highlight"><c- n>_concept</c-></code> | ❌ | ✅ |
-| Named in the typedef definition, and in the callee | ❌ | ✅ |
-| Callee is generic-programming machinery | ❌ | ✅ |
-| Don’t derive from each other | ✅ | ✅ |</p>
+   <table class="comparison-table">
+    <thead>
+     <tr>
+      <th>Property of <code class="highlight"><c- n>sender_t</c-></code>
+      <th>Disambiguation<br>tag-like
+      <th>Concept<br>tag-like
+    <tbody>
+     <tr>
+      <td>Ends with <code class="highlight"><c- n>_t</c-></code>
+      <td>✅
+      <td>❌
+     <tr>
+      <td>Without the suffix it’s a concept
+      <td>❌
+      <td>✅
+     <tr>
+      <td>Used only in generic programming
+      <td>❌
+      <td>✅
+     <tr>
+      <td>Associated member typedef ending with <code class="highlight"><c- n>_concept</c-></code>
+      <td>❌
+      <td>✅
+     <tr>
+      <td>Named in the typedef definition only
+      <td>❌
+      <td>✅
+     <tr>
+      <td>Callee is generic-programming machinery
+      <td>❌
+      <td>✅
+     <tr>
+      <td>No derived classes in the Standard today
+      <td>✅
+      <td>✅
+     <tr>
+      <td>Concept involves <code class="highlight"><c- n>derived_from</c-></code>
+      <td>❌
+      <td>✅
+   </table>
    <p>So <code class="highlight"><c- n>sender_t</c-></code> really "should" have been named <code class="highlight"><c- n>sender_tag</c-></code>, as it has been
-(organically and independently, as far as I know) in
+(organically and independently, as far as we know) in
 <a href="https://github.com/jaredhoberock/croquet/blob/e32a83322878e6e2855f23c948abafb008bfd38b/fused_sender.hpp#L14">jaredhoberock/croquet</a> since 2019,
 <a href="https://github.com/janciesko/stdexx/blob/9a24fa414639ecb0a993fb378f238a03337395b8/impl/qthreads/stdexec.hpp#L247">janciesko/stdexx</a> since June 2025,
 <a href="https://github.com/Cra3z/coio/blob/6b20969c29d3a0fafc326bf956df74db450b04f1/include/coio/execution_context.h#L25">Cra3z/coio</a> since August 2025,
@@ -2315,45 +2373,61 @@ and maybe a few other places.</p>
     <li data-md>
      <p><code class="highlight"><c- n>scheduler_t</c-></code>, associated with <a href="https://eel.is/c++draft/exec.sched"><code class="highlight"><c- n>scheduler_concept</c-></code> and <code class="highlight"><c- k>concept</c-> <c- nc>scheduler</c-></code></a></p>
    </ul>
-   <h2 class="heading settled" data-level="3" id="wording"><span class="secno">3. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
-   <h3 class="heading settled" data-level="3.1" id="wording-execution.syn"><span class="secno">3.1. </span><span class="content">[execution.syn]</span><a class="self-link" href="#wording-execution.syn"></a></h3>
-   <p>Modify <a href="http://eel.is/c++draft/execution.syn">[execution.syn]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
+   <h2 class="heading settled" data-level="3" id="additional-motivation"><span class="secno">3. </span><span class="content">Additional motivation</span><a class="self-link" href="#additional-motivation"></a></h2>
+   <p>While writing up <a href="#wording-exec.schedule.from">[exec.schedule.from]</a>,
+we noticed that the type name <code class="highlight"><c- n>receiver_t</c-></code> is shadowed in that section. The local alias
+<code class="highlight"><c- n>receiver_t</c-></code> is an alias for <i><code class="highlight"><c- n>receiver</c-><c- o>-</c-><c- n>type</c-></code></i>, which has a member
+<code class="highlight"><c- n>receiver_concept</c-></code> aliased to <code class="highlight"><c- n>receiver_t</c-></code>. But this second use of <code class="highlight"><c- n>receiver_t</c-></code> is not
+the <code class="highlight"><c- n>receiver_t</c-></code> we’re in the middle of defining; it’s the global concept tag!
+This is not <em>formally</em> an ambiguity in the spec, but it’s not very felicitous. Our proposed
+change eliminates the notional overloading by cleanly separating the global concept tag
+<code class="highlight"><c- n>receiver_tag</c-></code> from the local concrete type <code class="highlight"><c- n>receiver_t</c-></code>.</p>
+   <p>Yi’an predicts that future standards will define not only <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>execution</c-><c- o>::</c-><c- n>scheduler_tag</c-></code>, but further
+derived tags such as <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>execution</c-><c- o>::</c-><c- n>network_scheduler_tag</c-></code>, <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>execution</c-><c- o>::</c-><c- n>pipe_scheduler_tag</c-></code>,
+etc., all derived from <code class="highlight"><c- n>scheduler_tag</c-></code> and indicating concepts that subsume <code class="highlight"><c- n>scheduler</c-></code>.
+That is, we predict that the future evolution of C++ will make <code class="highlight"><c- n>scheduler_tag</c-></code> conform even more
+tightly to the "concept tag" pattern than it does today.</p>
+   <h2 class="heading settled" data-level="4" id="wording"><span class="secno">4. </span><span class="content">Proposed wording</span><a class="self-link" href="#wording"></a></h2>
+   <div class="smaller">
+    <h3 class="heading settled" data-level="4.1" id="wording-execution.syn"><span class="secno">4.1. </span><span class="content">[execution.syn]</span><a class="self-link" href="#wording-execution.syn"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/execution.syn">[execution.syn]</a> as follows.
+Note that the names of query object types such as <code class="highlight"><c- n>set_value_t</c-></code> and <code class="highlight"><c- n>start_t</c-></code> are not changed;
+only the names of the four concept tags are changed.</p>
+    <blockquote>
 <pre class="highlight"><c- p>[...]</c->
-<c- c1>// [exec.sched], schedulers</c->
+<i><c- c1>// [exec.sched], schedulers</c-></i>
 <c- k>struct</c-> <c- nc>scheduler_t</c-><ins><c- nc>ag</c-></ins> <c- p>{};</c->
 
 <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Sch</c-><c- o>></c->
-  <c- k>concept</c-> <c- nc>scheduler</c-> <c- o>=</c-> <c- n>see</c-> <c- n>below</c-><c- p>;</c->
+  <c- k>concept</c-> <c- nc>scheduler</c-> <c- o>=</c-> <i><c- n>see</c-> <c- n>below</c-></i><c- p>;</c->
 
-<c- c1>// [exec.recv], receivers</c->
+<i><c- c1>// [exec.recv], receivers</c-></i>
 <c- k>struct</c-> <c- nc>receiver_t</c-><ins><c- nc>ag</c-></ins> <c- p>{};</c->
 
 <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Rcvr</c-><c- o>></c->
-  <c- k>concept</c-> <c- nc>receiver</c-> <c- o>=</c-> <c- n>see</c-> <c- n>below</c-><c- p>;</c->
+  <c- k>concept</c-> <c- nc>receiver</c-> <c- o>=</c-> <i><c- n>see</c-> <c- n>below</c-></i><c- p>;</c->
 
 <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Rcvr</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Completions</c-><c- o>></c->
-  <c- k>concept</c-> <c- nc>receiver_of</c-> <c- o>=</c-> <c- n>see</c-> <c- n>below</c-><c- p>;</c->
+  <c- k>concept</c-> <c- nc>receiver_of</c-> <c- o>=</c-> <i><c- n>see</c-> <c- n>below</c-></i><c- p>;</c->
 
-<c- k>struct</c-> <c- nc>set_value_t</c-> <c- p>{</c-> <c- n>unspecified</c-> <c- p>};</c->
-<c- k>struct</c-> <c- nc>set_error_t</c-> <c- p>{</c-> <c- n>unspecified</c-> <c- p>};</c->
-<c- k>struct</c-> <c- nc>set_stopped_t</c-> <c- p>{</c-> <c- n>unspecified</c-> <c- p>};</c->
+<c- k>struct</c-> <c- nc>set_value_t</c-> <c- p>{</c-> <i><c- n>unspecified</c-></i> <c- p>};</c->
+<c- k>struct</c-> <c- nc>set_error_t</c-> <c- p>{</c-> <i><c- n>unspecified</c-></i> <c- p>};</c->
+<c- k>struct</c-> <c- nc>set_stopped_t</c-> <c- p>{</c-> <i><c- n>unspecified</c-></i> <c- p>};</c->
 
 <c- kr>inline</c-> <c- k>constexpr</c-> <c- n>set_value_t</c-> <c- n>set_value</c-><c- p>{};</c->
 <c- kr>inline</c-> <c- k>constexpr</c-> <c- n>set_error_t</c-> <c- n>set_error</c-><c- p>{};</c->
 <c- kr>inline</c-> <c- k>constexpr</c-> <c- n>set_stopped_t</c-> <c- n>set_stopped</c-><c- p>{};</c->
 
-<c- c1>// [exec.opstate], operation states</c->
+<i><c- c1>// [exec.opstate], operation states</c-></i>
 <c- k>struct</c-> <c- nc>operation_state_t</c-><ins><c- nc>ag</c-></ins> <c- p>{};</c->
 
 <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>O</c-><c- o>></c->
-  <c- k>concept</c-> <c- nc>operation_state</c-> <c- o>=</c-> <c- n>see</c-> <c- n>below</c-><c- p>;</c->
+  <c- k>concept</c-> <c- nc>operation_state</c-> <c- o>=</c-> <i><c- n>see</c-> <c- n>below</c-></i><c- p>;</c->
 
 <c- k>struct</c-> <c- nc>start_t</c-><c- p>;</c->
 <c- kr>inline</c-> <c- k>constexpr</c-> <c- n>start_t</c-> <c- n>start</c-><c- p>{};</c->
 
-<c- c1>// [exec.snd], senders</c->
+<i><c- c1>// [exec.snd], senders</c-></i>
 <c- k>struct</c-> <c- nc>sender_t</c-><ins><c- nc>ag</c-></ins> <c- p>{};</c->
 
 <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Sndr</c-><c- o>></c->
@@ -2363,12 +2437,11 @@ and maybe a few other places.</p>
   <c- k>concept</c-> <c- nc>sender</c-> <c- o>=</c-> <i><c- n>see</c-> <c- n>below</c-></i><c- p>;</c->
 <c- p>[...]</c->
 </pre>
-   </blockquote>
-   <h3 class="heading settled" data-level="3.2" id="wording-exec.sched"><span class="secno">3.2. </span><span class="content">[exec.sched]</span><a class="self-link" href="#wording-exec.sched"></a></h3>
-   <p>Modify <a href="http://eel.is/c++draft/exec.sched">[exec.sched]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p>1․ The <code class="highlight"><c- n>scheduler</c-></code> concept defines the requirements of a scheduler type ([exec.async.ops]).
+    </blockquote>
+    <h3 class="heading settled" data-level="4.2" id="wording-exec.sched"><span class="secno">4.2. </span><span class="content">[exec.sched]</span><a class="self-link" href="#wording-exec.sched"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.sched">[exec.sched]</a> as follows:</p>
+    <blockquote>
+     <p>1․ The <code class="highlight"><c- n>scheduler</c-></code> concept defines the requirements of a scheduler type ([exec.async.ops]).
 <code class="highlight"><c- n>schedule</c-></code> is a customization point object that accepts a scheduler.
 A valid invocation of <code class="highlight"><c- n>schedule</c-></code> is a schedule-expression.
 </p>
@@ -2387,15 +2460,14 @@ A valid invocation of <code class="highlight"><c- n>schedule</c-></code> is a sc
       <c- n>copyable</c-><c- o>&lt;</c-><c- n>remove_cvref_t</c-><c- o>&lt;</c-><c- n>Sch</c-><c- o>>></c-><c- p>;</c->
 <c- p>}</c->
 </pre>
-    
+     
 [...]
 
-   </blockquote>
-   <h3 class="heading settled" data-level="3.3" id="wording-exec.recv.concepts"><span class="secno">3.3. </span><span class="content">[exec.recv.concepts]</span><a class="self-link" href="#wording-exec.recv.concepts"></a></h3>
-   <p>Modify <a href="http://eel.is/c++draft/exec.recv.concepts">[exec.recv.concepts]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p>1․ A receiver represents the continuation of an asynchronous operation.
+    </blockquote>
+    <h3 class="heading settled" data-level="4.3" id="wording-exec.recv.concepts"><span class="secno">4.3. </span><span class="content">[exec.recv.concepts]</span><a class="self-link" href="#wording-exec.recv.concepts"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.recv.concepts">[exec.recv.concepts]</a> as follows:</p>
+    <blockquote>
+     <p>1․ A receiver represents the continuation of an asynchronous operation.
 The <code class="highlight"><c- n>receiver</c-></code> concept defines the requirements for a receiver type ([exec.async.ops]).
 The <code class="highlight"><c- n>receiver_of</c-></code> concept defines the requirements for a receiver type that is usable as the first argument
 of a set of completion operations corresponding to a set of completion signatures. The <code class="highlight"><c- n>get_env</c-></code>
@@ -2411,15 +2483,14 @@ customization point object is used to access a receiver’s associated environme
       <c- n>move_constructible</c-><c- o>&lt;</c-><c- n>remove_cvref_t</c-><c- o>&lt;</c-><c- n>Rcvr</c-><c- o>>></c-> <c- o>&amp;&amp;</c->       <c- c1>// rvalues are movable, and</c->
       <c- n>constructible_from</c-><c- o>&lt;</c-><c- n>remove_cvref_t</c-><c- o>&lt;</c-><c- n>Rcvr</c-><c- o>></c-><c- p>,</c-> <c- n>Rcvr</c-><c- o>></c-><c- p>;</c->   <c- c1>// lvalues are copyable</c->
 </pre>
-    
+     
 [...]
 
-   </blockquote>
-   <h3 class="heading settled" data-level="3.4" id="wording-exec.opstate.general"><span class="secno">3.4. </span><span class="content">[exec.opstate.general]</span><a class="self-link" href="#wording-exec.opstate.general"></a></h3>
-   <p>Modify <a href="http://eel.is/c++draft/exec.opstate.general">[exec.opstate.general]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p>1․ The <code class="highlight"><c- n>operation_state</c-></code> concept defines the requirements of an operation state type ([exec.async.ops]).
+    </blockquote>
+    <h3 class="heading settled" data-level="4.4" id="wording-exec.opstate.general"><span class="secno">4.4. </span><span class="content">[exec.opstate.general]</span><a class="self-link" href="#wording-exec.opstate.general"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.opstate.general">[exec.opstate.general]</a> as follows:</p>
+    <blockquote>
+     <p>1․ The <code class="highlight"><c- n>operation_state</c-></code> concept defines the requirements of an operation state type ([exec.async.ops]).
 </p>
 <pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-><c- o>::</c-><c- nn>execution</c-> <c- p>{</c->
   <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>O</c-><c- o>></c->
@@ -2430,14 +2501,13 @@ customization point object is used to access a receiver’s associated environme
       <c- p>};</c->
 <c- p>}</c->
 </pre>
-    
+     
 [...]
 
-   </blockquote>
-   <h3 class="heading settled" data-level="3.5" id="wording-exec.snd.expos"><span class="secno">3.5. </span><span class="content">[exec.snd.expos]</span><a class="self-link" href="#wording-exec.snd.expos"></a></h3>
-   <p>Modify <a href="http://eel.is/c++draft/exec.snd.expos">[exec.snd.expos]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
+    </blockquote>
+    <h3 class="heading settled" data-level="4.5" id="wording-exec.snd.expos"><span class="secno">4.5. </span><span class="content">[exec.snd.expos]</span><a class="self-link" href="#wording-exec.snd.expos"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.snd.expos">[exec.snd.expos]</a> as follows:</p>
+    <blockquote>
 <pre class="highlight"><c- p>[...]</c->
 
   <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Sndr</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Rcvr</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Index</c-><c- o>></c->
@@ -2466,51 +2536,125 @@ customization point object is used to access a receiver’s associated environme
 
 <c- p>[...]</c->
 </pre>
-   </blockquote>
-   <h3 class="heading settled" data-level="3.6" id="wording-exec.snd.concepts"><span class="secno">3.6. </span><span class="content">[exec.snd.concepts]</span><a class="self-link" href="#wording-exec.snd.concepts"></a></h3>
-   <p>Modify <a href="http://eel.is/c++draft/exec.snd.concepts">[exec.snd.concepts]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    
+    </blockquote>
+    <h3 class="heading settled" data-level="4.6" id="wording-exec.snd.concepts"><span class="secno">4.6. </span><span class="content">[exec.snd.concepts]</span><a class="self-link" href="#wording-exec.snd.concepts"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.snd.concepts">[exec.snd.concepts]</a> as follows:</p>
+    <blockquote>
+     
 [...]
 
 <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Sndr</c-><c- o>></c->
   <c- k>concept</c-> <i><c- nc>is</c-><c- o>-</c-><c- n>sender</c-></i> <c- o>=</c->                                         <i><c- c1>// exposition only</c-></i>
     <c- n>derived_from</c-><c- o>&lt;</c-><c- k>typename</c-> <c- nc>Sndr</c-><c- o>::</c-><c- n>sender_concept</c-><c- p>,</c-> <c- n>sender_t</c-><ins><c- n>ag</c-></ins><c- o>></c-><c- p>;</c->
 </pre>
-    
+     
 [...]
 
-   </blockquote>
-   <h3 class="heading settled" data-level="3.7" id="wording-exec.connect"><span class="secno">3.7. </span><span class="content">[exec.connect]</span><a class="self-link" href="#wording-exec.connect"></a></h3>
-   <p>Modify the example in <a href="http://eel.is/c++draft/exec.connect">[exec.connect]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    <p>4. Let <i><code class="highlight"><c- n>operation</c-><c- o>-</c-><c- n>state</c-><c- o>-</c-><c- n>task</c-></code></i> be the following exposition-only class:
+    </blockquote>
+    <h3 class="heading settled" data-level="4.7" id="wording-exec.connect"><span class="secno">4.7. </span><span class="content">[exec.connect]</span><a class="self-link" href="#wording-exec.connect"></a></h3>
+    <p>Modify the example in <a href="http://eel.is/c++draft/exec.connect">[exec.connect]</a> as follows:</p>
+    <blockquote>
+     <p>4. Let <i><code class="highlight"><c- n>operation</c-><c- o>-</c-><c- n>state</c-><c- o>-</c-><c- n>task</c-></code></i> be the following exposition-only class:
 </p>
 <pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-><c- o>::</c-><c- nn>execution</c-> <c- p>{</c->
   <c- k>struct</c-> <i><c- nc>operation</c-><c- o>-</c-><c- n>state</c-><c- o>-</c-><c- n>task</c-></i> <c- p>{</c->                              <i><c- c1>// exposition only</c-></i>
     <c- k>using</c-> <c- n>operation_state_concept</c-> <c- o>=</c-> <c- n>operation_state_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
 </pre>
-    
+     
 [...]
 
-   </blockquote>
-   <h3 class="heading settled" data-level="3.8" id="wording-exec.schedule.from"><span class="secno">3.8. </span><span class="content">[exec.schedule.from]</span><a class="self-link" href="#wording-exec.schedule.from"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
-   <h3 class="heading settled" data-level="3.9" id="wording-exec.let"><span class="secno">3.9. </span><span class="content">[exec.let]</span><a class="self-link" href="#wording-exec.let"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
-   <h3 class="heading settled" data-level="3.10" id="wording-exec.spawn.future"><span class="secno">3.10. </span><span class="content">[exec.spawn.future]</span><a class="self-link" href="#wording-exec.spawn.future"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
-   <h3 class="heading settled" data-level="3.11" id="wording-exec.sync.wait"><span class="secno">3.11. </span><span class="content">[exec.sync.wait]</span><a class="self-link" href="#wording-exec.sync.wait"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
-   <h3 class="heading settled" data-level="3.12" id="wording-exec.spawn"><span class="secno">3.12. </span><span class="content">[exec.spawn]</span><a class="self-link" href="#wording-exec.spawn"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
-   <h3 class="heading settled" data-level="3.13" id="wording-exec.cmplsig"><span class="secno">3.13. </span><span class="content">[exec.cmplsig]</span><a class="self-link" href="#wording-exec.cmplsig"></a></h3>
-   <p>Modify the example in <a href="http://eel.is/c++draft/exec.cmplsig">[exec.cmplsig]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
-    
+    </blockquote>
+    <h3 class="heading settled" data-level="4.8" id="wording-exec.schedule.from"><span class="secno">4.8. </span><span class="content">[exec.schedule.from]</span><a class="self-link" href="#wording-exec.schedule.from"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.schedule.from">[exec.schedule.from]</a> as follows.
+Note that the name of the local type <code class="highlight"><c- n>receiver_t</c-></code> in paragraph 6 is not changed; only the
+name of the global concept tag <code class="highlight"><c- n>receiver_t</c-></code> in paragraph 10 is changed.</p>
+    <blockquote>
+     <p>6. The member <code class="highlight"><i><c- n>impls</c-><c- o>-</c-><c- k>for</c-></i><c- o>&lt;</c-><c- n>schedule_from_t</c-><c- o>>::</c-><i><c- n>get</c-><c- o>-</c-><c- n>state</c-></i></code> is initialized with a callable object equivalent to the following lambda:
+</p>
+<pre class="highlight"><c- p>[]</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Sndr</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Rcvr</c-><c- o>></c-><c- p>(</c-><c- n>Sndr</c-><c- o>&amp;&amp;</c-> <c- n>sndr</c-><c- p>,</c-> <c- n>Rcvr</c-><c- o>&amp;</c-> <c- n>rcvr</c-><c- p>)</c-> <c- k>noexcept</c-><c- p>(</c-><i><c- n>see</c-> <c- n>below</c-></i><c- p>)</c->
+    <c- k>requires</c-> <c- n>sender_in</c-><c- o>&lt;</c-><i><c- n>child</c-><c- o>-</c-><c- n>type</c-></i><c- o>&lt;</c-><c- n>Sndr</c-><c- o>></c-><c- p>,</c-> <i><c- n>FWD</c-><c- o>-</c-><c- n>ENV</c-><c- o>-</c-><c- n>T</c-></i><c- p>(</c-><c- n>env_of_t</c-><c- o>&lt;</c-><c- n>Rcvr</c-><c- o>></c-><c- p>)</c-><c- o>></c-> <c- p>{</c->
+
+  <c- k>auto</c-><c- o>&amp;</c-> <c- p>[</c-><c- n>_</c-><c- p>,</c-> <c- n>sch</c-><c- p>,</c-> <c- n>child</c-><c- p>]</c-> <c- o>=</c-> <c- n>sndr</c-><c- p>;</c->
+
+  <c- k>using</c-> <c- n>sched_t</c-> <c- o>=</c-> <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>(</c-><c- n>sch</c-><c- p>));</c->
+  <c- k>using</c-> <c- n>variant_t</c-> <c- o>=</c-> <i><c- n>see</c-> <c- n>below</c-></i><c- p>;</c->
+  <c- k>using</c-> <c- n>receiver_t</c-> <c- o>=</c-> <i><c- n>see</c-> <c- n>below</c-></i><c- p>;</c->
+  <c- k>using</c-> <c- n>operation_t</c-> <c- o>=</c-> <c- n>connect_result_t</c-><c- o>&lt;</c-><c- n>schedule_result_t</c-><c- o>&lt;</c-><c- n>sched_t</c-><c- o>></c-><c- p>,</c-> <c- n>receiver_t</c-><c- o>></c-><c- p>;</c->
+  <c- k>constexpr</c-> <c- b>bool</c-> <c- n>nothrow</c-> <c- o>=</c-> <c- k>noexcept</c-><c- p>(</c-><c- n>connect</c-><c- p>(</c-><c- n>schedule</c-><c- p>(</c-><c- n>sch</c-><c- p>),</c-> <c- n>receiver_t</c-><c- p>{</c-><c- k>nullptr</c-><c- p>}));</c->
+</pre>
+     
+[...]
+
+     <p>10. <code class="highlight"><c- n>receiver_t</c-></code> is an alias for the following exposition-only class:
+</p>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-><c- o>::</c-><c- nn>execution</c-> <c- p>{</c->
+  <c- k>struct</c-> <i><c- nc>receiver</c-><c- o>-</c-><c- n>type</c-></i> <c- p>{</c->
+    <c- k>using</c-> <c- n>receiver_concept</c-> <c- o>=</c-> <c- n>receiver_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+    <i><c- n>state</c-><c- o>-</c-><c- n>type</c-></i><c- o>*</c-> <c- n>state</c-><c- p>;</c->          <i><c- c1>// exposition only</c-></i>
+</pre>
+     
+[...]
+
+    </blockquote>
+    <h3 class="heading settled" data-level="4.9" id="wording-exec.let"><span class="secno">4.9. </span><span class="content">[exec.let]</span><a class="self-link" href="#wording-exec.let"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.let">[exec.let]</a> as follows:</p>
+    <blockquote>
+     <p>6. Let <code class="highlight"><i><c- n>receiver2</c-></i></code> denote the following exposition-only class template:
+</p>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-><c- o>::</c-><c- nn>execution</c-> <c- p>{</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Rcvr</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Env</c-><c- o>></c->
+  <c- k>struct</c-> <i><c- nc>receiver2</c-></i> <c- p>{</c->
+    <c- k>using</c-> <c- n>receiver_concept</c-> <c- o>=</c-> <c- n>receiver_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+</pre>
+     
+[...]
+
+    </blockquote>
+    <h3 class="heading settled" data-level="4.10" id="wording-exec.spawn.future"><span class="secno">4.10. </span><span class="content">[exec.spawn.future]</span><a class="self-link" href="#wording-exec.spawn.future"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.spawn.future">[exec.spawn.future]</a> as follows:</p>
+    <blockquote>
+     <p>5. Let <code class="highlight"><i><c- n>spawn</c-><c- o>-</c-><c- n>future</c-><c- o>-</c-><c- n>receiver</c-></i></code> be the exposition-only class template:
+</p>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-><c- o>::</c-><c- nn>execution</c-> <c- p>{</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Completions</c-><c- o>></c->
+  <c- k>struct</c-> <i><c- nc>spawn</c-><c- o>-</c-><c- n>future</c-><c- o>-</c-><c- n>receiver</c-></i> <c- p>{</c->                                <i><c- c1>// exposition only</c-></i>
+    <c- k>using</c-> <c- n>receiver_concept</c-> <c- o>=</c-> <c- n>receiver_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+</pre>
+     
+[...]
+
+    </blockquote>
+    <h3 class="heading settled" data-level="4.11" id="wording-exec.sync.wait"><span class="secno">4.11. </span><span class="content">[exec.sync.wait]</span><a class="self-link" href="#wording-exec.sync.wait"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.sync.wait">[exec.sync.wait]</a> as follows:</p>
+    <blockquote>
+     
+[...]
+
+<pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Sndr</c-><c- o>></c->
+<c- k>struct</c-> <i><c- nc>sync</c-><c- o>-</c-><c- n>wait</c-><c- o>-</c-><c- n>receiver</c-></i> <c- p>{</c->                                   <i><c- c1>// exposition only</c-></i>
+  <c- k>using</c-> <c- n>receiver_concept</c-> <c- o>=</c-> <c- n>execution</c-><c- o>::</c-><c- n>receiver_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+</pre>
+     
+[...]
+
+    </blockquote>
+    <h3 class="heading settled" data-level="4.12" id="wording-exec.spawn"><span class="secno">4.12. </span><span class="content">[exec.spawn]</span><a class="self-link" href="#wording-exec.spawn"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.spawn">[exec.spawn]</a> as follows:</p>
+    <blockquote>
+     
+[...]
+
+<pre class="highlight"><c- k>struct</c-> <i><c- nc>spawn</c-><c- o>-</c-><c- n>receiver</c-></i> <c- p>{</c->                                   <i><c- c1>// exposition only</c-></i>
+  <c- k>using</c-> <c- n>receiver_concept</c-> <c- o>=</c-> <c- n>receiver_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+</pre>
+     
+[...]
+
+    </blockquote>
+    <h3 class="heading settled" data-level="4.13" id="wording-exec.cmplsig"><span class="secno">4.13. </span><span class="content">[exec.cmplsig]</span><a class="self-link" href="#wording-exec.cmplsig"></a></h3>
+    <p>Modify the example in <a href="http://eel.is/c++draft/exec.cmplsig">[exec.cmplsig]</a> as follows:</p>
+    <blockquote>
+     
 <i>[Example 1:</i>
 
 <pre class="highlight"><c- k>struct</c-> <c- nc>my_sender</c-> <c- p>{</c->
@@ -2524,18 +2668,45 @@ customization point object is used to access a receiver’s associated environme
       <c- n>set_stopped_t</c-><c- p>()</c-><c- o>></c-><c- p>;</c->
 <c- p>};</c->
 </pre>
-    
+     
 Declares <code class="highlight"><c- n>my_sender</c-></code> to be a sender that [...] <i>—end example]</i>
 
-   </blockquote>
-   <h3 class="heading settled" data-level="3.14" id="wording-exec.as.awaitable"><span class="secno">3.14. </span><span class="content">[exec.as.awaitable]</span><a class="self-link" href="#wording-exec.as.awaitable"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
-   <h3 class="heading settled" data-level="3.15" id="wording-exec.inline.scheduler"><span class="secno">3.15. </span><span class="content">[exec.inline.scheduler]</span><a class="self-link" href="#wording-exec.inline.scheduler"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
-   <h3 class="heading settled" data-level="3.16" id="wording-exec.task.scheduler"><span class="secno">3.16. </span><span class="content">[exec.task.scheduler]</span><a class="self-link" href="#wording-exec.task.scheduler"></a></h3>
-   <p>Modify <a href="http://eel.is/c++draft/exec.task.scheduler">[exec.task.scheduler]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
+    </blockquote>
+    <h3 class="heading settled" data-level="4.14" id="wording-exec.as.awaitable"><span class="secno">4.14. </span><span class="content">[exec.as.awaitable]</span><a class="self-link" href="#wording-exec.as.awaitable"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.as.awaitable">[exec.as.awaitable]</a> as follows:</p>
+    <blockquote>
+     <p>3. <i><code class="highlight"><c- n>awaitable</c-><c- o>-</c-><c- n>receiver</c-></code></i> is equivalent to:
+</p>
+<pre class="highlight"><c- k>struct</c-> <i><c- nc>awaitable</c-><c- o>-</c-><c- n>receiver</c-></i> <c- p>{</c->
+  <c- k>using</c-> <c- n>receiver_concept</c-> <c- o>=</c-> <c- n>receiver_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+  <c- n>variant</c-><c- o>&lt;</c-><c- n>monostate</c-><c- p>,</c-> <i><c- n>result</c-><c- o>-</c-><c- n>type</c-></i><c- p>,</c-> <c- n>exception_ptr</c-><c- o>>*</c-> <i><c- n>result</c-><c- o>-</c-><c- n>ptr</c-></i><c- p>;</c->   <i><c- c1>// exposition only</c-></i>
+  <c- n>coroutine_handle</c-><c- o>&lt;</c-><c- n>Promise</c-><c- o>></c-> <i><c- n>continuation</c-></i><c- p>;</c->                       <i><c- c1>// exposition only</c-></i>
+  <i><c- c1>// see below</c-></i>
+<c- p>};</c->
+</pre>
+    </blockquote>
+    <h3 class="heading settled" data-level="4.15" id="wording-exec.inline.scheduler"><span class="secno">4.15. </span><span class="content">[exec.inline.scheduler]</span><a class="self-link" href="#wording-exec.inline.scheduler"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.inline.scheduler">[exec.inline.scheduler]</a> as follows:</p>
+    <blockquote>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-><c- o>::</c-><c- nn>execution</c-> <c- p>{</c->
+  <c- k>class</c-> <c- nc>inline_scheduler</c-> <c- p>{</c->
+    <c- k>class</c-> <i><c- nc>inline</c-><c- o>-</c-><c- n>sender</c-></i><c- p>;</c->                <i><c- c1>// exposition only</c-></i>
+
+    <c- k>template</c-><c- o>&lt;</c-><c- n>receiver</c-> <c- n>R</c-><c- o>></c->
+      <c- k>class</c-> <i><c- nc>inline</c-><c- o>-</c-><c- n>state</c-></i><c- p>;</c->               <i><c- c1>// exposition only</c-></i>
+
+  <c- k>public</c-><c- o>:</c->
+    <c- k>using</c-> <c- n>scheduler_concept</c-> <c- o>=</c-> <c- n>scheduler_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+
+    <c- k>constexpr</c-> <i><c- kr>inline</c-><c- o>-</c-><c- n>sender</c-></i> <c- n>schedule</c-><c- p>()</c-> <c- k>noexcept</c-> <c- p>{</c-> <c- k>return</c-> <c- p>{};</c-> <c- p>}</c->
+    <c- k>constexpr</c-> <c- b>bool</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>inline_scheduler</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- k>noexcept</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+  <c- p>};</c->
+<c- p>}</c->
+</pre>
+    </blockquote>
+    <h3 class="heading settled" data-level="4.16" id="wording-exec.task.scheduler"><span class="secno">4.16. </span><span class="content">[exec.task.scheduler]</span><a class="self-link" href="#wording-exec.task.scheduler"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.task.scheduler">[exec.task.scheduler]</a> as follows:</p>
+    <blockquote>
 <pre class="highlight"><c- k>class</c-> <c- nc>task_scheduler</c-> <c- p>{</c->
   <c- k>class</c-> <i><c- nc>ts</c-><c- o>-</c-><c- n>sender</c-></i><c- p>;</c->                    <i><c- c1>// exposition only</c-></i>
 
@@ -2563,7 +2734,7 @@ Declares <code class="highlight"><c- n>my_sender</c-></code> to be a sender that
   <c- n>shared_ptr</c-><c- o>&lt;</c-><c- b>void</c-><c- o>></c-> <c- n>sch_</c-><c- p>;</c-> <c- c1>// exposition only</c->
 <c- p>};</c->
 </pre>
-    
+     
 [...]
 
 <pre class="highlight"><c- k>class</c-> <c- nc>task_scheduler</c-><c- o>::</c-><i><c- n>ts</c-><c- o>-</c-><c- n>sender</c-></i> <c- p>{</c->     <i><c- c1>// exposition only</c-></i>
@@ -2574,7 +2745,7 @@ Declares <code class="highlight"><c- n>my_sender</c-></code> to be a sender that
     <c- n>state</c-><c- o>&lt;</c-><c- n>Rcvr</c-><c- o>></c-> <c- n>connect</c-><c- p>(</c-><c- n>Rcvr</c-><c- o>&amp;&amp;</c-> <c- n>rcvr</c-><c- p>);</c->
 <c- p>};</c->
 </pre>
-    
+     
 [...]
 
 <pre class="highlight"><c- k>template</c-><c- o>&lt;</c-><c- n>receiver</c-> <c- n>R</c-><c- o>></c->
@@ -2585,11 +2756,10 @@ Declares <code class="highlight"><c- n>my_sender</c-></code> to be a sender that
   <c- b>void</c-> <c- nf>start</c-><c- p>()</c-> <c- o>&amp;</c-> <c- k>noexcept</c-><c- p>;</c->
 <c- p>};</c->
 </pre>
-   </blockquote>
-   <h3 class="heading settled" data-level="3.17" id="wording-task.class"><span class="secno">3.17. </span><span class="content">[task.class]</span><a class="self-link" href="#wording-task.class"></a></h3>
-   <p>Modify <a href="http://eel.is/c++draft/task.class">[task.class]</a> as follows:</p>
-   <p><small></small></p>
-   <blockquote>
+    </blockquote>
+    <h3 class="heading settled" data-level="4.17" id="wording-task.class"><span class="secno">4.17. </span><span class="content">[task.class]</span><a class="self-link" href="#wording-task.class"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/task.class">[task.class]</a> as follows:</p>
+    <blockquote>
 <pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-><c- o>::</c-><c- nn>execution</c-> <c- p>{</c->
   <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Environment</c-><c- o>></c->
   <c- k>class</c-> <c- nc>task</c-> <c- p>{</c->
@@ -2601,14 +2771,42 @@ Declares <code class="highlight"><c- n>my_sender</c-></code> to be a sender that
     <c- k>using</c-> <c- n>sender_concept</c-> <c- o>=</c-> <c- n>sender_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
     <c- k>using</c-> <c- n>completion_signatures</c-> <c- o>=</c-> <i><c- n>see</c-> <c- n>below</c-></i><c- p>;</c->
 </pre>
-    
+     
 [...]
 
-   </blockquote>
-   <h3 class="heading settled" data-level="3.18" id="wording-task.state"><span class="secno">3.18. </span><span class="content">[task.state]</span><a class="self-link" href="#wording-task.state"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
-   <h3 class="heading settled" data-level="3.19" id="wording-exec.counting.scopes.general"><span class="secno">3.19. </span><span class="content">[exec.counting.scopes.general]</span><a class="self-link" href="#wording-exec.counting.scopes.general"></a></h3>
-   <p>TODO FIXME BUG HACK</p>
+    </blockquote>
+    <h3 class="heading settled" data-level="4.18" id="wording-task.state"><span class="secno">4.18. </span><span class="content">[task.state]</span><a class="self-link" href="#wording-task.state"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/task.state">[task.state]</a> as follows:</p>
+    <blockquote>
+<pre class="highlight"><c- k>namespace</c-> <c- nn>std</c-><c- o>::</c-><c- nn>execution</c-> <c- p>{</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>T</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Environment</c-><c- o>></c->
+  <c- k>template</c-><c- o>&lt;</c-><c- n>receiver</c-> <c- n>Rcvr</c-><c- o>></c->
+  <c- k>class</c-> <c- nc>task</c-><c- o>&lt;</c-><c- n>T</c-><c- p>,</c-> <c- n>Environment</c-><c- o>>::</c-><i><c- n>state</c-></i> <c- p>{</c->           <i><c- c1>// exposition only</c-></i>
+  <c- k>public</c-><c- o>:</c->
+    <c- k>using</c-> <c- n>operation_state_concept</c-> <c- o>=</c-> <c- n>operation_state_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+</pre>
+     
+[...]
+
+    </blockquote>
+    <h3 class="heading settled" data-level="4.19" id="wording-exec.counting.scopes.general"><span class="secno">4.19. </span><span class="content">[exec.counting.scopes.general]</span><a class="self-link" href="#wording-exec.counting.scopes.general"></a></h3>
+    <p>Modify <a href="http://eel.is/c++draft/exec.counting.scopes.general">[exec.counting.scopes.general]</a> as follows:</p>
+    <blockquote>
+     
+[...]
+
+<pre class="highlight"><c- k>template</c-><c- o>&lt;></c->
+<c- k>struct</c-> <i><c- nc>impls</c-><c- o>-</c-><c- k>for</c-></i><c- o>&lt;</c-><i><c- n>scope</c-><c- o>-</c-><c- n>join</c-><c- o>-</c-><c- n>t</c-></i><c- o>></c-> <c- o>:</c-> <i><c- k>default</c-><c- o>-</c-><c- n>impls</c-></i> <c- p>{</c->
+  <c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>Scope</c-><c- p>,</c-> <c- k>class</c-> <c- nc>Rcvr</c-><c- o>></c->
+  <c- k>struct</c-> <i><c- nc>state</c-></i> <c- p>{</c->                          <i><c- c1>// exposition only</c-></i>
+    <c- k>struct</c-> <i><c- nc>rcvr</c-><c- o>-</c-><c- n>t</c-></i> <c- p>{</c->                       <i><c- c1>// exposition only</c-></i>
+      <c- k>using</c-> <c- n>receiver_concept</c-> <c- o>=</c-> <c- n>receiver_t</c-><ins><c- n>ag</c-></ins><c- p>;</c->
+</pre>
+     
+[...]
+
+    </blockquote>
+   </div>
   </main>
 <script>
 (function() {
