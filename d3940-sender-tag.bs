@@ -1,0 +1,537 @@
+<pre class='metadata'>
+Title: Differentiate concept tags for C++26: sender_tag
+Shortname: D3940
+Revision: 0
+!Draft Revision: 1
+Audience: WG21
+Status: D
+Group: WG21
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+URL:
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  The STL has two kinds of tag types: concept tags (traditionally named with `_tag`)
+  and disambiguation tags (traditionally named with `_t`).
+  The new-in-C++26 `<execution>` header introduces four new concept tags, but
+  names them with `_t` instead of `_tag`. We propose to harmonize this before
+  C++26 is released.
+Date: 2025-12-09
+</pre>
+
+<style>
+body {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
+ins  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
+del  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #440000); text-decoration: line-through;}
+good  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
+bad  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #550000); text-decoration: underline;}
+</style>
+
+# Introduction # {#introduction}
+
+This paper is condensed from the blog post ["Two kinds of tag types: `foo_t` and `foo_tag`"](https://quuxplusone.github.io/blog/2025/12/03/tag-types/)
+(2025-12-03). However, the impetus for that blog post and for this proposal itself was identified
+by Yi'an Ye in the std-proposals thread <a href="https://lists.isocpp.org/std-proposals/2025/11/15884.php">"[execution] sender_t or sender_tag?"</a> (2025-11-10).
+
+# Two kinds of tag types # {#blog-post}
+
+In C++, when we have a type that carries no data — whose only "identity" is its type —
+we conventionally call that a "tag type." When you see code like `struct X {};` it's
+often the case that `X` is a tag type. However, not all tag types are created equal:
+there are at least two major disjoint use-cases for tag types, and the STL (as of 2025)
+therefore uses two distinct naming conventions for their identifiers.
+
+There is no widely recognized nomenclature for these two kinds of tag types, as far as I know,
+so I'm going to call them *disambiguation* tags and *concept* tags.
+
+## Disambiguation tag types
+
+A disambiguation tag type looks like this:
+
+```c++
+    struct foo_t {}; // maybe with an explicit ctor
+    inline constexpr foo_t foo = foo_t();
+```
+
+A disambiguation tag is passed explicitly by the caller to select among overloads of a library function —
+typically, a constructor. (Because otherwise we could use the function name itself to disambiguate;
+but all constructors belong to the same overload set by definition.)
+So we end up with code like this:
+
+```c++
+    struct useful_class {
+      explicit useful_class(foo_t, int, int);
+      explicit useful_class(bar_t, int, int);
+    };
+
+    auto myVar = useful_class(foo, 1, 2);
+```
+
+In this pattern the tag's name (sans `_t`) denotes a verb or prepositional phrase, or some kind of description
+of the functionality you're asking for — a description that we *would* have put into the name of the
+function, except that we can't, because the function is a constructor. Examples from the STL include:
+
+* [`std::defer_lock_t`](https://en.cppreference.com/w/cpp/thread/lock_tag)
+* [`std::from_range_t`](https://en.cppreference.com/w/cpp/ranges/from_range)
+* [`std::in_place_t`](https://en.cppreference.com/w/cpp/utility/in_place)
+    <span style="font-size: 80%;">(which <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2016/p0504r0.html">used to be weirder, but was fixed</a>)</span>
+* [`std::piecewise_construct_t`](https://en.cppreference.com/w/cpp/utility/piecewise_construct)
+* [`std::unexpect_t`](https://en.cppreference.com/w/cpp/utility/expected/unexpect_t)
+
+All of the above are passed only to constructors.
+[`std::nothrow_t`](https://en.cppreference.com/w/cpp/memory/new/nothrow) is passed to `operator new`.
+[`std::destroying_delete_t`](https://en.cppreference.com/w/cpp/memory/new/destroying_delete_t)
+is passed to `operator delete`.
+
+## Concept tag types
+
+A concept tag type looks like this instead:
+
+```c++
+    struct foo_tag {};
+
+    template<class T> concept foo = ~~~~;
+```
+
+A concept tag is *never* named explicitly at the call-site. It is used in generic programming —
+that is, inside a template that doesn't know quite all the capabilities of the type it's received.
+So the template will dispatch on a member typedef with a name conventionally ending in
+`_category` or `_concept`, which the user-supplied type must provide. Like this:
+
+```c++
+    template<class T> void internal_algorithm(T, foo_tag);
+    template<class T> void internal_algorithm(T, bar_tag);
+
+    template<class T>
+    void useful_template(T t) {
+      internal_algorithm(t, typename T::your_category());
+    }
+
+    struct MyFoolikeClass {
+      using your_category = foo_tag;
+    };
+```
+
+You can combine this pattern with inheritance, to build a class hierarchy
+of concept tags corresponding to your concept hierarchy of concepts. Then my user-supplied
+class `U` should (or is assumed to) model your `concept foo` exactly when `U::your_category`
+is — *or is derived from* — `foo_tag`. The STL does it:
+
+```c++
+    struct forward_iterator_tag : input_iterator_tag {};
+
+    template<class T>
+    concept forward_iterator = input_iterator<T> && ~~~~;
+```
+
+Of course the STL's iterator machinery long predates concepts, and when Concepts arrived
+in C++20 there was some retrofitting involved; so in fact the STL has member typedefs named
+both `U::iterator_category` and `U::iterator_concept`, and (since C++20) ordinary users
+never need to supply either of them.
+
+In this pattern the tag's name (sans `_tag`) always denotes a concept — a category of behaviors
+that the user-supplied type has — and the member typedef name always ends in `_category`
+or `_concept`. The C++23 STL has only one family of examples:
+
+* `iterator_category` and `iterator_concept` (`input_iterator_tag`, `output_iterator_tag`, `forward_iterator_tag`, etc.)
+
+But Boost has many more:
+
+* `directed_category` (`directed_tag`, `undirected_tag`, etc.) in [Boost.Graph](https://github.com/boostorg/graph)
+* `traversal_category` (`vertex_list_graph_tag`, etc.) in Boost.Graph
+* `fusion_tag` (`deque_tag`, `vector_tag`, etc.) in [Boost.Fusion](https://github.com/boostorg/fusion)
+* `stepper_category` (`stepper_tag`, etc.) in [Boost.Numeric.Odeint](https://github.com/boostorg/odeint)
+* `orientation_category` (`row_major_tag`, `column_major_tag`, etc.) in [Boost.uBlas](https://github.com/boostorg/ublas)
+* `type_category` (`tensor_tag`, etc.) in Boost.uBlas
+* `storage_category` (`dense_tag`, `packed_tag`, `sparse_tag`, etc.) in Boost.uBlas
+
+## Differences between the two kinds
+
+| Disambiguation tags | Concept tags |
+|---------------------|--------------|
+| Ends with `_t` | Ends with `_tag` |
+| Without the suffix it's an inline constexpr variable | Without the suffix it's a concept |
+| Used in concrete programming | Used only in generic programming |
+| No associated member typedef | Associated member typedef ending with `_category` or `_concept` |
+| Named in the caller | Named in the typedef definition, and in the callee |
+| Callee is usually a constructor | Callee is generic-programming machinery |
+| Never derive from each other | May derive from each other to form a hierarchy |
+
+## Wrong-naming in `<execution>`
+
+The `<execution>` header, a.k.a. [P2300](https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p2300r10.html)
+"Senders and Receivers" (S&amp;R), adds four new "concept tags," following the pattern precisely
+to the letter, *except* that (as of December 2025) it misnames them using `_t` rather
+than `_tag`. In each case we have the tag type and its associated concept:
+
+```c++
+    struct sender_t {};
+
+    template<class Sndr>
+      concept sender = ~~~~;
+```
+
+User code (e.g. this example from <a href="https://eel.is/c++draft/exec.cmplsig">[exec.cmplsig]/2</a>)
+has a member typedef ending in `_concept`:
+
+```c++
+    struct my_sender {
+      using sender_concept = sender_t;
+      ~~~~
+    };
+```
+
+This follows the "concept tag" pattern to the letter... except for the naming of `sender_t`!
+
+| Property of `sender_t` | Disambiguation<br>tag-like | Concept<br>tag-like |
+|-----------|----------------|--------------|
+| Ends with `_t` | &#x2705; | &#x274C; |
+| Without the suffix it's a concept | &#x274C; | &#x2705; |
+| Used only in generic programming | &#x274C; | &#x2705; |
+| Associated member typedef ending with `_concept` | &#x274C; | &#x2705; |
+| Named in the typedef definition, and in the callee | &#x274C; | &#x2705; |
+| Callee is generic-programming machinery | &#x274C; | &#x2705; |
+| Don't derive from each other | &#x2705; | &#x2705; |
+
+So `sender_t` really "should" have been named `sender_tag`, as it has been
+(organically and independently, as far as I know) in
+[jaredhoberock/croquet](https://github.com/jaredhoberock/croquet/blob/e32a83322878e6e2855f23c948abafb008bfd38b/fused_sender.hpp#L14) since 2019,
+[janciesko/stdexx](https://github.com/janciesko/stdexx/blob/9a24fa414639ecb0a993fb378f238a03337395b8/impl/qthreads/stdexec.hpp#L247) since June 2025,
+[Cra3z/coio](https://github.com/Cra3z/coio/blob/6b20969c29d3a0fafc326bf956df74db450b04f1/include/coio/execution_context.h#L25) since August 2025,
+and maybe a few other places.
+
+In an ideal world, the following four "concept tag" types would be renamed before we finalize C++26:
+
+* `sender_t`, associated with [`sender_concept` and `concept sender`](https://eel.is/c++draft/exec.snd.concepts)
+* `receiver_t`, associated with [`receiver_concept` and `concept receiver`](https://eel.is/c++draft/exec.recv.concepts)
+* `operation_state_t`, associated with [`operation_state_concept` and `concept operation_state`](https://eel.is/c++draft/exec.opstate)
+* `scheduler_t`, associated with [`scheduler_concept` and `concept scheduler`](https://eel.is/c++draft/exec.sched)
+
+# Proposed wording # {#wording}
+
+## [execution.syn] ## {#wording-execution.syn}
+
+Modify <a href="http://eel.is/c++draft/execution.syn">[execution.syn]</a> as follows:
+
+<small><blockquote>
+<pre>
+  [...]
+  // [exec.sched], schedulers
+  struct scheduler_t<ins>ag</ins> {};
+
+  template&lt;class Sch>
+    concept scheduler = see below;
+
+  // [exec.recv], receivers
+  struct receiver_t<ins>ag</ins> {};
+
+  template&lt;class Rcvr>
+    concept receiver = see below;
+
+  template&lt;class Rcvr, class Completions>
+    concept receiver_of = see below;
+
+  struct set_value_t { unspecified };
+  struct set_error_t { unspecified };
+  struct set_stopped_t { unspecified };
+
+  inline constexpr set_value_t set_value{};
+  inline constexpr set_error_t set_error{};
+  inline constexpr set_stopped_t set_stopped{};
+
+  // [exec.opstate], operation states
+  struct operation_state_t<ins>ag</ins> {};
+
+  template&lt;class O>
+    concept operation_state = see below;
+
+  struct start_t;
+  inline constexpr start_t start{};
+
+  // [exec.snd], senders
+  struct sender_t<ins>ag</ins> {};
+
+  template&lt;class Sndr>
+    inline constexpr bool enable_sender = <i>see below</i>;
+
+  template&lt;class Sndr>
+    concept sender = <i>see below</i>;
+  [...]
+</pre>
+</blockquote></small>
+
+## [exec.sched] ## {#wording-exec.sched}
+
+Modify <a href="http://eel.is/c++draft/exec.sched">[exec.sched]</a> as follows:
+
+<small><blockquote>
+<p>1․ The `scheduler` concept defines the requirements of a scheduler type ([exec.async.ops]).
+`schedule` is a customization point object that accepts a scheduler.
+A valid invocation of `schedule` is a schedule-expression.
+<pre>
+  namespace std::execution {
+    template&lt;class Sch>
+      concept scheduler =
+        derived_from&lt;typename remove_cvref_t&lt;Sch>::scheduler_concept, scheduler_t<ins>ag</ins>> &amp;&amp;
+        queryable&lt;Sch> &amp;&amp;
+        requires(Sch&amp;&amp; sch) {
+          { schedule(std::forward&lt;Sch>(sch)) } -> sender;
+          { auto(get_completion_scheduler&lt;set_value_t>(
+              get_env(schedule(std::forward&lt;Sch>(sch))))) }
+                -> same_as&lt;remove_cvref_t&lt;Sch>>;
+        } &amp;&amp;
+        equality_comparable&lt;remove_cvref_t&lt;Sch>> &amp;&amp;
+        copyable&lt;remove_cvref_t&lt;Sch>>;
+  }
+</pre>
+[...]
+</blockquote></small>
+
+## [exec.recv.concepts] ## {#wording-exec.recv.concepts}
+
+Modify <a href="http://eel.is/c++draft/exec.recv.concepts">[exec.recv.concepts]</a> as follows:
+
+<small><blockquote>
+<p>1․ A receiver represents the continuation of an asynchronous operation.
+The `receiver` concept defines the requirements for a receiver type ([exec.async.ops]).
+The `receiver_of` concept defines the requirements for a receiver type that is usable as the first argument
+of a set of completion operations corresponding to a set of completion signatures. The `get_env`
+customization point object is used to access a receiver's associated environment.
+<pre>
+  namespace std::execution {
+    template&lt;class Rcvr>
+      concept receiver =
+        derived_from&lt;typename remove_cvref_t&lt;Rcvr>::receiver_concept, receiver_t<ins>ag</ins>> &amp;&amp;
+        requires(const remove_cvref_t&lt;Rcvr>&amp; rcvr) {
+          { get_env(rcvr) } -> queryable;
+        } &amp;&amp;
+        move_constructible&lt;remove_cvref_t&lt;Rcvr>> &amp;&amp;       // rvalues are movable, and
+        constructible_from&lt;remove_cvref_t&lt;Rcvr>, Rcvr>;   // lvalues are copyable
+</pre>
+[...]
+</blockquote></small>
+
+## [exec.opstate.general] ## {#wording-exec.opstate.general}
+
+Modify <a href="http://eel.is/c++draft/exec.opstate.general">[exec.opstate.general]</a> as follows:
+
+<small><blockquote>
+<p>1․ The `operation_state` concept defines the requirements of an operation state type ([exec.async.ops]).
+<pre>
+  namespace std::execution {
+    template&lt;class O>
+      concept operation_state =
+        derived_from&lt;typename O::operation_state_concept, operation_state_t> &amp;&amp;
+        requires (O&amp; o) {
+          start(o);
+        };
+  }
+</pre>
+[...]
+</blockquote></small>
+
+## [exec.snd.expos] ## {#wording-exec.snd.expos}
+
+Modify <a href="http://eel.is/c++draft/exec.snd.expos">[exec.snd.expos]</a> as follows:
+
+<small><blockquote>
+<pre>
+[...]
+
+  template&lt;class Sndr, class Rcvr, class Index>
+      requires <i>valid-specialization</i>&lt;<i>env-type</i>, Index, Sndr, Rcvr>
+    struct <i>basic-receiver</i> {                                       <i>// exposition only</i>
+      using receiver_concept = receiver_t<ins>ag</ins>;
+
+[...]
+
+  template&lt;class Sndr, class Rcvr>
+    requires <i>valid-specialization</i>&lt;<i>state-type</i>, Sndr, Rcvr> &&
+             <i>valid-specialization</i>&lt;<i>connect-all-result</i>, Sndr, Rcvr>
+  struct <i>basic-operation</i> : <i>basic-state</i>&lt;Sndr, Rcvr> {            <i>// exposition only</i>
+    using operation_state_concept = operation_state_t<ins>ag</ins>;
+
+[...]
+
+  template&lt;class Tag, class Data, class... Child>
+    struct <i>basic-sender</i> : <i>product-type</i>&lt;Tag, Data, Child...> {     <i>// exposition only</i>
+      using sender_concept = sender_t<ins>ag</ins>;
+
+[...]
+
+  struct <i>not-a-sender</i> {
+    using sender_concept = sender_t<ins>ag</ins>;
+
+[...]
+</pre>
+</blockquote></small>
+
+## [exec.snd.concepts] ## {#wording-exec.snd.concepts}
+
+Modify <a href="http://eel.is/c++draft/exec.snd.concepts">[exec.snd.concepts]</a> as follows:
+
+<small><blockquote>
+[...]
+<pre>
+  template&lt;class Sndr>
+    concept <i>is-sender</i> =                                         <i>// exposition only</i>
+      derived_from&lt;typename Sndr::sender_concept, sender_t<ins>ag</ins>>;
+</pre>
+[...]
+</blockquote></small>
+
+## [exec.connect] ## {#wording-exec.connect}
+
+Modify the example in <a href="http://eel.is/c++draft/exec.connect">[exec.connect]</a> as follows:
+
+<small><blockquote>
+<p>4. Let <i><code>operation-state-task</code></i> be the following exposition-only class:
+<pre>
+namespace std::execution {
+  struct <i>operation-state-task</i> {                              <i>// exposition only</i>
+    using operation_state_concept = operation_state_t<ins>ag</ins>;
+</pre>
+[...]
+</blockquote></small>
+
+## [exec.schedule.from] ## {#wording-exec.schedule.from}
+
+TODO FIXME BUG HACK
+
+## [exec.let] ## {#wording-exec.let}
+
+TODO FIXME BUG HACK
+
+## [exec.spawn.future] ## {#wording-exec.spawn.future}
+
+TODO FIXME BUG HACK
+
+## [exec.sync.wait] ## {#wording-exec.sync.wait}
+
+TODO FIXME BUG HACK
+
+## [exec.spawn] ## {#wording-exec.spawn}
+
+TODO FIXME BUG HACK
+
+## [exec.cmplsig] ## {#wording-exec.cmplsig}
+
+Modify the example in <a href="http://eel.is/c++draft/exec.cmplsig">[exec.cmplsig]</a> as follows:
+
+<small><blockquote>
+<i>[Example 1:</i>
+<pre>
+struct my_sender {
+  using sender_concept = sender_t<ins>ag</ins>;
+  using completion_signatures =
+    execution::completion_signatures&lt;
+      set_value_t(),
+      set_value_t(int, float),
+      set_error_t(exception_ptr),
+      set_error_t(error_code),
+      set_stopped_t()>;
+};
+</pre>
+Declares `my_sender` to be a sender that [...] <i>—end example]</i>
+</blockquote></small>
+
+## [exec.as.awaitable] ## {#wording-exec.as.awaitable}
+
+TODO FIXME BUG HACK
+
+## [exec.inline.scheduler] ## {#wording-exec.inline.scheduler}
+
+TODO FIXME BUG HACK
+
+## [exec.task.scheduler] ## {#wording-exec.task.scheduler}
+
+Modify <a href="http://eel.is/c++draft/exec.task.scheduler">[exec.task.scheduler]</a> as follows:
+
+<small><blockquote>
+<pre>
+    class task_scheduler {
+      class <i>ts-sender</i>;                    <i>// exposition only</i>
+
+      template&lt;receiver R>
+        class <i>state</i>;                      <i>// exposition only</i>
+
+    public:
+      using scheduler_concept = scheduler_t<ins>ag</ins>;
+
+      template&lt;class Sch, class Allocator = allocator&lt;void>>
+        requires (!same_as&lt;task_scheduler, remove_cvref_t&lt;Sch>>)
+          &amp;&amp; scheduler&lt;Sch>
+      explicit task_scheduler(Sch&amp;&amp; sch, Allocator alloc = {});
+
+      <i>ts-sender</i> schedule();
+
+      friend bool operator==(const task_scheduler&amp; lhs, const task_scheduler&amp; rhs)
+          noexcept;
+      template&lt;class Sch>
+        requires (!same_as&lt;task_scheduler, Sch>)
+        &amp;&amp; scheduler&lt;Sch>
+      friend bool operator==(const task_scheduler&amp; lhs, const Sch&amp; rhs) noexcept;
+
+    private:
+      shared_ptr&lt;void> sch_; // exposition only
+    };
+</pre>
+[...]
+<pre>
+    class task_scheduler::<i>ts-sender</i> {     <i>// exposition only</i>
+    public:
+      using sender_concept = sender_t<ins>ag</ins>;
+
+      template&lt;receiver Rcvr>
+        state&lt;Rcvr> connect(Rcvr&amp;&amp; rcvr);
+    };
+</pre>
+[...]
+<pre>
+    template&lt;receiver R>
+    class task_scheduler::<i>state</i> {         <i>// exposition only</i>
+    public:
+      using operation_state_concept = operation_state_t<ins>ag</ins>;
+
+      void start() &amp; noexcept;
+    };
+</pre>
+</blockquote></small>
+
+## [task.class] ## {#wording-task.class}
+
+Modify <a href="http://eel.is/c++draft/task.class">[task.class]</a> as follows:
+
+<small><blockquote>
+<pre>
+  namespace std::execution {
+    template&lt;class T, class Environment>
+    class task {
+      <i>// [task.state]</i>
+      template&lt;receiver Rcvr>
+        class state;                              <i>// exposition only</i>
+
+    public:
+      using sender_concept = sender_t<ins>ag</ins>;
+      using completion_signatures = <i>see below</i>;
+</pre>
+[...]
+</blockquote></small>
+
+## [task.state] ## {#wording-task.state}
+
+TODO FIXME BUG HACK
+
+## [exec.counting.scopes.general] ## {#wording-exec.counting.scopes.general}
+
+TODO FIXME BUG HACK
+
+
+<pre class=biblio>
+{
+  "N5013": {
+    "title": "Committee Draft — Programming Languages — C++",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5013.pdf",
+    "date": "August 2025"
+  }
+}
+</pre>

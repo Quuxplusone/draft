@@ -27,7 +27,8 @@ all: \
     d3612-proxy-reference.html \
     d3623-valarray.html \
     d3823-remove-keywords.html \
-    d3827-remove-replaceable.html
+    d3827-remove-replaceable.html \
+    d3940-sender-tag.html
 
 %.html: %.bs
 	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
