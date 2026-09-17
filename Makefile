@@ -31,5 +31,5 @@ all: \
     d3940-sender-tag.html
 
 %.html: %.bs
-	curl https://api.csswg.org/bikeshed/ -F file=@$< -F output=err
-	curl https://api.csswg.org/bikeshed/ -F file=@$< -F force=1 > $@
+	curl https://www.w3.org/publications/spec-generator/ -F type=bikeshed-spec -F file=@$< -F output=messages
+	curl https://www.w3.org/publications/spec-generator/ -F type=bikeshed-spec -F file=@$< -F die-on=nothing > $@
