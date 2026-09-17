@@ -1,7 +1,7 @@
 <pre class='metadata'>
-Title: auto& operator=(X&&) = default
+Title: Deduced return types for defaulted operator functions
 Shortname: D2952
-Revision: 2
+Revision: 3
 !Draft Revision: 16
 Audience: CWG
 Status: D
@@ -15,7 +15,7 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2025-01-08
+Date: 2026-09-13
 </pre>
 
 <style>
@@ -25,6 +25,13 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R3 (Brno):
+    - CWG review, wording changes.
+
+    - Change paper title to be more descriptive of the full scope of the paper.
+
+    - Update divergence table in [[#corner-cases]], list compiler versions tested.
 
 - R2 (pre-Hagenberg):
 
@@ -341,13 +348,13 @@ to *spell* that return type using a placeholder such as `auto&`.
 ## Existing corner cases ## {#corner-cases}
 
 There is vendor divergence in some corner cases. Here is a table of the divergences we found,
-plus our opinion as to the conforming behavior, and our proposed behavior.
+plus our opinion as to the conforming behavior, and our proposed behavior. The compilers tested are x86-64 gcc trunk, x86-64 Clang trunk, arm64 msvc19.latest, and x86 nvc++ 23.5.
 
 <small><table>
 <tr><th>URL</th><th>Code</th><th>Clang</th><th>GCC</th><th>MSVC</th><th>EDG</th><th>Correct</th></tr>
 <tr><td><a href="https://godbolt.org/z/3EqYc43xh">link</a></td><td><pre>const bool operator==(const C&) const = default;</pre></td>
     <td>✗</td><td>✗</td><td>✗</td><td bgcolor="#FFCACA">✓</td><td><a href="https://eel.is/c++draft/class.eq#1.sentence-1">✗</a></td></tr>
-<tr><td><a href="https://godbolt.org/z/hx9vvorsn">link</a></td><td><pre>friend bool operator==(const C, const C) = default;</pre></td>
+<tr><td><a href="https://godbolt.org/z/nWKPbh13P">link</a></td><td><pre>friend bool operator==(const C, const C) = default;</pre></td>
     <td>✓</td><td bgcolor="#FFCACA">✗</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/class.compare#default-1.sentence-1">✓</a></td></tr>
 <tr><td><a href="https://godbolt.org/z/e7Eba49qr">link</a></td><td><pre>decltype(auto) operator<=>(const C&) const = default;</pre></td>
     <td>✗</td><td bgcolor="#FFCACA">✓</td><td>✗</td><td>✗</td><td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: ✓</td></tr>
@@ -368,18 +375,18 @@ struct C {
   U operator<=>(const C&) const = default;
 };</pre></td>
     <td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-2">deleted</a></td></tr>
-<tr><td><a href="https://godbolt.org/z/T6bnsMqWo">link</a></td><td><pre>struct C {
+<tr><td><a href="https://godbolt.org/z/cKv6ejWf5">link</a></td><td><pre>struct C {
   int i;
   const std::strong_ordering&
     operator<=>(const C&) const = default;
 };</pre></td>
     <td bgcolor="#FFCACA">✓</td><td>deleted</td><td bgcolor="#FFCACA">✓</td><td>deleted</td><td>deleted</td></tr>
-<tr><td><a href="https://godbolt.org/z/W3eW1Tdb9">link</a></td><td><pre>struct C {
+<tr><td><a href="https://godbolt.org/z/4587EMx6b">link</a></td><td><pre>struct C {
   const std::strong_ordering&
     operator<=>(const C&) const = default;
 };</pre></td>
     <td>✓</td><td>✓</td><td>✓</td><td bgcolor="#FFCACA">deleted</td><td>Today: ✓<br>Proposed: deleted</td></tr>
-<tr><td><a href="https://godbolt.org/z/KTTGMjWox">link</a></td><td><pre>struct W {
+<tr><td><a href="https://godbolt.org/z/xWd46bKj5">link</a></td><td><pre>struct W {
   const std::strong_ordering
     operator<=>(const W&) const;
 };
@@ -388,7 +395,7 @@ struct C {
   auto operator<=>(const C&) const = default;
 };</pre></td>
     <td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✓</td><td>deleted</td><td><a href="https://eel.is/c++draft/class.compare#class.spaceship-2.1.sentence-2">deleted</a></td></tr>
-<tr><td><a href="https://godbolt.org/z/3T4b9YM6r">link</a></td><td><pre>struct W {
+<tr><td><a href="https://godbolt.org/z/T879sf1qd">link</a></td><td><pre>struct W {
   const std::strong_ordering
     operator<=>(const W&) const;
 };
@@ -401,15 +408,15 @@ struct C {
 <tr><td><a href="https://godbolt.org/z/G3ddGeex8">link</a><td><pre>auto operator<=>(const M&) const
   noexcept(false) = default;</pre></td>
     <td>✓</td><td>✓</td><td bgcolor="#FFCACA">noexcept</td><td bgcolor="#FFCACA">incon-<br>sistent</td><td><a href="https://eel.is/c++draft/class.compare#default-note-1">✓</a></td>
-<tr><td><a href="https://godbolt.org/z/WezedYYE3">link</a></td><td><pre>C& operator=(C&) = default;</pre></td>
+<tr><td><a href="https://godbolt.org/z/cnv99zo3s">link</a></td><td><pre>C& operator=(C&) = default;</pre></td>
     <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
 <tr><td><a href="https://godbolt.org/z/hxc9za5KT">link</a></td><td><pre>C& operator=(const C&&) = default;</pre></td>
     <td>deleted</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
 <tr><td><a href="https://godbolt.org/z/ojM541bTM">link</a></td><td><pre>C& operator=(const C&) const = default;</pre></td>
     <td>deleted</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
-<tr><td><a href="https://godbolt.org/z/hchco3rcK">link</a></td><td><pre>C& operator=(const C&) && = default;</pre></td>
-    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>([[P2953]]: deleted)</td></tr>
-<tr><td><a href="https://godbolt.org/z/5P6EKrGjo">link</a></td><td><pre>C&& operator=(const C&) && = default;</pre></td>
+<tr><td><a href="https://godbolt.org/z/GT87o1f4K">link</a></td><td><pre>C& operator=(const C&) && = default;</pre></td>
+    <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✓</a><br>([[P2953]]: ill-formed)</td></tr>
+<tr><td><a href="https://godbolt.org/z/GsPb8rreo">link</a></td><td><pre>C&& operator=(const C&) && = default;</pre></td>
     <td>✗</td><td>✗</td><td>✗</td><td>✗</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a></td></tr>
 </table></small>
 
@@ -447,18 +454,31 @@ The first was interpreted as "no consensus"; the second was interpreted as conse
 <th> 3 </th><th> 10 </th><th> 4 </th><th> 1 </th><th> 0 </th></tr>
 </table>
 
+This paper was presented again in EWG in Hagenberg, with the following poll taken:
+
+<table class="def">
+<tr><th style="width: 70%;"></th><th>**SF**</th><th>**F**</th><th>**N**</th><th>**A**</th><th>**SA**</th></tr>
+
+<tr><th><small>P2952R2 auto& operator=(X&&) = default: forward to CWG for C++26.</small></th>
+<th> 5 </th><th> 25  </th><th> 13 </th><th> 5 </th><th> 4 </th></tr>
+</table>
+
+
 # Proposed wording # {#wording}
 
 ## [class.eq] ## {#wording-class.eq}
 
 <p class="note"><b>DRAFTING NOTE:</b>
 The phrase "equality operator function" (<a href="https://eel.is/c++draft/over.binary">[over.binary]</a>)
-means `==` or `!=`. But `!=` is not covered by [class.eq]; it's covered by [class.compare.secondary] below.
+means `==` or `!=`. But `!=` is not covered by [class.eq]; it's covered by [class.compare.secondary] below.</p>
 
 Modify <a href="https://eel.is/c++draft/class.eq">[class.eq]</a> as follows:
 
 <small><blockquote>
 <p><del>1․ A defaulted equality operator function ([over.binary]) shall have a declared return type `bool`.</del>
+
+<p><ins>x․ A defaulted `==` operator function shall have the return type `bool`. If its declared return type
+contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
 
 2․ A defaulted `==` operator function for a class `C` is defined as deleted unless, for each `x`<sub><i>i</i></sub>
 in the expanded list of subobjects for an object `x` of type `C`, `x`<sub><i>i</i></sub> `== x`<sub><i>i</i></sub> is usable
@@ -469,9 +489,6 @@ in the expanded list of subobjects for an object `x` of type `C`, `x`<sub><i>i</
 until the first index <i>i</i> where `x`<sub><i>i</i></sub> `==` `y`<sub><i>i</i></sub> <del>yields a result value
 which</del> , <del>when</del> contextually converted to `bool`, yields `false`.
 If no such index exists, `V` is `true`. Otherwise, `V` is `false`.
-
-<ins>x․ A defaulted `==` operator function shall have the return type `bool`. If its declared return type
-contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
 
 4․ [<i>Example 1:</i>
 <pre>
@@ -495,35 +512,34 @@ or else the sequence `x`<sub><i>i</i></sub> must be empty (in which case there a
 that it be constructible from `strong_ordering::equal`). We strengthen the wording to directly mandate that the
 return type be a comparison category type, even in the empty case.
 
-Modify <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a> as follows:
+Modify <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a> as follows:</p>
 
 <small><blockquote>
 [...]
 
-2․ Let `R` be the declared return type of a defaulted three-way comparison operator function, and let 
+2․ Let `R` be the declared return type of a defaulted three-way comparison operator function, and let
 `x`<sub><i>i</i></sub> be the elements of the expanded list of subobjects for an object `x` of type `C`.
 
-— (2.1) If `R` <del>is `auto`,</del> <ins>contains a placeholder type,</ins> then let
-<i>cv<sub>i</sub></i> `R`<sub><i>i</i></sub> be the type of the expression
+— (2.1) If `R` <del>is `auto`,</del> <ins>contains a placeholder type, then let `S` be the return type after deduction.</ins> <del>then l</del><ins>L</ins>et
+<i>cv<sub>i</sub></i> <del>`R`</del><ins>`S`</ins><sub><i>i</i></sub> be the type of the expression
 `x`<sub><i>i</i></sub> `<=> x`<sub><i>i</i></sub>. The operator function is defined as deleted if that expression is not usable
-or if `R`<sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>.
-The return type is deduced as <ins>if from `return Q(std::strong_ordering::equal);`, where `Q` is</ins> the
-common comparison type (see below) of `R`<sub>0</sub>, `R`<sub>1</sub>, ..., `R`<sub>n-1</sub>.
+or if <del>`R`</del><ins>`S`</ins><sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>.
+The return type is deduced as <ins>if from `return Q(std::strong_ordering::equal);` where `Q` is</ins> the common comparison type (see below) of <del>`R`</del><ins>`S`</ins><sub>0</sub>, <del>`R`</del><ins>`S`</ins><sub>1</sub>, ..., <del>`R`</del><ins>`S`</ins><sub>n-1</sub>.
 
 — (2.2) Otherwise, <del>`R` shall not contain a placeholder type. If</del> <ins>if</ins> the synthesized three-way comparison of type `R`
 between any objects `x`<sub><i>i</i></sub> and `x`<sub><i>i</i></sub> is not defined, the operator function is
 defined as deleted.
 
-3․ The return value `V` <del>of type `R`</del> of the defaulted three-way comparison operator function with parameters `x` and `y` <del>of
+<ins>x․ A defaulted three-way comparison operator function that is not deleted shall have a return type which is a comparison category type
+([cmp.categories.pre]).</ins>
+
+3․ The return value `V` of type `R` of the defaulted three-way comparison operator function with parameters `x` and `y` <del>of
 the same type</del> is determined by comparing corresponding elements `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub>
 in the expanded lists of subobjects for `x` and `y` (in increasing index order) until the first index <i>i</i>
 where the synthesized three-way comparison of type `R` between `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub>
 yields a result value `v`<sub><i>i</i></sub> where `v`<sub><i>i</i></sub> `!= 0`, contextually converted to `bool`,
 yields `true`; `V` is <del>a copy of</del> `v`<sub><i>i</i></sub>.
-If no such index exists, `V` is <del>`static_cast<R>(`</del>`std::strong_ordering::equal`<del>`)`</del>.
-
-<ins>x․ A defaulted three-way comparison operator function which is not deleted shall have a return type which is a comparison category type
-([cmp.categories.pre]).</ins>
+If no such index exists, `V` is `static_cast<R>(std::strong_ordering::equal)`.
 
 4․ The <i>common comparison type</i> `U` of a possibly-empty list of <i>n</i> comparison category types
 `T`<sub>0</sub>, `T`<sub>1</sub>, ..., `T`<sub>n-1</sub> is defined as follows:
@@ -536,8 +552,11 @@ If no such index exists, `V` is <del>`static_cast<R>(`</del>`std::strong_orderin
 Modify <a href="https://eel.is/c++draft/class.compare.secondary">[class.compare.secondary]</a> as follows:
 
 <small><blockquote>
-<p>1․ A <i>secondary comparison operator</i> is a relational operator ([expr.rel]) or the `!=` operator. <del>A
+<p>1․ A <i>secondary comparison operator</i> <ins>`@`</ins> is a relational operator ([expr.rel]) or the `!=` operator. <del>A
 defaulted operator function ([over.binary]) for a secondary comparison operator `@` shall have a declared return type `bool`.</del>
+
+<p><ins>x․ A defaulted secondary comparison operator function shall have the return type `bool`. If its declared return type
+contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
 
 2․ <del>The</del> <ins>A defaulted secondary comparison</ins> operator function with parameters `x` and `y` is defined as deleted if
 
@@ -547,9 +566,6 @@ defaulted operator function ([over.binary]) for a secondary comparison operator 
 
 Otherwise, the operator function yields `x @ y`. The defaulted operator function is not considered as a candidate
 in the overload resolution for the `@` operator.
-
-<ins>x․ A defaulted secondary comparison operator function shall have the return type `bool`. If its declared return type
-contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
 
 3․ [<i>Example 1</i>:
 <pre>
@@ -572,28 +588,98 @@ But we need this new wording to ensure that an *explicitly-defaulted* copy/move 
 will deduce that same type. (If it deduces a different type, then the explicitly-defaulted operator
 becomes ill-formed, as in example `B` below.)
 
-Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:
+Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:</p>
 
-<small><blockquote>
+<small>
+<blockquote>
+<p>
 14․ The implicitly-defined copy/move assignment operator for a class returns
 the object for which the assignment operator is invoked, that is,
 the object assigned to.
-<p><ins>15․ If a defaulted copy/move assignment operator's declared return type contains a
+</p>
+
+<ins block>
+15․ If the declared return type of a defaulted copy/move assignment operator for a class X contains a
 placeholder type, its return type is deduced as if from `return r;`, where `r` is an lvalue
-reference to the object for which the assignment operator is invoked.</ins>
-<p><ins>16․ [<i>Example:</i></ins>
+reference to `X`. <br>
+
+<ins block>
+<ins>16․ [<i>Example:</i></ins>
+</ins>
 <pre>
-<ins>struct A {</ins>
-  <ins>decltype(auto) operator=(A&&) = default;</ins>
-    <ins><i>// Return type is A&</i></ins>
-<ins>};</ins>
-<ins>struct B {</ins>
-  <ins>auto operator=(B&&) = default;</ins>
-    <ins><i>// error: Return type is B, which violates [dcl.fct.def.default]/2.5</i></ins>
-<ins>};</ins>
+<ins>struct A {
+  decltype(auto) operator=(A&&) = default;
+    <i>// OK, return type is A&</i>
+};
+struct B {
+  auto operator=(B&&) = default;
+    <i>// error: return type is B, which violates [dcl.fct.def.default]</i>
+};</ins>
 </pre>
-<ins>—<i>end example</i>]</ins>
+—<i>end example</i>]
+</ins>
+</blockquote>
+</small>
+
+## [over.inc.default] ## {#wording-over.inc.default}
+
+Modify <a href=https://eel.is/c++draft/over.inc.default>[over.inc.default]</a> as follows:
+
+<small><blockquote>
+<p>1. A defaulted postfix increment or decrement operator function for a type C shall be a non-template function that </p>
+<p> — (1.1) has a first parameter of type “reference to C” or a first parameter of type “reference to volatile C”, where the implicit object parameter (if any) is considered to be the first parameter, </p>
+<p> — (1.2) is defined as defaulted in C or in a context where C is complete, and </p>
+<p> — (1.3) has a declared return type of C <ins> or a placeholder type</ins>.</p>
+
+[...]
+
+<p>3. The implicit definition of a defaulted postfix increment or decrement operator function `F` that is not defined as deleted for a type `C` is equivalent to:</p>
+
+<pre>
+C <i>tmp</i>(c);
+++c;
+return <i>tmp</i>;
+</pre>
+
+<p>for a postfix increment operator function, or</p>
+
+<pre>
+C <i>tmp</i>(c);
+--c;
+return <i>tmp</i>;
+</pre>
+
+<p>for a postfix decrement operator function,</p>
+
+<p>where <i><code>tmp</code></i> is a variable defined for exposition only, and `c` is an lvalue that denotes `*this` if `F` is an implicit object member function, or the first parameter of `F` otherwise.</p>
+
+[...]
+
+<ins block>
+<p><ins> 5. If the return type of a defaulted postfix increment or decrement operator function contains a placeholder type, its return type is deduced as if from <code>return <i>tmp</i>;</code></ins></p>
+</ins>
 </blockquote></small>
+
+
+
+## Annex C ## {#wording-annex-c}
+
+Add a clause to Annex C under [class] as follows:
+
+<blockquote>
+<ins>
+<b>Affected clause:</b> <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a><br>
+<b>Change:</b> A defaulted three-way comparison operator must return a comparison category type, otherwise it is deleted.<br>
+<b>Rationale:</b> The old behaviour was inconsistent and confusing. <br>
+<b>Effect on original feature:</b> A valid C++26 program which contains a defaulted three-way comparison operator with a return type which is not a comparison category type, and which attempts to call it, is ill-formed.<br>
+<b>Example: </b><br>
+<code>
+struct C{ <br>
+&nbsp; &nbsp; const std::strong_ordering& operator<=>(const C&) const = default; // deleted; previously not deleted <br>
+}; <br>
+</code>
+</ins>
+</blockquote>
 
 <pre class=biblio>
 {
