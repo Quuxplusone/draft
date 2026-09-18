@@ -1566,6 +1566,7 @@ Possible extra rowspan handling
   <meta content="45e9c0ac7c8d85efa48ef6f9bcf3cfa46b80511d" name="revision">
   <meta content="dark light" name="color-scheme">
 <style>
+div  {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
 p    {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
@@ -2125,7 +2126,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <p data-fill-with="logo"></p>
    <h1 class="no-ref p-name" id="title">D2952R3<br>Deduced return types for defaulted operator functions</h1>
    <h2 class="heading no-num no-ref no-toc settled" id="profile-and-date"><span class="content">Draft Proposal,
-    <time class="dt-updated" datetime="2026-09-17">2026-09-17</time></span></h2>
+    <time class="dt-updated" datetime="2026-09-18">2026-09-18</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2136,7 +2137,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>17
+     <dd>18
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2191,7 +2192,7 @@ This allows more consistency and less repetition when declaring defaulted functi
      <p>R3 (pre-Búzios):</p>
      <ul>
       <li data-md>
-       <p>Wording changes after CWG review.</p>
+       <p>Wording changes after CWG review. Add the Annex C example.</p>
       <li data-md>
        <p>Change paper title to be more descriptive of the full scope of the paper.</p>
       <li data-md>
@@ -2295,6 +2296,17 @@ making it unnecessarily tedious to upgrade to <code class="highlight"><c- o>=</c
 <pre class="highlight"><small>
 <c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <c- k>const</c-> <del><c- p>{</c-> <c- k>return</c-> <c- n>i</c-> <c- o>==</c-> <c- n>r</c-><c- p>.</c-><c- n>i</c-><c- p>;</c-> <c- p>}</c-></del>
 <c- k>auto</c-> <c- k>operator</c-><c- o>==</c-><c- p>(</c-><c- k>const</c-> <c- n>MyClass</c-><c- o>&amp;</c-> <c- n>r</c-><c- p>)</c-> <c- k>const</c-> <ins><c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+</small></pre>
+     <tr>
+      <td>
+<pre class="highlight"><small>
+<del><c- k>auto</c-></del> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-> <del><c- p>{</c-> <c- k>auto</c-> <c- n>tmp</c-> <c- o>=</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- o>++*</c-><c- k>this</c-><c- p>;</c-> <c- k>return</c-> <c- n>tmp</c-><c- p>;</c-> <c- p>}</c-></del>
+<ins><c- n>MyClass</c-></ins> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-> <ins><c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+</small></pre>
+      <td>
+<pre class="highlight"><small>
+<c- k>auto</c-> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-> <del><c- p>{</c-> <c- k>auto</c-> <c- n>tmp</c-> <c- o>=</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- o>++*</c-><c- k>this</c-><c- p>;</c-> <c- k>return</c-> <c- n>tmp</c-><c- p>;</c-> <c- p>}</c-></del>
+<c- k>auto</c-> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-> <ins><c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
 </small></pre>
    </table>
    <p>The ill-formedness of these declarations comes from overly restrictive wording in the standard,
@@ -2430,7 +2442,6 @@ regardless of whether it’s declared using explicit object syntax.</p>
 which forbids them entirely. Either way, P2952 doesn’t need to treat them specially.
 Defaulted assignment operators invariably return lvalue references, so we invariably deduce as-if-from
 an lvalue reference, full stop.</p>
-   <p>See <a href="#polls">§ 5 Straw poll results</a>.</p>
    <h3 class="heading settled" data-level="3.4" id="new-burden"><span class="secno">3.4. </span><span class="content">Burden on specifying new defaultable operators</span><a class="self-link" href="#new-burden"></a></h3>
    <p>We propose to leave <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> alone
 and reinterpret its term "return type" to mean the actual return type, not the declared return type.
@@ -2779,6 +2790,14 @@ that it be constructible from <code class="highlight"><c- n>strong_ordering</c->
 return type be a comparison category type, even in the empty case.
 
 </p>
+   <p class="note" role="note"><b>DRAFTING NOTE:</b>
+The "new" wording below incorporates the Tentatively Ready fix for <a data-link-type="biblio" href="#biblio-cwg3207" title="Deduced return type of a deleted three-way comparison operator function">[CWG3207]</a>, which tries to ensure
+that the placeholder return type of a deleted function is never deduced. Our proposed wording in
+[over.inc.default] also matches CWG3207’s intent. But our proposed wording in [class.eq] and [class.compare.secondary]
+and [class.copy.assign] do not match CWG3207’s intent. Should CWG3207 therefore remain open?
+For an alternative wording that almost works, see our R2.
+
+</p>
    <p>Modify <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a> as follows:</p>
    <p><small></small></p>
    <blockquote>
@@ -2800,10 +2819,14 @@ return type be a comparison category type, even in the empty case.
 or if 
      <del><code class="highlight"><c- n>R</c-></code></del>
      <ins><code class="highlight"><c- n>S</c-></code></ins>
-     <sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>.
-The return type is deduced as 
+     <sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>. 
+     <del>The</del>
+     <ins>Otherwise,
+the</ins>
+      return type is deduced as 
      <ins>if from <code class="highlight"><c- k>return</c-> <c- n>Q</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-><c- p>);</c-></code> where <code class="highlight"><c- n>Q</c-></code> is</ins>
-      the common comparison type (see below) of 
+      the
+common comparison type (see below) of 
      <del><code class="highlight"><c- n>R</c-></code></del>
      <ins><code class="highlight"><c- n>S</c-></code></ins>
      <sub>0</sub>, 
@@ -2976,14 +2999,16 @@ its return type is deduced as if from <code class="highlight"><c- k>return</c-> 
    <blockquote>
     <ins>
 <b>Affected clause:</b> [class.spaceship]<br>
-<b>Change:</b> A defaulted three-way comparison operator must return a comparison category type; otherwise, it is deleted.<br>
-<b>Rationale:</b> The old behaviour was inconsistent and confusing. <br>
+<b>Change:</b> The defaulted three-way comparison operator of an empty class type must return a
+comparison category type.<br>
+<b>Rationale:</b> Consistency with the existing restriction on defaulted three-way comparison operators of non-empty class types.<br>
 <b>Effect on original feature:</b> A valid C++26 program that contains a defaulted three-way comparison operator
-with a return type that is not a comparison category type, and that attempts to call it, is ill-formed.<br>
+with a return type that is not a comparison category type is ill-formed.<br>
 <b>Example:</b></ins>
-<pre class="highlight"><ins><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c-></ins>
-    <ins><c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
-        <ins><c- c1>// deleted; previously not deleted</c-></ins>
+<pre class="highlight"><ins><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- n>U</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- p>};</c-></ins>
+<ins><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c-></ins>
+  <ins><c- n>U</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></ins>
+    <ins><c- c1>// ill-formed; previously well-formed</c-></ins>
 <ins><c- p>};</c-></ins>
 </pre>
    </blockquote>
@@ -3122,6 +3147,8 @@ with a return type that is not a comparison category type, and that attempts to 
   <dl>
    <dt id="biblio-cwg2586">[CWG2586]
    <dd>Barry Revzin. <a href="https://cplusplus.github.io/CWG/issues/2586.html"><cite>Explicit object parameter for assignment and comparison</cite></a>. May–July 2022. URL: <a href="https://cplusplus.github.io/CWG/issues/2586.html">https://cplusplus.github.io/CWG/issues/2586.html</a>
+   <dt id="biblio-cwg3207">[CWG3207]
+   <dd>Arthur O'Dwyer. <a href="https://cplusplus.github.io/CWG/issues/3207.html"><cite>Deduced return type of a deleted three-way comparison operator function</cite></a>. June–July 2026. URL: <a href="https://cplusplus.github.io/CWG/issues/3207.html">https://cplusplus.github.io/CWG/issues/3207.html</a>
    <dt id="biblio-p2953">[P2953]
    <dd>Matthew Taylor; Arthur O'Dwyer. <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p2953r5.html"><cite>Adding restrictions to defaulted assignment operator functions</cite></a>. June 2026. URL: <a href="https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p2953r5.html">https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p2953r5.html</a>
    <dt id="biblio-p3668">[P3668]
