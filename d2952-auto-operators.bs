@@ -1,8 +1,8 @@
 <pre class='metadata'>
 Title: Deduced return types for defaulted operator functions
 Shortname: D2952
-Revision: 3
-!Draft Revision: 18
+Revision: 4
+!Draft Revision: 19
 Audience: CWG
 Status: D
 Group: WG21
@@ -15,17 +15,24 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2026-09-18
+Date: 2026-09-26
 </pre>
 
 <style>
-div  {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
-p    {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
+body  {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
 ins  {background-color: #CCFFCC; text-decoration: underline;}
 del  {background-color: #FFCACA; text-decoration: line-through;}
 </style>
 
 # Changelog # {#changelog}
+
+- R4 (pre-Búzios):
+
+    - Add two examples for clarity.
+
+    - Make `auto* operator++(int) = default;` invariably ill-formed, rather than
+        "ill-formed if non-deleted, well-formed if deleted." This harmonizes the
+        wordings added to [class.copy.assign] and [over.inc.default].
 
 - R3 (pre-Búzios):
 
@@ -164,7 +171,7 @@ as if from a fictional return statement that returns:
 * a prvalue of type `bool`, in the case of `operator==`, `operator!=`, `operator<`, `operator>`, `operator<=`, or `operator>=`
 * a prvalue of type `Q`, in the case of `operator<=>`; where `Q` is the common comparison type of <i>R</i><sub>0</sub>, <i>R</i><sub>1</sub>,... <i>R</i><sub>n-1</sub>
 * an lvalue of type `C`, in the case of `operator=` for a class type `C`
-* an lvalue of type `C`, in the case of `operator++` or `operator--` for a class type `C`
+* an rvalue of type `C`, in the case of `operator++` or `operator--` for a class type `C`
 
 Then, the deduced return type is compared to the return type(s) permitted by the standard.
 If the types match, the declaration is well-formed. Otherwise it's ill-formed.
@@ -444,6 +451,7 @@ The following poll <a href="https://wiki.isocpp.org/2025-02_Hagenberg:NotesEWGP2
 <p class="note"><b>DRAFTING NOTE:</b>
 The phrase "equality operator function" (<a href="https://eel.is/c++draft/over.binary">[over.binary]</a>)
 means `==` or `!=`. But `!=` is not covered by [class.eq]; it's covered by [class.compare.secondary] below.
+The new example is modeled on <a href="https://eel.is/c++draft/dcl.spec.auto.general#11">[dcl.spec.auto.general] Example&nbsp;3</a>.
 
 <p>Modify <a href="https://eel.is/c++draft/class.eq">[class.eq]</a> as follows:</p>
 
@@ -468,6 +476,12 @@ struct D {
   friend bool operator==(const D& x, const D& y) = default;
       // OK, returns x.i == y.i
 };
+
+<ins>struct E {</ins>
+  <ins>struct N {} n;</ins>
+  <ins>auto* operator==(const E&) const = default;</ins>
+      <ins>// error: cannot deduce auto* from true</ins>
+<ins>};</ins>
 </pre>
 — <i>end example</i>]
 </blockquote></small>
@@ -484,11 +498,16 @@ that it be constructible from `strong_ordering::equal`). We strengthen the wordi
 return type be a comparison category type, even in the empty case.
 
 <p class="note"><b>DRAFTING NOTE:</b>
-The "new" wording below incorporates the Tentatively Ready fix for [[CWG3207]], which tries to ensure
-that the placeholder return type of a deleted function is never deduced. Our proposed wording in
-[over.inc.default] also matches CWG3207's intent. But our proposed wording in [class.eq] and [class.compare.secondary]
-and [class.copy.assign] do not match CWG3207's intent. Should CWG3207 therefore remain open?
-For an alternative wording that almost works, see our R2.
+The "new" wording below incorporates the Tentatively Ready fix for [[CWG3207]], which ensures that the
+return type is deduced only in the non-deleted case (because deduction is not well-defined in the deleted case).
+The placeholder return type of a defaulted-as-deleted `<=>` function remains undeduced.
+The placeholder return type of a defaulted-as-deleted `=`, `++`, `--`, `==`, or secondary comparison operator is deduced, and
+may make the program ill-formed.
+An inappropriate *non-placeholder* return type of a defaulted-as-deleted `<=>` may make the program ill-formed.
+In short: `auto* operator<=>(...) = default` might be well-formed if it's defaulted-as-deleted, but `int operator<=>(...) = default`
+and `auto* operator==(...) = default` are always ill-formed.
+Should we eliminate this inconsistency by simply saying in (2.1) that in the first (deleted) situation `Q` is deduced as
+`std::strong_ordering` and that's all? That would be a new and different proposed resolution to [[CWG3207]].
 
 <p>Modify <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a> as follows:</p>
 
@@ -507,9 +526,24 @@ common comparison type (see below) of <del>`R`</del><ins>`S`</ins><sub>0</sub>, 
 
 — (2.2) Otherwise, <del>`R` shall not contain a placeholder type. If</del> <ins>if</ins> the synthesized three-way comparison of type `R`
 between any objects `x`<sub><i>i</i></sub> and `x`<sub><i>i</i></sub> is not defined, the operator function is
-defined as deleted.
+defined as deleted.</p>
 
-<ins>x․ A defaulted three-way comparison operator function that is not defined as deleted shall have a return type which is a comparison category type
+<ins>x․ [<i>Example:</i></ins>
+
+<pre>
+<ins>struct E {</ins>
+  <ins>struct N {</ins>
+    <ins>auto operator==(const N&) const = default;</ins>
+  <ins>} n;</ins>
+  <ins>auto* operator<=>(const E&) const = default;</ins>
+      <ins>// OK: defined as deleted, and the return type is not deduced</ins>
+<ins>};</ins>
+<ins>bool b1 = (E() <=> E());  // ill-formed: operator<=> is deleted</ins>
+<ins>bool b2 = (E() == E());   // OK: operator== is implicitly declared</ins>
+</pre>
+<ins>— <i>end example</i>]</ins>
+
+<p><ins>x․ A defaulted three-way comparison operator function that is not defined as deleted shall have a return type which is a comparison category type
 ([cmp.categories.pre]).</ins>
 
 3․ The return value of type `R` of the defaulted three-way comparison operator function with parameters `x` and `y` <del>of
@@ -602,7 +636,13 @@ reference to `X`.</ins>
 
 ## [over.inc.default] ## {#wording-over.inc.default}
 
-Modify <a href=https://eel.is/c++draft/over.inc.default>[over.inc.default]</a> as follows:
+<p class="note"><b>DRAFTING NOTE:</b>
+We deduce from "a prvalue expression of type `C`"
+(rather than merely "an lvalue reference to `C`" or "a move-eligible rvalue reference to `C`")
+to ensure that `decltype(auto) operator++(int) = default;` deduces a non-reference type.
+Such code is contrived, but should do the Right Thing rather than the Wrong Thing if we can help it.
+
+<p>Modify <a href=https://eel.is/c++draft/over.inc.default>[over.inc.default]</a> as follows:</p>
 
 <small><blockquote>
 <p>1․ A defaulted postfix increment or decrement operator function for a type `C` shall be a non-template function that
@@ -611,30 +651,24 @@ where the implicit object parameter (if any) is considered to be the first param
 <p> — (1.2) is defined as defaulted in `C` or in a context where `C` is complete, and
 <p> — (1.3) has <del>a declared</del> <ins>the</ins> return type <del>of</del> `C`.
 
-<p>[...]
+<p>[<i>Note 1:</i> A postfix increment or decrement operator always has a parameter of type int ([over.inc.general]). — <i>end note</i>]
 
-<p>3․ The implicit definition of a defaulted postfix increment or decrement operator function `F`
-that is not defined as deleted for a type `C` is equivalent to
+<p>Name lookups and access checks in the implicit definition ([dcl.fct.def.default]) of a defaulted postfix increment
+or decrement operator function are performed from a context equivalent to its *function-body*. A definition of a postfix
+increment or decrement operator as defaulted that appears in a class shall be the first declaration of that function.
+
+<p>[<i>Example 1:</i>
 <pre>
-C <i>tmp</i>(c);
-++c;
-return <i>tmp</i>;
+struct S;
+S operator++(S&, int) = default;  // error: S is not complete
 </pre>
-for a postfix increment operator function, or
-<pre>
-C <i>tmp</i>(c);
---c;
-return <i>tmp</i>;
-</pre>
-for a postfix decrement operator function,
-where <i><code>tmp</code></i> is a variable defined for exposition only,
-and `c` is an lvalue that denotes `*this` if `F` is an implicit object member function, or the first parameter of `F` otherwise.
+— <i>end example</i>]
 
-<p><ins>x. If the declared return type of a defaulted postfix increment or decrement operator function
-that is not defined as deleted contains a placeholder type,
-its return type is deduced as if from <code>return <i>tmp</i>;</code>.</ins>
+<p><ins>x․ If the declared return type of a defaulted postfix increment or decrement operator
+for a class `C` contains a placeholder type, its return type is deduced as if from `return r;`,
+where `r` is a prvalue expression of type `C`.</ins>
 
-<p>4․ [<i>Example:</i> [...]
+<p>2․ A defaulted postfix increment or decrement operator function for a type `C` is defined as deleted if [...]
 </blockquote></small>
 
 ## Annex C, [diff.cpp26] ## {#wording-annex-c}
