@@ -2,7 +2,7 @@
 Title: Deduced return types for defaulted operator functions
 Shortname: D2952
 Revision: 4
-!Draft Revision: 21
+!Draft Revision: 22
 Audience: CWG
 Status: D
 Group: WG21
@@ -15,7 +15,7 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2026-09-27
+Date: 2026-09-28
 </pre>
 
 <style>
@@ -33,6 +33,7 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
     - Make `auto* operator++(int) = default;` invariably ill-formed, rather than
         "ill-formed if non-deleted, well-formed if deleted." This harmonizes the
         wordings added to [class.copy.assign] and [over.inc.default].
+        Adjust [[#defaulted-as-deleted]] and [[#impact]] to match.
 
     - Make `auto operator<=>(const X&) const = default;` deduce `strong_ordering`
         if it is defaulted-as-deleted, rather than remaining undeduced. This has
@@ -247,7 +248,12 @@ Container<Weird> cw;
   // returns a non-comparison-category type
 ```
 
-Similarly for dependent return types:
+Here, [[CWG3207]] is relevant. `Container<mutex>::operator<=>` is deleted because `mutex`
+is not comparable. We propose that the return type of the deleted `operator<=>` should be
+`strong_ordering`. This means the return type of `operator<=>` is still a comparison category
+type, so that `Container<mutex>` is not ill-formed.
+
+Until R3, we considered the following case to be similar:
 ```cpp
 template<class R>
 struct C {
@@ -256,16 +262,24 @@ struct C {
 };
 static_assert(std::three_way_comparable<C<std::strong_ordering>>);
 static_assert(!std::three_way_comparable<C<int>>);
-  // OK, C<int>'s operator<=> is deleted
+  // Today: OK, C<int>'s operator<=> is deleted
+  // Proposed: ill-formed, a defaulted operator<=> can't have return type int
 ```
-
-Therefore we can't just say "`operator<=>` *shall* have a return type that is a comparison category type";
-we must say that if the return type is not a comparison category type then the operator is defaulted as deleted.
+But now this use of template parameter `R` as the return type of `operator<=>`, without forcing `R`
+to be a comparison category type at all, strikes us as contrived and thus not necessary to support.
+We aim particularly to make this simplest case ill-formed, instead of deleted:
+```cpp
+struct C {
+  int operator<=>(const C&) const = default;
+    // Today: OK, defined as deleted
+    // Proposed: ill-formed, a defaulted operator<=> can't have return type int
+};
+```
 
 ## "Deducing `this`" and CWG2586 ## {#deducing-this}
 
 [[CWG2586]] (adopted for C++23) permits defaulted functions to have explicit object parameters.
-This constrains the wordings we can choose for `operator=`: we can't say “the return type is deduced
+This constrained the wording we could choose for `operator=`: we couldn't say “the return type is deduced
 as if from `return *this`” because there might not be a `*this`.
 
 There's a quirk with rvalue-ref-qualified assignment operators — not *move* assignment, but
@@ -350,7 +364,7 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.
 <tr><td><a href="https://godbolt.org/z/5jGoMedsY">link</a></td><td><pre>const bool operator==(const C&) const = default;</pre></td>
     <td>✗</td><td>✗</td><td>✗</td><td bgcolor="#FFCACA">✓</td><td><a href="https://eel.is/c++draft/class.eq#1.sentence-1">✗</a></td></tr>
 <tr><td><a href="https://godbolt.org/z/sKGM6Ecja">link</a></td><td><pre>friend bool operator==(const C, const C) = default;</pre></td>
-    <td>✓</td><td bgcolor="#FFCACA">✗</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/class.compare#default-1.sentence-1">✓</a></td></tr>
+    <td>✓</td><td bgcolor="#FFCACA">✗</td><td>✓</td><td>✓</td><td><a href="https://eel.is/c++draft/class.compare#default-1.sentence-1">✓?</a></td></tr>
 <tr><td><a href="https://godbolt.org/z/1a6e6aTre">link</a></td><td><pre>decltype(auto) operator<=>(const C&) const = default;</pre></td>
     <td bgcolor="#FFCACA">✓</td><td>✗</td><td>✗</td><td>✗</td><td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: ✓</td></tr>
 <tr><td><a href="https://godbolt.org/z/9q6rqGKKe">link</a></td><td><pre>const auto operator<=>(const C&) const = default;</pre></td>
@@ -359,24 +373,26 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.
     <td bgcolor="#FFCACA">✓</td><td>✗</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: ✓</td></tr>
 <tr><td><a href="https://godbolt.org/z/oc8vxPsjn">link</a></td><td><pre>False auto operator<=>(const C&) const = default;</pre></td>
     <td bgcolor="#FFCACA">unmet</td><td>✗</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: unmet</td></tr>
-<tr><td><a href="https://godbolt.org/z/sWh1a9n89">link</a></td><td><pre>struct U { U(std::strong_ordering); };
+<tr><td><a href="https://godbolt.org/z/zG9szGvvh">link</a></td><td><pre>int operator<=>(const C&) const = default;</pre></td>
+    <td>deleted</td><td bgcolor="#FFCACA">unusable</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td>Today: deleted?<br>Proposed: ✗</td></tr>
+<tr><td><a href="https://godbolt.org/z/sWh1a9n89">link</a></td><td><pre>struct U { U(strong_ordering); };
 struct C {
   U operator<=>(const C&) const = default;
 };</pre></td>
     <td>✓</td><td>✓</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">deleted</td><td>Today: ✓<br>Proposed: ✗</td></tr>
-<tr><td><a href="https://godbolt.org/z/6zfhq7K51">link</a></td><td><pre>struct U { U(std::strong_ordering); };
+<tr><td><a href="https://godbolt.org/z/6zfhq7K51">link</a></td><td><pre>struct U { U(strong_ordering); };
 struct C {
   int i;
   U operator<=>(const C&) const = default;
 };</pre></td>
     <td bgcolor="#FFCACA">deleted</td><td>unusable</td><td>✗</td><td bgcolor="#FFCACA">deleted</td><td>Today: ?<br>Proposed: ✗</td></tr>
-<tr><td><a href="https://godbolt.org/z/YsaMq93E7">link</a></td><td><pre>struct U { U(std::strong_ordering); operator int(); };
+<tr><td><a href="https://godbolt.org/z/YsaMq93E7">link</a></td><td><pre>struct U { U(strong_ordering); operator int(); };
 struct C {
   int i;
   U operator<=>(const C&) const = default;
 };</pre></td>
     <td>✓</td><td>✓</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">deleted</td><td>Today: ✓<br>Proposed: ✗</td></tr>
-<tr><td><a href="https://godbolt.org/z/sdPr56zor">link</a></td><td><pre>struct U { explicit U(std::strong_ordering); operator int(); };
+<tr><td><a href="https://godbolt.org/z/sdPr56zor">link</a></td><td><pre>struct U { explicit U(strong_ordering); operator int(); };
 struct C {
   int i;
   U operator<=>(const C&) const = default;
@@ -384,12 +400,12 @@ struct C {
     <td bgcolor="#FFCACA">deleted</td><td>✓</td><td bgcolor="#FFCACA">✗</td><td bgcolor="#FFCACA">deleted</td><td>Today: ✓<br>Proposed: ✗</td></tr>
 <tr><td><a href="https://godbolt.org/z/Ka6Tbb1vq">link</a></td><td><pre>struct C {
   int i;
-  const std::strong_ordering&
+  const strong_ordering&
     operator<=>(const C&) const = default;
 };</pre></td>
     <td bgcolor="#FFCACA"><a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=127456">ICE</a></td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td>deleted</td><td>deleted</td></tr>
 <tr><td><a href="https://godbolt.org/z/WYW7Tsre1">link</a></td><td><pre>struct C {
-  const std::strong_ordering&
+  const strong_ordering&
     operator<=>(const C&) const = default;
 };</pre></td>
     <td>✓</td><td>✓</td><td>✓</td><td bgcolor="#FFCACA">deleted</td><td>Today: ✓<br>Proposed: ✗</td></tr>
@@ -402,22 +418,25 @@ struct C {
     <td>deleted</td><td>deleted</td><td bgcolor="#FFCACA">✗</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
 <tr><td><a href="https://godbolt.org/z/6Y1f4ce9q">link</a></td><td><pre>C& operator=(const C&) const = default;</pre></td>
     <td>deleted</td><td>deleted</td><td bgcolor="#FFCACA">✓</td><td>deleted</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a></td></tr>
-<tr><td><a href="https://godbolt.org/z/bW893rjba">link</a></td><td><pre>C& operator=(const C&) && = default;</pre></td>
-    <td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td bgcolor="#FFCACA">✓</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✗</a><br>only since [[P2953]]</td></tr>
-<tr><td><a href="https://godbolt.org/z/boWPETYYd">link</a></td><td><pre>C&& operator=(const C&) && = default;</pre></td>
-    <td>✗</td><td>✗</td><td>✗</td><td>✗</td><td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a></td></tr>
 </table></small>
 
 ## Impact on existing code ## {#impact}
 
 There should be little effect on existing code, since this proposal mainly allows syntax that was ill-formed before.
-As shown in [[#corner-cases]], we do propose to change some very arcane examples, e.g.
+As shown in [[#corner-cases]], we do propose to change some arcane and contrived examples, e.g.
 ```cpp
+struct U { U(std::strong_ordering); };
 struct C {
-  const std::strong_ordering&
-    operator<=>(const C&) const = default;
-    // Today: Well-formed, non-deleted
-    // Tomorrow: Well-formed, deleted
+  U operator<=>(const C&) const = default;
+    // Today: Well-formed, non-deleted (GCC and Clang are correct)
+    // Tomorrow: Ill-formed (MSVC becomes correct)
+};
+
+struct D {
+  int i;
+  int operator<=>(const D&) const = default;
+    // Today: Well-formed, deleted (Clang and EDG are correct)
+    // Tomorrow: Ill-formed (MSVC becomes correct)
 };
 ```
 

@@ -2125,7 +2125,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <p data-fill-with="logo"></p>
    <h1 class="no-ref p-name" id="title">D2952R4<br>Deduced return types for defaulted operator functions</h1>
    <h2 class="heading no-num no-ref no-toc settled" id="profile-and-date"><span class="content">Draft Proposal,
-    <time class="dt-updated" datetime="2026-09-27">2026-09-27</time></span></h2>
+    <time class="dt-updated" datetime="2026-09-28">2026-09-28</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2136,7 +2136,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>21
+     <dd>22
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2195,7 +2195,8 @@ This allows more consistency and less repetition when declaring defaulted functi
       <li data-md>
        <p>Make <code class="highlight"><c- k>auto</c-><c- o>*</c-> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></code> invariably ill-formed, rather than
 "ill-formed if non-deleted, well-formed if deleted." This harmonizes the
-wordings added to [class.copy.assign] and [over.inc.default].</p>
+wordings added to [class.copy.assign] and [over.inc.default].
+Adjust <a href="#defaulted-as-deleted">§ 3.2 "Defaulted as deleted"</a> and <a href="#impact">§ 3.7 Impact on existing code</a> to match.</p>
       <li data-md>
        <p>Make <code class="highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>X</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></code> deduce <code class="highlight"><c- n>strong_ordering</c-></code>
 if it is defaulted-as-deleted, rather than remaining undeduced. This has
@@ -2408,7 +2409,11 @@ of class <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex<
   <c- c1>// OK, &lt;=> is deleted because Weird's operator&lt;=></c->
   <c- c1>// returns a non-comparison-category type</c->
 </pre>
-   <p>Similarly for dependent return types:</p>
+   <p>Here, <a data-link-type="biblio" href="#biblio-cwg3207" title="Deduced return type of a deleted three-way comparison operator function">[CWG3207]</a> is relevant. <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex</c-><c- o>>::</c-><c- k>operator</c-><c- o>&lt;=></c-></code> is deleted because <code class="highlight"><c- n>mutex</c-></code>
+is not comparable. We propose that the return type of the deleted <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> should be
+<code class="highlight"><c- n>strong_ordering</c-></code>. This means the return type of <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> is still a comparison category
+type, so that <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex</c-><c- o>></c-></code> is not ill-formed.</p>
+   <p>Until R3, we considered the following case to be similar:</p>
 <pre class="highlight language-cpp"><c- k>template</c-><c- o>&lt;</c-><c- k>class</c-> <c- nc>R</c-><c- o>></c->
 <c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- b>int</c-> <c- n>i</c-><c- p>;</c->
@@ -2416,13 +2421,23 @@ of class <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex<
 <c- p>};</c->
 <c- k>static_assert</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>three_way_comparable</c-><c- o>&lt;</c-><c- n>C</c-><c- o>&lt;</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>>></c-><c- p>);</c->
 <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>three_way_comparable</c-><c- o>&lt;</c-><c- n>C</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>);</c->
-  <c- c1>// OK, C&lt;int>'s operator&lt;=> is deleted</c->
+  <c- c1>// Today: OK, C&lt;int>'s operator&lt;=> is deleted</c->
+  <c- c1>// Proposed: ill-formed, a defaulted operator&lt;=> can't have return type int</c->
 </pre>
-   <p>Therefore we can’t just say "<code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> <em>shall</em> have a return type that is a comparison category type";
-we must say that if the return type is not a comparison category type then the operator is defaulted as deleted.</p>
+   
+But now this use of template parameter <code class="highlight"><c- n>R</c-></code> as the return type of <code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code>, without forcing <code class="highlight"><c- n>R</c-></code>
+to be a comparison category type at all, strikes us as contrived and thus not necessary to support.
+We aim particularly to make this simplest case ill-formed, instead of deleted:
+
+<pre class="highlight language-cpp"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
+  <c- b>int</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+    <c- c1>// Today: OK, defined as deleted</c->
+    <c- c1>// Proposed: ill-formed, a defaulted operator&lt;=> can't have return type int</c->
+<c- p>};</c->
+</pre>
    <h3 class="heading settled" data-level="3.3" id="deducing-this"><span class="secno">3.3. </span><span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span><a class="self-link" href="#deducing-this"></a></h3>
    <p><a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> (adopted for C++23) permits defaulted functions to have explicit object parameters.
-This constrains the wordings we can choose for <code class="highlight"><c- k>operator</c-><c- o>=</c-></code>: we can’t say “the return type is deduced
+This constrained the wording we could choose for <code class="highlight"><c- k>operator</c-><c- o>=</c-></code>: we couldn’t say “the return type is deduced
 as if from <code class="highlight"><c- k>return</c-> <c- o>*</c-><c- k>this</c-></code>” because there might not be a <code class="highlight"><c- o>*</c-><c- k>this</c-></code>.</p>
    <p>There’s a quirk with rvalue-ref-qualified assignment operators — not <em>move</em> assignment, but
 assignment where the <em>destination</em> object is explicitly rvalue-ref-qualified.</p>
@@ -2521,7 +2536,7 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.</p>
       <td bgcolor="#FFCACA">✗
       <td>✓
       <td>✓
-      <td><a href="https://eel.is/c++draft/class.compare#default-1.sentence-1">✓</a>
+      <td><a href="https://eel.is/c++draft/class.compare#default-1.sentence-1">✓?</a>
      <tr>
       <td><a href="https://godbolt.org/z/1a6e6aTre">link</a>
       <td>
@@ -2559,9 +2574,18 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.</p>
       <td bgcolor="#FFCACA">✓
       <td>Today: <a href="https://eel.is/c++draft/class.compare#class.spaceship-2.2.sentence-1">✗</a><br>Proposed: unmet
      <tr>
+      <td><a href="https://godbolt.org/z/zG9szGvvh">link</a>
+      <td>
+<pre class="highlight"><c- b>int</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
+      <td>deleted
+      <td bgcolor="#FFCACA">unusable
+      <td bgcolor="#FFCACA">✗
+      <td>deleted
+      <td>Today: deleted?<br>Proposed: ✗
+     <tr>
       <td><a href="https://godbolt.org/z/sWh1a9n89">link</a>
       <td>
-<pre class="highlight"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- n>U</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- p>};</c->
+<pre class="highlight"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- n>U</c-><c- p>(</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- p>};</c->
 <c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- n>U</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c-></pre>
@@ -2573,7 +2597,7 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.</p>
      <tr>
       <td><a href="https://godbolt.org/z/6zfhq7K51">link</a>
       <td>
-<pre class="highlight"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- n>U</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- p>};</c->
+<pre class="highlight"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- n>U</c-><c- p>(</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- p>};</c->
 <c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- b>int</c-> <c- n>i</c-><c- p>;</c->
   <c- n>U</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2586,7 +2610,7 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.</p>
      <tr>
       <td><a href="https://godbolt.org/z/YsaMq93E7">link</a>
       <td>
-<pre class="highlight"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- n>U</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- k>operator</c-> <c- b>int</c-><c- p>();</c-> <c- p>};</c->
+<pre class="highlight"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- n>U</c-><c- p>(</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- k>operator</c-> <c- b>int</c-><c- p>();</c-> <c- p>};</c->
 <c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- b>int</c-> <c- n>i</c-><c- p>;</c->
   <c- n>U</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2599,7 +2623,7 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.</p>
      <tr>
       <td><a href="https://godbolt.org/z/sdPr56zor">link</a>
       <td>
-<pre class="highlight"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- k>explicit</c-> <c- n>U</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- k>operator</c-> <c- b>int</c-><c- p>();</c-> <c- p>};</c->
+<pre class="highlight"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- k>explicit</c-> <c- n>U</c-><c- p>(</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- k>operator</c-> <c- b>int</c-><c- p>();</c-> <c- p>};</c->
 <c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- b>int</c-> <c- n>i</c-><c- p>;</c->
   <c- n>U</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
@@ -2614,7 +2638,7 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.</p>
       <td>
 <pre class="highlight"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
   <c- b>int</c-> <c- n>i</c-><c- p>;</c->
-  <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>&amp;</c->
+  <c- k>const</c-> <c- n>strong_ordering</c-><c- o>&amp;</c->
     <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c-></pre>
       <td bgcolor="#FFCACA"><a href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=127456">ICE</a>
@@ -2626,7 +2650,7 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.</p>
       <td><a href="https://godbolt.org/z/WYW7Tsre1">link</a>
       <td>
 <pre class="highlight"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
-  <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>&amp;</c->
+  <c- k>const</c-> <c- n>strong_ordering</c-><c- o>&amp;</c->
     <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
 <c- p>};</c-></pre>
       <td>✓
@@ -2671,33 +2695,22 @@ GCC 16, Clang 23, MSVS 18.6, and EDG 6.9.</p>
       <td bgcolor="#FFCACA">✓
       <td>deleted
       <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.6">deleted</a>
-     <tr>
-      <td><a href="https://godbolt.org/z/bW893rjba">link</a>
-      <td>
-<pre class="highlight"><c- n>C</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
-      <td bgcolor="#FFCACA">✓
-      <td bgcolor="#FFCACA">✓
-      <td bgcolor="#FFCACA">✓
-      <td bgcolor="#FFCACA">✓
-      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.1">✗</a><br>only since <a data-link-type="biblio" href="#biblio-p2953" title="Adding restrictions to defaulted assignment operator functions">[P2953]</a>
-     <tr>
-      <td><a href="https://godbolt.org/z/boWPETYYd">link</a>
-      <td>
-<pre class="highlight"><c- n>C</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></pre>
-      <td>✗
-      <td>✗
-      <td>✗
-      <td>✗
-      <td><a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">✗</a>
    </table>
    <h3 class="heading settled" data-level="3.7" id="impact"><span class="secno">3.7. </span><span class="content">Impact on existing code</span><a class="self-link" href="#impact"></a></h3>
    <p>There should be little effect on existing code, since this proposal mainly allows syntax that was ill-formed before.
-As shown in <a href="#corner-cases">§ 3.6 Existing corner cases</a>, we do propose to change some very arcane examples, e.g.</p>
-<pre class="highlight language-cpp"><c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
-  <c- k>const</c-> <c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>&amp;</c->
-    <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
-    <c- c1>// Today: Well-formed, non-deleted</c->
-    <c- c1>// Tomorrow: Well-formed, deleted</c->
+As shown in <a href="#corner-cases">§ 3.6 Existing corner cases</a>, we do propose to change some arcane and contrived examples, e.g.</p>
+<pre class="highlight language-cpp"><c- k>struct</c-> <c- nc>U</c-> <c- p>{</c-> <c- n>U</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- p>);</c-> <c- p>};</c->
+<c- k>struct</c-> <c- nc>C</c-> <c- p>{</c->
+  <c- n>U</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>C</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+    <c- c1>// Today: Well-formed, non-deleted (GCC and Clang are correct)</c->
+    <c- c1>// Tomorrow: Ill-formed (MSVC becomes correct)</c->
+<c- p>};</c->
+
+<c- k>struct</c-> <c- nc>D</c-> <c- p>{</c->
+  <c- b>int</c-> <c- n>i</c-><c- p>;</c->
+  <c- b>int</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>D</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c->
+    <c- c1>// Today: Well-formed, deleted (Clang and EDG are correct)</c->
+    <c- c1>// Tomorrow: Ill-formed (MSVC becomes correct)</c->
 <c- p>};</c->
 </pre>
    <h2 class="heading settled" data-level="4" id="experience"><span class="secno">4. </span><span class="content">Implementation experience</span><a class="self-link" href="#experience"></a></h2>
