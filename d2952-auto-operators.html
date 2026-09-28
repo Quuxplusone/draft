@@ -2136,7 +2136,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>20
+     <dd>21
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2196,6 +2196,11 @@ This allows more consistency and less repetition when declaring defaulted functi
        <p>Make <code class="highlight"><c- k>auto</c-><c- o>*</c-> <c- k>operator</c-><c- o>++</c-><c- p>(</c-><c- b>int</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></code> invariably ill-formed, rather than
 "ill-formed if non-deleted, well-formed if deleted." This harmonizes the
 wordings added to [class.copy.assign] and [over.inc.default].</p>
+      <li data-md>
+       <p>Make <code class="highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>X</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></code> deduce <code class="highlight"><c- n>strong_ordering</c-></code>
+if it is defaulted-as-deleted, rather than remaining undeduced. This has
+the benefit of making <code class="highlight"><c- k>auto</c-><c- o>*</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(</c-><c- k>const</c-> <c- n>X</c-><c- o>&amp;</c-><c- p>)</c-> <c- k>const</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-></code>
+invariably ill-formed. In R3 it was ill-formed only if non-deleted.</p>
      </ul>
     <li data-md>
      <p>R3 (pre-Búzios):</p>
@@ -2413,7 +2418,7 @@ of class <code class="highlight"><c- n>Container</c-><c- o>&lt;</c-><c- n>mutex<
 <c- k>static_assert</c-><c- p>(</c-><c- o>!</c-><c- n>std</c-><c- o>::</c-><c- n>three_way_comparable</c-><c- o>&lt;</c-><c- n>C</c-><c- o>&lt;</c-><c- b>int</c-><c- o>>></c-><c- p>);</c->
   <c- c1>// OK, C&lt;int>'s operator&lt;=> is deleted</c->
 </pre>
-   <p>Therefore we can’t just say "<code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> <em>shall</em> have a return type which is a comparison category type";
+   <p>Therefore we can’t just say "<code class="highlight"><c- k>operator</c-><c- o>&lt;=></c-></code> <em>shall</em> have a return type that is a comparison category type";
 we must say that if the return type is not a comparison category type then the operator is defaulted as deleted.</p>
    <h3 class="heading settled" data-level="3.3" id="deducing-this"><span class="secno">3.3. </span><span class="content">"Deducing <code class="highlight"><c- k>this</c-></code>" and CWG2586</span><a class="self-link" href="#deducing-this"></a></h3>
    <p><a data-link-type="biblio" href="#biblio-cwg2586" title="Explicit object parameter for assignment and comparison">[CWG2586]</a> (adopted for C++23) permits defaulted functions to have explicit object parameters.
@@ -2833,16 +2838,11 @@ return type be a comparison category type, even in the empty case.
 
 </p>
    <p class="note" role="note"><b>DRAFTING NOTE:</b>
-The "new" wording below incorporates the Tentatively Ready fix for <a data-link-type="biblio" href="#biblio-cwg3207" title="Deduced return type of a deleted three-way comparison operator function">[CWG3207]</a>, which ensures that the
-return type is deduced only in the non-deleted case (because deduction is not well-defined in the deleted case).
-The placeholder return type of a defaulted-as-deleted <code class="highlight"><c- o>&lt;=></c-></code> function remains undeduced.
-The placeholder return type of a defaulted-as-deleted <code class="highlight"><c- o>=</c-></code>, <code class="highlight"><c- o>++</c-></code>, <code class="highlight"><c- o>--</c-></code>, <code class="highlight"><c- o>==</c-></code>, or secondary comparison operator is deduced, and
-may make the program ill-formed.
-An inappropriate <em>non-placeholder</em> return type of a defaulted-as-deleted <code class="highlight"><c- o>&lt;=></c-></code> may make the program ill-formed.
-In short: <code class="highlight"><c- k>auto</c-><c- o>*</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(...)</c-> <c- o>=</c-> <c- k>default</c-></code> might be well-formed if it’s defaulted-as-deleted, but <code class="highlight"><c- b>int</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(...)</c-> <c- o>=</c-> <c- k>default</c-></code>
-and <code class="highlight"><c- k>auto</c-><c- o>*</c-> <c- k>operator</c-><c- o>==</c-><c- p>(...)</c-> <c- o>=</c-> <c- k>default</c-></code> are always ill-formed.
-Should we eliminate this inconsistency by simply saying in (2.1) that in the first (deleted) situation <code class="highlight"><c- n>Q</c-></code> is deduced as
-<code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-></code> and that’s all? That would be a new and different proposed resolution to <a data-link-type="biblio" href="#biblio-cwg3207" title="Deduced return type of a deleted three-way comparison operator function">[CWG3207]</a>.
+The wording below replaces the Tentatively Ready fix for <a data-link-type="biblio" href="#biblio-cwg3207" title="Deduced return type of a deleted three-way comparison operator function">[CWG3207]</a>. That fix had proposed that a defaulted-as-deleted
+<code class="highlight"><c- k>auto</c-> <c- k>operator</c-><c- o>&lt;=></c-></code> should remain undeduced. We propose instead that it should deduce <code class="highlight"><c- n>strong_ordering</c-></code>. This means
+that the placeholder return type of a defaulted-as-deleted <code class="highlight"><c- o>&lt;=></c-></code> function is deduced, just as the
+placeholder return type of a defaulted-as-deleted <code class="highlight"><c- o>=</c-></code>, <code class="highlight"><c- o>++</c-></code>, <code class="highlight"><c- o>--</c-></code>, <code class="highlight"><c- o>==</c-></code>, or secondary comparison operator is deduced.
+In short: <code class="highlight"><c- k>auto</c-><c- o>*</c-> <c- k>operator</c-><c- o>&lt;=></c-><c- p>(...)</c-> <c- o>=</c-> <c- k>default</c-></code> is never well-formed, even if it’s defaulted-as-deleted.
 
 </p>
    <p>Modify <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a> as follows:</p>
@@ -2854,41 +2854,31 @@ Should we eliminate this inconsistency by simply saying in (2.1) that in the fir
     <p>2․ Let <code class="highlight"><c- n>R</c-></code> be the declared return type of a defaulted three-way comparison operator function, and let
 <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> be the elements of the expanded list of subobjects for an object <code class="highlight"><c- n>x</c-></code> of type <code class="highlight"><c- n>C</c-></code>.</p>
     <p>
-     — (2.1) If <code class="highlight"><c- n>R</c-></code> 
+     <del>— (2.1)</del>
+      If <code class="highlight"><c- n>R</c-></code> 
      <del>is <code class="highlight"><c- k>auto</c-></code></del>
      <ins>contains a placeholder type</ins>
      , then let
-<i>cv<sub>i</sub></i> 
-     <del><code class="highlight"><c- n>R</c-></code></del>
-     <ins><code class="highlight"><c- n>S</c-></code></ins>
-     <sub><i>i</i></sub> be the type of the expression
-<code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>&lt;=></c-> <c- n>x</c-></code><sub><i>i</i></sub>. The operator function is defined as deleted if that expression is not usable
-or if 
-     <del><code class="highlight"><c- n>R</c-></code></del>
-     <ins><code class="highlight"><c- n>S</c-></code></ins>
-     <sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>. 
-     <del>The</del>
-     <ins>Otherwise,
-the</ins>
-      return type is deduced as 
-     <ins>if from <code class="highlight"><c- k>return</c-> <c- n>Q</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-><c- p>);</c-></code> where <code class="highlight"><c- n>Q</c-></code> is</ins>
-      the
-common comparison type (see below) of 
-     <del><code class="highlight"><c- n>R</c-></code></del>
-     <ins><code class="highlight"><c- n>S</c-></code></ins>
-     <sub>0</sub>, 
-     <del><code class="highlight"><c- n>R</c-></code></del>
-     <ins><code class="highlight"><c- n>S</c-></code></ins>
-     <sub>1</sub>, ..., 
-     <del><code class="highlight"><c- n>R</c-></code></del>
-     <ins><code class="highlight"><c- n>S</c-></code></ins>
-     <sub>n-1</sub>.
+<i>cv<sub>i</sub></i> <code class="highlight"><c- n>R</c-></code><sub><i>i</i></sub> be the type of the expression
+<code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> <code class="highlight"><c- o>&lt;=></c-> <c- n>x</c-></code><sub><i>i</i></sub>. 
+     <del>The operator function is defined as deleted if that expression is not usable
+or if <code class="highlight"><c- n>R</c-></code><sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>.</del>
+     <ins>If that expression
+is usable and <code class="highlight"><c- n>R</c-></code><sub><i>i</i></sub> is a comparison category type for all <i>i</i>, let <code class="highlight"><c- n>Q</c-></code> be the common comparison type (see below)
+of <code class="highlight"><c- n>R</c-></code><sub>0</sub>, <code class="highlight"><c- n>R</c-></code><sub>1</sub>, ..., <code class="highlight"><c- n>R</c-></code><sub><i>n</i>−1</sub>. Otherwise, let <code class="highlight"><c- n>Q</c-></code> be <code class="highlight"><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-></code>.</ins>
+      The
+return type is deduced as 
+     <ins>if from <code class="highlight"><c- k>return</c-> <c- n>Q</c-><c- p>(</c-><c- n>std</c-><c- o>::</c-><c- n>strong_ordering</c-><c- o>::</c-><c- n>equal</c-><c- p>);</c-></code></ins>
+     <del>the
+common comparison type (see below) of <code class="highlight"><c- n>R</c-></code><sub>0</sub>, <code class="highlight"><c- n>R</c-></code><sub>1</sub>, ..., <code class="highlight"><c- n>R</c-></code><sub>n-1</sub></del>
+     .
+
+
     </p>
     <p>
-     — (2.2) Otherwise, 
-     <del><code class="highlight"><c- n>R</c-></code> shall not contain a placeholder type. If</del>
-     <ins>if</ins>
-      the synthesized three-way comparison of type <code class="highlight"><c- n>R</c-></code>
+     <ins>x․</ins>
+     <del>— (2.2) Otherwise, <code class="highlight"><c- n>R</c-></code> shall not contain a placeholder type.</del>
+      If the synthesized three-way comparison of type <code class="highlight"><c- n>R</c-></code>
 between any objects <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> and <code class="highlight"><c- n>x</c-></code><sub><i>i</i></sub> is not defined, the operator function is
 defined as deleted.
     </p>
@@ -2905,7 +2895,7 @@ defined as deleted.
 </pre>
     <ins>— <i>end example</i>]</ins>
     <p>
-     <ins>x․ A defaulted three-way comparison operator function that is not defined as deleted shall have a return type which is a comparison category type
+     <ins>x․ A defaulted three-way comparison operator function that is not defined as deleted shall have a return type that is a comparison category type
 ([cmp.categories.pre]).</ins>
     </p>
     <p>

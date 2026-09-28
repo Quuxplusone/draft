@@ -2,7 +2,7 @@
 Title: Deduced return types for defaulted operator functions
 Shortname: D2952
 Revision: 4
-!Draft Revision: 20
+!Draft Revision: 21
 Audience: CWG
 Status: D
 Group: WG21
@@ -33,6 +33,11 @@ del  {background-color: #FFCACA; text-decoration: line-through;}
     - Make `auto* operator++(int) = default;` invariably ill-formed, rather than
         "ill-formed if non-deleted, well-formed if deleted." This harmonizes the
         wordings added to [class.copy.assign] and [over.inc.default].
+
+    - Make `auto operator<=>(const X&) const = default;` deduce `strong_ordering`
+        if it is defaulted-as-deleted, rather than remaining undeduced. This has
+        the benefit of making `auto* operator<=>(const X&) const = default;`
+        invariably ill-formed. In R3 it was ill-formed only if non-deleted.
 
 - R3 (pre-Búzios):
 
@@ -510,16 +515,11 @@ that it be constructible from `strong_ordering::equal`). We strengthen the wordi
 return type be a comparison category type, even in the empty case.
 
 <p class="note"><b>DRAFTING NOTE:</b>
-The "new" wording below incorporates the Tentatively Ready fix for [[CWG3207]], which ensures that the
-return type is deduced only in the non-deleted case (because deduction is not well-defined in the deleted case).
-The placeholder return type of a defaulted-as-deleted `<=>` function remains undeduced.
-The placeholder return type of a defaulted-as-deleted `=`, `++`, `--`, `==`, or secondary comparison operator is deduced, and
-may make the program ill-formed.
-An inappropriate *non-placeholder* return type of a defaulted-as-deleted `<=>` may make the program ill-formed.
-In short: `auto* operator<=>(...) = default` might be well-formed if it's defaulted-as-deleted, but `int operator<=>(...) = default`
-and `auto* operator==(...) = default` are always ill-formed.
-Should we eliminate this inconsistency by simply saying in (2.1) that in the first (deleted) situation `Q` is deduced as
-`std::strong_ordering` and that's all? That would be a new and different proposed resolution to [[CWG3207]].
+The wording below replaces the Tentatively Ready fix for [[CWG3207]]. That fix had proposed that a defaulted-as-deleted
+`auto operator<=>` should remain undeduced. We propose instead that it should deduce `strong_ordering`. This means
+that the placeholder return type of a defaulted-as-deleted `<=>` function is deduced, just as the
+placeholder return type of a defaulted-as-deleted `=`, `++`, `--`, `==`, or secondary comparison operator is deduced.
+In short: `auto* operator<=>(...) = default` is never well-formed, even if it's defaulted-as-deleted.
 
 <p>Modify <a href="https://eel.is/c++draft/class.spaceship">[class.spaceship]</a> as follows:</p>
 
@@ -529,19 +529,20 @@ Should we eliminate this inconsistency by simply saying in (2.1) that in the fir
 2․ Let `R` be the declared return type of a defaulted three-way comparison operator function, and let
 `x`<sub><i>i</i></sub> be the elements of the expanded list of subobjects for an object `x` of type `C`.
 
-— (2.1) If `R` <del>is `auto`</del> <ins>contains a placeholder type</ins>, then let
-<i>cv<sub>i</sub></i> <del>`R`</del><ins>`S`</ins><sub><i>i</i></sub> be the type of the expression
-`x`<sub><i>i</i></sub> `<=> x`<sub><i>i</i></sub>. The operator function is defined as deleted if that expression is not usable
-or if <del>`R`</del><ins>`S`</ins><sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>. <del>The</del> <ins>Otherwise,
-the</ins> return type is deduced as <ins>if from `return Q(std::strong_ordering::equal);` where `Q` is</ins> the
-common comparison type (see below) of <del>`R`</del><ins>`S`</ins><sub>0</sub>, <del>`R`</del><ins>`S`</ins><sub>1</sub>, ..., <del>`R`</del><ins>`S`</ins><sub>n-1</sub>.
+<p><del>— (2.1)</del> If `R` <del>is `auto`</del> <ins>contains a placeholder type</ins>, then let
+<i>cv<sub>i</sub></i> `R`<sub><i>i</i></sub> be the type of the expression
+`x`<sub><i>i</i></sub> `<=> x`<sub><i>i</i></sub>. <del>The operator function is defined as deleted if that expression is not usable
+or if `R`<sub><i>i</i></sub> is not a comparison category type ([cmp.categories.pre]) for any <i>i</i>.</del> <ins>If that expression
+is usable and `R`<sub><i>i</i></sub> is a comparison category type for all <i>i</i>, let `Q` be the common comparison type (see below)
+of `R`<sub>0</sub>, `R`<sub>1</sub>, ..., `R`<sub><i>n</i>&minus;1</sub>. Otherwise, let `Q` be `std::strong_ordering`.</ins> The
+return type is deduced as <ins>if from `return Q(std::strong_ordering::equal);`</ins> <del>the
+common comparison type (see below) of `R`<sub>0</sub>, `R`<sub>1</sub>, ..., `R`<sub>n-1</sub></del>.
 
-— (2.2) Otherwise, <del>`R` shall not contain a placeholder type. If</del> <ins>if</ins> the synthesized three-way comparison of type `R`
+<p><ins>x․</ins> <del>— (2.2) Otherwise, `R` shall not contain a placeholder type.</del> If the synthesized three-way comparison of type `R`
 between any objects `x`<sub><i>i</i></sub> and `x`<sub><i>i</i></sub> is not defined, the operator function is
 defined as deleted.</p>
 
 <ins>x․ [<i>Example:</i></ins>
-
 <pre>
 <ins>struct E {</ins>
   <ins>struct N {</ins>
