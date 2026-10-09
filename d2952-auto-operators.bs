@@ -2,7 +2,7 @@
 Title: Deduced return types for defaulted operator functions
 Shortname: D2952
 Revision: 4
-!Draft Revision: 22
+!Draft Revision: 23
 Audience: CWG
 Status: D
 Group: WG21
@@ -15,7 +15,7 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2026-09-28
+Date: 2026-10-09
 </pre>
 
 <style>
@@ -640,6 +640,10 @@ But we need this new wording to ensure that an *explicitly-defaulted* copy/move 
 will deduce that same type. (If it deduces a different type, then the explicitly-defaulted operator
 becomes ill-formed, as in example `B` below.)
 
+<p class="note"><b>DRAFTING NOTE:</b>
+We deduce from "an lvalue reference to `X`"
+to ensure that `decltype(auto) operator=(const X&) = default;` deduces `X&`, not `X`.
+
 <p>Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:</p>
 
 <small><blockquote>
@@ -648,7 +652,7 @@ the object for which the assignment operator is invoked, that is,
 the object assigned to.
 
 <p><ins>15․ If the declared return type of a defaulted copy/move assignment operator for a class `X` contains a
-placeholder type, its return type is deduced as if from `return r;`, where `r` is an lvalue
+placeholder type, the return type is deduced as if from `return r;`, where `r` is an lvalue
 reference to `X`.</ins>
 
 <p><ins>16․ \[<i>Example:</i></ins>
@@ -697,7 +701,7 @@ S operator++(S&, int) = default;  // error: S is not complete
 — <i>end example</i>]
 
 <p><ins>x․ If the declared return type of a defaulted postfix increment or decrement operator
-for a class `C` contains a placeholder type, its return type is deduced as if from `return r;`,
+for a class `C` contains a placeholder type, the return type is deduced as if from `return r;`,
 where `r` is a prvalue expression of type `C`.</ins>
 
 <p>2․ A defaulted postfix increment or decrement operator function for a type `C` is defined as deleted if [...]
