@@ -1339,16 +1339,6 @@ A \grammarterm{lambda-expression} does not introduce a class scope.
 \end{note}
 
 \pnum
-If the expression \tcode{this}
-appears within the predicate of a contract assertion\iref{basic.contract.general}
-(including as the result of an implicit transformation\iref{expr.prim.id.general}
-and including in the bodies of nested \grammarterm{lambda-expression}s)
-and the current class
-encloses the contract assertion,
-\keyword{const} is combined with the \grammarterm{cv-qualifier-seq}
-used to generate the resulting type (see below).
-
-\pnum
 If a declaration declares a member function or member function template of a
 class \tcode{X}, the expression \keyword{this} is a prvalue of type ``pointer to
 \grammarterm{cv-qualifier-seq} \tcode{X}''
@@ -1460,10 +1450,6 @@ the unary \tcode{\&} operator\iref{expr.unary.op},
 \end{itemize}
 the \grammarterm{id-expression} is transformed into
 a class member access expression using \tcode{(*this)} as the object expression.
-If this transformation occurs
-in the predicate of a precondition assertion of a constructor of \tcode{X}
-or a postcondition assertion of a destructor of \tcode{X},
-the expression is ill-formed.
 \begin{note}
 If \tcode{C} is not \tcode{X} or a base class of \tcode{X},
 the class member access expression is ill-formed.
@@ -1473,16 +1459,6 @@ the class member access is ill-formed.
 \end{note}
 This transformation does not apply in
 the template definition context\iref{temp.dep.type}.
-\begin{example}
-\begin{codeblock}
-struct C {
-  bool b;
-  C() pre(b)                // error
-      pre(&this->b)         // OK
-      pre(sizeof(b) > 0);   // OK, \tcode{b} is not potentially evaluated.
-};
-\end{codeblock}
-\end{example}
 
 \pnum
 If an \grammarterm{id-expression} $E$ denotes
@@ -1692,96 +1668,6 @@ that of the copy of the parameter\iref{dcl.fct.def.coroutine},
 and the result is that copy.
 
 \pnum
-Otherwise,
-if the \grammarterm{unqualified-id}
-names a result binding\iref{dcl.contract.res}
-attached to a function
-with return type \tcode{U},
-\begin{itemize}
-\item
-if \tcode{U} is ``reference to \tcode{T}'',
-then the type of the expression is
-\tcode{const T};
-\item
-otherwise,
-the type of the expression is \tcode{const U}.
-\end{itemize}
-
-\pnum
-Otherwise,
-if the \grammarterm{unqualified-id}
-appears in the predicate of a contract assertion $C$\iref{basic.contract}
-and the entity is
-\begin{itemize}
-\item
-a variable
-declared outside of $C$
-of object type \tcode{T},
-\item
-a variable or template parameter
-declared outside of $C$
-of type ``reference to \tcode{T}'', or
-\item
-a structured binding
-of type \tcode{T}
-whose corresponding variable
-is declared outside of $C$,
-\end{itemize}
-then the type of the expression is \keyword{const}~\tcode{T}.
-
-\pnum
-\begin{example}
-\begin{codeblock}
-int n = 0;
-struct X { bool m(); };
-
-struct Y {
-  int z = 0;
-
-  void f(int i, int* p, int& r, X x, X* px)
-    pre (++n)       // error: attempting to modify const lvalue
-    pre (++i)       // error: attempting to modify const lvalue
-    pre (++(*p))    // OK
-    pre (++r)       // error: attempting to modify const lvalue
-    pre (x.m())     // error: calling non-const member function
-    pre (px->m())   // OK
-    pre ([=,&i,*this] mutable {
-      ++n;          // error: attempting to modify const lvalue
-      ++i;          // error: attempting to modify const lvalue
-      ++p;          // OK, refers to member of closure type
-      ++r;          // OK, refers to non-reference member of closure type
-      ++this->z;    // OK, captured \tcode{*\keyword{this}}
-      ++z;          // OK, captured \tcode{*\keyword{this}}
-      int j = 17;
-      [&]{
-        int k = 34;
-        ++i;    // error: attempting to modify const lvalue
-        ++j;    // OK
-        ++k;    // OK
-      }();
-      return true;
-    }());
-
-  template <int N, int& R, int* P>
-  void g()
-    pre(++N)        // error: attempting to modify prvalue
-    pre(++R)        // error: attempting to modify const lvalue
-    pre(++(*P));    // OK
-
-  int h()
-    post(r : ++r)   // error: attempting to modify const lvalue
-    post(r: [=] mutable {
-       ++r;         // OK, refers to member of closure type
-       return true;
-     }());
-
-  int& k()
-    post(r : ++r);  // error: attempting to modify const lvalue
-};
-\end{codeblock}
-\end{example}
-
-\pnum
 Otherwise, if the entity is a template parameter object for
 a template parameter of type \tcode{T}\iref{temp.param},
 the type of the expression is \tcode{const T}.
@@ -1802,44 +1688,10 @@ if the entity is a
 function,
 variable,
 structured binding\iref{dcl.struct.bind},
-result binding\iref{dcl.contract.res},
 data member, or
 template parameter object;
 and a prvalue otherwise\iref{basic.lval};
 it is a bit-field if the identifier designates a bit-field.
-
-\pnum
-If an \grammarterm{id-expression} $E$
-appears in the predicate of
-a function contract assertion attached to a function \placeholder{f}
-and denotes
-a function parameter of \placeholder{f}
-and the implementation introduces any temporary objects
-to hold the value of that parameter as specified in \ref{class.temporary},
-\begin{itemize}
-\item
-if the contract assertion
-is a precondition assertion
-and the evaluation of the precondition assertion
-is sequenced before the initialization of the parameter object,
-$E$ refers to the most recently initialized such temporary object, and
-\item
-if the contract assertion
-is a postcondition assertion,
-it is unspecified whether $E$ refers to
-one of the temporary objects or the parameter object;
-the choice is consistent within a single evaluation of a postcondition assertion.
-\end{itemize}
-
-\pnum
-If an \grammarterm{id-expression} $E$
-names a result binding
-in a postcondition assertion
-and the implementation introduces any temporary objects
-to hold the result object as specified in \ref{class.temporary},
-and the postcondition assertion
-is sequenced before the initialization of the result object\iref{expr.call},
-$E$ refers to the most recently initialized such temporary object.
 
 \pnum
 An \defnadj{implicitly movable}{entity} is
@@ -2029,30 +1881,7 @@ nor of the form
 \pnum
 The result of a \grammarterm{qualified-id} $Q$ is
 the entity it denotes\iref{basic.lookup.qual}.
-
-\pnum
-If $Q$ appears
-in the predicate of a contract assertion $C$\iref{basic.contract}
-and the entity is
-\begin{itemize}
-\item
-a variable
-declared outside of $C$
-of object type \tcode{T},
-\item
-a variable
-declared outside of $C$
-of type ``reference to \tcode{T}'', or
-\item
-a structured binding of type \tcode{T}
-whose corresponding variable
-is declared outside of $C$,
-\end{itemize}
-then the type of the expression is \keyword{const}~\tcode{T}.
-
-
-\pnum
-Otherwise, the type of the expression is the type of the result.
+The type of the expression is the type of the result.
 
 \pnum
 The result is an lvalue if the member is
@@ -2154,11 +1983,10 @@ void f() {
 \begin{bnf}
 \nontermdef{lambda-declarator}\br
     lambda-specifier-seq \opt{noexcept-specifier} \opt{attribute-specifier-seq} \opt{trailing-return-type}\br
-    \bnfindent \opt{function-contract-specifier-seq}\br
-    noexcept-specifier \opt{attribute-specifier-seq} \opt{trailing-return-type} \opt{function-contract-specifier-seq}\br
-    \opt{trailing-return-type} \opt{function-contract-specifier-seq}\br
+    noexcept-specifier \opt{attribute-specifier-seq} \opt{trailing-return-type}\br
+    \opt{trailing-return-type}\br
     \terminal{(} parameter-declaration-clause \terminal{)} \opt{lambda-specifier-seq} \opt{noexcept-specifier} \opt{attribute-specifier-seq}\br
-    \bnfindent \opt{trailing-return-type} \opt{requires-clause} \opt{function-contract-specifier-seq}
+    \bnfindent \opt{trailing-return-type} \opt{requires-clause}
 \end{bnf}
 
 \begin{bnf}
@@ -2395,7 +2223,7 @@ followed by \keyword{mutable} and
 the \grammarterm{lambda-declarator} does not contain
 an explicit object parameter.
 It is neither virtual nor declared \tcode{volatile}.
-Any \grammarterm{noexcept-specifier} or \grammarterm{function-contract-specifier}\iref{dcl.contract.func}
+Any \grammarterm{noexcept-specifier}
 specified on a \grammarterm{lambda-expression}
 applies to the corresponding function call operator or operator template.
 An \grammarterm{attribute-specifier-seq} in a \grammarterm{lambda-declarator} appertains
@@ -2474,51 +2302,6 @@ auto f = []<typename T1, C1 T2> requires C2<sizeof(T1) + sizeof(T2)>
 \end{codeblock}
 \end{example}
 \end{note}
-
-\pnum
-If all potential references
-to a local entity implicitly captured by a \grammarterm{lambda-expression} $L$
-occur within the function contract assertions\iref{dcl.contract.func}
-of the call operator or operator template of $L$
-or within \grammarterm{assertion-statement}s\iref{stmt.contract.assert}
-within the body of $L$,
-the program is ill-formed.
-\begin{note}
-Adding a contract assertion to an existing \Cpp{} program cannot
-cause additional captures.
-\end{note}
-\begin{example}
-\begin{codeblock}
-static int i = 0;
-
-void test() {
-  auto f1 = [=] pre(i > 0) {};  // OK, no local entities are captured.
-
-  int i = 1;
-  auto f2 = [=] pre(i > 0) {};  // error: cannot implicitly capture \tcode{i} here
-  auto f3 = [i] pre(i > 0) {};  // OK, \tcode{i} is captured explicitly.
-
-  auto f4 = [=] {
-    contract_assert(i > 0);     // error: cannot implicitly capture \tcode{i} here
-  };
-
-  auto f5 = [=] {
-    contract_assert(i > 0);     // OK, \tcode{i} is referenced elsewhere.
-    (void)i;
-  };
-
-  auto f6 = [=] pre(                // \#1
-    []{
-      bool x = true;
-      return [=]{ return x; }();    // OK, \#1 captures nothing.
-    }()) {};
-
-  bool y = true;
-  auto f7 = [=] pre([=]{ return y; }());    // error: outer capture of \tcode{y} is invalid.
-}
-\end{codeblock}
-\end{example}
-
 
 \pnum
 The closure type for a non-generic \grammarterm{lambda-expression} with no
@@ -2785,15 +2568,11 @@ in its \grammarterm{lambda-introducer}
 unless
 \begin{itemize}
 \item
-its innermost enclosing scope is a block scope\iref{basic.scope.block},
+its innermost enclosing scope is a block scope\iref{basic.scope.block}, or
 \item
 it appears within a default member initializer
 and its innermost enclosing scope is
-the corresponding class scope\iref{basic.scope.class}, or
-\item
-it appears within a contract assertion
-and its innermost enclosing scope
-is the corresponding contract-assertion scope\iref{basic.scope.contract}.
+the corresponding class scope\iref{basic.scope.class}.
 \end{itemize}
 
 \pnum
@@ -3926,60 +3705,6 @@ denoted by the object expression
 of the class member access\iref{expr.ref,basic.life}.
 
 \pnum
-The precondition assertions of a function call are,
-in order:
-\begin{itemize}
-\item
-if the \grammarterm{postfix-expression}
-is a (possibly implicit) class member access expression
-and the call
-is a virtual function call,
-the precondition assertions\iref{dcl.contract.func}
-of the statically chosen function;
-\item
-the precondition assertions
-of the function actually called.
-\end{itemize}
-The postcondition assertions of a function call are,
-in order:
-\begin{itemize}
-\item
-the postcondition assertions
-of the function actually called;
-\item
-if the \grammarterm{postfix-expression}
-is a (possibly implicit) class member access expression
-and the call
-is a virtual function call,
-the postcondition assertions
-of the statically chosen function.
-\end{itemize}
-\begin{example}
-\begin{codeblock}
-struct X1 { virtual void f()         pre(a) post(b) {} };
-struct X2 { virtual void f()         pre(c) post(d) {} };
-struct Y : X1    { void f() override pre(e) post(f) {} };
-struct Z : Y, X2 { void f() override pre(g) post(h) {} };
-
-void t() {
-  Z z;
-  z.f();                        // asserts g, h
-  static_cast<Y*>(&z)->f();     // asserts e, g, h, f
-
-  X1& x1ref = z;
-  X2& x2ref = z;
-  x1ref.f();                    // asserts a, g, h, b
-  x2ref.f();                    // asserts c, g, h, d
-  x1ref.X1::f();                // asserts a, b
-  x1ref.[:^^X1::f:]();          // asserts a, g, h, b
-
-  void (X1::*pmf)() = &X1::f;
-  (x1ref.*pmf)();               // asserts g, h
-}
-\end{codeblock}
-\end{example}
-
-\pnum
 A type $\tcode{T}_\text{call}$ is
 \defn{call-compatible} with a function type $\tcode{T}_\text{func}$
 if $\tcode{T}_\text{call}$ is the same type as $\tcode{T}_\text{func}$ or
@@ -4005,9 +3730,7 @@ and the function types are otherwise the same.
 \indextext{initialization!parameter}%
 When a function is called, each parameter\iref{dcl.fct} is
 initialized\iref{dcl.init,class.copy.ctor} with
-its corresponding argument,
-and each precondition assertion of the function call
-is evaluated\iref{dcl.contract.func}.
+its corresponding argument.
 If the function is an explicit object member function and
 there is an implied object argument\iref{over.call.func},
 the list of provided arguments is preceded by the implied object argument
@@ -4073,15 +3796,6 @@ to hold the values of function parameters\iref{class.temporary},
 the initialization of those temporaries,
 including every associated value computation and side effect,
 is indeterminately sequenced with respect to that of any other parameter.
-These evaluations are
-sequenced before
-the evaluation of the precondition assertions of the function call,
-which are evaluated in sequence\iref{dcl.contract.func}.
-For any temporaries
-introduced to hold the values of function parameters,
-the initialization of the parameter objects from those temporaries
-is indeterminately sequenced with respect to
-the evaluation of each precondition assertion.
 \begin{note}
 All side effects of
 argument evaluations are sequenced before the function is
@@ -4126,18 +3840,6 @@ except in a virtual function call if the return type of the
 final overrider is different from the return type of the statically
 chosen function, the value returned from the final overrider is
 converted to the return type of the statically chosen function.
-
-\pnum
-When the called function exits normally\iref{stmt.return,expr.await},
-all postcondition assertions of the function call
-are evaluated in sequence\iref{dcl.contract.func}.
-If the implementation introduces any temporary objects
-to hold the result value as specified in \ref{class.temporary},
-the evaluation of each postcondition assertion
-is indeterminately sequenced with respect to
-the initialization of any of those temporaries or the result object.
-These evaluations, in turn, are sequenced before
-the destruction of any function parameters.
 
 \pnum
 \begin{note}
@@ -5624,9 +5326,6 @@ An \grammarterm{await-expression} shall not appear in a
 default argument\iref{dcl.fct.default}.
 An \grammarterm{await-expression} shall not appear in the initializer of
 a block variable with static or thread storage duration.
-An \grammarterm{await-expression} shall not be
-a potentially-evaluated subexpression
-of the predicate of a contract assertion\iref{basic.contract}.
 A context within a function where an \grammarterm{await-expression} can appear
 is called a \term{suspension context} of the function.
 
@@ -9347,26 +9046,15 @@ and for each constituent reference of \tcode{x} that refers to an object $o$,
 $o$ is constexpr-referenceable from $P$.
 
 \pnum
-\indextext{contract evaluation semantics!ignore}
 A variable \tcode{v} is \defn{constant-initializable} if
 \begin{itemize}
 \item
 the full-expression of its initialization is a constant expression
-when interpreted as a \grammarterm{constant-expression}
-with all contract assertions
-using the ignore evaluation semantic\iref{basic.contract.eval},
+when interpreted as a \grammarterm{constant-expression},
 \begin{note}
 In the course of this determination,
 \tcode{std::is_constant_evaluated()}\iref{meta.const.eval}
 has the value \keyword{true}.
-\end{note}
-\begin{note}
-Furthermore, if the initialization is manifestly constant-evaluated\iref{expr.const.defns},
-its evaluation during translation
-can still evaluate contract assertions
-with other evaluation semantics,
-resulting in a diagnostic or ill-formed program
-if a contract violation occurs.
 \end{note}
 \item
 immediately after the initializing declaration of \tcode{v},
@@ -9606,15 +9294,6 @@ template<class T>
 constexpr int k(int) {          // \tcode{k<int>} is not an immediate function because \tcode{A(42)} is a
   return A(42).y;               // constant expression and thus not immediate-escalating
 }
-
-constexpr int l(int c) pre(c >= 2) {
-  return (c % 2 == 0) ? c / 0 : c;
-}
-
-const int i0 = l(0);    // dynamic initialization; contract violation or undefined behavior
-const int i1 = l(1);    // static initialization; value of \tcode{1} or contract violation at compile time
-const int i2 = l(2);    // dynamic initialization; undefined behavior
-const int i3 = l(3);    // static initialization; value of \tcode{3}
 \end{codeblock}
 \end{example}
 
@@ -9836,8 +9515,6 @@ has constant initialization\iref{basic.start.static}.
 \begin{footnote}
 Testing this condition
 can involve a notional evaluation of its initializer,
-with evaluations of contract assertions
-using the ignore evaluation semantic\iref{basic.contract.eval},
 as described above.
 \end{footnote}
 \begin{example}
