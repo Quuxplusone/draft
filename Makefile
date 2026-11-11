@@ -28,7 +28,8 @@ all: \
     d3623-valarray.html \
     d3823-remove-keywords.html \
     d3827-remove-replaceable.html \
-    d3940-sender-tag.html
+    d3940-sender-tag.html \
+    d4469-underlying-type.html
 
 %.html: %.bs
 	curl https://www.w3.org/publications/spec-generator/ -F type=bikeshed-spec -F file=@$< -F output=messages

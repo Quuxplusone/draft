@@ -1,0 +1,176 @@
+<pre class='metadata'>
+Title: Better `std::underlying_type` (and LWG4634)
+Shortname: D4469
+Revision: 0
+!Draft Revision: 1
+Audience: WG21
+Status: D
+Group: WG21
+Editor: Arthur O'Dwyer, arthur.j.odwyer@gmail.com
+URL:
+Markup Shorthands: markdown yes, biblio yes, markup yes
+Abstract:
+  There are unfortunate inconsistencies in how core and library clauses handle
+  "underlying type," leading to (1) vendor divergence and (2) difficulties in
+  specifying new features such as [[P3643]] `to_signed`. We propose a small
+  breaking change to make `std::underlying_type_t<T>` always return the underlying
+  type of enums and character types, and to make `std::make_signed_t<T>` always
+  operate in terms of `underlying_type_t` instead of playing by its own rules.
+Date: 2026-11-09
+</pre>
+
+<style>
+body {-moz-hyphens: none; -ms-hyphens: none; -webkit-hyphens: none; hyphens: none;}
+ins  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
+del  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #440000); text-decoration: line-through;}
+good  {color: light-dark(black, #DDDDDD); background-color: light-dark(#CCFFCC, #005500); text-decoration: underline;}
+bad  {color: light-dark(black, #FFCACA); background-color: light-dark(#FFCACA, #550000); text-decoration: underline;}
+table.comparison-table td { padding: 0.5em 1em; text-align: left; }
+table.comparison-table th { padding: 1em 1em; text-align: left; }
+div.smaller { font-size: 80%; }
+div.smaller h3 { margin-top: 1rem; }
+</style>
+
+# Motivation # {#motivation}
+
+`char8_t`’s underlying type is `unsigned char` (<a href="https://eel.is/c++draft/basic.types#basic.fundamental-9.sentence-1">[basic.fundamental]</a>),
+yet `std::underlying_type_t<char8_t>` is ill-formed.
+
+`char32_t`’s underlying type is `uint32_t`. On a 32-bit platform, it is permitted for `uint32_t` to be `unsigned long`.
+Yet on such a platform `make_unsigned_t<char32_t>` will still be `unsigned int`, not `unsigned long`.
+
+A user-hostile implementation might give `long` 32 value bits, and give `int` 16 value bits and 16 padding bits, so that
+`sizeof(int) == sizeof(long)`. Then declare `enum E : long {}` and discover that `make_signed_t<E>` is `int`, not `long`,
+because `make_signed_t` doesn't care about the number of value bits, only the size
+(<a href="https://eel.is/c++draft/meta.trans.sign">[meta.trans.sign]</a>).
+
+For all these reasons but especially the last one, [[P3643]] defines its own helper <i><code>underlying-int-t&lt;T&gt;</code></i>
+and writes
+
+    template<class T>
+      constexpr make_signed_t&lt;underlying-int-t&lt;T>> to_signed(T value) noexcept;
+
+where we would have preferred to see
+
+    template&lt;class T>
+      constexpr make_signed_t&lt;T> to_signed(T value) noexcept;
+
+The first goal of this paper is to bring `make_signed` and `make_unsigned` into harmony with [[P3643]]'s proposed `to_signed` semantics,
+so that `make_signed_t<T>` is always equivalent to `decltype(to_signed(T()))`.
+
+The second goal of this paper is to bring `underlying_type` into harmony with the core language's multiple meanings
+of "underlying type," such that for any type `T`, `underlying_type_t<T>` should return `T`’s underlying type if `T` has one.
+
+## Design considerations ## {#design-considerations}
+
+Q: What if `enum T : char8_t`? Should `underlying_type_t<T>` be `char8_t` or `unsigned char`?
+
+A: For an enum type, usually the goal of `underlying_type_t<T>` is to get down to an integral type we can do math on;
+which suggests we should keep looking through every "layer" until we get to the most fundamental bottom layer. However,
+C++11-to-present has already decided that `underlying_type_t<T>` should be `char8_t`; let's not gratuitously break that
+behavior without a good reason.
+
+Q: Should `make_signed_t<bool>` be defined to `signed char` and `make_unsigned_t<bool>` be defined to `unsigned char`?
+
+A: I think not. `make_signed` and P3643’s proposed `to_signed` both forbid calling them with `bool` (or, since [[LWG4634]],
+enum types with underlying type `bool`).
+
+
+
+(2) While `underlying_type_t<T>` is invariably an integer type
+(<a href="https://eel.is/c++draft/dcl.enum#2.sentence-4">[dcl.enum]</a>), it can be `bool`. `bool` is neither a signed integer type
+nor an unsigned integer type, although `is_unsigned_v<bool>` is `true`. `bool` has no underlying type, although it has a similar special
+relationship to an implementation-defined unsigned integer type (<a href="https://eel.is/c++draft/basic.fundamental#10.sentence-1">[basic.fundamental]</a>).
+Because of (2), our answer to (1) is that `underlying_type_t` should strip just one layer, not all layers.
+
+
+
+| T | Underlying type | std::underlying_type_t<T> | std::make_signed_t<T> | std::make_unsigned_t<T> |
+|---|---|---|---|---|
+| bool | — | — | — | — |
+| char | unsigned char | — | signed char | unsigned char |
+| char8_t | unsigned char | — | signed char | unsigned char |
+
+
+
+<table>
+<tr><th>Type</th><th>Underlying type</th><th>underlying_type_t&lt;T&gt;</th><th>make_signed_t&lt;T&gt;</th></tr>
+<tr><td>char</td>signed char</tr>
+
+# Proposed wording # {#wording}
+
+## [meta.trans.sign] ## {#wording-meta.trans.sign}
+
+Modify the table in <a href="http://eel.is/c++draft/meta.trans.sign">[meta.trans.sign]</a> as follows:
+
+<small><blockquote>
+<p><pre>
+template&lt;class T>
+struct make_signed;
+</pre>
+<p>If `T` is a (possibly _cv_-qualified) signed integer type ([basic.fundamental]) then the member typedef `type` denotes `T`;
+otherwise, if `T` is a (possibly _cv_-qualified) unsigned integer type then `type` denotes the corresponding signed integer type,
+with the same _cv_-qualifiers as `T`; otherwise, `type` denotes the signed integer type with smallest rank ([conv.rank])
+for which `sizeof(T) == sizeof(type)`, with the same _cv_-qualifiers as `T`.
+<p><i>Mandates:</i> `T` is an integral or enumeration type other than _cv_ `bool`.
+<p><pre>
+template&lt;class T>
+struct make_unsigned;
+</pre>
+<p>If `T` is a (possibly _cv_-qualified) unsigned integer type ([basic.fundamental]) then the member typedef `type` denotes `T`;
+otherwise, if `T` is a (possibly cv-qualified) signed integer type then `type` denotes the corresponding unsigned integer type,
+with the same _cv_-qualifiers as `T`; otherwise, `type` denotes the unsigned integer type with smallest rank ([conv.rank])
+for which `sizeof(T) == sizeof(type)`, with the same _cv_-qualifiers as `T`.
+<i>Mandates:</i> `T` is an integral or enumeration type other than _cv_ `bool`.
+</blockquote></small>
+
+## [meta.trans.other] ## {#wording-meta.trans.other}
+
+Modify the table in <a href="http://eel.is/c++draft/meta.trans.other">[meta.trans.other]</a> as follows:
+
+<small><blockquote>
+<p><pre>
+template&lt;class T>
+struct underlying_type;
+</pre>
+<p>If `T` is a<del>n</del> <ins>character or</ins> enumeration type, the member typedef `type` denotes the underlying type of `T` (<ins>[basic.fundamental],</ins> [dcl.enum]);
+otherwise, there is no member `type`.
+<p><i>Mandates:</i> `T` is not an incomplete enumeration type.
+</blockquote></small>
+
+## [utility.underlying] (no change) ## {#wording-utility.underlying}
+
+Don't modify <a href="http://eel.is/c++draft/utility.underlying">[utility.underlying]</a>.
+
+<small><blockquote>
+<p><pre>
+  template&lt;class T>
+    constexpr underlying_type_t&lt;T> to_underlying(T value) noexcept;
+</pre>
+<p>1․ Returns: `static_cast<underlying_type_t<T>>(value)`.
+</blockquote></small>
+
+
+<pre class=biblio>
+{
+  "LWG4634": {
+    "authors": [
+      "Robert Shearer"
+    ],
+    "title": "Underlying bool type in make_signed and make_unsigned",
+    "href": "https://cplusplus.github.io/LWG/issue4634",
+    "date": "October 2026"
+  },
+  "N5013": {
+    "title": "Committee Draft — Programming Languages — C++",
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2025/n5013.pdf",
+    "date": "August 2025"
+  },
+  "P3643": {
+    "title": "std::to_signed and std::to_unsigned",
+    "authors": ["Jan Schultke"],
+    "href": "https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2026/p3643r5.html",
+    "date": "October 2026"
+  },
+}
+</pre>
