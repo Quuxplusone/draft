@@ -2124,7 +2124,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
    <p data-fill-with="logo"></p>
    <h1 class="no-ref p-name" id="title">D2952R5<br>Deduced return types for defaulted operator functions</h1>
    <h2 class="heading no-num no-ref no-toc settled" id="profile-and-date"><span class="content">Draft Proposal,
-    <time class="dt-updated" datetime="2026-11-10">2026-11-10</time></span></h2>
+    <time class="dt-updated" datetime="2026-11-14">2026-11-14</time></span></h2>
    <div data-fill-with="spec-metadata">
     <dl>
      <dt class="editor">Authors:
@@ -2135,7 +2135,7 @@ c-[il] { color: #000000 } /* Literal.Number.Integer.Long */
      <dt>Project:
      <dd>ISO/IEC 14882 Programming Languages — C++, ISO/IEC JTC1/SC22/WG21
      <dt>Draft Revision:
-     <dd>24
+     <dd>25
     </dl>
    </div>
    <div data-fill-with="warning"></div>
@@ -2193,6 +2193,8 @@ This allows more consistency and less repetition when declaring defaulted functi
        <p>Strike R4’s addition of a (wrong) example to [class.spaceship].
  The example demonstrated R3 behavior, not R4 behavior;
  R4 made it simply ill-formed, exactly like the [class.eq] example, so the example was redundant.</p>
+      <li data-md>
+       <p>Update <a href="#deducing-this">§ 3.3 "Deducing this" and CWG2586</a> since P2953 was adopted for C++29.</p>
      </ul>
     <li data-md>
      <p>R4 (pre-Búzios):</p>
@@ -2457,9 +2459,11 @@ assignment where the <em>destination</em> object is explicitly rvalue-ref-qualif
    <p>Nonetheless, a <em>defaulted</em> assignment operator always returns an lvalue reference
 (<a href="https://eel.is/c++draft/class.copy.assign#6.sentence-1">[class.copy.assign]/6</a>,
 <a href="https://eel.is/c++draft/dcl.fct.def.default#2.5">[dcl.fct.def.default]/2.5</a>),
-regardless of whether it’s declared using explicit object syntax.</p>
+regardless of whether it’s declared using explicit object syntax.
+In fact, C++29 has adopted our <a data-link-type="biblio" href="#biblio-p2953" title="Adding restrictions to defaulted assignment operator functions">[P2953]</a>, which forbids them entirely.
+So P2952 doesn’t need to treat them specially at all.</p>
 <pre class="highlight language-cpp"><c- k>struct</c-> <c- nc>A</c-> <c- p>{</c->
-  <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK today</c->
+  <c- n>A</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed since P2953</c->
   <c- n>A</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed, return type isn't A&amp;</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- p>{</c-> <c- k>return</c-> <c- o>*</c-><c- k>this</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK, deduces A&amp;</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>const</c-> <c- n>A</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>&amp;&amp;</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed since P2953; would have deduced A&amp;</c->
@@ -2469,15 +2473,11 @@ regardless of whether it’s declared using explicit object syntax.</p>
   <c- n>B</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK</c->
   <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- p>{</c-> <c- k>return</c-> <c- n>self</c-><c- p>;</c-> <c- p>}</c-> <c- c1>// OK, deduces B&amp;&amp;</c->
   <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK</c->
-  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// OK</c->
+  <c- n>B</c-><c- o>&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed since P2953</c->
   <c- n>B</c-><c- o>&amp;&amp;</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed, return type isn't B&amp;</c->
-  <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Proposed OK, deduces B&amp;</c->
+  <c- k>decltype</c-><c- p>(</c-><c- k>auto</c-><c- p>)</c-> <c- k>operator</c-><c- o>=</c-><c- p>(</c-><c- k>this</c-> <c- n>B</c-><c- o>&amp;&amp;</c-> <c- n>self</c-><c- p>,</c-> <c- k>const</c-> <c- n>B</c-><c- o>&amp;</c-><c- p>)</c-> <c- o>=</c-> <c- k>default</c-><c- p>;</c-> <c- c1>// Ill-formed since P2953; would have deduced B&amp;</c->
 <c- p>};</c->
 </pre>
-   <p>Defaulted rvalue-ref-qualified assignment operators are weird; C++29 has adopted our <a data-link-type="biblio" href="#biblio-p2953" title="Adding restrictions to defaulted assignment operator functions">[P2953]</a>
-which forbids them entirely. Either way, P2952 doesn’t need to treat them specially.
-Defaulted assignment operators invariably return lvalue references, so we invariably deduce as-if-from
-an lvalue reference, full stop.</p>
    <h3 class="heading settled" data-level="3.4" id="new-burden"><span class="secno">3.4. </span><span class="content">Burden on specifying new defaultable operators</span><a class="self-link" href="#new-burden"></a></h3>
    <p>We propose to leave <a href="https://eel.is/c++draft/dcl.fct.def.default">[dcl.fct.def.default]</a> alone
 and reinterpret its term "return type" to mean the actual return type, not the declared return type.
