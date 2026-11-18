@@ -202,42 +202,6 @@ auto n = decltype(a)::b;        // IFNDR, more than one unnamed enum definition 
 \end{codeblocktu}
 \end{example}
 
-\ifndrdescription{basic.contract.vastart.contract.predicate}
-
-\pnum
-The use of \tcode{va_start}\iref{cstdarg.syn}
-within the predicate of a contract assertion
-is ill-formed, no diagnostic required.
-
-\pnum
-\begin{example}
-\begin{codeblock}
-void f(...)
-{
-  va_list args;
-  contract_assert((va_start(const_cast<decltype(args)>(args)), true))   // IFNDR
-}
-\end{codeblock}
-\end{example}
-
-\ifndrdescription{basic.contract.handler.replacing.nonreplaceable}
-
-\pnum
-On platforms where
-the contract-violation handler
-is not replaceable\iref{dcl.fct.def.replace}
-a function declaration which could be such a replacement function
-is ill-formed, no diagnostic required.
-
-\pnum
-\begin{example}
-\begin{codeblock}
-#include <contracts>
-void handle_contract_violation(const std::contracts::contract_violation& violation);
-    // IFNDR, if contract-violation handler is not replaceable
-\end{codeblock}
-\end{example}
-
 \ifndrdescription{class.member.lookup.name.refers.diff.decl}
 
 \pnum
@@ -397,28 +361,6 @@ inline int f(int x = 3, int y = 4);
 \end{codeblocktu}
 \end{example}
 
-\ifndrdescription{dcl.contract.func.mismatched.contract.specifiers}
-
-\pnum
-If two different first declarations of a function
-(which must therefore not be reachable from one another)
-do not have equivalent function contract specifiers
-the program is ill-formed, no diagnostic required.
-
-\pnum
-\begin{example}
-\begin{codeblocktu}{Translation unit \#1}
-int f(int x) pre(x >= 0);       // IFNDR, \tcode{pre} present, not present in the other first declaration of \tcode{f}
-int g(int x) pre(x == 0);       // IFNDR, \tcode{pre} differs from the other first declaration of \tcode{g}
-int h(int x) pre(x <= 0);       // OK, \tcode{pre} equivalent to \tcode{pre} on the other first declaration of \tcode{h}
-\end{codeblocktu}
-\begin{codeblocktu}{Translation unit \#2}
-int f(int x);                   // IFNDR, \tcode{pre} not present, present in the other first declaration of \tcode{f}
-int g(int x) pre(x != 0);       // IFNDR, \tcode{pre} differs from the other first declaration of \tcode{g}
-int h(int y) pre(y <= 0);       // OK, \tcode{pre} equivalent to \tcode{pre} on the other first declaration of \tcode{h}
-\end{codeblocktu}
-\end{example}
-
 \ifndrdescription{dcl.fct.def.replace.bad.replacement}
 
 \pnum
@@ -434,11 +376,6 @@ then the program is ill-formed, no diagnostic required.
 \pnum
 \begin{example}
 \begin{codeblock}
-extern "C"  // IFNDR, wrong language linkage
-inline      // IFNDR, inline
-int         // IFNDR, wrong return type
-handle_contract_violation(const std::contracts::contract_violation&) {}
-
 void* operator new(decltype(sizeof(0))) noexcept;   // IFNDR, mismatched exception specification to
                                                     // declaration in \tcode{<new>}
 \end{codeblock}
