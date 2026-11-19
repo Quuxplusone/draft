@@ -2,7 +2,7 @@
 Title: Deduced return types for defaulted operator functions
 Shortname: D2952
 Revision: 5
-!Draft Revision: 26
+!Draft Revision: 27
 Audience: CWG
 Status: D
 Group: WG21
@@ -15,7 +15,7 @@ Abstract:
   except for C++20's <code>operator&lt;=&gt;</code>. We remove this syntactic restriction
   in cases where the deduced return type would be the same as the expected one.
   This allows more consistency and less repetition when declaring defaulted functions.
-Date: 2026-11-15
+Date: 2026-11-19
 </pre>
 
 <style>
@@ -502,8 +502,7 @@ The new example is modeled on <a href="https://eel.is/c++draft/dcl.spec.auto.gen
 <p>Modify <a href="https://eel.is/c++draft/class.eq">[class.eq]</a> as follows:</p>
 
 <small><blockquote>
-<p>1․ A defaulted <del>equality</del> <ins>`==`</ins> operator function ([over.binary]) shall have <del>a declared</del> <ins>the</ins> return type `bool`.
-<ins>If its declared return type contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
+<p>1. <del>A</del><ins>If the declared return type of a</ins>defaulted <del>equality</del> <ins>`==`</ins> operator function ([over.binary]) <ins>contains a placeholder type, its return type is deduced as if from `return true;`. A defaulted `==` operator function</ins> shall have <del>a declared</del> <ins>the</ins> return type `bool`.
 
 <p>2․ A defaulted `==` operator function for a class `C` is defined as deleted unless, for each `x`<sub><i>i</i></sub>
 in the expanded list of subobjects for an object `x` of type `C`, `x`<sub><i>i</i></sub> `== x`<sub><i>i</i></sub> is usable
@@ -567,20 +566,19 @@ of `R`<sub>0</sub>, `R`<sub>1</sub>, ..., `R`<sub><i>n</i>&minus;1</sub>. Otherw
 return type is deduced as <ins>if from `return Q(std::strong_ordering::equal);`</ins> <del>the
 common comparison type (see below) of `R`<sub>0</sub>, `R`<sub>1</sub>, ..., `R`<sub>n-1</sub></del>.
 
-<p><ins>x․</ins> <del>— (2.2) Otherwise, `R` shall not contain a placeholder type.</del> If the synthesized three-way comparison of type `R`
+<p><ins>x. Let `S` be the (possibly deduced) return type of the defaulted three-way comparison operator function. `S` shall be a comparison category type ([cmp.categories.pre]).</ins></p>
+
+<p><ins>x․</ins> <del>— (2.2) Otherwise, `R` shall not contain a placeholder type.</del> If the synthesized three-way comparison of type <del>`R`</del><ins>`S`</ins>
 between any objects `x`<sub><i>i</i></sub> and `x`<sub><i>i</i></sub> is not defined, the operator function is
 defined as deleted.</p>
 
-<p><ins>x․ A defaulted three-way comparison operator function shall have a return type that is a comparison category type
-([cmp.categories.pre]).</ins>
-
-3․ The return value of type `R` of the defaulted three-way comparison operator function with parameters `x` and `y` <del>of
+3․ The return value <del>of type `R`</del> of the defaulted three-way comparison operator function with parameters `x` and `y` <del>of
 the same type</del> is determined by comparing corresponding elements `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub>
 in the expanded lists of subobjects for `x` and `y` (in increasing index order) until the first index <i>i</i>
-where the synthesized three-way comparison of type `R` between `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub>
+where the synthesized three-way comparison of type <del>`R`</del><ins>`S`</ins> between `x`<sub><i>i</i></sub> and `y`<sub><i>i</i></sub>
 yields a result value `v`<sub><i>i</i></sub> where `v`<sub><i>i</i></sub> `!= 0`, contextually converted to `bool`,
 yields `true`. The return value is <del>a copy of</del> `v`<sub><i>i</i></sub> if such an index exists
-and `static_cast<R>(std::strong_ordering::equal)` otherwise.
+and <code>static_cast&lt;<del>R</del><ins>S</ins>&gt;(std::strong_ordering::equal)</code> otherwise.
 
 4․ The <i>common comparison type</i> `U` of a possibly-empty list of <i>n</i> comparison category types
 `T`<sub>0</sub>, `T`<sub>1</sub>, ..., `T`<sub>n-1</sub> is defined as follows: [...]
@@ -594,8 +592,8 @@ Modify <a href="https://eel.is/c++draft/class.compare.secondary">[class.compare.
 <p>1․ A <i>secondary comparison operator</i> <ins>`@`</ins> is a relational operator ([expr.rel]) or the `!=` operator. <del>A
 defaulted operator function ([over.binary]) for a secondary comparison operator `@` shall have a declared return type `bool`.</del>
 
-<p><ins>x․ A defaulted secondary comparison operator function shall have the return type `bool`. If its declared return type
-contains a placeholder type, its return type is deduced as if from `return true;`.</ins>
+<p><ins>x. If the declared return type of a defaulted secondary comparison operator function contains a placeholder type, its return type is deduced
+as if from `return true;`. A defaulted secondary comparison operator function shall have the return type `bool`.</ins></p>
 
 2․ <del>The</del> <ins>A defaulted secondary comparison</ins> operator function with parameters `x` and `y` is defined as deleted if
 
@@ -637,7 +635,7 @@ will deduce that same type. (If it deduces a different type, then the explicitly
 becomes ill-formed, as in example `B` below.)
 
 <p class="note"><b>DRAFTING NOTE:</b>
-We deduce from "an lvalue reference to `X`"
+We deduce from "an lvalue of type `X`"
 to ensure that `decltype(auto) operator=(const X&) = default;` deduces `X&`, not `X`.
 
 <p>Modify <a href="https://eel.is/c++draft/class.copy.assign">[class.copy.assign]</a> as follows:</p>
@@ -648,8 +646,8 @@ the object for which the assignment operator is invoked, that is,
 the object assigned to.
 
 <p><ins>15․ If the declared return type of a defaulted copy/move assignment operator for a class `X` contains a
-placeholder type, the return type is deduced as if from `return r;`, where `r` is an lvalue
-reference to `X`.</ins>
+placeholder type, the return type is deduced as if from <code>return <i>r</i>;</code>, where <code><i>r</i></code> is an lvalue
+of type `X`.</ins>
 
 <p><ins>16․ \[<i>Example:</i></ins>
 <pre>
@@ -669,7 +667,7 @@ reference to `X`.</ins>
 ## [over.inc.default] ## {#wording-over.inc.default}
 
 <p class="note"><b>DRAFTING NOTE:</b>
-We deduce from "a prvalue expression of type `C`"
+We deduce from "a prvalue of type `C`"
 (rather than merely "an lvalue reference to `C`" or "a move-eligible rvalue reference to `C`")
 to ensure that `decltype(auto) operator++(int) = default;` deduces a non-reference type.
 Such code is contrived, but should do the Right Thing rather than the Wrong Thing if we can help it.
@@ -677,7 +675,11 @@ Such code is contrived, but should do the Right Thing rather than the Wrong Thin
 <p>Modify <a href=https://eel.is/c++draft/over.inc.default>[over.inc.default]</a> as follows:</p>
 
 <small><blockquote>
-<p>1․ A defaulted postfix increment or decrement operator function for a type `C` shall be a non-template function that
+<p><ins>x․ If the declared return type of a defaulted postfix increment or decrement operator
+for a type `C` contains a placeholder type, the return type is deduced as if from <code>return <i>r</i>;</code>,
+where <code><i>r</i></code> is a prvalue of type `C`.</ins></p>
+
+<p>1․ A defaulted postfix increment or decrement operator function for <del>a type</del> `C` shall be a non-template function that
 <p> — (1.1) has a first parameter of type “reference to `C`” or a first parameter of type “reference to volatile `C`”,
 where the implicit object parameter (if any) is considered to be the first parameter,
 <p> — (1.2) is defined as defaulted in `C` or in a context where `C` is complete, and
@@ -696,10 +698,6 @@ S operator++(S&, int) = default;  // error: S is not complete
 </pre>
 — <i>end example</i>]
 
-<p><ins>x․ If the declared return type of a defaulted postfix increment or decrement operator
-for a class `C` contains a placeholder type, the return type is deduced as if from `return r;`,
-where `r` is a prvalue expression of type `C`.</ins>
-
 <p>2․ A defaulted postfix increment or decrement operator function for a type `C` is defined as deleted if [...]
 </blockquote></small>
 
@@ -710,8 +708,8 @@ Add a clause to Annex C, <a href="https://eel.is/c++draft/diff.cpp26">[diff.cpp2
 <blockquote>
 <ins>
 <b>Affected clause:</b> [class.spaceship]<br>
-<b>Change:</b> The defaulted three-way comparison operator of an empty class type must return a
-comparison category type.<br>
+<b>Change:</b> It is invalid for a defaulted three-way comparison operator of an empty class type to return a
+type other than a comparison category type.<br>
 <b>Rationale:</b> Consistency with the existing restriction on defaulted three-way comparison operators of non-empty class types.<br>
 <b>Effect on original feature:</b> A valid C++26 program that contains a defaulted three-way comparison operator
 with a return type that is not a comparison category type is ill-formed.<br>
